@@ -12,15 +12,19 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from mcp.server.fastmcp import Context, FastMCP
-from sentinel import CommandExecutor
+from sentinel.command_executor import CommandExecutor
 
 # Setup logging
 SCRIPT_DIR = Path(__file__).resolve().parent
+# Ensure the logs directory exists
+log_dir = SCRIPT_DIR / ".logs"
+log_dir.mkdir(exist_ok=True)
+
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join(SCRIPT_DIR, "logs", "sentinel.log")),
+        logging.FileHandler(os.path.join(SCRIPT_DIR, ".logs", "sentinel.log")),
         logging.StreamHandler(),
     ],
 )
@@ -59,27 +63,15 @@ LINUX_ALLOWED_COMMANDS = ["ls", "pwd", "echo"]
 WINDOWS_ALLOWED_COMMANDS = ["dir", "echo"]
 
 
-@mcp.tool(
-    arguments=[
-        {
-            "name": "command",
-            "type": "string",
-            "description": "The command to execute (e.g., ls, dir, echo, pwd)",
-            "required": True,
-        }
-    ]
-)
+@mcp.tool()
 async def execute_command(ctx: Context, command: str) -> Dict[str, Any]:
     """Execute allowed system commands"""
     return ctx.request_context.lifespan_context.cmd_executor.execute(command)
 
 
 if __name__ == "__main__":
-    # Ensure the logs directory exists
-    log_dir = SCRIPT_DIR / "logs"
-    log_dir.mkdir(exist_ok=True)
-
     # Start the server
     import uvicorn
 
+    print("Starting Sentinel server...")  # Add a log message for clarity
     uvicorn.run(mcp.app, host="0.0.0.0", port=8000)

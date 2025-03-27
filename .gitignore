@@ -44,6 +44,9 @@ htmlcov/
 .tox/
 .nox/
 
+# Logs
+.logs/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

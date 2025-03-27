@@ -25,10 +25,11 @@ source ./venv/bin/activate
 
 ```bash
 pip install -r sentinel/requirements.txt
+pip install uv # for mcp server
 ```
 
 > **Note for Windows Users:**
-> If you encounter an error like: "Microsoft Visual C++ 14.0 or greater is required", 
+> If you encounter an error like: "Microsoft Visual C++ 14.0 or greater is required",
 > install the Microsoft C++ Build Tools from:
 > https://visualstudio.microsoft.com/visual-cpp-build-tools/
 
