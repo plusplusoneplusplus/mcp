@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import shutil
 from datetime import datetime
-
+import socket
 
 class BrowserUtils:
     @staticmethod
@@ -49,11 +49,20 @@ class BrowserUtils:
             chrome_options.add_argument("--headless")  # Run in headless mode if needed
 
         # Set up Chrome driver to use Windows Chrome from WSL
-        driver_path = subprocess.getoutput("which chromedriver").strip()
+        if os.name == "nt":  # Windows
+            driver_path = subprocess.getoutput("where chromedriver").strip()
+        else:  # Linux/Unix
+            driver_path = subprocess.getoutput("which chromedriver").strip()
         service = Service(driver_path)
 
-        # Set up remote debugging port for WSL
-        chrome_options.add_argument("--remote-debugging-port=9222")
+        # Use a dynamic port for remote debugging to avoid conflicts
+        def find_free_port():
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', 0))
+                return s.getsockname()[1]
+                
+        debug_port = find_free_port()
+        chrome_options.add_argument(f"--remote-debugging-port={debug_port}")
 
         try:
             driver = webdriver.Chrome(service=service, options=chrome_options)

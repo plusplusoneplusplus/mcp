@@ -98,7 +98,7 @@ class TestLinuxCommands:
         """Test timeout functionality"""
         logging.info("Starting timeout test")
         # Sleep command should timeout
-        result = executor.execute("sleep 10", timeout=0.5)
+        result = executor.execute("sleep 2", timeout=0.5)
         logging.info(f"Result: {result}")
         assert not result["success"], "Command should have failed due to timeout"
         assert (
@@ -136,7 +136,7 @@ class TestWindowsCommands:
 
     def test_type_command(self, executor, test_file):
         """Test type command on Windows"""
-        result = executor.execute(f"type {test_file}")
+        result = executor.execute(f'type "{test_file}"')
         assert result[
             "success"
         ], f"Command failed with error: {result.get('error', 'Unknown error')}"
@@ -154,7 +154,8 @@ class TestWindowsCommands:
 
     def test_timeout(self, executor):
         """Test timeout functionality"""
-        result = executor.execute("timeout 10", timeout=0.5)
+        # why cmd /c?  see https://stackoverflow.com/questions/74842935/powershell-batch-script-timeout-error-input-redirection-is-not-supported-exiti
+        result = executor.execute("cmd /c start /min timeout.exe 2", timeout=0.5)
         assert not result["success"]
         assert "timed out" in result["error"]
 
@@ -167,7 +168,7 @@ class TestCrossPlatformFeatures:
         """Test process information retrieval"""
         # Start a long-running command
         if platform.system().lower() == "windows":
-            cmd = "timeout 5"
+            cmd = "cmd /c start /min timeout.exe 2"
         else:
             cmd = "sleep 5"
 
