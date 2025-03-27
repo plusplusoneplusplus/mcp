@@ -71,3 +71,17 @@ pip install -e ./sentinel
 # Run all tests
 .\sentinel\run_tests.ps1
 ```
+
+# Config MCP server as part of cursor/vscode
+```json
+{
+    "mcpServers": {
+      "mymcp": {
+        "command": "mcp\\venv\\scripts\\python",
+        "args": ["-m", "uv", "run", "--with", "mcp", "mcp", "run", "mcp\\main.py"]
+      }
+    }
+  }
+```
+
+![MCP Server Configuration](assets/mcp-server.png)
