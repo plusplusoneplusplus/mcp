@@ -12,39 +12,44 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from mcp.server.fastmcp import Context, FastMCP
-
-from command_executor import CommandExecutor
+from sentinel import CommandExecutor
 
 # Setup logging
+SCRIPT_DIR = Path(__file__).resolve().parent
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(SCRIPT_DIR, "logs", "sentinel.log")),
+        logging.StreamHandler(),
+    ],
 )
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class AppContext:
     collection: Collection
     cmd_executor: CommandExecutor
 
+
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Manage application lifecycle with type-safe context"""
 
     # Setup vector database
-    db = chromadb.PersistentClient(path="./.vectordb")
+    db_path = SCRIPT_DIR / ".vectordb"
+    db = chromadb.PersistentClient(path=str(db_path))
     collection = db.get_or_create_collection(name="sentinel_collection")
 
     # Setup command executor
     cmd_executor = CommandExecutor()
 
     try:
-        yield AppContext(
-            collection=collection,
-            cmd_executor=cmd_executor
-        )
+        yield AppContext(collection=collection, cmd_executor=cmd_executor)
     finally:
         pass
+
 
 # Pass lifespan to server
 mcp = FastMCP("Sentinel", lifespan=app_lifespan)
@@ -53,16 +58,28 @@ mcp = FastMCP("Sentinel", lifespan=app_lifespan)
 LINUX_ALLOWED_COMMANDS = ["ls", "pwd", "echo"]
 WINDOWS_ALLOWED_COMMANDS = ["dir", "echo"]
 
+
 @mcp.tool(
     arguments=[
         {
             "name": "command",
             "type": "string",
             "description": "The command to execute (e.g., ls, dir, echo, pwd)",
-            "required": True
+            "required": True,
         }
     ]
 )
 async def execute_command(ctx: Context, command: str) -> Dict[str, Any]:
     """Execute allowed system commands"""
     return ctx.request_context.lifespan_context.cmd_executor.execute(command)
+
+
+if __name__ == "__main__":
+    # Ensure the logs directory exists
+    log_dir = SCRIPT_DIR / "logs"
+    log_dir.mkdir(exist_ok=True)
+
+    # Start the server
+    import uvicorn
+
+    uvicorn.run(mcp.app, host="0.0.0.0", port=8000)

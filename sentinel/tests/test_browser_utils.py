@@ -5,12 +5,7 @@ from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 
-# Add the project root to Python path
-project_root = str(Path(__file__).parent.parent)
-if project_root not in sys.path:
-    sys.path.append(project_root)
-
-from src.browser_utils import BrowserUtils
+from sentinel.browser_utils import BrowserUtils
 
 
 def test_get_windows_chrome_path():
@@ -42,7 +37,7 @@ def test_get_page_html():
     """Test fetching HTML content from a test URL"""
     test_url = "https://www.google.com"
     try:
-        html_content = BrowserUtils.get_page_html(test_url, wait_time=5)
+        html_content = BrowserUtils.get_page_html(test_url, wait_time=2)
         assert html_content is not None
         assert isinstance(html_content, str)
         assert len(html_content) > 0
