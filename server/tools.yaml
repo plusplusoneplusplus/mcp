@@ -1,0 +1,37 @@
+tools:
+  execute_command:
+    name: execute_command
+    description: Execute allowed system commands
+    inputSchema:
+      type: object
+      properties:
+        command:
+          type: string
+          description: The command to execute
+      required:
+        - command
+
+  list_prompts:
+    name: list_prompts
+    description: List all available prompts
+    inputSchema:
+      type: object
+      properties: {}
+      required: []
+
+  get_prompt:
+    name: get_prompt
+    description: Get a specific prompt with its messages
+    inputSchema:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the prompt to retrieve
+        arguments:
+          type: object
+          description: Arguments to format the prompt template
+          additionalProperties:
+            type: string
+      required:
+        - name 

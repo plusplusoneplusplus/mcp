@@ -1,6 +1,7 @@
 # Core dependencies
 mcp>=0.1.0  # Model Context Protocol Python SDK
 chromadb>=0.4.22  # Vector database for semantic search
+pyyaml>=6.0.1  # YAML parser
 
 # Testing
 pytest>=7.4.0

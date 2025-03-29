@@ -1,0 +1,12 @@
+prompts:
+  git-commit:
+    name: git-commit
+    description: Generate a Git commit message
+    arguments:
+      - name: changes
+        description: Git diff or description of changes
+        required: true
+    template: |
+      Generate a concise but descriptive commit message for these changes:
+
+      {changes}
