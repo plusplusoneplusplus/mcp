@@ -58,6 +58,8 @@ PROMPTS = {
     ),
 }
 
+server = Server("mymcp")
+
 async def start_server() -> None:
     # Setup logging
     SCRIPT_DIR = Path(__file__).resolve().parent
@@ -74,8 +76,6 @@ async def start_server() -> None:
         ],
     )
     logger = logging.getLogger(__name__)
-
-    server = Server("mymcp")
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
@@ -104,6 +104,24 @@ async def start_server() -> None:
     async def list_prompts() -> list[Prompt]:
         return list(PROMPTS.values())
 
+    @server.get_prompt()
+    async def get_prompt(name: str, arguments: dict) -> GetPromptResult:
+        if name not in PROMPTS:
+            raise ValueError(f"Prompt not found: {name}")
+
+        if name == "add-or-update-dc":
+            dc_name = arguments.get("dc_name") if arguments else ""
+            return GetPromptResult(
+                messages=[
+                    PromptMessage(
+                        role="user",
+                        content=TextContent(
+                            type="text",
+                            text=f"Create a {{dc_name}}.json file for the dc_name: {dc_name}"
+                        )
+                    )
+                ]
+            )
 
     options = server.create_initialization_options()
     # Add prompt capabilities

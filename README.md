@@ -78,7 +78,11 @@ pip install -e ./sentinel
     "mcpServers": {
       "mymcp": {
         "command": "mcp\\venv\\scripts\\python",
-        "args": ["-m", "uv", "run", "--with", "mcp", "mcp", "run", "mcp\\main.py"]
+        "args": ["mcp\\server\\main.py"]
+      },
+      "fastmcp" : {
+        "command": "mcp\\venv\\scripts\\python",
+        "args": ["-m", "uv", "run", "--with", "mcp", "mcp", "run", "mcp\\server\\fast-main.py"]
       }
     }
   }

@@ -1,1 +1,1 @@
-mcp dev main.py
+mcp dev server/main.py
