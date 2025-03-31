@@ -1,7 +1,8 @@
 tools:
   execute_command:
+    enabled: false
     name: execute_command
-    description: Execute allowed system commands
+    description: Execute a command
     inputSchema:
       type: object
       properties:
@@ -11,27 +12,24 @@ tools:
       required:
         - command
 
-  list_prompts:
-    name: list_prompts
-    description: List all available prompts
+  list_instructions:
+    enabled: true
+    name: list_instructions
+    description: List all available instructions
     inputSchema:
       type: object
       properties: {}
       required: []
 
-  get_prompt:
-    name: get_prompt
-    description: Get a specific prompt with its messages
+  get_instruction:
+    enabled: true
+    name: get_instruction
+    description: Get a specific instruction with its details
     inputSchema:
       type: object
       properties:
         name:
           type: string
-          description: Name of the prompt to retrieve
-        arguments:
-          type: object
-          description: Arguments to format the prompt template
-          additionalProperties:
-            type: string
+          description: Name of the instruction to retrieve
       required:
         - name 

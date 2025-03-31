@@ -13,8 +13,6 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-from sentinel.command_executor import CommandExecutor
-
 import logging
 from pathlib import Path
 from typing import Sequence
@@ -37,26 +35,9 @@ from mcp.types import (
 from enum import Enum
 from pydantic import BaseModel
 
-class ExecuteCommandInput(BaseModel):
-    command: str
-
-class UpdateDcCommandInput(BaseModel):
-    dc_name: str
-
-# Define available prompts
-PROMPTS = {
-    "add-or-update-dc": Prompt(
-        name="add-or-update-dc",
-        description="Add a new DC or Update an existing DC",
-        arguments=[
-            PromptArgument(
-                name="dc_name",
-                description="The name of the DC to add or update",
-                required=True
-            )
-        ],
-    ),
-}
+# Import tools and prompts directly since they're in the same directory
+import tools
+import prompts
 
 server = Server("mymcp")
 
@@ -79,49 +60,11 @@ async def start_server() -> None:
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
-        return [
-            Tool(
-                name="execute_command",
-                description="Execute a command",
-                inputSchema=ExecuteCommandInput.model_json_schema(),
-            )
-        ]
+        return tools.get_tools()
 
     @server.call_tool()
-    async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-        match name:
-            case "execute_command":
-                result = await execute_command(arguments)
-                return [TextContent(
-                    type="text",
-                    text=f"Command result:\n{result}"
-                )]
-
-            case _:
-                raise ValueError(f"Unknown tool: {name}")
-
-    @server.list_prompts()
-    async def list_prompts() -> list[Prompt]:
-        return list(PROMPTS.values())
-
-    @server.get_prompt()
-    async def get_prompt(name: str, arguments: dict) -> GetPromptResult:
-        if name not in PROMPTS:
-            raise ValueError(f"Prompt not found: {name}")
-
-        if name == "add-or-update-dc":
-            dc_name = arguments.get("dc_name") if arguments else ""
-            return GetPromptResult(
-                messages=[
-                    PromptMessage(
-                        role="user",
-                        content=TextContent(
-                            type="text",
-                            text=f"Create a {{dc_name}}.json file for the dc_name: {dc_name}"
-                        )
-                    )
-                ]
-            )
+    async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
+        return await tools.call_tool(name, arguments)
 
     options = server.create_initialization_options()
     # Add prompt capabilities
