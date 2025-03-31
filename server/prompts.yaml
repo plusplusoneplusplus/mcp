@@ -1,5 +1,6 @@
 prompts:
   git-commit:
+    enabled: true
     name: git-commit
     description: Generate a Git commit message
     arguments:
@@ -12,6 +13,7 @@ prompts:
       {changes}
   
   add-or-update-dc:
+    enabled: true
     name: add-or-update-dc
     description: Add a new DC or Update an existing DC
     arguments:

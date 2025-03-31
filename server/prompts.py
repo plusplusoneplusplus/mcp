@@ -16,7 +16,10 @@ def load_prompts_from_yaml() -> dict:
     with open(yaml_path, 'r') as file:
         yaml_data = yaml.safe_load(file)
     
-    return yaml_data.get('prompts', {})
+    prompts = yaml_data.get('prompts', {})
+    # Filter out disabled prompts
+    prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
+    return prompts
 
 def convert_yaml_to_prompts(yaml_prompts: dict) -> dict:
     """Convert YAML prompt definitions to Prompt objects."""
