@@ -1,4 +1,5 @@
 tools:
+  # Regular tools
   execute_command:
     enabled: false
     name: execute_command
@@ -32,4 +33,26 @@ tools:
           type: string
           description: Name of the instruction to retrieve
       required:
-        - name 
+        - name
+
+  # Script-based tools examples
+  deploy:
+    enabled: true
+    name: deploy
+    description: Deploy the application
+    type: script
+    script: powershell -file {pwd}/test_deploy.ps1
+    inputSchema:
+      type: object
+      properties:
+        environment:
+          type: string
+          description: Deployment environment
+          enum: ["dev", "staging", "prod"]
+        force:
+          type: boolean
+          description: Force deployment even if version exists
+          default: false
+      required:
+        - environment
+        - version 

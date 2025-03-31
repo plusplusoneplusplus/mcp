@@ -8,6 +8,7 @@ from mcp.types import TextContent, Tool
 from sentinel.command_executor import CommandExecutor
 
 executor = CommandExecutor()
+pwd = Path(__file__).resolve().parent
 
 class ExecuteCommandInput(BaseModel):
     command: str
@@ -17,17 +18,16 @@ class UpdateDcCommandInput(BaseModel):
 
 class ToolExecutor:
     """Base class for all tool executors."""
-    tool_name: ClassVar[str] = ""
-    tool_description: ClassVar[str] = ""
-    input_schema: ClassVar[dict] = {}
-    
-    @classmethod
-    def get_tool_definition(cls) -> Tool:
+    tool_name: str = ""
+    tool_description: str = ""
+    input_schema: dict = {}
+
+    def get_tool_definition(self) -> Tool:
         """Get the tool definition."""
         return Tool(
-            name=cls.tool_name,
-            description=cls.tool_description,
-            inputSchema=cls.input_schema
+            name=self.tool_name,
+            description=self.tool_description,
+            inputSchema=self.input_schema
         )
     
     async def execute(self, arguments: dict) -> list[TextContent]:
@@ -44,7 +44,7 @@ class ExecuteCommandTool(ToolExecutor):
         """Execute a command and return the result."""
         command = arguments.get('command', '')
         print(f"Executing command: {command}")
-        result = executor.execute_command(command)
+        result = executor.execute(command)
         return [TextContent(
             type="text",
             text=f"Command result:\n{result}"
@@ -54,11 +54,7 @@ class ListInstructionsTool(ToolExecutor):
     """Tool to list all available instructions."""
     tool_name = "list_instructions"
     tool_description = "List all available instructions"
-    input_schema = {
-        "type": "object",
-        "properties": {},
-        "required": []
-    }
+    input_schema = {}
     
     async def execute(self, arguments: dict) -> list[TextContent]:
         """List all available instructions."""
@@ -76,16 +72,7 @@ class GetInstructionTool(ToolExecutor):
     """Tool to get a specific instruction with its details."""
     tool_name = "get_instruction"
     tool_description = "Get a specific instruction with its details"
-    input_schema = {
-        "type": "object",
-        "properties": {
-            "name": {
-                "type": "string",
-                "description": "Name of the instruction to retrieve"
-            }
-        },
-        "required": ["name"]
-    }
+    input_schema = {}
     
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Get a specific instruction with its details."""
@@ -119,9 +106,59 @@ class GetInstructionTool(ToolExecutor):
             text=f"Instruction: {instruction_data.get('name')}\nDescription: {instruction_data.get('description')}{args_desc}{template}"
         )]
 
+class ScriptTool(ToolExecutor):
+    """Tool to execute scripts defined in YAML."""
+    input_schema = {
+        "type": "object",
+        "properties": {},
+        "required": []
+    }
+
+    def __init__(self, name: str, description: str, script_path: str, input_schema: dict):
+        self.tool_name = name
+        self.tool_description = description
+        self.script_path = script_path
+        self.input_schema = input_schema
+    
+    @classmethod
+    def from_yaml(cls, name: str, tool_data: dict) -> 'ScriptTool':
+        """Create a ScriptTool instance from YAML data."""
+        return cls(
+            name=name,
+            description=tool_data.get('description', ''),
+            script_path=tool_data.get('script', ''),
+            input_schema=tool_data.get('inputSchema', {})
+        )
+    
+    async def execute(self, arguments: dict) -> list[TextContent]:
+        """Execute the script with the provided arguments."""
+        defaultparams = {"pwd": pwd}
+        script_path = self.script_path.format(**defaultparams)
+        script_path = Path(script_path)
+        
+        # Build command with arguments
+        command = [str(script_path)]
+        for arg_name, arg_value in arguments.items():
+            command.extend([f"--{arg_name}", str(arg_value)])
+        
+        print(f"Executing script: {' '.join(command)}")
+        result = executor.execute(' '.join(command))
+        return [TextContent(
+            type="text",
+            text=f"Script result:\n{result}"
+        )]
+
 def load_tools_from_yaml() -> Dict[str, Dict[str, Any]]:
     """Load tools from the tools.yaml file."""
-    yaml_path = Path(__file__).resolve().parent / "tools.yaml"
+    # First try to load from private directory
+    private_yaml_path = pwd / ".private" / "tools.yaml"
+    if private_yaml_path.exists():
+        with open(private_yaml_path, 'r') as file:
+            yaml_data = yaml.safe_load(file)
+            return yaml_data.get('tools', {})
+    
+    # Fallback to default location if private file doesn't exist
+    yaml_path = pwd / "tools.yaml"
     with open(yaml_path, 'r') as file:
         yaml_data = yaml.safe_load(file)
     
@@ -134,33 +171,55 @@ TOOL_EXECUTORS = {
     "get_instruction": GetInstructionTool,
 }
 
+# initialize the tools
+yaml_tools = load_tools_from_yaml()
+tools_mapping = {}
+
+for name, tool_data in yaml_tools.items():
+    if name not in TOOL_EXECUTORS:
+        print(f"Adding tool: {name}")
+        if tool_data.get('type') == 'script':
+            # Create a script-based tool
+            script_tool = ScriptTool.from_yaml(name, tool_data)
+            tools_mapping[name] = script_tool
+        else:
+            # Create a regular tool
+            tools_mapping[name] = Tool(
+                name=tool_data.get('name', name),
+                description=tool_data.get('description', ''),
+                inputSchema=tool_data.get('inputSchema', {})
+            )
+    elif tool_data.get('enabled', True) == False:
+        if name in tools_mapping:
+            tools_mapping.pop(name)
+    else:
+        # Create tool instance with YAML data
+        tool_class = TOOL_EXECUTORS[name]
+        tool_instance = tool_class()
+        
+        # Override properties with YAML data if provided
+        if 'name' in tool_data:
+            tool_instance.tool_name = tool_data['name']
+        if 'description' in tool_data:
+            tool_instance.tool_description = tool_data['description']
+        if 'inputSchema' in tool_data:
+            tool_instance.input_schema = tool_data['inputSchema']
+
+        # print(f"tool_instance: {tool_instance.get_tool_definition()}")
+
+        tools_mapping[name] = tool_instance
+
 def get_tools() -> list[Tool]:
     """Return a list of available tools."""
-    # First get tools from executors
-    tools_list = [executor_class().get_tool_definition() for executor_class in TOOL_EXECUTORS.values()]
-    
-    # Then add any tools from YAML that don't have executors
-    yaml_tools = load_tools_from_yaml()
-    for name, tool_data in yaml_tools.items():
-        if name not in TOOL_EXECUTORS:
-            tools_list.append(
-                Tool(
-                    name=tool_data.get('name', name),
-                    description=tool_data.get('description', ''),
-                    inputSchema=tool_data.get('inputSchema', {})
-                )
-            )
-        elif tool_data.get('enabled', True) == False:
-            tools_list = [tool for tool in tools_list if tool.name != name]
-    
-    return tools_list
+    result = [tool.get_tool_definition() for tool in tools_mapping.values()]
+    print(f"result: {result}")
+    return result
 
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Call a tool by name with the provided arguments."""
     # Check if we have an executor for this tool
-    if name in TOOL_EXECUTORS:
-        tool_executor = TOOL_EXECUTORS[name]()
-        return await tool_executor.execute(arguments)
+    if name in tools_mapping:
+        return await tools_mapping[name].execute(arguments)
     
     # Check if tool exists in YAML
     yaml_tools = load_tools_from_yaml()

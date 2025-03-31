@@ -12,6 +12,17 @@ from mcp.types import (
 
 def load_prompts_from_yaml() -> dict:
     """Load prompts from the prompts.yaml file."""
+    # First try to load from private directory
+    private_yaml_path = Path(__file__).resolve().parent / ".private" / "prompts.yaml"
+    if private_yaml_path.exists():
+        with open(private_yaml_path, 'r') as file:
+            yaml_data = yaml.safe_load(file)
+            prompts = yaml_data.get('prompts', {})
+            # Filter out disabled prompts
+            prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
+            return prompts
+    
+    # Fallback to default location if private file doesn't exist
     yaml_path = Path(__file__).resolve().parent / "prompts.yaml"
     with open(yaml_path, 'r') as file:
         yaml_data = yaml.safe_load(file)

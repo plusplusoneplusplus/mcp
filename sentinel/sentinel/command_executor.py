@@ -57,6 +57,8 @@ class CommandExecutor:
                 # This will block until timeout or completion
                 stdout, stderr = process.communicate(timeout=timeout)
 
+                logger.debug(f"Process completed, returncode: {process.returncode}")
+
                 # Process completed within timeout
                 return {
                     "success": process.returncode == 0,

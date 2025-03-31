@@ -11,14 +11,3 @@ prompts:
       Generate a concise but descriptive commit message for these changes:
 
       {changes}
-  
-  add-or-update-dc:
-    enabled: true
-    name: add-or-update-dc
-    description: Add a new DC or Update an existing DC
-    arguments:
-      - name: dc_name
-        description: The name of the DC to add or update
-        required: true
-    template: |
-      Create a {dc_name}.json file for the dc_name: {dc_name}
