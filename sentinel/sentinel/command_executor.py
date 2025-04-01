@@ -7,9 +7,28 @@ import logging
 import shlex
 import time
 import psutil
+import json
+from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
 
+def _log_with_context(log_level: int, msg: str, context: Dict[str, Any] = None) -> None:
+    """Helper function for structured logging with context
+
+    Args:
+        log_level: The logging level to use
+        msg: The message to log
+        context: Optional dictionary of contextual information
+    """
+    if context is None:
+        context = {}
+    
+    # Add timestamp in ISO format using timezone-aware UTC
+    context['timestamp'] = datetime.now(UTC).isoformat()
+    
+    # Format the log message with context
+    structured_msg = f"{msg} | Context: {json.dumps(context, default=str)}"
+    logger.log(log_level, structured_msg)
 
 class CommandExecutor:
     """Command executor that can run processes synchronously or asynchronously
@@ -54,10 +73,20 @@ class CommandExecutor:
         """
         # Extract the base command (first word)
         mapped_command = command
-
+        start_time = time.time()
         pid = None
+        
         try:
-            logger.debug(f"Executing command: {mapped_command}")
+            _log_with_context(
+                logging.INFO,
+                "Starting command execution",
+                {
+                    "command": mapped_command,
+                    "timeout": timeout,
+                    "os_type": self.os_type,
+                    "start_time": start_time
+                }
+            )
 
             # Use shell=True on Windows for better command compatibility
             shell_needed = self.os_type == "windows"
@@ -68,7 +97,14 @@ class CommandExecutor:
             else:
                 command_parts = mapped_command
 
-            logger.debug(f"Command parts: {command_parts}.")
+            _log_with_context(
+                logging.DEBUG,
+                "Prepared command for execution",
+                {
+                    "shell_needed": shell_needed,
+                    "command_parts": command_parts
+                }
+            )
 
             # Use subprocess with timeout directly
             process = subprocess.Popen(
@@ -80,7 +116,29 @@ class CommandExecutor:
             )
 
             pid = process.pid
-            logger.debug(f"Process started with PID: {pid}")
+            try:
+                process_info = psutil.Process(pid)
+                memory_info = process_info.memory_info()._asdict()
+                cpu_percent = process_info.cpu_percent()
+            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                memory_info = {}
+                cpu_percent = None
+                _log_with_context(
+                    logging.WARNING,
+                    "Could not get process metrics",
+                    {"error": str(e), "pid": pid}
+                )
+
+            _log_with_context(
+                logging.INFO,
+                "Process started",
+                {
+                    "pid": pid,
+                    "memory_info": memory_info,
+                    "cpu_percent": cpu_percent,
+                    "command": mapped_command
+                }
+            )
 
             # Store process for potential later use
             self.running_processes[pid] = process
@@ -88,8 +146,21 @@ class CommandExecutor:
             try:
                 # This will block until timeout or completion
                 stdout, stderr = process.communicate(timeout=timeout)
+                end_time = time.time()
+                duration = end_time - start_time
 
-                logger.debug(f"Process completed, returncode: {process.returncode}")
+                _log_with_context(
+                    logging.INFO,
+                    "Process completed",
+                    {
+                        "pid": pid,
+                        "returncode": process.returncode,
+                        "duration": duration,
+                        "success": process.returncode == 0,
+                        "stdout_length": len(stdout),
+                        "stderr_length": len(stderr)
+                    }
+                )
 
                 # Process completed within timeout
                 return {
@@ -97,11 +168,21 @@ class CommandExecutor:
                     "output": stdout,
                     "error": stderr,
                     "pid": pid,
+                    "duration": duration
                 }
 
             except subprocess.TimeoutExpired:
                 # Process timed out, terminate it
-                logger.debug(f"Process timed out after {timeout} seconds, terminating")
+                _log_with_context(
+                    logging.ERROR,
+                    "Process timeout",
+                    {
+                        "pid": pid,
+                        "timeout": timeout,
+                        "command": mapped_command,
+                        "elapsed_time": time.time() - start_time
+                    }
+                )
                 process.kill()
 
                 # Collect any output so far
@@ -110,21 +191,52 @@ class CommandExecutor:
                 raise TimeoutError(f"Command timed out after {timeout} seconds")
 
         except TimeoutError as e:
-            logger.error(f"Command timed out: {str(e)}")
+            end_time = time.time()
+            _log_with_context(
+                logging.ERROR,
+                "Command execution timed out",
+                {
+                    "pid": pid,
+                    "error": str(e),
+                    "duration": end_time - start_time,
+                    "command": mapped_command
+                }
+            )
             return {
                 "success": False,
                 "error": str(e),
                 "output": stdout if "stdout" in locals() else "",
                 "pid": pid,
+                "duration": end_time - start_time
             }
 
         except Exception as e:
-            logger.error(f"Unexpected error executing command: {str(e)}")
-            return {"success": False, "error": f"Unexpected error: {str(e)}"}
+            end_time = time.time()
+            _log_with_context(
+                logging.ERROR,
+                "Unexpected error during command execution",
+                {
+                    "pid": pid,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "duration": end_time - start_time,
+                    "command": mapped_command
+                }
+            )
+            return {
+                "success": False,
+                "error": f"Unexpected error: {str(e)}",
+                "duration": end_time - start_time
+            }
 
         finally:
             # Clean up process tracking if needed
             if pid in self.running_processes:
+                _log_with_context(
+                    logging.DEBUG,
+                    "Cleaning up process tracking",
+                    {"pid": pid}
+                )
                 self.running_processes.pop(pid, None)
 
     async def execute_async(self, command: str, timeout: Optional[float] = None) -> Dict[str, Any]:
@@ -139,12 +251,20 @@ class CommandExecutor:
         """
         # Generate a unique token for this process
         token = str(uuid.uuid4())
-
-        # Extract the base command (first word)
+        start_time = time.time()
         pid = None
 
         try:
-            logger.debug(f"Executing command asynchronously: {command}")
+            _log_with_context(
+                logging.INFO,
+                "Starting async command execution",
+                {
+                    "command": command,
+                    "token": token,
+                    "timeout": timeout,
+                    "start_time": start_time
+                }
+            )
 
             # Start the process asynchronously
             process = await asyncio.create_subprocess_shell(
@@ -152,22 +272,74 @@ class CommandExecutor:
             )
 
             pid = process.pid
-            logger.debug(f"Async process started with PID: {pid} and token: {token}")
+            
+            # Collect process metrics if possible
+            try:
+                process_info = psutil.Process(pid)
+                memory_info = process_info.memory_info()._asdict()
+                cpu_percent = process_info.cpu_percent()
+                create_time = process_info.create_time()
+            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                memory_info = {}
+                cpu_percent = None
+                create_time = None
+                _log_with_context(
+                    logging.WARNING,
+                    "Could not get async process metrics",
+                    {"error": str(e), "pid": pid, "token": token}
+                )
+
+            _log_with_context(
+                logging.INFO,
+                "Async process started",
+                {
+                    "pid": pid,
+                    "token": token,
+                    "memory_info": memory_info,
+                    "cpu_percent": cpu_percent,
+                    "create_time": create_time,
+                    "command": command,
+                    "elapsed_time": time.time() - start_time
+                }
+            )
 
             # Store process and map token to pid
             self.running_processes[pid] = process
             self.process_tokens[token] = pid
 
+            _log_with_context(
+                logging.DEBUG,
+                "Process tracking initialized",
+                {
+                    "pid": pid,
+                    "token": token,
+                    "total_running_processes": len(self.running_processes)
+                }
+            )
+
             # Return immediately with the token
             return {"token": token, "pid": pid, "status": "running"}
 
         except Exception as e:
-            logger.error(f"Unexpected error executing async command: {str(e)}")
+            end_time = time.time()
+            _log_with_context(
+                logging.ERROR,
+                "Error in async command execution",
+                {
+                    "token": token,
+                    "pid": pid,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "duration": end_time - start_time,
+                    "command": command
+                }
+            )
             return {
                 "token": token,
                 "success": False,
                 "error": f"Unexpected error: {str(e)}",
                 "status": "failed",
+                "duration": end_time - start_time
             }
 
     async def wait_for_process(self, token: str, timeout: Optional[float] = None) -> Dict[str, Any]:
@@ -180,15 +352,37 @@ class CommandExecutor:
         Returns:
             Dictionary with process results
         """
+        start_time = time.time()
+        
         pid = self.process_tokens.get(token)
         if not pid:
+            _log_with_context(
+                logging.ERROR,
+                "Process token not found",
+                {"token": token}
+            )
             return {"success": False, "error": f"No process found for token: {token}"}
 
         process = self.running_processes.get(pid)
         if not process:
+            _log_with_context(
+                logging.ERROR,
+                "Process not found",
+                {"token": token, "pid": pid}
+            )
             return {"success": False, "error": f"Process not found for PID: {pid}"}
 
         try:
+            _log_with_context(
+                logging.INFO,
+                "Waiting for process completion",
+                {
+                    "token": token,
+                    "pid": pid,
+                    "timeout": timeout
+                }
+            )
+
             # Wait for the process to complete with timeout
             if timeout is not None:
                 # Wait with timeout
@@ -198,13 +392,37 @@ class CommandExecutor:
                     )
                 except asyncio.TimeoutError:
                     # Process timed out, terminate it
-                    logger.debug(f"Process timed out after {timeout} seconds, terminating")
+                    elapsed_time = time.time() - start_time
+                    _log_with_context(
+                        logging.ERROR,
+                        "Process wait timeout",
+                        {
+                            "token": token,
+                            "pid": pid,
+                            "timeout": timeout,
+                            "elapsed_time": elapsed_time
+                        }
+                    )
+                    
                     try:
                         process.kill()
+                        _log_with_context(
+                            logging.INFO,
+                            "Process terminated after timeout",
+                            {"token": token, "pid": pid}
+                        )
                         # Collect any output so far
                         stdout_bytes, stderr_bytes = await process.communicate()
-                    except Exception as e:
-                        logger.error(f"Error terminating timed out process: {str(e)}")
+                    except Exception as kill_error:
+                        _log_with_context(
+                            logging.ERROR,
+                            "Error terminating process after timeout",
+                            {
+                                "token": token,
+                                "pid": pid,
+                                "error": str(kill_error)
+                            }
+                        )
                         stdout_bytes, stderr_bytes = b"", b""
 
                     raise TimeoutError(f"Command timed out after {timeout} seconds")
@@ -216,7 +434,32 @@ class CommandExecutor:
             stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
             stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
 
-            logger.debug(f"Process completed, returncode: {process.returncode}")
+            end_time = time.time()
+            duration = end_time - start_time
+
+            # Try to get final process metrics
+            try:
+                ps_process = psutil.Process(pid)
+                final_cpu = ps_process.cpu_percent()
+                final_memory = ps_process.memory_info()._asdict()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                final_cpu = None
+                final_memory = {}
+
+            _log_with_context(
+                logging.INFO,
+                "Process completed",
+                {
+                    "token": token,
+                    "pid": pid,
+                    "returncode": process.returncode,
+                    "duration": duration,
+                    "stdout_length": len(stdout),
+                    "stderr_length": len(stderr),
+                    "final_cpu_percent": final_cpu,
+                    "final_memory": final_memory
+                }
+            )
 
             # Process completed
             result = {
@@ -226,16 +469,36 @@ class CommandExecutor:
                 "error": stderr,
                 "pid": pid,
                 "status": "completed",
+                "duration": duration
             }
 
             # Clean up tracking
             self.running_processes.pop(pid, None)
             self.process_tokens.pop(token, None)
 
+            _log_with_context(
+                logging.DEBUG,
+                "Process tracking cleaned up",
+                {
+                    "token": token,
+                    "pid": pid,
+                    "remaining_processes": len(self.running_processes)
+                }
+            )
+
             return result
 
         except TimeoutError as e:
-            logger.error(f"Command timed out: {str(e)}")
+            _log_with_context(
+                logging.ERROR,
+                "Process wait timed out",
+                {
+                    "token": token,
+                    "pid": pid,
+                    "error": str(e),
+                    "duration": time.time() - start_time
+                }
+            )
             return {
                 "token": token,
                 "success": False,
@@ -243,23 +506,48 @@ class CommandExecutor:
                 "output": stdout if "stdout" in locals() else "",
                 "pid": pid,
                 "status": "timeout",
+                "duration": time.time() - start_time
             }
         except Exception as e:
-            logger.error(f"Unexpected error waiting for process: {str(e)}")
+            _log_with_context(
+                logging.ERROR,
+                "Unexpected error waiting for process",
+                {
+                    "token": token,
+                    "pid": pid,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "duration": time.time() - start_time
+                }
+            )
             # Try to clean up
             try:
                 if pid in self.running_processes:
                     self.running_processes.pop(pid)
                 if token in self.process_tokens:
                     self.process_tokens.pop(token)
-            except:
-                pass
+                _log_with_context(
+                    logging.INFO,
+                    "Process tracking cleaned up after error",
+                    {"token": token, "pid": pid}
+                )
+            except Exception as cleanup_error:
+                _log_with_context(
+                    logging.ERROR,
+                    "Error during cleanup after process error",
+                    {
+                        "token": token,
+                        "pid": pid,
+                        "cleanup_error": str(cleanup_error)
+                    }
+                )
 
             return {
                 "token": token,
                 "success": False,
                 "error": f"Unexpected error: {str(e)}",
                 "status": "error",
+                "duration": time.time() - start_time
             }
 
     async def get_process_status(self, token: str) -> Dict[str, Any]:

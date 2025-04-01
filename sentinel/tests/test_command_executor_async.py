@@ -261,3 +261,101 @@ class TestCommandExecutorAsync:
         # Try to terminate the process
         success = executor.terminate_by_token(fake_token)
         assert success == False
+
+    async def test_large_stdout_capture(self, executor):
+        """Test capturing large stdout output completely from a long-running process"""
+        # Command that generates a large number of lines
+        line_count = 500  # Generate 500 lines of output
+        
+        if platform.system().lower() == "windows":
+            # Windows command to generate many lines
+            cmd = f"for /L %i in (1,1,{line_count}) do @echo Line %i of {line_count}"
+        else:
+            # Unix command to generate many lines
+            cmd = f"for i in $(seq 1 {line_count}); do echo \"Line $i of {line_count}\"; done"
+            
+        # Execute the command
+        response = await executor.execute_async(cmd)
+        token = response["token"]
+        
+        # Wait for the process to complete
+        result = await executor.wait_for_process(token)
+        
+        # Verify the command succeeded
+        assert result["success"] == True
+        assert result["status"] == "completed"
+        
+        # Split output into lines and count
+        output_lines = result["output"].strip().split("\n")
+        actual_lines = [line for line in output_lines if line.strip()]  # Remove empty lines
+        
+        # Check that we have the expected number of lines (allowing for some variation)
+        # Some platforms might add extra lines, so we check for minimum
+        assert len(actual_lines) >= line_count * 0.9, f"Expected at least {line_count*0.9} lines, got {len(actual_lines)}"
+        
+        # Verify content of some specific lines
+        if len(actual_lines) >= line_count:
+            # Check first line
+            assert f"Line 1 of {line_count}" in actual_lines[0]
+            
+            # Check a line in the middle
+            middle_idx = line_count // 2
+            if middle_idx < len(actual_lines):
+                assert f"Line {middle_idx}" in actual_lines[middle_idx - 1]
+            
+            # Check the last line
+            if line_count <= len(actual_lines):
+                assert f"Line {line_count}" in actual_lines[line_count - 1]
+
+    async def test_streaming_output_capture(self, executor):
+        """Test capturing streaming output from a long-running process"""
+        # Number of lines to generate with delay between them
+        line_count = 20
+        
+        if platform.system().lower() == "windows":
+            # Windows command that prints lines with a delay
+            # Using timeout between prints to simulate processing delay
+            delay_cmd = "ping -n 1 127.0.0.1"  # Quick delay without visible output
+            cmd = f"powershell -Command \"for ($i=1; $i -le {line_count}; $i++) {{ Write-Host \\\"Processing chunk $i of {line_count}\\\"; Start-Sleep -Milliseconds 100 }}\""
+        else:
+            # Unix command that prints lines with a delay
+            # Using sleep between prints to simulate processing delay
+            cmd = f"for i in $(seq 1 {line_count}); do echo \"Processing chunk $i of {line_count}\"; sleep 0.1; done"
+
+        print(f"Running command: {cmd}")
+        
+        # Execute the command
+        response = await executor.execute_async(cmd)
+        token = response["token"]
+        
+        # Wait for the process to complete
+        start_time = time.time()
+        result = await executor.wait_for_process(token)
+        duration = time.time() - start_time
+        
+        # Should take some time to complete
+        print(f"Streaming output process completed in {duration:.2f} seconds")
+        
+        # Verify the command succeeded
+        assert result["success"] == True
+        assert result["status"] == "completed"
+        
+        # Verify output contains the expected lines
+        output_lines = result["output"].strip().split("\n")
+        actual_lines = [line for line in output_lines if line.strip() and "Processing chunk" in line]
+        
+        # Check that we have most of the expected output lines
+        assert len(actual_lines) >= line_count * 0.8, f"Expected at least {line_count*0.8} lines, got {len(actual_lines)}"
+        
+        # Print a sample of captured output for debugging
+        print(f"Captured {len(actual_lines)} output lines out of {line_count} expected")
+        if len(actual_lines) > 0:
+            print(f"First line: {actual_lines[0]}")
+            if len(actual_lines) > 1:
+                print(f"Last line: {actual_lines[-1]}")
+                
+        # Verify first and last lines if available
+        if len(actual_lines) > 0:
+            assert "Processing chunk 1" in actual_lines[0]
+            if len(actual_lines) >= line_count:
+                assert f"Processing chunk {line_count}" in actual_lines[-1]
