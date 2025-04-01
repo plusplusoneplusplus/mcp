@@ -11,6 +11,10 @@ pytest "$SCRIPT_DIR/tests/test_browser_utils.py" -v
 echo -e "\nRunning integration tests..."
 pytest "$SCRIPT_DIR/tests/test_command_executor_integration.py" -v
 
+# Run async tests
+echo -e "\nRunning async tests..."
+pytest "$SCRIPT_DIR/tests/test_command_executor_async.py" -v
+
 # Run all tests with coverage, skip for now
 # echo -e "\nRunning all tests with coverage..."
 # pytest "$SCRIPT_DIR/tests" --cov=sentinel --cov-report=term-missing

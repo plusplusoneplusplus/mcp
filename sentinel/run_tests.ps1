@@ -9,6 +9,9 @@ pytest "$SCRIPT_DIR\tests\test_browser_utils.py" -v
 Write-Host "`nRunning integration tests..."
 pytest "$SCRIPT_DIR\tests\test_command_executor_integration.py" -v
 
+Write-Host "`nRunning async tests..."
+pytest "$SCRIPT_DIR\tests\test_command_executor_async.py" -v
+
 # Run all tests with coverage, skip for now
 # Write-Host "`nRunning all tests with coverage..."
 # pytest "$SCRIPT_DIR\tests" --cov=sentinel --cov-report=term-missing 
