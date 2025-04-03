@@ -200,4 +200,8 @@ if %ERRORLEVEL% EQU 0 (
   }
 ```
 
+# Demo: Basic Command Execution
 ![MCP Server Configuration](assets/mcp-server.png)
+
+# Demo: Async Command Execution
+![MCP Server async command execution](assets/mcp-async-command.png)
