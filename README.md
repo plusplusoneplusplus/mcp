@@ -191,10 +191,11 @@ if %ERRORLEVEL% EQU 0 (
         "command": "mcp\\venv\\scripts\\python",
         "args": ["mcp\\server\\main.py"]
       },
-      "fastmcp" : {
-        "command": "mcp\\venv\\scripts\\python",
-        "args": ["-m", "uv", "run", "--with", "mcp", "mcp", "run", "mcp\\server\\fast-main.py"]
-      }
+      // this is deprecated.
+      // "fastmcp" : {
+      //   "command": "mcp\\venv\\scripts\\python",
+      //   "args": ["-m", "uv", "run", "--with", "mcp", "mcp", "run", "mcp\\server\\fast-main.py"]
+      // }
     }
   }
 ```
