@@ -1,60 +1,6 @@
-# Sentinel
+# MCP Server
 
-A browser automation and command execution utility for testing and monitoring.
-
-## Setup Guide
-
-### 1. Set up Python Virtual Environment
-
-```bash
-# Create a virtual environment
-python -m venv ./venv
-
-# Activate the virtual environment
-# On Linux/Mac:
-source ./venv/bin/activate
-
-# On Windows (Command Prompt):
-.\venv\Scripts\activate.bat
-
-# On Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-```
-
-### 2. Install Python Dependencies
-
-```bash
-pip install -r sentinel/requirements.txt
-pip install uv # for mcp server
-```
-
-> **Note for Windows Users:**
-> If you encounter an error like: "Microsoft Visual C++ 14.0 or greater is required",
-> install the Microsoft C++ Build Tools from:
-> https://visualstudio.microsoft.com/visual-cpp-build-tools/
-
-### 3. Install Local Sentinel Package
-
-```bash
-pip install -e ./sentinel
-```
-
-### 4. Install Browser Drivers
-
-#### ChromeDriver
-
-- **Linux**:
-  ```bash
-  apt install chromium-chromedriver
-  ```
-
-- **Windows**:
-  - Download the appropriate ChromeDriver from [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/)
-  - Add the directory containing the chromedriver.exe to your PATH environment variable
-
-#### EdgeDriver (Optional)
-
-- Follow the instructions in the [Microsoft Edge WebDriver documentation](https://learn.microsoft.com/en-us/microsoft-edge/webdriver-chromium/?tabs=python)
+The MCP Server provides a flexible framework for AI-powered command execution and tool management.
 
 ## Configuration 
 
@@ -155,6 +101,43 @@ tools:
       required:
         - environment
         - version 
+        
+  # Async Command Execution
+  execute_command_async:
+    enabled: true
+    name: execute_command_async
+    description: Start a command execution asynchronously and return a token for tracking
+    inputSchema:
+      type: object
+      properties:
+        command:
+          type: string
+          description: The command to execute
+        timeout:
+          type: number
+          description: Optional timeout in seconds
+      required:
+        - command
+
+  query_command_status:
+    enabled: true
+    name: query_command_status
+    description: Query the status of an asynchronous command execution or wait for it to complete
+    inputSchema:
+      type: object
+      properties:
+        token:
+          type: string
+          description: The token returned by execute_command_async
+        wait:
+          type: boolean
+          description: Whether to wait for the command to complete
+          default: false
+        timeout:
+          type: number
+          description: Optional timeout in seconds for waiting
+      required:
+        - token
 ```
 
 ### Script-Based Tools
