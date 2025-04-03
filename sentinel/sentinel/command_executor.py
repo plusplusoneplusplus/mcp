@@ -63,6 +63,7 @@ class CommandExecutor:
         self.os_type = platform.system().lower()
         self.running_processes = {}
         self.process_tokens = {}  # Maps tokens to process IDs
+        self.completed_processes = {}  # Store results of completed processes
 
     def execute(self, command: str, timeout: Optional[float] = None) -> Dict[str, Any]:
         """Execute a command and return the result with process monitoring
@@ -352,6 +353,15 @@ class CommandExecutor:
         Returns:
             Dictionary with process results
         """
+        # First check if we already have results for this token
+        if token in self.completed_processes:
+            _log_with_context(
+                logging.INFO,
+                "Returning cached process results",
+                {"token": token}
+            )
+            return self.completed_processes[token]
+            
         start_time = time.time()
         
         pid = self.process_tokens.get(token)
@@ -472,6 +482,9 @@ class CommandExecutor:
                 "duration": duration
             }
 
+            # Store the result in the completed_processes dictionary before cleanup
+            self.completed_processes[token] = result
+
             # Clean up tracking
             self.running_processes.pop(pid, None)
             self.process_tokens.pop(token, None)
@@ -559,6 +572,11 @@ class CommandExecutor:
         Returns:
             Dictionary with process status information
         """
+        # First check if we have completed results for this token
+        if token in self.completed_processes:
+            result = self.completed_processes[token]
+            return result
+            
         pid = self.process_tokens.get(token)
         if not pid:
             return {"success": False, "error": f"No process found for token: {token}"}
@@ -566,6 +584,10 @@ class CommandExecutor:
         print("Getting process info for pid: ", pid)
         process_info = self.get_process_info(pid)
         if not process_info:
+            # Check if we have completed results for this token (double-check)
+            if token in self.completed_processes:
+                return self.completed_processes[token]
+                
             # Process may have completed or been terminated
             return {"token": token, "status": "not_running", "pid": pid}
 
@@ -644,6 +666,10 @@ class CommandExecutor:
         if result:
             # Clean up tracking if termination was successful
             self.process_tokens.pop(token, None)
+            
+            # Also remove from completed processes if it exists
+            if token in self.completed_processes:
+                self.completed_processes.pop(token, None)
 
         return result
 
@@ -660,9 +686,15 @@ class CommandExecutor:
         Returns:
             Dictionary with process status or results
         """
+        # First check if we have completed results for this token
+        if token in self.completed_processes:
+            return self.completed_processes[token]
+                
         # If not waiting, just return current status
         if not wait:
-            return await self.get_process_status(token)
+            result = await self.get_process_status(token)
+            if result["status"] != "completed" and result["status"] != "not_running":
+                return result
 
         # Otherwise, wait for process to complete
         return await self.wait_for_process(token, timeout)

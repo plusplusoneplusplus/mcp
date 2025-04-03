@@ -359,3 +359,94 @@ class TestCommandExecutorAsync:
             assert "Processing chunk 1" in actual_lines[0]
             if len(actual_lines) >= line_count:
                 assert f"Processing chunk {line_count}" in actual_lines[-1]
+                
+    async def test_completed_process_output_retrieval(self, executor):
+        """Test retrieving output from a completed process without waiting again"""
+        if platform.system().lower() == "windows":
+            cmd = "echo Hello World"
+        else:
+            cmd = 'echo "Hello World"'
+
+        # Start and wait for the process to complete
+        response = await executor.execute_async(cmd)
+        token = response["token"]
+        
+        # Wait for the process to complete
+        result = await executor.wait_for_process(token)
+        assert result["status"] == "completed"
+        assert "Hello World" in result["output"]
+        
+        # Now try to get the output again using get_process_status
+        status = await executor.get_process_status(token)
+        assert status["status"] == "completed"
+        assert "output" in status
+        assert "Hello World" in status["output"]
+        
+        # Try using query_process without waiting
+        query_result = await executor.query_process(token, wait=False)
+        assert query_result["status"] == "completed"
+        assert "output" in query_result
+        assert "Hello World" in query_result["output"]
+        
+        # Test that calling wait_for_process again works and returns cached results
+        result_again = await executor.wait_for_process(token)
+        assert result_again["status"] == "completed"
+        assert "output" in result_again
+        assert "Hello World" in result_again["output"]
+        
+    async def test_query_completed_process_without_wait(self, executor):
+        """Test retrieving stdout from a completed process using query_process without wait=True"""
+        # Create a command that generates multiple lines of output
+        if platform.system().lower() == "windows":
+            cmd = "echo Line 1 && echo Line 2 && echo Line 3"
+        else:
+            cmd = 'echo "Line 1" && echo "Line 2" && echo "Line 3"'
+            
+        # Start the command
+        response = await executor.execute_async(cmd)
+        token = response["token"]
+        
+        # Wait for completion to ensure it's done and stored in the completed_processes cache
+        await asyncio.sleep(1)
+        
+        # Use query_process without wait to get the process status
+        status = await executor.query_process(token, wait=False)
+        
+        # Verify it's completed and has output
+        assert status["status"] == "completed"
+        assert "output" in status
+        
+        # Check content of the output
+        output = status["output"]
+        assert "Line 1" in output
+        assert "Line 2" in output
+        assert "Line 3" in output
+        
+        # Check that we can query it repeatedly and get the same results
+        for _ in range(3):
+            repeat_status = await executor.query_process(token, wait=False)
+            assert repeat_status["status"] == "completed"
+            assert "output" in repeat_status
+            assert repeat_status["output"] == output
+        
+        # Try with a different process too
+        if platform.system().lower() == "windows":
+            cmd2 = "echo Different output"
+        else:
+            cmd2 = 'echo "Different output"'
+            
+        response2 = await executor.execute_async(cmd2)
+        token2 = response2["token"]
+        
+        # Wait for completion
+        await asyncio.sleep(1)
+        
+        # Check both processes have their correct outputs
+        status1 = await executor.query_process(token, wait=False)
+        status2 = await executor.query_process(token2, wait=False)
+        
+        assert status1["status"] == "completed"
+        assert status2["status"] == "completed"
+        
+        assert "Line 1" in status1["output"]
+        assert "Different output" in status2["output"]

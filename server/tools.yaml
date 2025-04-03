@@ -1,17 +1,54 @@
 tools:
   # Regular tools
-  execute_command:
-    enabled: false
-    name: execute_command
-    description: Execute a command
+
+  # execute_command: # deprecated
+  #   enabled: false
+  #   name: execute_command
+  #   description: Execute a command
+  #   inputSchema:
+  #     type: object
+  #     properties:
+  #       command:
+  #         type: string
+  #         description: The command to execute
+  #     required:
+  #       - command
+
+  execute_command_async:
+    enabled: true
+    name: execute_command_async
+    description: Start a command execution asynchronously and return a token for tracking
     inputSchema:
       type: object
       properties:
         command:
           type: string
           description: The command to execute
+        timeout:
+          type: number
+          description: Optional timeout in seconds
       required:
         - command
+
+  query_command_status:
+    enabled: true
+    name: query_command_status
+    description: Query the status of an asynchronous command execution or wait for it to complete
+    inputSchema:
+      type: object
+      properties:
+        token:
+          type: string
+          description: The token returned by execute_command_async
+        wait:
+          type: boolean
+          description: Whether to wait for the command to complete
+          default: false
+        timeout:
+          type: number
+          description: Optional timeout in seconds for waiting
+      required:
+        - token
 
   list_instructions:
     enabled: true
@@ -55,4 +92,4 @@ tools:
           default: false
       required:
         - environment
-        - version 
+        - version

@@ -13,6 +13,15 @@ pwd = Path(__file__).resolve().parent
 class ExecuteCommandInput(BaseModel):
     command: str
 
+class ExecuteCommandAsyncInput(BaseModel):
+    command: str
+    timeout: Optional[float] = None
+
+class QueryCommandStatusInput(BaseModel):
+    token: str
+    wait: bool = False
+    timeout: Optional[float] = None
+
 class UpdateDcCommandInput(BaseModel):
     dc_name: str
 
@@ -49,6 +58,61 @@ class ExecuteCommandTool(ToolExecutor):
             type="text",
             text=f"Command result:\n{result}"
         )]
+
+class ExecuteCommandAsyncTool(ToolExecutor):
+    """Tool to execute system commands asynchronously."""
+    tool_name = "execute_command_async"
+    tool_description = "Start a command execution asynchronously and return a token for tracking"
+    input_schema = ExecuteCommandAsyncInput.model_json_schema()
+    
+    async def execute(self, arguments: dict) -> list[TextContent]:
+        """Start a command execution asynchronously and return a token for tracking."""
+        command = arguments.get('command', '')
+        timeout = arguments.get('timeout')
+        
+        print(f"Starting async command execution: {command}")
+        result = await executor.execute_async(command, timeout)
+        
+        return [TextContent(
+            type="text",
+            text=f"Command started with token: {result['token']}\nStatus: {result['status']}\nPID: {result['pid']}"
+        )]
+
+class QueryCommandStatusTool(ToolExecutor):
+    """Tool to query the status of an asynchronous command execution."""
+    tool_name = "query_command_status"
+    tool_description = "Query the status of an asynchronous command execution or wait for it to complete"
+    input_schema = QueryCommandStatusInput.model_json_schema()
+    
+    async def execute(self, arguments: dict) -> list[TextContent]:
+        """Query the status of an asynchronous command execution or wait for it to complete."""
+        token = arguments.get('token', '')
+        wait = arguments.get('wait', False)
+        timeout = arguments.get('timeout')
+        
+        print(f"Querying command status for token: {token}, wait: {wait}")
+        
+        result = await executor.query_process(token, wait, timeout)
+        
+        if result.get('status') == 'completed':
+            return [TextContent(
+                type="text",
+                text=f"Command completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}\nError:\n{result.get('error')}"
+            )]
+        else:
+            # Just returning status
+            status_text = f"Command status (token: {token}): {result.get('status')}"
+            if 'pid' in result:
+                status_text += f"\nPID: {result.get('pid')}"
+            if 'cpu_percent' in result:
+                status_text += f"\nCPU: {result.get('cpu_percent')}%"
+            if 'memory_info' in result:
+                status_text += f"\nMemory: {result.get('memory_info')}"
+            
+            return [TextContent(
+                type="text",
+                text=status_text
+            )]
 
 class ListInstructionsTool(ToolExecutor):
     """Tool to list all available instructions."""
@@ -166,7 +230,9 @@ def load_tools_from_yaml() -> Dict[str, Dict[str, Any]]:
 
 # Dictionary mapping tool names to their executor classes
 TOOL_EXECUTORS = {
-    "execute_command": ExecuteCommandTool,
+    # "execute_command": ExecuteCommandTool,
+    "execute_command_async": ExecuteCommandAsyncTool,
+    "query_command_status": QueryCommandStatusTool,
     "list_instructions": ListInstructionsTool,
     "get_instruction": GetInstructionTool,
 }
