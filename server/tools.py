@@ -4,6 +4,7 @@ import yaml
 from typing import Dict, Any, List, Optional, ClassVar, Type
 from pydantic import BaseModel
 from mcp.types import TextContent, Tool
+import platform
 
 from sentinel.command_executor import CommandExecutor
 
@@ -18,6 +19,15 @@ class ExecuteCommandAsyncInput(BaseModel):
     timeout: Optional[float] = None
 
 class QueryCommandStatusInput(BaseModel):
+    token: str
+    wait: bool = False
+    timeout: Optional[float] = None
+
+class ExecuteTaskInput(BaseModel):
+    task_name: str
+    timeout: Optional[float] = None
+
+class QueryTaskStatusInput(BaseModel):
     token: str
     wait: bool = False
     timeout: Optional[float] = None
@@ -113,6 +123,148 @@ class QueryCommandStatusTool(ToolExecutor):
                 type="text",
                 text=status_text
             )]
+
+class ExecuteTaskTool(ToolExecutor):
+    """Tool to execute predefined tasks by name."""
+    tool_name = "execute_task"
+    tool_description = "Execute a predefined task by name and start it asynchronously"
+    input_schema = ExecuteTaskInput.model_json_schema()
+    
+    async def execute(self, arguments: dict) -> list[TextContent]:
+        """Execute a predefined task by name."""
+        task_name = arguments.get('task_name', '')
+        timeout = arguments.get('timeout')
+        
+        # Load available tasks
+        tasks = load_tasks_from_yaml()
+        if task_name not in tasks:
+            return [TextContent(
+                type="text",
+                text=f"Error: Task '{task_name}' not found. Use 'list_tasks' to see available tasks."
+            )]
+        
+        task = tasks[task_name]
+        
+        # Get the current OS
+        os_type = platform.system().lower()
+        
+        # Check if this task has OS-conditional commands
+        if 'commands' in task:
+            # Get the command for the current OS
+            if os_type not in task['commands']:
+                return [TextContent(
+                    type="text",
+                    text=f"Error: Task '{task_name}' does not support the {os_type} operating system."
+                )]
+            command = task['commands'][os_type]
+        elif 'command' in task:
+            # Fallback to the simple command if no OS-conditional commands are defined
+            command = task.get('command', '')
+        else:
+            return [TextContent(
+                type="text",
+                text=f"Error: Task '{task_name}' does not have a valid command definition."
+            )]
+        
+        # Use the task-defined timeout if available and not overridden
+        if timeout is None and 'timeout' in task:
+            timeout = task.get('timeout')
+        
+        print(f"Starting task '{task_name}' with command: {command}")
+        result = await executor.execute_async(command, timeout)
+        
+        return [TextContent(
+            type="text",
+            text=f"Task '{task_name}' started with token: {result['token']}\nStatus: {result['status']}\nPID: {result['pid']}\nCommand: {command}\nOS: {os_type}"
+        )]
+
+class QueryTaskStatusTool(ToolExecutor):
+    """Tool to query the status of an asynchronously executed task."""
+    tool_name = "query_task_status"
+    tool_description = "Query the status of an asynchronously executed task"
+    input_schema = QueryTaskStatusInput.model_json_schema()
+    
+    async def execute(self, arguments: dict) -> list[TextContent]:
+        """Query the status of an executed task."""
+        token = arguments.get('token', '')
+        wait = arguments.get('wait', False)
+        timeout = arguments.get('timeout')
+        
+        print(f"Querying task status for token: {token}, wait: {wait}")
+        
+        result = await executor.query_process(token, wait, timeout)
+        
+        if result.get('status') == 'completed':
+            return [TextContent(
+                type="text",
+                text=f"Task completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}\nError:\n{result.get('error')}"
+            )]
+        else:
+            # Just returning status
+            status_text = f"Task status (token: {token}): {result.get('status')}"
+            if 'pid' in result:
+                status_text += f"\nPID: {result.get('pid')}"
+            if 'cpu_percent' in result:
+                status_text += f"\nCPU: {result.get('cpu_percent')}%"
+            if 'memory_info' in result:
+                status_text += f"\nMemory: {result.get('memory_info')}"
+            
+            return [TextContent(
+                type="text",
+                text=status_text
+            )]
+
+class ListTasksTool(ToolExecutor):
+    """Tool to list all available predefined tasks."""
+    tool_name = "list_tasks"
+    tool_description = "List all available predefined tasks"
+    input_schema = {}
+    
+    async def execute(self, arguments: dict) -> list[TextContent]:
+        """List all available predefined tasks."""
+        tasks = load_tasks_from_yaml()
+        
+        if not tasks:
+            return [TextContent(
+                type="text",
+                text="No predefined tasks found."
+            )]
+        
+        # Get the current OS
+        os_type = platform.system().lower()
+        
+        task_list = []
+        for name, task in tasks.items():
+            description = task.get('description', 'No description')
+            timeout = f", timeout: {task.get('timeout')} seconds" if 'timeout' in task else ""
+            
+            # Handle OS-conditional commands
+            if 'commands' in task:
+                if os_type in task['commands']:
+                    command = task['commands'][os_type]
+                    os_support = f"Current OS command ({os_type}): {command}"
+                else:
+                    command = "No command available for current OS"
+                    os_support = f"Warning: This task does not support the current OS ({os_type})"
+                
+                # Add all supported OS commands
+                all_commands = "\n  ".join([f"{os}: {cmd}" for os, cmd in task['commands'].items()])
+                command_info = f"All OS commands:\n  {all_commands}"
+            elif 'command' in task:
+                command = task.get('command', 'No command')
+                os_support = "Generic command (all OS)"
+                command_info = f"Command: {command}"
+            else:
+                command = "No command defined"
+                os_support = "Warning: This task has no command defined"
+                command_info = ""
+            
+            task_list.append(f"- {name}: {description}{timeout}\n  {os_support}\n  {command_info}")
+        
+        return [TextContent(
+            type="text",
+            text=f"Available predefined tasks:\n\n" + "\n\n".join(task_list)
+        )]
 
 class ListInstructionsTool(ToolExecutor):
     """Tool to list all available instructions."""
@@ -212,6 +364,26 @@ class ScriptTool(ToolExecutor):
             text=f"Script result:\n{result}"
         )]
 
+def load_tasks_from_yaml() -> Dict[str, Dict[str, Any]]:
+    """Load tasks from the tools.yaml file."""
+    yaml_data = None
+    
+    # First try to load from private directory
+    private_yaml_path = pwd / ".private" / "tools.yaml"
+    if private_yaml_path.exists():
+        with open(private_yaml_path, 'r') as file:
+            yaml_data = yaml.safe_load(file)
+    else:
+        # Fallback to default location if private file doesn't exist
+        yaml_path = pwd / "tools.yaml"
+        with open(yaml_path, 'r') as file:
+            yaml_data = yaml.safe_load(file)
+    
+    if yaml_data and 'tasks' in yaml_data:
+        return yaml_data.get('tasks', {})
+    
+    return {}
+
 def load_tools_from_yaml() -> Dict[str, Dict[str, Any]]:
     """Load tools from the tools.yaml file."""
     # First try to load from private directory
@@ -231,8 +403,11 @@ def load_tools_from_yaml() -> Dict[str, Dict[str, Any]]:
 # Dictionary mapping tool names to their executor classes
 TOOL_EXECUTORS = {
     # "execute_command": ExecuteCommandTool,
-    "execute_command_async": ExecuteCommandAsyncTool,
-    "query_command_status": QueryCommandStatusTool,
+    # "execute_command_async": ExecuteCommandAsyncTool,
+    # "query_command_status": QueryCommandStatusTool,
+    "execute_task": ExecuteTaskTool,
+    "query_task_status": QueryTaskStatusTool,
+    "list_tasks": ListTasksTool,
     "list_instructions": ListInstructionsTool,
     "get_instruction": GetInstructionTool,
 }

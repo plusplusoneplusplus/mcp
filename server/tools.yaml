@@ -14,41 +14,86 @@ tools:
   #     required:
   #       - command
 
-  execute_command_async:
+  # execute_command_async:
+  #   enabled: true
+  #   name: execute_command_async
+  #   description: Start a command execution asynchronously and return a token for tracking. Use the token to query the status (tool/query_command_status) of the command execution every 30 seconds.
+  #   inputSchema:
+  #     type: object
+  #     properties:
+  #       command:
+  #         type: string
+  #         description: The command to execute
+  #       timeout:
+  #         type: number
+  #         description: Optional timeout in seconds
+  #     required:
+  #       - command
+
+  # query_command_status:
+  #   enabled: true
+  #   name: query_command_status
+  #   description: Query the status of an asynchronous command execution or wait for it to complete
+  #   inputSchema:
+  #     type: object
+  #     properties:
+  #       token:
+  #         type: string
+  #         description: The token returned by execute_command_async
+  #       wait:
+  #         type: boolean
+  #         description: Whether to wait for the command to complete
+  #         default: false
+  #       timeout:
+  #         type: number
+  #         description: Optional timeout in seconds for waiting
+  #     required:
+  #       - token
+
+  execute_task:
     enabled: true
-    name: execute_command_async
-    description: Start a command execution asynchronously and return a token for tracking. Use the token to query the status (tool/query_command_status) of the command execution every 30 seconds.
+    name: execute_task
+    description: Execute a predefined task by name and start it asynchronously
     inputSchema:
       type: object
       properties:
-        command:
+        task_name:
           type: string
-          description: The command to execute
+          description: Name of the task to execute
         timeout:
           type: number
           description: Optional timeout in seconds
       required:
-        - command
+        - task_name
 
-  query_command_status:
+  query_task_status:
     enabled: true
-    name: query_command_status
-    description: Query the status of an asynchronous command execution or wait for it to complete
+    name: query_task_status
+    description: Query the status of an asynchronously executed task
     inputSchema:
       type: object
       properties:
         token:
           type: string
-          description: The token returned by execute_command_async
+          description: The token returned by execute_task
         wait:
           type: boolean
-          description: Whether to wait for the command to complete
+          description: Whether to wait for the task to complete
           default: false
         timeout:
           type: number
           description: Optional timeout in seconds for waiting
       required:
         - token
+
+  list_tasks:
+    enabled: true
+    name: list_tasks
+    description: List all available predefined tasks
+    inputSchema:
+      type: object
+      properties: {}
+      required: []
 
   list_instructions:
     enabled: true
@@ -93,3 +138,64 @@ tools:
       required:
         - environment
         - version
+
+# Predefined tasks with associated command lines
+tasks:
+  # System information tasks
+  system_info:
+    description: Get system information
+    commands:
+      windows: systeminfo
+      linux: uname -a && lsb_release -a
+      darwin: system_profiler SPSoftwareDataType SPHardwareDataType
+    timeout: 30
+
+  network_info:
+    description: Get network information
+    commands:
+      windows: ipconfig /all
+      linux: ifconfig -a || ip addr show
+      darwin: ifconfig -a
+
+  process_list:
+    description: List all running processes
+    commands:
+      windows: tasklist
+      linux: ps aux
+      darwin: ps aux
+
+  memory_usage:
+    description: Show memory usage
+    commands:
+      windows: systeminfo | findstr /C:"Total Physical Memory" /C:"Available Physical Memory"
+      linux: free -h
+      darwin: vm_stat && top -l 1 -n 0 | grep PhysMem
+
+  disk_usage:
+    description: Show disk usage
+    commands:
+      windows: wmic logicaldisk get deviceid, freespace, size, volumename
+      linux: df -h
+      darwin: df -h
+
+  # Generic long-running tasks
+  ping_test:
+    description: Ping a host 10 times
+    commands:
+      windows: ping -n 10 google.com
+      linux: ping -c 10 google.com
+      darwin: ping -c 10 google.com
+
+  docker_status:
+    description: Show Docker container status
+    commands:
+      windows: docker ps
+      linux: docker ps
+      darwin: docker ps
+
+  git_status:
+    description: Show Git repository status
+    commands:
+      windows: git status
+      linux: git status
+      darwin: git status
