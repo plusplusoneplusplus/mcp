@@ -8,8 +8,35 @@ import platform
 
 from sentinel.command_executor import CommandExecutor
 
+PRIVATE_DIRECTORY_NAME = ".private"
+DEFAULT_TIMEOUT = 30
+
 executor = CommandExecutor()
 pwd = Path(__file__).resolve().parent
+
+g_default_parameters = {
+    "pwd": pwd
+}
+
+def format_command_with_parameters(command: str, parameters: Dict[str, Any]) -> str:
+    """Format a command with parameters.
+    
+    Args:
+        command: The command string with placeholders
+        parameters: Dictionary of parameters to substitute
+    """
+    # Merge with global default parameters if not already defined
+    merged_parameters = {**g_default_parameters}
+    merged_parameters.update(parameters)
+    
+    try:
+        return command.format(**merged_parameters)
+    except KeyError as e:
+        print(f"Warning: Missing parameter in command: {e}")
+        return command  # Return original command if formatting fails
+    except ValueError as e:
+        print(f"Warning: Invalid format in command: {e}")
+        return command  # Return original command if formatting fails
 
 class ExecuteCommandInput(BaseModel):
     command: str
@@ -98,7 +125,7 @@ class QueryCommandStatusTool(ToolExecutor):
         """Query the status of an asynchronous command execution or wait for it to complete."""
         token = arguments.get('token', '')
         wait = arguments.get('wait', False)
-        timeout = arguments.get('timeout')
+        timeout = arguments.get('timeout', DEFAULT_TIMEOUT)
         
         print(f"Querying command status for token: {token}, wait: {wait}")
         
@@ -133,7 +160,7 @@ class ExecuteTaskTool(ToolExecutor):
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Execute a predefined task by name."""
         task_name = arguments.get('task_name', '')
-        timeout = arguments.get('timeout')
+        timeout = arguments.get('timeout', DEFAULT_TIMEOUT)
         
         # Load available tasks
         tasks = load_tasks_from_yaml()
@@ -170,6 +197,8 @@ class ExecuteTaskTool(ToolExecutor):
         if timeout is None and 'timeout' in task:
             timeout = task.get('timeout')
         
+        command = format_command_with_parameters(command, g_default_parameters)
+
         print(f"Starting task '{task_name}' with command: {command}")
         result = await executor.execute_async(command, timeout)
         
@@ -188,7 +217,7 @@ class QueryTaskStatusTool(ToolExecutor):
         """Query the status of an executed task."""
         token = arguments.get('token', '')
         wait = arguments.get('wait', False)
-        timeout = arguments.get('timeout')
+        timeout = arguments.get('timeout', DEFAULT_TIMEOUT)
         
         print(f"Querying task status for token: {token}, wait: {wait}")
         
@@ -348,8 +377,7 @@ class ScriptTool(ToolExecutor):
     
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Execute the script with the provided arguments."""
-        defaultparams = {"pwd": pwd}
-        script_path = self.script_path.format(**defaultparams)
+        script_path = self.script_path.format(**g_default_parameters)
         script_path = Path(script_path)
         
         # Build command with arguments
@@ -369,7 +397,7 @@ def load_tasks_from_yaml() -> Dict[str, Dict[str, Any]]:
     yaml_data = None
     
     # First try to load from private directory
-    private_yaml_path = pwd / ".private" / "tools.yaml"
+    private_yaml_path = pwd / PRIVATE_DIRECTORY_NAME / "tools.yaml"
     if private_yaml_path.exists():
         with open(private_yaml_path, 'r') as file:
             yaml_data = yaml.safe_load(file)
@@ -387,7 +415,7 @@ def load_tasks_from_yaml() -> Dict[str, Dict[str, Any]]:
 def load_tools_from_yaml() -> Dict[str, Dict[str, Any]]:
     """Load tools from the tools.yaml file."""
     # First try to load from private directory
-    private_yaml_path = pwd / ".private" / "tools.yaml"
+    private_yaml_path = pwd / PRIVATE_DIRECTORY_NAME / "tools.yaml"
     if private_yaml_path.exists():
         with open(private_yaml_path, 'r') as file:
             yaml_data = yaml.safe_load(file)
@@ -402,9 +430,9 @@ def load_tools_from_yaml() -> Dict[str, Dict[str, Any]]:
 
 # Dictionary mapping tool names to their executor classes
 TOOL_EXECUTORS = {
-    # "execute_command": ExecuteCommandTool,
-    # "execute_command_async": ExecuteCommandAsyncTool,
-    # "query_command_status": QueryCommandStatusTool,
+    "execute_command": ExecuteCommandTool,
+    "execute_command_async": ExecuteCommandAsyncTool,
+    "query_command_status": QueryCommandStatusTool,
     "execute_task": ExecuteTaskTool,
     "query_task_status": QueryTaskStatusTool,
     "list_tasks": ListTasksTool,
