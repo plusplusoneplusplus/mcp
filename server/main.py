@@ -38,6 +38,7 @@ from pydantic import BaseModel
 # Import tools and prompts directly since they're in the same directory
 import tools
 import prompts
+import environment
 
 server = Server("mymcp")
 
@@ -57,6 +58,12 @@ async def start_server() -> None:
         ],
     )
     logger = logging.getLogger(__name__)
+    
+    # Initialize environment
+    env = environment.env
+    env.load()
+    logger.info(f"Initialized environment: Git root={env.repository_info.git_root}, " +
+                f"Workspace folder={env.repository_info.workspace_folder}")
 
     @server.list_tools()
     async def list_tools() -> list[Tool]:
