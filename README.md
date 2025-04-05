@@ -224,7 +224,11 @@ if %ERRORLEVEL% EQU 0 (
     "mcpServers": {
       "mymcp": {
         "command": "mcp\\venv\\scripts\\python",
-        "args": ["mcp\\server\\main.py"]
+        "args": ["mcp\\server\\main.py"],
+        "env": {
+          "GIT_ROOT": "${workspaceFolder}",
+          "PRIVATE_TOOL_ROOT": "${workspaceFolder}/.private"
+        }
       },
       // this is deprecated.
       // "fastmcp" : {
