@@ -145,3 +145,10 @@ tasks:
       windows: ping -n 10 google.com
       linux: ping -c 10 google.com
       darwin: ping -c 10 google.com
+
+  private_tool:
+    description: A private tool
+    commands:
+      windows: powershell -file {private_tool_root}/test_private_tool.ps1
+      linux: bash {private_tool_root}/test_private_tool.sh
+      darwin: bash {private_tool_root}/test_private_tool.sh

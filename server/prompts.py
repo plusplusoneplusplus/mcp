@@ -10,22 +10,52 @@ from mcp.types import (
     PromptMessage
 )
 
+from server.environment import get_private_tool_root
+
 def load_prompts_from_yaml() -> dict:
     """Load prompts from the prompts.yaml file."""
-    # First try to load from private directory
+    yaml_data = {}
+    
+    # Priority 1: Load from PRIVATE_TOOL_ROOT if set
+    private_tool_root = get_private_tool_root()
+    if private_tool_root:
+        private_root_path = Path(private_tool_root)
+        private_yaml_path = private_root_path / "prompts.yaml"
+        if private_yaml_path.exists():
+            print(f"Loading prompts.yaml from PRIVATE_TOOL_ROOT: {private_yaml_path}")
+            try:
+                with open(private_yaml_path, 'r') as file:
+                    yaml_data = yaml.safe_load(file)
+                    prompts = yaml_data.get('prompts', {})
+                    # Filter out disabled prompts
+                    prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
+                    return prompts
+            except Exception as e:
+                print(f"Error loading prompts from PRIVATE_TOOL_ROOT: {e}")
+    
+    # Priority 2: Load from private directory in server folder
     private_yaml_path = Path(__file__).resolve().parent / ".private" / "prompts.yaml"
     if private_yaml_path.exists():
-        with open(private_yaml_path, 'r') as file:
-            yaml_data = yaml.safe_load(file)
-            prompts = yaml_data.get('prompts', {})
-            # Filter out disabled prompts
-            prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
-            return prompts
+        print(f"Loading prompts.yaml from private directory: {private_yaml_path}")
+        try:
+            with open(private_yaml_path, 'r') as file:
+                yaml_data = yaml.safe_load(file)
+                prompts = yaml_data.get('prompts', {})
+                # Filter out disabled prompts
+                prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
+                return prompts
+        except Exception as e:
+            print(f"Error loading prompts from private directory: {e}")
     
-    # Fallback to default location if private file doesn't exist
+    # Priority 3: Fallback to default location
     yaml_path = Path(__file__).resolve().parent / "prompts.yaml"
-    with open(yaml_path, 'r') as file:
-        yaml_data = yaml.safe_load(file)
+    if yaml_path.exists():
+        print(f"Loading prompts.yaml from default location: {yaml_path}")
+        try:
+            with open(yaml_path, 'r') as file:
+                yaml_data = yaml.safe_load(file)
+        except Exception as e:
+            print(f"Error loading prompts from default location: {e}")
     
     prompts = yaml_data.get('prompts', {})
     # Filter out disabled prompts
