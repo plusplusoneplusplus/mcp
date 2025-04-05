@@ -11,6 +11,7 @@ class RepositoryInfo(BaseModel):
     workspace_folder: Optional[str] = None
     project_name: Optional[str] = None
     additional_paths: Dict[str, str] = Field(default_factory=dict)
+    private_tool_root: Optional[str] = None  # New field for private tool root
 
 class Environment:
     """
@@ -43,6 +44,10 @@ class Environment:
         
         if project_name := os.environ.get("PROJECT_NAME"):
             self.repository_info.project_name = project_name
+        
+        # Load private tool root environment variable
+        if private_tool_root := os.environ.get("PRIVATE_TOOL_ROOT"):
+            self.repository_info.private_tool_root = private_tool_root
         
         # Load additional paths from MCP_PATHS_{NAME} environment variables
         for key, value in os.environ.items():
@@ -78,6 +83,10 @@ class Environment:
                 if project_name := repo_info.get("project_name"):
                     self.repository_info.project_name = project_name
                     
+                # Update private tool root if provided
+                if private_tool_root := repo_info.get("private_tool_root"):
+                    self.repository_info.private_tool_root = private_tool_root
+                    
                 # Update additional paths
                 for key, value in repo_info.get("additional_paths", {}).items():
                     self.repository_info.additional_paths[key] = value
@@ -93,6 +102,7 @@ class Environment:
             "git_root": self.repository_info.git_root,
             "workspace_folder": self.repository_info.workspace_folder,
             "project_name": self.repository_info.project_name,
+            "private_tool_root": self.repository_info.private_tool_root,  # Add private tool root
         }
         
         # Add all additional paths
@@ -125,3 +135,8 @@ def get_project_name() -> Optional[str]:
 def get_path(name: str) -> Optional[str]:
     """Get a specific path by name"""
     return env.repository_info.additional_paths.get(name)
+
+
+def get_private_tool_root() -> Optional[str]:
+    """Get private tool root directory"""
+    return env.repository_info.private_tool_root

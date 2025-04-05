@@ -35,6 +35,41 @@ The system will:
 - Fall back to the default configuration files if private versions don't exist
 - The `.private` directory is automatically ignored by git
 
+### External Private Tool Directory
+
+You can also define a separate directory for private tools and configurations outside the project directory:
+
+1. Set the `PRIVATE_TOOL_ROOT` environment variable to point to your private tools directory:
+   ```bash
+   # Linux/Mac
+   export PRIVATE_TOOL_ROOT=/path/to/your/private/tools
+   
+   # Windows (PowerShell)
+   $env:PRIVATE_TOOL_ROOT = "D:\path\to\your\private\tools"
+   
+   # Windows (CMD)
+   set PRIVATE_TOOL_ROOT=D:\path\to\your\private\tools
+   ```
+
+2. Create and customize your configuration files in this directory:
+   ```
+   /path/to/your/private/tools/
+   ├── tools.yaml
+   ├── prompts.yaml
+   ├── myscript.ps1
+   └── other-scripts/
+   ```
+
+3. The server will look for configuration files in this priority order:
+   1. `PRIVATE_TOOL_ROOT` directory (if set)
+   2. `.private` directory in the server folder
+   3. Default files in the server folder
+
+This approach allows you to:
+- Keep private tools and configurations completely separate from the project
+- Share the same private tools across multiple projects
+- Easily switch between different sets of private tools by changing the environment variable
+
 ### Example Configuration Structure
 
 ```yaml

@@ -7,6 +7,7 @@ from mcp.types import TextContent, Tool
 import platform
 
 from sentinel.command_executor import CommandExecutor
+from server.environment import env, get_private_tool_root
 
 PRIVATE_DIRECTORY_NAME = ".private"
 DEFAULT_TIMEOUT = 30
@@ -392,41 +393,60 @@ class ScriptTool(ToolExecutor):
             text=f"Script result:\n{result}"
         )]
 
+def load_yaml_from_locations(filename: str) -> dict:
+    """Load YAML file from multiple possible locations with priority order."""
+    yaml_data = {}
+    
+    # Priority 1: Load from PRIVATE_TOOL_ROOT if set
+    private_tool_root = get_private_tool_root()
+    if private_tool_root:
+        private_root_path = Path(private_tool_root)
+        private_yaml_path = private_root_path / filename
+        if private_yaml_path.exists():
+            print(f"Loading {filename} from PRIVATE_TOOL_ROOT: {private_yaml_path}")
+            try:
+                with open(private_yaml_path, 'r') as file:
+                    yaml_data = yaml.safe_load(file)
+                    return yaml_data
+            except Exception as e:
+                print(f"Error loading from PRIVATE_TOOL_ROOT: {e}")
+    
+    # Priority 2: Load from private directory in server folder
+    private_yaml_path = pwd / PRIVATE_DIRECTORY_NAME / filename
+    if private_yaml_path.exists():
+        print(f"Loading {filename} from private directory: {private_yaml_path}")
+        try:
+            with open(private_yaml_path, 'r') as file:
+                yaml_data = yaml.safe_load(file)
+                return yaml_data
+        except Exception as e:
+            print(f"Error loading from private directory: {e}")
+    
+    # Priority 3: Fallback to default location
+    yaml_path = pwd / filename
+    if yaml_path.exists():
+        print(f"Loading {filename} from default location: {yaml_path}")
+        try:
+            with open(yaml_path, 'r') as file:
+                yaml_data = yaml.safe_load(file)
+        except Exception as e:
+            print(f"Error loading from default location: {e}")
+    
+    return yaml_data
+
 def load_tasks_from_yaml() -> Dict[str, Dict[str, Any]]:
     """Load tasks from the tools.yaml file."""
-    yaml_data = None
-    
-    # First try to load from private directory
-    private_yaml_path = pwd / PRIVATE_DIRECTORY_NAME / "tools.yaml"
-    if private_yaml_path.exists():
-        with open(private_yaml_path, 'r') as file:
-            yaml_data = yaml.safe_load(file)
-    else:
-        # Fallback to default location if private file doesn't exist
-        yaml_path = pwd / "tools.yaml"
-        with open(yaml_path, 'r') as file:
-            yaml_data = yaml.safe_load(file)
-    
-    if yaml_data and 'tasks' in yaml_data:
-        return yaml_data.get('tasks', {})
-    
-    return {}
+    yaml_data = load_yaml_from_locations("tools.yaml")
+    return yaml_data.get('tasks', {})
 
 def load_tools_from_yaml() -> Dict[str, Dict[str, Any]]:
     """Load tools from the tools.yaml file."""
-    # First try to load from private directory
-    private_yaml_path = pwd / PRIVATE_DIRECTORY_NAME / "tools.yaml"
-    if private_yaml_path.exists():
-        with open(private_yaml_path, 'r') as file:
-            yaml_data = yaml.safe_load(file)
-            return yaml_data.get('tools', {})
-    
-    # Fallback to default location if private file doesn't exist
-    yaml_path = pwd / "tools.yaml"
-    with open(yaml_path, 'r') as file:
-        yaml_data = yaml.safe_load(file)
-    
+    yaml_data = load_yaml_from_locations("tools.yaml")
     return yaml_data.get('tools', {})
+
+# Update default parameters with environment variables
+env_params = env.get_parameter_dict()
+g_default_parameters.update(env_params)
 
 # Dictionary mapping tool names to their executor classes
 TOOL_EXECUTORS = {
