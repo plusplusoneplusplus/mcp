@@ -11,7 +11,7 @@ import command_executor
 from environment import env, get_private_tool_root
 
 PRIVATE_DIRECTORY_NAME = ".private"
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 25
 
 executor = command_executor.CommandExecutor()
 pwd = Path(__file__).resolve().parent
