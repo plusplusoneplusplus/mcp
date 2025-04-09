@@ -10,6 +10,8 @@ import psutil
 import json
 from datetime import datetime, UTC
 
+g_config_sleep_when_running = True
+
 logger = logging.getLogger(__name__)
 
 def _log_with_context(log_level: int, msg: str, context: Dict[str, Any] = None) -> None:
@@ -737,6 +739,11 @@ class CommandExecutor:
             _log_with_context(
                 logging.INFO,
                 "Querying process status without wait",
-                {"token": token}
+                {"token": token, "timeout": timeout}
             )
-            return await self.get_process_status(token) 
+            status = await self.get_process_status(token) 
+            if status['status'] == 'running' and g_config_sleep_when_running:
+                await asyncio.sleep(timeout)
+                return await self.get_process_status(token)
+            else:
+                return status
