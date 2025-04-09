@@ -15,7 +15,9 @@ tools:
   execute_command_async:
     enabled: false
     name: execute_command_async
-    description: Start a command execution asynchronously and return a token for tracking. Use the token to query the status (tool/query_command_status) of the command execution every 30 seconds.
+    description: |
+      Start a command execution asynchronously and return a token for tracking.
+      Use the token to query the status (tool/query_command_status) of the command execution every 30 seconds.
     inputSchema:
       type: object
       properties:
@@ -51,7 +53,9 @@ tools:
   execute_task:
     enabled: true
     name: execute_task
-    description: Execute a predefined task by name and start it asynchronously
+    description: | 
+      Execute a predefined task by name and start it asynchronously.
+      Use the token returned by this tool to query the status (tool/query_task_status) of the task execution every 30 seconds.
     inputSchema:
       type: object
       properties:
