@@ -248,42 +248,63 @@ class CommandExecutor:
             timeout: Optional timeout in seconds
 
         Returns:
-            Dictionary with token for tracking and initial process info
+            Dictionary with the token and initial status information
         """
-        # Generate a unique token for this process
+        # Generate a unique token for this execution
         token = str(uuid.uuid4())
-        start_time = time.time()
-        pid = None
+        mapped_command = command
+        
+        _log_with_context(
+            logging.INFO,
+            "Starting async command execution",
+            {
+                "command": mapped_command,
+                "timeout": timeout,
+                "os_type": self.os_type,
+                "token": token
+            }
+        )
 
+        # Use shell=True on Windows for better command compatibility
+        shell_needed = self.os_type == "windows"
+
+        # Split command properly for non-shell execution
+        if not shell_needed:
+            command_parts = shlex.split(mapped_command)
+        else:
+            command_parts = mapped_command
+
+        _log_with_context(
+            logging.DEBUG,
+            "Prepared async command for execution",
+            {
+                "shell_needed": shell_needed,
+                "command_parts": command_parts,
+                "token": token
+            }
+        )
+
+        # Launch the process
         try:
-            _log_with_context(
-                logging.INFO,
-                "Starting async command execution",
-                {
-                    "command": command,
-                    "token": token,
-                    "timeout": timeout,
-                    "start_time": start_time
-                }
-            )
-
-            # Start the process asynchronously
-            process = await asyncio.create_subprocess_shell(
-                command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            # Use subprocess with timeout directly
+            process = subprocess.Popen(
+                command_parts,
+                shell=shell_needed,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
 
             pid = process.pid
             
-            # Collect process metrics if possible
             try:
+                # Get initial process metrics
                 process_info = psutil.Process(pid)
                 memory_info = process_info.memory_info()._asdict()
                 cpu_percent = process_info.cpu_percent()
-                create_time = process_info.create_time()
             except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
                 memory_info = {}
                 cpu_percent = None
-                create_time = None
                 _log_with_context(
                     logging.WARNING,
                     "Could not get async process metrics",
@@ -295,406 +316,427 @@ class CommandExecutor:
                 "Async process started",
                 {
                     "pid": pid,
-                    "token": token,
                     "memory_info": memory_info,
                     "cpu_percent": cpu_percent,
-                    "create_time": create_time,
-                    "command": command,
-                    "elapsed_time": time.time() - start_time
+                    "command": mapped_command,
+                    "token": token
                 }
             )
 
-            # Store process and map token to pid
+            # Store the process and mapping
             self.running_processes[pid] = process
             self.process_tokens[token] = pid
 
-            _log_with_context(
-                logging.DEBUG,
-                "Process tracking initialized",
-                {
-                    "pid": pid,
-                    "token": token,
-                    "total_running_processes": len(self.running_processes)
-                }
-            )
+            # Create a task to monitor and eventually collect output
+            asyncio.create_task(self.wait_for_process(token, timeout))
 
-            # Return immediately with the token
-            return {"token": token, "pid": pid, "status": "running"}
-
-        except Exception as e:
-            end_time = time.time()
-            _log_with_context(
-                logging.ERROR,
-                "Error in async command execution",
-                {
-                    "token": token,
-                    "pid": pid,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "duration": end_time - start_time,
-                    "command": command
-                }
-            )
+            # Return initial information
             return {
                 "token": token,
-                "success": False,
-                "error": f"Unexpected error: {str(e)}",
-                "status": "failed",
-                "duration": end_time - start_time
+                "status": "running",
+                "pid": pid,
+                "memory_info": memory_info,
+                "cpu_percent": cpu_percent
+            }
+
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                "Error starting async process",
+                {
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "command": mapped_command,
+                    "token": token
+                }
+            )
+            # Store the error in completed processes
+            self.completed_processes[token] = {
+                "status": "error",
+                "error": f"Failed to start process: {str(e)}",
+                "success": False
+            }
+            return {
+                "token": token,
+                "status": "error",
+                "error": f"Failed to start process: {str(e)}"
             }
 
     async def wait_for_process(self, token: str, timeout: Optional[float] = None) -> Dict[str, Any]:
-        """Wait for a process to complete using its token
+        """Wait for a process to complete and collect its output
 
         Args:
-            token: The token returned by execute_async
+            token: The token returned from execute_async
             timeout: Optional timeout in seconds
 
         Returns:
-            Dictionary with process results
+            Dictionary with success, output, and error information
         """
-        # First check if we already have results for this token
         if token in self.completed_processes:
+            # Process has already completed or errored
             _log_with_context(
                 logging.INFO,
-                "Returning cached process results",
+                "Fetching already completed process results",
                 {"token": token}
             )
             return self.completed_processes[token]
-            
-        start_time = time.time()
-        
-        pid = self.process_tokens.get(token)
-        if not pid:
+
+        if token not in self.process_tokens:
+            # Process token not found
+            error_msg = f"Process token not found: {token}"
             _log_with_context(
                 logging.ERROR,
-                "Process token not found",
+                error_msg,
                 {"token": token}
             )
-            return {"success": False, "error": f"No process found for token: {token}"}
+            return {
+                "status": "error",
+                "error": error_msg,
+                "success": False
+            }
 
-        process = self.running_processes.get(pid)
-        if not process:
+        # Get the process ID
+        pid = self.process_tokens[token]
+        if pid not in self.running_processes:
+            # Process no longer running
+            error_msg = f"Process not found (token: {token}, pid: {pid})"
             _log_with_context(
                 logging.ERROR,
-                "Process not found",
+                error_msg,
                 {"token": token, "pid": pid}
             )
-            return {"success": False, "error": f"Process not found for PID: {pid}"}
+            return {
+                "status": "error",
+                "error": error_msg,
+                "success": False
+            }
+
+        # Get the process object
+        process = self.running_processes[pid]
+        start_time = time.time()
+        
+        _log_with_context(
+            logging.INFO,
+            "Waiting for process completion",
+            {"token": token, "pid": pid, "timeout": timeout}
+        )
 
         try:
-            _log_with_context(
-                logging.INFO,
-                "Waiting for process completion",
-                {
-                    "token": token,
-                    "pid": pid,
-                    "timeout": timeout
-                }
+            # This will block until timeout or completion
+            stdout, stderr = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: process.communicate(timeout=timeout)
             )
-
-            # Wait for the process to complete with timeout
-            if timeout is not None:
-                # Wait with timeout
-                try:
-                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                        process.communicate(), timeout=timeout
-                    )
-                except asyncio.TimeoutError:
-                    # Process timed out, terminate it
-                    elapsed_time = time.time() - start_time
-                    _log_with_context(
-                        logging.ERROR,
-                        "Process wait timeout",
-                        {
-                            "token": token,
-                            "pid": pid,
-                            "timeout": timeout,
-                            "elapsed_time": elapsed_time
-                        }
-                    )
-                    
-                    try:
-                        process.kill()
-                        _log_with_context(
-                            logging.INFO,
-                            "Process terminated after timeout",
-                            {"token": token, "pid": pid}
-                        )
-                        # Collect any output so far
-                        stdout_bytes, stderr_bytes = await process.communicate()
-                    except Exception as kill_error:
-                        _log_with_context(
-                            logging.ERROR,
-                            "Error terminating process after timeout",
-                            {
-                                "token": token,
-                                "pid": pid,
-                                "error": str(kill_error)
-                            }
-                        )
-                        stdout_bytes, stderr_bytes = b"", b""
-
-                    raise TimeoutError(f"Command timed out after {timeout} seconds")
-            else:
-                # Wait indefinitely
-                stdout_bytes, stderr_bytes = await process.communicate()
-
-            # Decode bytes to strings
-            stdout = stdout_bytes.decode("utf-8", errors="replace") if stdout_bytes else ""
-            stderr = stderr_bytes.decode("utf-8", errors="replace") if stderr_bytes else ""
-
             end_time = time.time()
             duration = end_time - start_time
 
-            # Try to get final process metrics
-            try:
-                ps_process = psutil.Process(pid)
-                final_cpu = ps_process.cpu_percent()
-                final_memory = ps_process.memory_info()._asdict()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                final_cpu = None
-                final_memory = {}
-
+            success = process.returncode == 0
+            
             _log_with_context(
                 logging.INFO,
-                "Process completed",
+                "Process wait completed",
                 {
                     "token": token,
                     "pid": pid,
                     "returncode": process.returncode,
                     "duration": duration,
+                    "success": success,
                     "stdout_length": len(stdout),
-                    "stderr_length": len(stderr),
-                    "final_cpu_percent": final_cpu,
-                    "final_memory": final_memory
+                    "stderr_length": len(stderr)
                 }
             )
 
-            # Process completed
             result = {
-                "token": token,
-                "success": process.returncode == 0,
+                "status": "completed",
+                "success": success,
                 "output": stdout,
                 "error": stderr,
                 "pid": pid,
-                "status": "completed",
+                "returncode": process.returncode,
                 "duration": duration
             }
 
-            # Store the result in the completed_processes dictionary before cleanup
+            # Store the result for later retrieval
             self.completed_processes[token] = result
 
             # Clean up tracking
             self.running_processes.pop(pid, None)
-            self.process_tokens.pop(token, None)
-
-            _log_with_context(
-                logging.DEBUG,
-                "Process tracking cleaned up",
-                {
-                    "token": token,
-                    "pid": pid,
-                    "remaining_processes": len(self.running_processes)
-                }
-            )
 
             return result
 
-        except TimeoutError as e:
+        except asyncio.TimeoutError:
+            # Process timed out, terminate it
             _log_with_context(
                 logging.ERROR,
-                "Process wait timed out",
+                "Process wait timeout",
                 {
                     "token": token,
                     "pid": pid,
-                    "error": str(e),
-                    "duration": time.time() - start_time
+                    "timeout": timeout,
+                    "elapsed_time": time.time() - start_time
                 }
             )
-            return {
-                "token": token,
-                "success": False,
-                "error": str(e),
-                "output": stdout if "stdout" in locals() else "",
-                "pid": pid,
+            
+            # Terminate the process
+            self.terminate_process(pid)
+            
+            # Try to collect any output so far
+            try:
+                stdout, stderr = process.communicate(timeout=1)
+            except subprocess.TimeoutExpired:
+                stdout, stderr = "", "Unable to collect output after timeout"
+
+            error_message = f"Process timed out after {timeout} seconds"
+            result = {
                 "status": "timeout",
+                "success": False,
+                "error": error_message,
+                "output": stdout,
+                "pid": pid,
                 "duration": time.time() - start_time
             }
+
+            # Store the result for later retrieval
+            self.completed_processes[token] = result
+
+            # Clean up tracking
+            self.running_processes.pop(pid, None)
+
+            return result
+
         except Exception as e:
+            # Other error occurred
+            end_time = time.time()
             _log_with_context(
                 logging.ERROR,
-                "Unexpected error waiting for process",
+                "Error during process wait",
                 {
                     "token": token,
                     "pid": pid,
                     "error": str(e),
                     "error_type": type(e).__name__,
-                    "duration": time.time() - start_time
+                    "duration": end_time - start_time
                 }
             )
-            # Try to clean up
+            
+            # Try to collect any output so far
             try:
-                if pid in self.running_processes:
-                    self.running_processes.pop(pid)
-                if token in self.process_tokens:
-                    self.process_tokens.pop(token)
-                _log_with_context(
-                    logging.INFO,
-                    "Process tracking cleaned up after error",
-                    {"token": token, "pid": pid}
-                )
-            except Exception as cleanup_error:
-                _log_with_context(
-                    logging.ERROR,
-                    "Error during cleanup after process error",
-                    {
-                        "token": token,
-                        "pid": pid,
-                        "cleanup_error": str(cleanup_error)
-                    }
-                )
+                stdout, stderr = process.communicate(timeout=1)
+            except:
+                stdout, stderr = "", "Unable to collect output after error"
+                
+            # Ensure the process is terminated
+            self.terminate_process(pid)
 
-            return {
-                "token": token,
-                "success": False,
-                "error": f"Unexpected error: {str(e)}",
+            error_message = f"Error waiting for process: {str(e)}"
+            result = {
                 "status": "error",
-                "duration": time.time() - start_time
+                "success": False,
+                "error": error_message,
+                "output": stdout,
+                "pid": pid,
+                "duration": end_time - start_time
             }
 
+            # Store the result for later retrieval
+            self.completed_processes[token] = result
+
+            # Clean up tracking
+            self.running_processes.pop(pid, None)
+
+            return result
+
     async def get_process_status(self, token: str) -> Dict[str, Any]:
-        """Get the status of a process using its token
+        """Get the current status of a process by token without waiting for completion
 
         Args:
-            token: The token returned by execute_async
+            token: The token returned from execute_async
 
         Returns:
-            Dictionary with process status information
+            Dictionary with current status information
         """
-        # First check if we have completed results for this token
         if token in self.completed_processes:
-            result = self.completed_processes[token]
-            return result
-            
-        pid = self.process_tokens.get(token)
-        if not pid:
-            return {"success": False, "error": f"No process found for token: {token}"}
+            # Process has already completed
+            completed_result = self.completed_processes[token]
+            _log_with_context(
+                logging.INFO,
+                "Fetching status for completed process",
+                {"token": token, "status": completed_result.get("status", "completed")}
+            )
+            return completed_result
 
-        print("Getting process info for pid: ", pid)
-        process_info = self.get_process_info(pid)
-        if not process_info:
-            # Check if we have completed results for this token (double-check)
-            if token in self.completed_processes:
-                return self.completed_processes[token]
-                
-            # Process may have completed or been terminated
-            return {"token": token, "status": "not_running", "pid": pid}
+        if token not in self.process_tokens:
+            # Process token not found
+            error_msg = f"Process token not found: {token}"
+            _log_with_context(
+                logging.ERROR,
+                error_msg,
+                {"token": token}
+            )
+            return {
+                "status": "error",
+                "error": error_msg
+            }
 
-        # Add token to process info
-        process_info["token"] = token
-        process_info["status"] = "running"
-        return process_info
+        # Get the process ID
+        pid = self.process_tokens[token]
+        
+        # Get process metrics via psutil
+        try:
+            process_info = psutil.Process(pid)
+            memory_info = process_info.memory_info()._asdict()
+            cpu_percent = process_info.cpu_percent()
+            status = "running"
+        except psutil.NoSuchProcess:
+            # Process no longer exists, but we don't have completion info
+            memory_info = {}
+            cpu_percent = None
+            status = "unknown"
+        except Exception as e:
+            memory_info = {}
+            cpu_percent = None
+            _log_with_context(
+                logging.WARNING,
+                "Error getting process status",
+                {"token": token, "pid": pid, "error": str(e)}
+            )
+            status = "error_monitoring"
+
+        return {
+            "status": status,
+            "pid": pid,
+            "memory_info": memory_info,
+            "cpu_percent": cpu_percent,
+            "token": token
+        }
 
     def get_allowed_commands(self) -> List[str]:
-        """Return list of allowed commands for current OS"""
-        return self.allowed_commands
+        """Get the list of allowed commands based on the OS type"""
+        return []
 
     def terminate_process(self, pid: int) -> bool:
-        """Terminate a running process by PID"""
-        process = self.running_processes.get(pid)
-        if process:
-            try:
-                # Handle both regular subprocess and asyncio processes
-                if hasattr(process, "kill"):
-                    process.kill()
-                elif hasattr(process, "terminate"):
-                    process.terminate()
-                # Remove from tracking
-                self.running_processes.pop(pid, None)
-                return True
-            except Exception as e:
-                logger.error(f"Error terminating process {pid}: {str(e)}")
-        return False
-
-    def get_process_info(self, pid: int) -> Optional[Dict[str, Any]]:
-        """Get information about a running process"""
-        process = self.running_processes.get(pid)
-        if not process:
-            return None
-
-        # Handle different process types (asyncio Process vs subprocess.Popen)
-        process_running = False
-        if hasattr(process, "poll"):
-            # This is a subprocess.Popen object
-            process_running = process.poll() is None
-        elif hasattr(process, "returncode"):
-            # This is an asyncio Process object
-            process_running = process.returncode is None
-
-        if process_running:
-            try:
-                # Use psutil to get additional process info
-                ps_process = psutil.Process(pid)
-                return {
-                    "pid": pid,
-                    "status": ps_process.status(),
-                    "cpu_percent": ps_process.cpu_percent(),
-                    "memory_info": ps_process.memory_info()._asdict(),
-                    "create_time": ps_process.create_time(),
-                    "cmdline": ps_process.cmdline(),
-                }
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-        return None
-
-    def terminate_by_token(self, token: str) -> bool:
-        """Terminate a running process by token
+        """Terminate a process by PID
 
         Args:
-            token: The token returned by execute_async
+            pid: The process ID to terminate
 
         Returns:
-            Boolean indicating success
+            True if the process was terminated successfully, False otherwise
         """
-        pid = self.process_tokens.get(token)
-        if not pid:
-            logger.warning(f"No process found for token: {token}")
+        try:
+            process = psutil.Process(pid)
+            process.terminate()
+            
+            # Give it a moment to terminate
+            gone, still_alive = psutil.wait_procs([process], timeout=3)
+            if still_alive:
+                # Force kill if still alive
+                for p in still_alive:
+                    p.kill()
+            
+            return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, Exception) as e:
+            _log_with_context(
+                logging.ERROR,
+                "Error terminating process",
+                {"pid": pid, "error": str(e)}
+            )
             return False
 
-        result = self.terminate_process(pid)
-        if result:
-            # Clean up tracking if termination was successful
-            self.process_tokens.pop(token, None)
-            
-            # Also remove from completed processes if it exists
-            if token in self.completed_processes:
-                self.completed_processes.pop(token, None)
+    def get_process_info(self, pid: int) -> Optional[Dict[str, Any]]:
+        """Get detailed information about a process
 
+        Args:
+            pid: The process ID to get information for
+
+        Returns:
+            Dictionary with process information or None if the process cannot be found
+        """
+        try:
+            process = psutil.Process(pid)
+            return {
+                "pid": pid,
+                "status": process.status(),
+                "cpu_percent": process.cpu_percent(),
+                "memory_info": process.memory_info()._asdict(),
+                "create_time": process.create_time(),
+                "cmdline": process.cmdline(),
+                "username": process.username(),
+                "name": process.name()
+            }
+        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+            _log_with_context(
+                logging.WARNING,
+                "Could not get process info",
+                {"pid": pid, "error": str(e)}
+            )
+            return None
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                "Unexpected error getting process info",
+                {"pid": pid, "error": str(e)}
+            )
+            return None
+
+    def terminate_by_token(self, token: str) -> bool:
+        """Terminate a process by its token
+
+        Args:
+            token: The token for the process to terminate
+
+        Returns:
+            True if the process was terminated successfully, False otherwise
+        """
+        if token not in self.process_tokens:
+            _log_with_context(
+                logging.WARNING,
+                "Process token not found for termination",
+                {"token": token}
+            )
+            return False
+
+        pid = self.process_tokens[token]
+        result = self.terminate_process(pid)
+        
+        if result:
+            # Mark as completed with termination status
+            self.completed_processes[token] = {
+                "status": "terminated",
+                "success": False,
+                "error": "Process was terminated by request",
+                "output": "",
+                "pid": pid
+            }
+            
+            # Clean up tracking
+            self.running_processes.pop(pid, None)
+            
         return result
 
     async def query_process(
         self, token: str, wait: bool = False, timeout: Optional[float] = None
     ) -> Dict[str, Any]:
-        """Query a process status and optionally wait for completion
+        """Query the status of a process and optionally wait for completion
 
         Args:
-            token: The token returned by execute_async
-            wait: If True, wait for the process to complete
-            timeout: Optional timeout in seconds for waiting
+            token: The token for the process to query
+            wait: Whether to wait for the process to complete
+            timeout: Optional timeout in seconds for the wait (if wait is True)
 
         Returns:
-            Dictionary with process status or results
+            Dictionary with process status or completion information
         """
-        # First check if we have completed results for this token
-        if token in self.completed_processes:
-            return self.completed_processes[token]
-                
-        # If not waiting, just return current status
-        if not wait:
-            result = await self.get_process_status(token)
-            if result["status"] != "completed" and result["status"] != "not_running":
-                return result
-
-        # Otherwise, wait for process to complete
-        return await self.wait_for_process(token, timeout)
+        if wait:
+            _log_with_context(
+                logging.INFO,
+                "Querying process with wait",
+                {"token": token, "timeout": timeout}
+            )
+            return await self.wait_for_process(token, timeout)
+        else:
+            _log_with_context(
+                logging.INFO,
+                "Querying process status without wait",
+                {"token": token}
+            )
+            return await self.get_process_status(token) 

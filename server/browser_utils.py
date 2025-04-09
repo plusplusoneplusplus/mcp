@@ -114,4 +114,4 @@ class BrowserUtils:
                     shutil.rmtree(driver.temp_dir, ignore_errors=True)
                 except Exception:
                     pass
-            driver.quit()
+            driver.quit() 

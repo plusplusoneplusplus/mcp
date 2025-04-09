@@ -6,13 +6,14 @@ from pydantic import BaseModel
 from mcp.types import TextContent, Tool
 import platform
 
-from sentinel.command_executor import CommandExecutor
-from server.environment import env, get_private_tool_root
+# Use absolute imports with 'import command_executor' instead of relative imports
+import command_executor
+from environment import env, get_private_tool_root
 
 PRIVATE_DIRECTORY_NAME = ".private"
 DEFAULT_TIMEOUT = 30
 
-executor = CommandExecutor()
+executor = command_executor.CommandExecutor()
 pwd = Path(__file__).resolve().parent
 
 g_default_parameters = {

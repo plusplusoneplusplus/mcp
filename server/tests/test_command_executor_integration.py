@@ -8,7 +8,13 @@ import signal
 import psutil
 import logging
 
-from sentinel.command_executor import CommandExecutor
+# Update import to use local command_executor
+import sys
+from pathlib import Path
+
+# Add the parent directory to the path so we can import server modules
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+from server.command_executor import CommandExecutor
 
 # Set up logging
 logging.basicConfig(
