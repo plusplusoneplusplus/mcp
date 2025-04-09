@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from mcp.server.fastmcp import Context, FastMCP
-from sentinel.command_executor import CommandExecutor
+import command_executor
 
 # Setup logging
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -24,7 +24,7 @@ logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join(SCRIPT_DIR, ".logs", "sentinel.log")),
+        logging.FileHandler(os.path.join(SCRIPT_DIR, ".logs", "server.log")),
         logging.StreamHandler(),
     ],
 )
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AppContext:
     collection: Collection
-    cmd_executor: CommandExecutor
+    cmd_executor: command_executor.CommandExecutor
 
 
 @asynccontextmanager
@@ -44,10 +44,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     # Setup vector database
     db_path = SCRIPT_DIR / ".vectordb"
     db = chromadb.PersistentClient(path=str(db_path))
-    collection = db.get_or_create_collection(name="sentinel_collection")
+    collection = db.get_or_create_collection(name="mcp_collection")
 
     # Setup command executor
-    cmd_executor = CommandExecutor()
+    cmd_executor = command_executor.CommandExecutor()
 
     try:
         yield AppContext(collection=collection, cmd_executor=cmd_executor)
@@ -56,7 +56,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
 
 
 # Pass lifespan to server
-mcp = FastMCP("Sentinel", lifespan=app_lifespan)
+mcp = FastMCP("MCP Server", lifespan=app_lifespan)
 
 # Define allowed commands
 LINUX_ALLOWED_COMMANDS = ["ls", "pwd", "echo"]

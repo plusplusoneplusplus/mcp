@@ -204,18 +204,11 @@ if %ERRORLEVEL% EQU 0 (
 
 ## Running Tests
 
-### Using Bash Script (Linux/Mac)
+To run tests for the MCP server:
 
 ```bash
-# Run all tests
-./sentinel/run_tests.sh
-```
-
-### Using PowerShell Script (Windows)
-
-```powershell
-# Run all tests
-.\sentinel\run_tests.ps1
+# Run all tests with pytest
+python -m pytest
 ```
 
 # Config MCP server as part of cursor/vscode
