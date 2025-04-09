@@ -222,12 +222,7 @@ python -m pytest
           "GIT_ROOT": "${workspaceFolder}",
           "PRIVATE_TOOL_ROOT": "${workspaceFolder}/.private"
         }
-      },
-      // this is deprecated.
-      // "fastmcp" : {
-      //   "command": "mcp\\venv\\scripts\\python",
-      //   "args": ["-m", "uv", "run", "--with", "mcp", "mcp", "run", "mcp\\server\\fast-main.py"]
-      // }
+      }
     }
   }
 ```
