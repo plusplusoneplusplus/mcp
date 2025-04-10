@@ -22,7 +22,7 @@ g_default_parameters = {
 
 def format_command_with_parameters(command: str, parameters: Dict[str, Any]) -> str:
     """Format a command with parameters.
-    
+
     Args:
         command: The command string with placeholders
         parameters: Dictionary of parameters to substitute
@@ -30,7 +30,7 @@ def format_command_with_parameters(command: str, parameters: Dict[str, Any]) -> 
     # Merge with global default parameters if not already defined
     merged_parameters = {**g_default_parameters}
     merged_parameters.update(parameters)
-    
+
     try:
         return command.format(**merged_parameters)
     except KeyError as e:
@@ -77,7 +77,7 @@ class ToolExecutor:
             description=self.tool_description,
             inputSchema=self.input_schema
         )
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Execute the tool with the provided arguments."""
         raise NotImplementedError("Subclasses must implement this method")
@@ -87,7 +87,7 @@ class ExecuteCommandTool(ToolExecutor):
     tool_name = "execute_command"
     tool_description = "Execute a command"
     input_schema = ExecuteCommandInput.model_json_schema()
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Execute a command and return the result."""
         command = arguments.get('command', '')
@@ -103,15 +103,15 @@ class ExecuteCommandAsyncTool(ToolExecutor):
     tool_name = "execute_command_async"
     tool_description = "Start a command execution asynchronously and return a token for tracking"
     input_schema = ExecuteCommandAsyncInput.model_json_schema()
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Start a command execution asynchronously and return a token for tracking."""
         command = arguments.get('command', '')
         timeout = arguments.get('timeout')
-        
+
         print(f"Starting async command execution: {command}")
         result = await executor.execute_async(command, timeout)
-        
+
         return [TextContent(
             type="text",
             text=f"Command started with token: {result['token']}\nStatus: {result['status']}\nPID: {result['pid']}"
@@ -122,17 +122,17 @@ class QueryCommandStatusTool(ToolExecutor):
     tool_name = "query_command_status"
     tool_description = "Query the status of an asynchronous command execution or wait for it to complete"
     input_schema = QueryCommandStatusInput.model_json_schema()
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Query the status of an asynchronous command execution or wait for it to complete."""
         token = arguments.get('token', '')
         wait = arguments.get('wait', False)
         timeout = arguments.get('timeout', DEFAULT_TIMEOUT)
-        
+
         print(f"Querying command status for token: {token}, wait: {wait}")
-        
+
         result = await executor.query_process(token, wait, timeout)
-        
+
         if result.get('status') == 'completed':
             return [TextContent(
                 type="text",
@@ -147,7 +147,7 @@ class QueryCommandStatusTool(ToolExecutor):
                 status_text += f"\nCPU: {result.get('cpu_percent')}%"
             if 'memory_info' in result:
                 status_text += f"\nMemory: {result.get('memory_info')}"
-            
+
             return [TextContent(
                 type="text",
                 text=status_text
@@ -158,12 +158,12 @@ class ExecuteTaskTool(ToolExecutor):
     tool_name = "execute_task"
     tool_description = "Execute a predefined task by name and start it asynchronously"
     input_schema = ExecuteTaskInput.model_json_schema()
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Execute a predefined task by name."""
         task_name = arguments.get('task_name', '')
         timeout = arguments.get('timeout', DEFAULT_TIMEOUT)
-        
+
         # Load available tasks
         tasks = load_tasks_from_yaml()
         if task_name not in tasks:
@@ -171,12 +171,12 @@ class ExecuteTaskTool(ToolExecutor):
                 type="text",
                 text=f"Error: Task '{task_name}' not found. Use 'list_tasks' to see available tasks."
             )]
-        
+
         task = tasks[task_name]
-        
+
         # Get the current OS
         os_type = platform.system().lower()
-        
+
         # Check if this task has OS-conditional commands
         if 'commands' in task:
             # Get the command for the current OS
@@ -194,16 +194,16 @@ class ExecuteTaskTool(ToolExecutor):
                 type="text",
                 text=f"Error: Task '{task_name}' does not have a valid command definition."
             )]
-        
+
         # Use the task-defined timeout if available and not overridden
         if timeout is None and 'timeout' in task:
             timeout = task.get('timeout')
-        
+
         command = format_command_with_parameters(command, g_default_parameters)
 
         print(f"Starting task '{task_name}' with command: {command}")
         result = await executor.execute_async(command, timeout)
-        
+
         return [TextContent(
             type="text",
             text=f"Task '{task_name}' started with token: {result['token']}\nStatus: {result['status']}\nPID: {result['pid']}\nCommand: {command}\nOS: {os_type}"
@@ -214,17 +214,17 @@ class QueryTaskStatusTool(ToolExecutor):
     tool_name = "query_task_status"
     tool_description = "Query the status of an asynchronously executed task"
     input_schema = QueryTaskStatusInput.model_json_schema()
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Query the status of an executed task."""
         token = arguments.get('token', '')
         wait = arguments.get('wait', False)
         timeout = arguments.get('timeout', DEFAULT_TIMEOUT)
-        
+
         print(f"Querying task status for token: {token}, wait: {wait}")
-        
+
         result = await executor.query_process(token, wait, timeout)
-        
+
         if result.get('status') == 'completed':
             return [TextContent(
                 type="text",
@@ -239,7 +239,7 @@ class QueryTaskStatusTool(ToolExecutor):
                 status_text += f"\nCPU: {result.get('cpu_percent')}%"
             if 'memory_info' in result:
                 status_text += f"\nMemory: {result.get('memory_info')}"
-            
+
             return [TextContent(
                 type="text",
                 text=status_text
@@ -250,25 +250,25 @@ class ListTasksTool(ToolExecutor):
     tool_name = "list_tasks"
     tool_description = "List all available predefined tasks"
     input_schema = {}
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """List all available predefined tasks."""
         tasks = load_tasks_from_yaml()
-        
+
         if not tasks:
             return [TextContent(
                 type="text",
                 text="No predefined tasks found."
             )]
-        
+
         # Get the current OS
         os_type = platform.system().lower()
-        
+
         task_list = []
         for name, task in tasks.items():
             description = task.get('description', 'No description')
             timeout = f", timeout: {task.get('timeout')} seconds" if 'timeout' in task else ""
-            
+
             # Handle OS-conditional commands
             if 'commands' in task:
                 if os_type in task['commands']:
@@ -277,7 +277,7 @@ class ListTasksTool(ToolExecutor):
                 else:
                     command = "No command available for current OS"
                     os_support = f"Warning: This task does not support the current OS ({os_type})"
-                
+
                 # Add all supported OS commands
                 all_commands = "\n  ".join([f"{os}: {cmd}" for os, cmd in task['commands'].items()])
                 command_info = f"All OS commands:\n  {all_commands}"
@@ -289,9 +289,9 @@ class ListTasksTool(ToolExecutor):
                 command = "No command defined"
                 os_support = "Warning: This task has no command defined"
                 command_info = ""
-            
+
             task_list.append(f"- {name}: {description}{timeout}\n  {os_support}\n  {command_info}")
-        
+
         return [TextContent(
             type="text",
             text=f"Available predefined tasks:\n\n" + "\n\n".join(task_list)
@@ -302,14 +302,14 @@ class ListInstructionsTool(ToolExecutor):
     tool_name = "list_instructions"
     tool_description = "List all available instructions"
     input_schema = {}
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """List all available instructions."""
         # Import here to avoid circular imports
         import prompts
         available_instructions = prompts.get_prompts()
         instruction_list = "\n".join([f"- {p.name}: {p.description}" for p in available_instructions])
-        
+
         return [TextContent(
             type="text",
             text=f"Available instructions:\n{instruction_list}"
@@ -320,23 +320,23 @@ class GetInstructionTool(ToolExecutor):
     tool_name = "get_instruction"
     tool_description = "Get a specific instruction with its details"
     input_schema = {}
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Get a specific instruction with its details."""
         # Import here to avoid circular imports
         import prompts
-        
+
         instruction_name = arguments.get('name')
         if not instruction_name:
             raise ValueError("Instruction name is required")
-        
+
         # Get all instructions
         yaml_prompts = prompts.load_prompts_from_yaml()
         if instruction_name not in yaml_prompts:
             raise ValueError(f"Instruction not found: {instruction_name}")
-        
+
         instruction_data = yaml_prompts[instruction_name]
-        
+
         # Format the response
         args_desc = ""
         if 'arguments' in instruction_data:
@@ -345,9 +345,9 @@ class GetInstructionTool(ToolExecutor):
                 f"({'Required' if arg.get('required') else 'Optional'})"
                 for arg in instruction_data['arguments']
             ])
-        
+
         template = f"\nTemplate:\n{instruction_data.get('template', 'No template available')}" if 'template' in instruction_data else ""
-        
+
         return [TextContent(
             type="text",
             text=f"Instruction: {instruction_data.get('name')}\nDescription: {instruction_data.get('description')}{args_desc}{template}"
@@ -366,7 +366,7 @@ class ScriptTool(ToolExecutor):
         self.tool_description = description
         self.script_path = script_path
         self.input_schema = input_schema
-    
+
     @classmethod
     def from_yaml(cls, name: str, tool_data: dict) -> 'ScriptTool':
         """Create a ScriptTool instance from YAML data."""
@@ -376,17 +376,17 @@ class ScriptTool(ToolExecutor):
             script_path=tool_data.get('script', ''),
             input_schema=tool_data.get('inputSchema', {})
         )
-    
+
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Execute the script with the provided arguments."""
         script_path = self.script_path.format(**g_default_parameters)
         script_path = Path(script_path)
-        
+
         # Build command with arguments
         command = [str(script_path)]
         for arg_name, arg_value in arguments.items():
             command.extend([f"--{arg_name}", str(arg_value)])
-        
+
         print(f"Executing script: {' '.join(command)}")
         result = executor.execute(' '.join(command))
         return [TextContent(
@@ -397,7 +397,7 @@ class ScriptTool(ToolExecutor):
 def load_yaml_from_locations(filename: str) -> dict:
     """Load YAML file from multiple possible locations with priority order."""
     yaml_data = {}
-    
+
     # Priority 1: Load from PRIVATE_TOOL_ROOT if set
     private_tool_root = get_private_tool_root()
     if private_tool_root:
@@ -411,7 +411,7 @@ def load_yaml_from_locations(filename: str) -> dict:
                     return yaml_data
             except Exception as e:
                 print(f"Error loading from PRIVATE_TOOL_ROOT: {e}")
-    
+
     # Priority 2: Load from private directory in server folder
     private_yaml_path = pwd / PRIVATE_DIRECTORY_NAME / filename
     if private_yaml_path.exists():
@@ -422,7 +422,7 @@ def load_yaml_from_locations(filename: str) -> dict:
                 return yaml_data
         except Exception as e:
             print(f"Error loading from private directory: {e}")
-    
+
     # Priority 3: Fallback to default location
     yaml_path = pwd / filename
     if yaml_path.exists():
@@ -432,7 +432,7 @@ def load_yaml_from_locations(filename: str) -> dict:
                 yaml_data = yaml.safe_load(file)
         except Exception as e:
             print(f"Error loading from default location: {e}")
-    
+
     return yaml_data
 
 def load_tasks_from_yaml() -> Dict[str, Dict[str, Any]]:
@@ -486,7 +486,7 @@ for name, tool_data in yaml_tools.items():
         # Create tool instance with YAML data
         tool_class = TOOL_EXECUTORS[name]
         tool_instance = tool_class()
-        
+
         # Override properties with YAML data if provided
         if 'name' in tool_data:
             tool_instance.tool_name = tool_data['name']
@@ -510,10 +510,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     # Check if we have an executor for this tool
     if name in tools_mapping:
         return await tools_mapping[name].execute(arguments)
-    
+
     # Check if tool exists in YAML
     yaml_tools = load_tools_from_yaml()
     if name in yaml_tools:
         raise ValueError(f"Tool '{name}' found in YAML but no executor is implemented")
-    
+
     raise ValueError(f"Tool not found: {name}")
