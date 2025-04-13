@@ -61,6 +61,10 @@ class QueryTaskStatusInput(BaseModel):
     wait: bool = False
     timeout: Optional[float] = None
 
+class QueryScriptStatusInput(BaseModel):
+    token: str
+    timeout: Optional[float] = None
+
 class UpdateDcCommandInput(BaseModel):
     dc_name: str
 
@@ -134,9 +138,12 @@ class QueryCommandStatusTool(ToolExecutor):
         result = await executor.query_process(token, wait, timeout)
 
         if result.get('status') == 'completed':
+            error_text = result.get('error')
+            error_section = f"\nError:\n{error_text}" if error_text and error_text.strip() else ""
+            
             return [TextContent(
                 type="text",
-                text=f"Command completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}\nError:\n{result.get('error')}"
+                text=f"Command completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}{error_section}"
             )]
         else:
             # Just returning status
@@ -226,9 +233,12 @@ class QueryTaskStatusTool(ToolExecutor):
         result = await executor.query_process(token, wait, timeout)
 
         if result.get('status') == 'completed':
+            error_text = result.get('error')
+            error_section = f"\nError:\n{error_text}" if error_text and error_text.strip() else ""
+            
             return [TextContent(
                 type="text",
-                text=f"Task completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}\nError:\n{result.get('error')}"
+                text=f"Task completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}{error_section}"
             )]
         else:
             # Just returning status
@@ -353,7 +363,7 @@ class GetInstructionTool(ToolExecutor):
             text=f"Instruction: {instruction_data.get('name')}\nDescription: {instruction_data.get('description')}{args_desc}{template}"
         )]
 
-class ScriptTool(ToolExecutor):
+class ScriptAsyncTool(ToolExecutor):
     """Tool to execute scripts defined in YAML."""
     input_schema = {
         "type": "object",
@@ -361,38 +371,119 @@ class ScriptTool(ToolExecutor):
         "required": []
     }
 
-    def __init__(self, name: str, description: str, script_path: str, input_schema: dict):
+    def __init__(self, name: str, description: str, script_path: str, input_schema: dict, scripts: dict = None):
         self.tool_name = name
         self.tool_description = description
         self.script_path = script_path
         self.input_schema = input_schema
+        self.scripts = scripts or {}  # OS-specific scripts
 
     @classmethod
-    def from_yaml(cls, name: str, tool_data: dict) -> 'ScriptTool':
-        """Create a ScriptTool instance from YAML data."""
+    def from_yaml(cls, name: str, tool_data: dict) -> 'ScriptAsyncTool':
+        """Create a ScriptAsyncTool instance from YAML data."""
         return cls(
             name=name,
             description=tool_data.get('description', ''),
             script_path=tool_data.get('script', ''),
-            input_schema=tool_data.get('inputSchema', {})
+            input_schema=tool_data.get('inputSchema', {}),
+            scripts=tool_data.get('scripts', {})
         )
 
     async def execute(self, arguments: dict) -> list[TextContent]:
         """Execute the script with the provided arguments."""
-        script_path = self.script_path.format(**g_default_parameters)
-        script_path = Path(script_path)
-
+        # Get the current OS
+        os_type = platform.system().lower()
+        
+        # Check if there are OS-specific scripts defined
+        if self.scripts and os_type in self.scripts:
+            # Use OS-specific script
+            script_cmd = self.scripts[os_type]
+        else:
+            # Use default script path
+            script_cmd = self.script_path
+            
+        # Format with parameters
+        script_cmd = format_command_with_parameters(script_cmd, g_default_parameters)
+        
         # Build command with arguments
-        command = [str(script_path)]
-        for arg_name, arg_value in arguments.items():
-            command.extend([f"--{arg_name}", str(arg_value)])
+        if "{args}" in script_cmd:
+            # If {args} placeholder exists, construct args string and inject it
+            args_str = ""
+            for arg_name, arg_value in arguments.items():
+                if arg_name != 'timeout':  # Handle timeout separately
+                    if isinstance(arg_value, bool):
+                        if arg_value:
+                            args_str += f" --{arg_name}"
+                    else:
+                        args_str += f" --{arg_name} {arg_value}"
+            
+            # Replace {args} with constructed args string
+            command = script_cmd.replace("{args}", args_str.strip())
+        else:
+            # Otherwise construct command array and join
+            command_parts = [script_cmd]
+            for arg_name, arg_value in arguments.items():
+                if arg_name != 'timeout':  # Handle timeout separately
+                    if isinstance(arg_value, bool):
+                        if arg_value:
+                            command_parts.append(f"--{arg_name}")
+                    else:
+                        command_parts.append(f"--{arg_name}")
+                        command_parts.append(str(arg_value))
+            
+            command = " ".join(command_parts)
 
-        print(f"Executing script: {' '.join(command)}")
-        result = executor.execute(' '.join(command))
+        timeout = arguments.get('timeout')
+        
+        # Execute asynchronously
+        print(f"Starting async script execution: {command}")
+        result = await executor.execute_async(command, timeout)
         return [TextContent(
             type="text",
-            text=f"Script result:\n{result}"
+            text=f"Script started with token: {result['token']}\nStatus: {result['status']}\nPID: {result['pid']}"
         )]
+
+class QueryScriptStatusTool(QueryCommandStatusTool):
+    """Tool to query the status of an asynchronously executed script."""
+    tool_name = "query_script_status"
+    tool_description = "Query the status of an asynchronously executed script"
+    input_schema = QueryScriptStatusInput.model_json_schema()
+
+    # This tool reuses the implementation from QueryCommandStatusTool
+    # but never waits for completion
+    
+    async def execute(self, arguments: dict) -> list[TextContent]:
+        """Query the status of an executed script without waiting."""
+        token = arguments.get('token', '')
+        timeout = arguments.get('timeout', DEFAULT_TIMEOUT)
+
+        print(f"Querying script status for token: {token}")
+
+        # Force wait to False to ensure we never wait
+        result = await executor.query_process(token, False, timeout)
+
+        if result.get('status') == 'completed':
+            error_text = result.get('error')
+            error_section = f"\nError:\n{error_text}" if error_text and error_text.strip() else ""
+            
+            return [TextContent(
+                type="text",
+                text=f"Script completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}{error_section}"
+            )]
+        else:
+            # Just returning status
+            status_text = f"Script status (token: {token}): {result.get('status')}"
+            if 'pid' in result:
+                status_text += f"\nPID: {result.get('pid')}"
+            if 'cpu_percent' in result:
+                status_text += f"\nCPU: {result.get('cpu_percent')}%"
+            if 'memory_info' in result:
+                status_text += f"\nMemory: {result.get('memory_info')}"
+
+            return [TextContent(
+                type="text",
+                text=status_text
+            )]
 
 def load_yaml_from_locations(filename: str) -> dict:
     """Load YAML file from multiple possible locations with priority order."""
@@ -459,6 +550,7 @@ TOOL_EXECUTORS = {
     "list_tasks": ListTasksTool,
     "list_instructions": ListInstructionsTool,
     "get_instruction": GetInstructionTool,
+    "query_script_status": QueryScriptStatusTool,
 }
 
 # initialize the tools
@@ -469,8 +561,8 @@ for name, tool_data in yaml_tools.items():
     if name not in TOOL_EXECUTORS:
         print(f"Adding tool: {name}")
         if tool_data.get('type') == 'script':
-            # Create a script-based tool
-            script_tool = ScriptTool.from_yaml(name, tool_data)
+            # Create a script-based tool (always async)
+            script_tool = ScriptAsyncTool.from_yaml(name, tool_data)
             tools_mapping[name] = script_tool
         else:
             # Create a regular tool
