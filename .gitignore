@@ -46,6 +46,7 @@ htmlcov/
 
 # Logs
 .logs/
+server/tests/logs/
 
 # Jupyter Notebook
 .ipynb_checkpoints
