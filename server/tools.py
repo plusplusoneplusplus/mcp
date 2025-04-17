@@ -6,14 +6,16 @@ from pydantic import BaseModel
 from mcp.types import TextContent, Tool
 import platform
 
-# Use absolute imports with 'import command_executor' instead of relative imports
+# Use absolute imports with 'import command_executor_v2' instead of relative imports
 import command_executor
+from command_executor_v2 import CommandExecutorV2
 from environment import env, get_private_tool_root
 
 PRIVATE_DIRECTORY_NAME = ".private"
 DEFAULT_TIMEOUT = 25
 
-executor = command_executor.CommandExecutor()
+# Use the new V2 executor
+executor = CommandExecutorV2()
 pwd = Path(__file__).resolve().parent
 
 g_default_parameters = {
