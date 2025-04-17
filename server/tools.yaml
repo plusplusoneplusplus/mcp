@@ -53,7 +53,7 @@ tools:
   execute_task:
     enabled: true
     name: execute_task
-    description: | 
+    description: |
       Execute a predefined task by name and start it asynchronously.
       Use the token returned by this tool to query the status (tool/query_task_status) of the task execution every 30 seconds.
     inputSchema:
@@ -109,13 +109,37 @@ tools:
       required:
         - name
 
+  query_script_status:
+    enabled: true
+    name: query_script_status
+    description: Query the status of an asynchronously executed script
+    inputSchema:
+      type: object
+      properties:
+        token:
+          type: string
+          description: The token returned by async script execution
+        timeout:
+          type: number
+          description: Optional timeout in seconds for waiting
+      required:
+        - token
+
   # Script-based tools examples
   deploy:
-    enabled: false
+    enabled: true
     name: deploy
-    description: Deploy the application
+    description: |
+      Deploy the application asynchronously and return a token for tracking.
+      Use the token to query the status (tool/query_script_status).
     type: script
-    script: powershell -file {pwd}/test_deploy.ps1
+    # Default script path (optional, used as fallback if no OS-specific script is found)
+    script: bash {pwd}/test_deploy.sh
+    # OS-specific scripts
+    scripts:
+      windows: powershell -file {pwd}/test_deploy.ps1
+      darwin: bash {pwd}/test_deploy.sh
+      linux: bash {pwd}/test_deploy.sh
     inputSchema:
       type: object
       properties:
@@ -123,13 +147,19 @@ tools:
           type: string
           description: Deployment environment
           enum: ["dev", "staging", "prod"]
+        version:
+          type: string
+          description: Version to deploy
+          default: "1.0.0"
         force:
           type: boolean
           description: Force deployment even if version exists
           default: false
+        timeout:
+          type: number
+          description: Optional timeout in seconds
       required:
         - environment
-        - version
 
 # Predefined tasks with associated command lines
 tasks:

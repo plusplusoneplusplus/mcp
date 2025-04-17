@@ -231,6 +231,54 @@ class TestCrossPlatformFeatures:
 
         assert line1_pos < line2_pos < line3_pos, "Lines are not in the expected order"
 
+    def test_git_branch_command(self, executor):
+        """Test git rev-parse command to get current branch name"""
+        # Store original directory
+        original_dir = os.getcwd()
+        try:
+            # Change to the directory containing this test file
+            test_file_dir = os.path.dirname(os.path.abspath(__file__))
+            os.chdir(test_file_dir)
+            
+            # Find the git root directory (assuming we're in a git repo)
+            result = executor.execute("git rev-parse --show-toplevel")
+            assert result["success"], "Not in a git repository"
+            git_root = result["output"].strip()
+            
+            # Change to git root directory
+            os.chdir(git_root)
+            
+            # Now run the branch command
+            result = executor.execute("git rev-parse --abbrev-ref HEAD")
+            assert result["success"], f"Command failed with error: {result.get('error', 'Unknown error')}"
+            assert result["output"].strip(), "Branch name should not be empty"
+            # Branch name should be a valid git branch name (no spaces or special chars except - _ /)
+            assert all(c.isalnum() or c in "-_/" for c in result["output"].strip()), "Invalid branch name characters"
+            assert not result["error"], "Command should not have errors"
+        finally:
+            # Restore original directory
+            os.chdir(original_dir)
+
+    def test_pwd_command(self, executor):
+        """Test getting the current working directory"""
+        # Get the current directory using Python
+        expected_pwd = os.getcwd()
+        
+        # Get the directory using command executor
+        if platform.system().lower() == "windows":
+            result = executor.execute("cd")  # Windows command for pwd
+        else:
+            result = executor.execute("pwd")  # Unix command for pwd
+            
+        assert result["success"], f"Command failed with error: {result.get('error', 'Unknown error')}"
+        # Clean up the output (remove newlines and spaces)
+        actual_pwd = result["output"].strip()
+        # Normalize paths for comparison (Windows vs Unix style)
+        expected_pwd = os.path.normpath(expected_pwd)
+        actual_pwd = os.path.normpath(actual_pwd)
+        assert actual_pwd == expected_pwd, f"Expected pwd: {expected_pwd}, got: {actual_pwd}"
+        assert not result["error"], "Command should not have errors"
+
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
