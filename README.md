@@ -222,6 +222,9 @@ python -m pytest
           "GIT_ROOT": "${workspaceFolder}",
           "PRIVATE_TOOL_ROOT": "${workspaceFolder}/.private"
         }
+      },
+      "mymcp-sse" : {
+        "url": "http://0.0.0.0:8000/sse"
       }
     }
   }
