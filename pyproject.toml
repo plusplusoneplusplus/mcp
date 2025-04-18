@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-cs"
+version = "0.1.0"
+description = "MCP configuration based server"
+authors = [
+    {name = "Yiheng Tao", email = "example@example.com"}
+]
+requires-python = ">=3.10"
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    # Core dependencies
+    "mcp>=0.1.0",  # Model Context Protocol Python SDK
+    "chromadb>=0.4.22",  # Vector database for semantic search
+    "pyyaml>=6.0.1",  # YAML parser
+    "psutil>=5.9.5",  # Process utilities for monitoring and management
+    
+    # HTTP/SSE server
+    "uvicorn>=0.25.0",  # ASGI server
+    "starlette>=0.35.0",  # ASGI framework
+    "httpx>=0.26.0",  # HTTP client
+    "httpx-sse>=0.4.0",  # SSE client for httpx
+    
+    # Webdriver tools
+    "selenium==4.18.1",
+    "webdriver-manager==4.0.1",
+    
+    # Testing
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+]
+
+[tool.setuptools]
+packages = ["server"]
+
+[tool.black]
+line-length = 88
+target-version = ["py38"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true 
