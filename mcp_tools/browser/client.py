@@ -15,7 +15,10 @@ from typing import Optional, Dict, Any, List
 
 # Import interface
 from mcp_tools.interfaces import BrowserClientInterface
+# Import the plugin decorator
+from mcp_tools.plugin import register_tool
 
+@register_tool
 class BrowserClient(BrowserClientInterface):
     """Client for browser automation operations.
     

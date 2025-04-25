@@ -16,6 +16,8 @@ import traceback
 
 # Import the interface
 from mcp_tools.interfaces import CommandExecutorInterface
+# Import the plugin decorator
+from mcp_tools.plugin import register_tool
 
 g_config_sleep_when_running = True
 
@@ -40,6 +42,7 @@ def _log_with_context(log_level: int, msg: str, context: Dict[str, Any] = None) 
     structured_msg = f"{msg} | Context: {json.dumps(context, default=str)}"
     logger.log(log_level, structured_msg)
 
+@register_tool
 class CommandExecutor(CommandExecutorInterface):
     """Command executor that can run processes synchronously or asynchronously,
     using temporary files for stdout/stderr capture.

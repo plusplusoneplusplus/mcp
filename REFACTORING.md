@@ -14,6 +14,7 @@ The new project structure decouples tools into their own packages:
 
 /mcp_tools/      # Decoupled tool modules
   - interfaces.py  # Shared interfaces for all tools
+  - plugin.py      # Plugin registration system
   - command_executor/  # Command execution functionality
   - azrepo/       # Azure repo integration
   - browser/      # Browser automation 
@@ -31,7 +32,7 @@ We've extracted each tool into its own package without changing functionality:
 2. ✅ Move each tool to its own package
 3. ✅ Create adapter to maintain backward compatibility
 
-### Phase 2: Interface Definition (Current Phase)
+### Phase 2: Interface Definition (Complete)
 
 We've defined clean interfaces for each tool to standardize interactions:
 
@@ -39,11 +40,13 @@ We've defined clean interfaces for each tool to standardize interactions:
 2. ✅ Adapt tools to implement these interfaces
 3. ✅ Update MCP to use interface methods instead of direct calls
 
-### Phase 3: Plugin System
+### Phase 3: Plugin System (Complete)
 
-1. Implement plugin registration system
-2. Convert tools to plugins
-3. Update MCP to discover and load plugins
+We've implemented a plugin system for tool registration and discovery:
+
+1. ✅ Implement plugin registration system
+2. ✅ Convert tools to plugins
+3. ✅ Update MCP to discover and load plugins dynamically
 
 ### Phase 4: Dependency Injection
 
@@ -115,6 +118,53 @@ browser = BrowserClient()
 html = browser.get_page_html("https://example.com")
 ```
 
+### Plugin System Approach
+
+```python
+# Using the plugin system for dynamic tool discovery
+from mcp_tools.plugin import registry, discover_and_register_tools
+
+# Discover all available tools
+discover_and_register_tools()
+
+# Get a tool instance by name
+command_executor = registry.get_tool_instance("command_executor")
+result = command_executor.execute("ls -la")
+
+# Get all registered tools
+all_tools = registry.get_all_instances()
+```
+
+### Creating Custom Tools
+
+```python
+# Creating a custom tool with the plugin decorator
+from mcp_tools.interfaces import ToolInterface
+from mcp_tools.plugin import register_tool
+
+@register_tool
+class MyCustomTool(ToolInterface):
+    @property
+    def name(self) -> str:
+        return "my_custom_tool"
+        
+    @property
+    def description(self) -> str:
+        return "A custom tool that does something awesome"
+        
+    @property
+    def input_schema(self) -> dict:
+        return {
+            "type": "object",
+            "properties": {
+                "param1": {"type": "string"}
+            }
+        }
+        
+    async def execute_tool(self, arguments: dict) -> dict:
+        return {"result": "Tool executed successfully!"}
+```
+
 ## Installation
 
 To install the refactored packages:
@@ -127,5 +177,5 @@ pip install -e .
 
 - ✅ Phase 1: Tool Isolation (Complete)
 - ✅ Phase 2: Interface Definition (Complete)
-- ❌ Phase 3: Plugin System
+- ✅ Phase 3: Plugin System (Complete)
 - ❌ Phase 4: Dependency Injection 

@@ -13,11 +13,8 @@ from mcp_tools.interfaces import (
     EnvironmentManagerInterface,
 )
 
-# Import the new tool modules
-from mcp_tools.command_executor import CommandExecutor
-from mcp_tools.azrepo import AzureRepoClient
-from mcp_tools.browser import BrowserClient
-from mcp_tools.environment import env
+# Import plugin system
+from mcp_tools.plugin import registry, discover_and_register_tools
 
 # For backward compatibility with MCP types
 from mcp.types import TextContent, Tool
@@ -29,14 +26,18 @@ class ToolsAdapter:
     
     def __init__(self):
         """Initialize the tools adapter with instances of the new tool modules."""
-        # Create instances using their interfaces
-        self.command_executor: CommandExecutorInterface = CommandExecutor()
-        self.azure_repo_client: RepoClientInterface = AzureRepoClient(self.command_executor)
-        self.browser_client: BrowserClientInterface = BrowserClient()
-        self.environment_manager: EnvironmentManagerInterface = env
+        # Discover and register all available tools
+        discover_and_register_tools()
+        
+        # Get tool instances from the registry
+        self.command_executor = registry.get_tool_instance("command_executor")
+        self.azure_repo_client = registry.get_tool_instance("azure_repo_client")
+        self.browser_client = registry.get_tool_instance("browser_client")
+        self.environment_manager = registry.get_tool_instance("environment_manager")
         
         # Load environment
-        self.environment_manager.load()
+        if self.environment_manager:
+            self.environment_manager.load()
         
         # Store registered tools
         self._tools: Dict[str, Dict[str, Any]] = {}
@@ -47,11 +48,9 @@ class ToolsAdapter:
     
     def _register_default_tools(self):
         """Register the default tools that are part of the original implementation."""
-        # Register tools directly using their interfaces
-        self._register_tool_interface(self.command_executor)
-        self._register_tool_interface(self.azure_repo_client)
-        self._register_tool_interface(self.browser_client)
-        self._register_tool_interface(self.environment_manager)
+        # Register all tools from the registry
+        for tool in registry.get_all_instances():
+            self._register_tool_interface(tool)
         
         # Register additional backwards-compatibility tools
         self._register_tool(
@@ -99,6 +98,9 @@ class ToolsAdapter:
         Args:
             tool: The tool interface to register
         """
+        if not tool:
+            return
+            
         self._tools[tool.name] = {
             "name": tool.name,
             "description": tool.description,
@@ -205,6 +207,12 @@ class ToolsAdapter:
         command = arguments.get('command', '')
         logger.info(f"Executing command: {command}")
         
+        if not self.command_executor:
+            return [TextContent(
+                type="text",
+                text="Error: Command executor not available"
+            )]
+            
         result = self.command_executor.execute(command)
         
         return [TextContent(
@@ -217,6 +225,12 @@ class ToolsAdapter:
         command = arguments.get('command', '')
         timeout = arguments.get('timeout')
         
+        if not self.command_executor:
+            return [TextContent(
+                type="text",
+                text="Error: Command executor not available"
+            )]
+            
         logger.info(f"Starting async command execution: {command}")
         result = await self.command_executor.execute_async(command, timeout)
         
@@ -232,6 +246,12 @@ class ToolsAdapter:
         organization = arguments.get('organization')
         status = arguments.get('status')
         
+        if not self.azure_repo_client:
+            return [TextContent(
+                type="text",
+                text="Error: Azure repo client not available"
+            )]
+            
         result = await self.azure_repo_client.list_pull_requests(
             repository=repository,
             project=project,
@@ -268,6 +288,12 @@ class ToolsAdapter:
         url = arguments.get('url', '')
         wait_time = arguments.get('wait_time', 30)
         
+        if not self.browser_client:
+            return [TextContent(
+                type="text",
+                text="Error: Browser client not available"
+            )]
+            
         html = self.browser_client.get_page_html(url, wait_time)
         
         if html:

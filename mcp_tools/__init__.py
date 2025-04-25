@@ -15,6 +15,14 @@ from mcp_tools.azrepo import AzureRepoClient
 from mcp_tools.browser import BrowserClient
 from mcp_tools.environment import EnvironmentManager, env
 
+# Import plugin system
+from mcp_tools.plugin import (
+    register_tool,
+    registry,
+    discover_and_register_tools,
+    PluginRegistry
+)
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -31,4 +39,10 @@ __all__ = [
     "BrowserClient",
     "EnvironmentManager",
     "env",
+    
+    # Plugin system
+    "register_tool",
+    "registry",
+    "discover_and_register_tools",
+    "PluginRegistry",
 ]

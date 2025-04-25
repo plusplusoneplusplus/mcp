@@ -4,8 +4,11 @@ from typing import Dict, Any, List, Optional, Union
 
 # Import interface
 from mcp_tools.interfaces import RepoClientInterface
+# Import the plugin decorator
+from mcp_tools.plugin import register_tool
 
 # Now we'll accept the CommandExecutor as a dependency rather than importing it directly
+@register_tool
 class AzureRepoClient(RepoClientInterface):
     """Client for interacting with Azure DevOps Repositories using Azure CLI commands.
 
@@ -92,13 +95,22 @@ class AzureRepoClient(RepoClientInterface):
             "required": ["operation"]
         }
 
-    def __init__(self, command_executor):
+    def __init__(self, command_executor=None):
         """Initialize the AzureRepoClient with a command executor.
         
         Args:
-            command_executor: An instance of CommandExecutor to use for running commands
+            command_executor: An instance of CommandExecutor to use for running commands.
+                              If None, it will be obtained from the registry.
         """
-        self.executor = command_executor
+        if command_executor is None:
+            # Get the command executor from the registry
+            from mcp_tools.plugin import registry
+            self.executor = registry.get_tool_instance("command_executor")
+            if not self.executor:
+                raise ValueError("Command executor not found in registry")
+        else:
+            self.executor = command_executor
+            
         self.logger = logging.getLogger(__name__)
 
     async def _run_az_command(self, command: str, timeout: Optional[float] = None) -> Dict[str, Any]:
