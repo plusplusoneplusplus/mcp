@@ -21,6 +21,9 @@ The MCP project is organized into several components:
 
 - **assets/**: Project assets and images for documentation
 
+- **config/**: Centralized configuration modules
+  - **config/templates/**: Configuration templates
+
 ## Installation
 
 ### Manual installation
@@ -38,6 +41,53 @@ pip install -e .
 ```
 
 This will install all the local packages in development mode, allowing you to make changes to the code while using the packages.
+
+## Environment Configuration
+
+The MCP project uses a centralized environment configuration system based on `.env` files. This allows for consistent configuration across different components.
+
+### Setting Up Your Environment
+
+1. Copy the template file to create your `.env` file:
+   ```bash
+   cp config/templates/env.template .env
+   ```
+
+2. Edit the `.env` file to configure your environment settings:
+   ```bash
+   # Repository Information
+   GIT_ROOT=/path/to/git/repo
+   WORKSPACE_FOLDER=/path/to/workspace
+   PROJECT_NAME=mcp_project
+   
+   # Azure Repo Configuration
+   AZREPO_ORG=your-organization
+   AZREPO_PROJECT=your-project
+   AZREPO_REPO=your-repository
+   ```
+
+3. The system will automatically load the `.env` file from:
+   - Workspace folder
+   - Git root directory
+   - Current working directory
+   - User's home directory
+
+### Using the Environment Manager
+
+```python
+# Import the environment manager
+from config import env_manager, env
+
+# Load the environment information
+env_manager.load()
+
+# Access environment settings
+git_root = env_manager.get_git_root()
+workspace = env_manager.get_workspace_folder()
+azrepo_params = env_manager.get_azrepo_parameters()
+```
+
+See `config/README.md` for more details on environment configuration.
 
 ## Configuration 
 
@@ -76,16 +126,9 @@ The system will:
 
 You can also define a separate directory for private tools and configurations outside the project directory:
 
-1. Set the `PRIVATE_TOOL_ROOT` environment variable to point to your private tools directory:
-   ```bash
-   # Linux/Mac
-   export PRIVATE_TOOL_ROOT=/path/to/your/private/tools
-   
-   # Windows (PowerShell)
-   $env:PRIVATE_TOOL_ROOT = "D:\path\to\your\private\tools"
-   
-   # Windows (CMD)
-   set PRIVATE_TOOL_ROOT=D:\path\to\your\private\tools
+1. Define `PRIVATE_TOOL_ROOT` in your `.env` file:
+   ```
+   PRIVATE_TOOL_ROOT=/path/to/your/private/tools
    ```
 
 2. Create and customize your configuration files in this directory
@@ -131,6 +174,8 @@ python -m pytest server/tests
 
 ## Configuring MCP Server in Cursor/VSCode
 
+The recommended way to configure MCP server is through the `.env` file. However, you can still override settings in your editor configuration:
+
 ```json
 {
     "mcpServers": {
@@ -138,8 +183,7 @@ python -m pytest server/tests
         "command": "python",
         "args": ["server/main.py"],
         "env": {
-          "GIT_ROOT": "${workspaceFolder}",
-          "PRIVATE_TOOL_ROOT": "${workspaceFolder}/.private"
+          "GIT_ROOT": "${workspaceFolder}"
         }
       },
       "mymcp-sse" : {

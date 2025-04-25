@@ -21,7 +21,7 @@ from mcp.types import (
 # Local and MCP Core imports
 from mcp_core.tools_adapter import ToolsAdapter
 import prompts
-from mcp_tools.environment import env
+from config import env
 
 # Create the server
 server = Server("mymcp")

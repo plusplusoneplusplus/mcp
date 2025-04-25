@@ -10,7 +10,7 @@ from mcp.types import (
     PromptMessage
 )
 
-from mcp_tools.environment import env
+from config import env
 
 def load_prompts_from_yaml() -> dict:
     """Load prompts from the prompts.yaml file."""

@@ -13,7 +13,7 @@ from mcp_tools.interfaces import (
 from mcp_tools.command_executor import CommandExecutor
 from mcp_tools.azrepo import AzureRepoClient
 from mcp_tools.browser import BrowserClient
-from mcp_tools.environment import EnvironmentManager, env
+from config import EnvironmentManager, env
 
 # Import plugin system
 from mcp_tools.plugin import (

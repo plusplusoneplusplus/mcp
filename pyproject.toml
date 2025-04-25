@@ -53,7 +53,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["server", "mcp_tools", "mcp_core"]
+packages = ["server", "mcp_tools", "mcp_core", "config"]
 
 # This tells uv/pip to install the local packages in development mode
 [tool.setuptools.package-data]

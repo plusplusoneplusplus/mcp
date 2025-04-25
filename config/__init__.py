@@ -1,5 +1,11 @@
-from mcp_tools.environment.manager import EnvironmentManager, env_manager
-from mcp_tools.environment.types import (
+"""
+MCP Configuration Package.
+
+This package contains centralized configuration modules for the MCP project.
+"""
+
+from config.manager import EnvironmentManager, env_manager
+from config.types import (
     RepositoryInfo,
     EnvironmentProvider,
     EnvironmentVariables,
@@ -11,7 +17,7 @@ env = env_manager
 __all__ = [
     "EnvironmentManager",
     "env_manager",
-    "env",  # Alias for env_manager for backward compatibility
+    "env",
     "RepositoryInfo",
     "EnvironmentProvider",
     "EnvironmentVariables",
