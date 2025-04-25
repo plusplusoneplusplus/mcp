@@ -2,34 +2,28 @@
 
 The MCP Server provides a flexible framework for AI-powered command execution and tool management.
 
+## Project Structure
+
+The MCP project is organized into several components:
+
+- **mcp_core/**: Core types and adapters
+  - **mcp_core/tests/**: Tests for core types and functionality
+  
+- **mcp_tools/**: Utility tools and implementations
+  - **mcp_tools/command_executor/**: Command execution utilities
+  - **mcp_tools/tests/**: Tests for utility tools
+
+- **server/**: Main MCP server implementation
+  - **server/tests/**: Tests for server-specific functionality
+  - **server/.private/**: Directory for private configurations (git-ignored)
+
+- **scripts/**: Utility scripts for project management
+
+- **assets/**: Project assets and images for documentation
+
 ## Installation
 
-The MCP server uses a local package structure with several components:
-
-1. **mcp_core**: Core types and adapters
-2. **mcp_tools**: Utility tools for command execution, browser automation, etc.
-3. **server**: The main MCP server implementation
-
-To install the project in development mode:
-
-### Using the provided scripts
-
-#### On Unix-like systems (Linux/macOS):
-```bash
-# Make the script executable if needed
-chmod +x install.sh
-# Run the installation script
-./install.sh
-```
-
-#### On Windows:
-```batch
-install.bat
-```
-
 ### Manual installation
-
-If you prefer to install manually:
 
 ```bash
 # Using uv (recommended):
@@ -94,14 +88,7 @@ You can also define a separate directory for private tools and configurations ou
    set PRIVATE_TOOL_ROOT=D:\path\to\your\private\tools
    ```
 
-2. Create and customize your configuration files in this directory:
-   ```
-   /path/to/your/private/tools/
-   ├── tools.yaml
-   ├── prompts.yaml
-   ├── myscript.ps1
-   └── other-scripts/
-   ```
+2. Create and customize your configuration files in this directory
 
 3. The server will look for configuration files in this priority order:
    1. `PRIVATE_TOOL_ROOT` directory (if set)
@@ -113,168 +100,24 @@ This approach allows you to:
 - Share the same private tools across multiple projects
 - Easily switch between different sets of private tools by changing the environment variable
 
-### Example Configuration Structure
+## Tool Types
 
-```yaml
-# prompts.yaml
-prompts:
-  my_prompt:
-    name: "My Custom Prompt"
-    description: "A custom prompt for specific tasks"
-    arguments:
-      - name: "param1"
-        description: "First parameter"
-        required: true
-    template: "Custom prompt template with {param1}"
-    enabled: true
+The MCP server supports several types of tools:
 
-# tools.yaml
-tools:
-  # Regular tool definition
-  my_tool:
-    name: "My Custom Tool"
-    description: "A custom tool for specific tasks"
-    inputSchema:
-      type: "object"
-      properties:
-        param1:
-          type: "string"
-          description: "First parameter"
-      required: ["param1"]
-    enabled: true
-
-  # Script-based tool definition
-  build_project:
-    name: "Build Project"
-    description: "Build the project"
-    type: "script"
-    script: "build.cmd"  # Script file in .private directory
-    inputSchema:
-      type: "object"
-      properties: {}  # No arguments needed
-      required: []
-    enabled: true
-
-  # Script with arguments
-  deploy:
-    enabled: true
-    name: deploy
-    description: Deploy the application
-    type: script
-    script: test_deploy.ps1
-    inputSchema:
-      type: object
-      properties:
-        environment:
-          type: string
-          description: Deployment environment
-          enum: ["dev", "staging", "prod"]
-        version:
-          type: string
-          description: Version to deploy
-        force:
-          type: boolean
-          description: Force deployment even if version exists
-          default: false
-      required:
-        - environment
-        - version 
-        
-  # Async Command Execution
-  execute_command_async:
-    enabled: true
-    name: execute_command_async
-    description: Start a command execution asynchronously and return a token for tracking
-    inputSchema:
-      type: object
-      properties:
-        command:
-          type: string
-          description: The command to execute
-        timeout:
-          type: number
-          description: Optional timeout in seconds
-      required:
-        - command
-
-  query_command_status:
-    enabled: true
-    name: query_command_status
-    description: Query the status of an asynchronous command execution or wait for it to complete
-    inputSchema:
-      type: object
-      properties:
-        token:
-          type: string
-          description: The token returned by execute_command_async
-        wait:
-          type: boolean
-          description: Whether to wait for the command to complete
-          default: false
-        timeout:
-          type: number
-          description: Optional timeout in seconds for waiting
-      required:
-        - token
-```
-
-### Script-Based Tools
-
-The system supports script-based tools that can be defined entirely in the YAML configuration. These tools:
-
-1. Are defined with `type: "script"` in the tools.yaml
-2. Reference a script file that should be placed in the `.private` directory
-3. Can accept command-line arguments defined in the `inputSchema`
-4. Support both Windows (`.cmd`, `.ps1`) and Unix (`.sh`) scripts
-
-Script files should:
-- Be placed in the `.private` directory
-- Accept arguments in the format `--arg_name value`
-- Return appropriate output that will be captured and displayed
-
-Example script (`build.cmd`):
-```batch
-@echo off
-echo Building unit tests...
-dotnet build tests/UnitTests
-if %ERRORLEVEL% EQU 0 (
-    echo Build successful
-) else (
-    echo Build failed
-    exit 1
-)
-```
+1. **Regular Tools**: Standard tools defined in the tools.yaml configuration
+2. **Script-Based Tools**: Tools that execute external scripts with configurable parameters
+3. **Task-Based Tools**: Pre-defined tasks that can be executed with platform-specific commands
+4. **Async Command Execution**: Tools that execute commands asynchronously and allow status tracking
 
 ## Running Tests
 
 The MCP project includes test suites for each component:
 
-- **mcp_core/tests**: Tests for the core types and adapters
-- **mcp_tools/tests**: Tests for utility tools and functionality
-- **server/tests**: Tests for server-specific functionality (if present)
+- **mcp_core/tests/**: Tests for the core types and adapters
+- **mcp_tools/tests/**: Tests for utility tools and functionality
+- **server/tests/**: Tests for server-specific functionality
 
-### Using the provided scripts
-
-To run all tests in the project, use:
-
-#### On Unix-like systems (Linux/macOS):
-```bash
-# Make the script executable if needed
-chmod +x run_tests.sh
-# Run the test script
-./run_tests.sh
-```
-
-#### On Windows:
-```batch
-run_tests.bat
-```
-
-These scripts will run tests for all components and provide a summary of the results.
-
-### Running tests manually
-
-You can also run tests manually using pytest:
+You can run tests manually using pytest:
 
 ```bash
 # Run all tests
@@ -283,15 +126,17 @@ python -m pytest
 # Run tests for a specific component
 python -m pytest mcp_core/tests
 python -m pytest mcp_tools/tests
+python -m pytest server/tests
 ```
 
-## Config MCP server as part of cursor/vscode
+## Configuring MCP Server in Cursor/VSCode
+
 ```json
 {
     "mcpServers": {
       "mymcp": {
-        "command": "mcp\\venv\\scripts\\python",
-        "args": ["mcp\\server\\main.py"],
+        "command": "python",
+        "args": ["server/main.py"],
         "env": {
           "GIT_ROOT": "${workspaceFolder}",
           "PRIVATE_TOOL_ROOT": "${workspaceFolder}/.private"
@@ -301,11 +146,10 @@ python -m pytest mcp_tools/tests
         "url": "http://0.0.0.0:8000/sse"
       }
     }
-  }
+}
 ```
 
-## Demo: Basic Command Execution
-![MCP Server Configuration](assets/mcp-server.png)
+## Demo Screenshots
 
-## Demo: Async Command Execution
+![MCP Server Configuration](assets/mcp-server.png)
 ![MCP Server async command execution](assets/mcp-async-command.png)
