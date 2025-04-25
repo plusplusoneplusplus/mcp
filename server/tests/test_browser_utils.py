@@ -11,7 +11,7 @@ from pathlib import Path
 
 # Add the parent directory to the path so we can import server modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from server.browser_utils import BrowserUtils
+from mcp_tools.browser_utils import BrowserUtils
 
 
 def test_get_windows_chrome_path():

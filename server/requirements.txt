@@ -1,8 +1,16 @@
 # Core dependencies
 mcp>=0.1.0  # Model Context Protocol Python SDK
-chromadb>=0.4.22  # Vector database for semantic search
-pyyaml>=6.0.1  # YAML parser
-psutil>=5.9.5  # Process utilities for monitoring and management
+mcp_tools>=0.1.0  # Refactored Tools Infrastructure
+mcp_core>=0.1.0  # Core Adapter for MCP Tools
+
+# Vector database
+chromadb>=0.4.22
+
+# YAML parser
+pyyaml>=6.0.1
+
+# Process utilities for monitoring and management
+psutil>=5.9.5
 
 # HTTP/SSE server
 uvicorn>=0.25.0  # ASGI server

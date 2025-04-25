@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Add the parent directory to the path so we can import server modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from server.command_executor import CommandExecutor
+from mcp_tools.command_executor import CommandExecutor
 
 # Set up logging
 logging.basicConfig(

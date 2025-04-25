@@ -199,4 +199,85 @@ pip install -e .
 - ✅ Phase 1: Tool Isolation (Complete)
 - ✅ Phase 2: Interface Definition (Complete)
 - ✅ Phase 3: Plugin System (Complete)
-- ✅ Phase 4: Dependency Injection (Complete) 
+- ✅ Phase 4: Dependency Injection (Complete)
+
+# MCP Tools Refactoring Integration Guide
+
+This guide provides instructions on how to integrate the refactored MCP Tools modules into the server and remove redundant implementations.
+
+## Overview
+
+The MCP Tools framework has been refactored into separate modules:
+- `mcp_tools`: Contains the core tool implementations
+- `mcp_core`: Contains the adapter and interfaces
+
+## Integration Steps
+
+### 1. Install the refactored modules
+
+```bash
+pip install -e .
+```
+
+### 2. Update Server Code
+
+The server's `main.py` file has been updated to use the new `ToolsAdapter` from `mcp_core.tools_adapter` instead of the old tools implementation. The changes include:
+
+- Importing `ToolsAdapter` from `mcp_core.tools_adapter`
+- Creating an instance of `ToolsAdapter`
+- Updating `list_tools` and `call_tool_handler` functions to use the adapter
+- Adjusting the environment initialization
+
+### 3. Update Dependencies
+
+The `server/requirements.txt` file has been updated to include the new modules:
+- `mcp_tools>=0.1.0`
+- `mcp_core>=0.1.0`
+
+### 4. Clean up Redundant Files
+
+A cleanup script has been created to remove redundant implementations:
+
+```bash
+python scripts/cleanup_server.py
+```
+
+The script will:
+- Back up redundant files to `backup_before_cleanup` directory
+- Remove the redundant files listed below
+- Display a list of tests that might need updating
+
+### Redundant Files
+
+The following files are now redundant and can be removed:
+- `server/command_executor.py`
+- `server/command_executor_v2.py`
+- `server/tools.py`
+- `server/environment.py`
+- `server/browser_utils.py`
+- `server/azrepo_utils.py`
+
+### Tests to Update
+
+The following tests might need to be updated to work with the new implementation:
+- `server/tests/test_command_executor_v2.py`
+- `server/tests/test_command_executor_async.py`
+- `server/tests/test_command_executor_integration.py`
+- `server/tests/test_browser_utils.py`
+
+## Testing
+
+After integration, run the tests to ensure everything works as expected:
+
+```bash
+pytest
+```
+
+## Troubleshooting
+
+If you encounter any issues:
+
+1. Check import statements in your code that might still reference the old modules
+2. Ensure the new modules are properly installed
+3. Verify that the `ToolsAdapter` is correctly initialized in `server/main.py`
+4. Check the test files for compatibility with the new implementation 

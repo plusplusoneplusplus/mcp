@@ -97,7 +97,7 @@ def test_private_tool_root():
         
         # Import and test tools loading
         # Only import these now after setting the environment variable
-        from server.tools import load_tools_from_yaml, load_tasks_from_yaml
+        from mcp_tools.tools import load_tools_from_yaml, load_tasks_from_yaml
         
         # Load tools and verify the private test tool is loaded
         tools = load_tools_from_yaml()

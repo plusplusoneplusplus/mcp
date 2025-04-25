@@ -35,10 +35,12 @@ from mcp.types import (
 from enum import Enum
 from pydantic import BaseModel
 
-# Import tools and prompts directly since they're in the same directory
-import tools
+# Import the new tools_adapter instead of the old tools implementation
+from mcp_core.tools_adapter import ToolsAdapter
+# Import prompts directly since it's still in the same directory
 import prompts
-import environment
+# Import the environment from mcp_tools instead of the local implementation
+from mcp_tools.environment import env
 
 # Import Starlette and uvicorn
 from starlette.applications import Starlette
@@ -49,14 +51,17 @@ import uvicorn
 # Create the server
 server = Server("mymcp")
 
-# Setup tools
+# Create tools adapter instance
+tools_adapter = ToolsAdapter()
+
+# Setup tools using the new tools adapter
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return tools.get_tools()
+    return tools_adapter.get_tools()
 
 @server.call_tool()
 async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
-    return await tools.call_tool(name, arguments)
+    return await tools_adapter.call_tool(name, arguments)
 
 # Setup SSE transport
 sse = SseServerTransport("/messages/")
@@ -99,11 +104,10 @@ def setup():
     )
     logger = logging.getLogger(__name__)
     
-    # Initialize environment
-    env = environment.env
+    # Initialize environment using the new module
     env.load()
-    logger.info(f"Initialized environment: Git root={env.repository_info.git_root}, " +
-                f"Workspace folder={env.repository_info.workspace_folder}")
+    logger.info(f"Initialized environment: Git root={env.get_git_root()}, " +
+                f"Workspace folder={env.get_workspace_folder()}")
 
 
 @click.command()
