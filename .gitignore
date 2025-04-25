@@ -46,7 +46,32 @@ htmlcov/
 
 # Logs
 .logs/
+logs/
 server/tests/logs/
+*.log
+*.log.*
+*log.txt
+*log.json
+*log.xml
+*.logfile
+log/
+log-files/
+logging/
+logfiles/
+debug.log
+error.log
+info.log
+warn.log
+trace.log
+access.log
+server.log
+app.log
+application.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Jupyter Notebook
 .ipynb_checkpoints
