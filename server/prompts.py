@@ -10,14 +10,14 @@ from mcp.types import (
     PromptMessage
 )
 
-import environment
+from mcp_tools.environment import env
 
 def load_prompts_from_yaml() -> dict:
     """Load prompts from the prompts.yaml file."""
     yaml_data = {}
     
     # Priority 1: Load from PRIVATE_TOOL_ROOT if set
-    private_tool_root = environment.get_private_tool_root()
+    private_tool_root = env.get_private_tool_root()
     if private_tool_root:
         private_root_path = Path(private_tool_root)
         private_yaml_path = private_root_path / "prompts.yaml"

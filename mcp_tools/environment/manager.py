@@ -7,10 +7,9 @@ from mcp_tools.environment.types import RepositoryInfo
 
 # Import interface
 from mcp_tools.interfaces import EnvironmentManagerInterface
-# Import the plugin decorator
-from mcp_tools.plugin import register_tool
 
-@register_tool
+# NOTE: Removed the register_tool decorator to avoid circular imports
+
 class EnvironmentManager(EnvironmentManagerInterface):
     """
     Environment manager to handle repository and environment information
@@ -99,7 +98,7 @@ class EnvironmentManager(EnvironmentManagerInterface):
     
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(EnvironmentManager, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance._initialize()
         return cls._instance
     

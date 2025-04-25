@@ -47,7 +47,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["server"]
+packages = ["server", "mcp_tools", "mcp_core"]
 
 [tool.black]
 line-length = 88
