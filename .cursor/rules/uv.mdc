@@ -1,6 +1,6 @@
 ---
 description: 
-globs: 
+globs: *.sh,*.md
 alwaysApply: false
 ---
 Use uv for package management instead of pip

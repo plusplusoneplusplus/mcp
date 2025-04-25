@@ -7,10 +7,10 @@ import logging
 from pathlib import Path
 import psutil
 
-# Add parent directory to path to import from server module
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add parent directory to path to import modules
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from command_executor_v2 import CommandExecutorV2
+from mcp_tools.command_executor import CommandExecutor
 
 # Configure logging
 logging.basicConfig(
@@ -40,8 +40,8 @@ def configure_logging():
     # Add the handler to the root logger
     root_logger.addHandler(file_handler)
     
-    # Also configure the specific logger for command_executor_v2
-    cmd_logger = logging.getLogger("command_executor_v2")
+    # Also configure the specific logger for command_executor
+    cmd_logger = logging.getLogger("command_executor")
     cmd_logger.setLevel(logging.DEBUG)
     
     # Make sure pytest doesn't capture log messages internally
@@ -58,7 +58,7 @@ def configure_logging():
 
 @pytest.fixture
 def executor():
-    return CommandExecutorV2()
+    return CommandExecutor()
 
 def test_sync_execution_success(executor):
     """Test synchronous command execution succeeds"""

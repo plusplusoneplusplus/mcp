@@ -1,52 +1,27 @@
 import os
 from pathlib import Path
-from typing import Dict, Any, List
-import chromadb
-from chromadb.config import Settings
-from chromadb.api import Collection
 import logging
 import click
-import sys
 import asyncio
 
-# Add lifespan support for startup/shutdown with strong typing
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-from dataclasses import dataclass
+# Starlette and uvicorn imports
+from starlette.applications import Starlette
+from starlette.routing import Route, Mount
+import uvicorn
 
-import logging
-from pathlib import Path
-from typing import Sequence
+# MCP imports
 from mcp.server import Server
-from mcp.server.stdio import stdio_server
+from mcp.server.sse import SseServerTransport
 from mcp.types import (
-    ClientCapabilities,
     TextContent,
     Tool,
-    ListRootsResult,
-    RootsCapability,
-    Prompt,
-    PromptArgument,
-    GetPromptResult,
-    PromptMessage,
     PromptsCapability
 )
 
-from enum import Enum
-from pydantic import BaseModel
-
-# Import the new tools_adapter instead of the old tools implementation
+# Local and MCP Core imports
 from mcp_core.tools_adapter import ToolsAdapter
-# Import prompts directly since it's still in the same directory
 import prompts
-# Import the environment from mcp_tools instead of the local implementation
 from mcp_tools.environment import env
-
-# Import Starlette and uvicorn
-from starlette.applications import Starlette
-from starlette.routing import Route, Mount
-from mcp.server.sse import SseServerTransport
-import uvicorn
 
 # Create the server
 server = Server("mymcp")
@@ -57,11 +32,37 @@ tools_adapter = ToolsAdapter()
 # Setup tools using the new tools adapter
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    return tools_adapter.get_tools()
+    # Convert our tools to the mcp.types.Tool format expected by the server
+    core_tools = tools_adapter.get_tools()
+    mcp_tools = []
+    
+    for core_tool in core_tools:
+        # Create a new mcp.types.Tool instance from our tool data
+        mcp_tool = Tool(
+            name=core_tool.name,
+            description=core_tool.description,
+            inputSchema=core_tool.inputSchema
+        )
+        mcp_tools.append(mcp_tool)
+    
+    return mcp_tools
 
 @server.call_tool()
 async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
-    return await tools_adapter.call_tool(name, arguments)
+    # Here we use the TextContent from mcp.types as defined above
+    result = await tools_adapter.call_tool(name, arguments)
+    
+    # Convert our TextContent objects to mcp.types.TextContent objects if needed
+    mcp_result = []
+    for item in result:
+        mcp_text = TextContent(
+            type=item.type,
+            text=item.text,
+            annotations=item.annotations
+        )
+        mcp_result.append(mcp_text)
+        
+    return mcp_result
 
 # Setup SSE transport
 sse = SseServerTransport("/messages/")

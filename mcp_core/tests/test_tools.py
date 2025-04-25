@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("tools_test")
 
 # Add parent directory to path to allow importing mcp_core
-parent_dir = str(Path(__file__).resolve().parent.parent)
+parent_dir = str(Path(__file__).resolve().parent.parent.parent)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
@@ -23,8 +23,11 @@ from mcp_core.tools_adapter import ToolsAdapter
 def main():
     print("\n=== MCP Tools YAML Integration Test ===\n")
     
+    # Get the server directory
+    server_dir = Path(parent_dir) / "server"
+    
     # Load tools.yaml content
-    yaml_path = Path(__file__).resolve().parent / "tools.yaml"
+    yaml_path = server_dir / "tools.yaml"
     if not yaml_path.exists():
         print(f"ERROR: tools.yaml not found at {yaml_path}")
         return
@@ -60,4 +63,4 @@ def main():
     print("\nTest completed successfully!")
 
 if __name__ == "__main__":
-    main()
+    main() 

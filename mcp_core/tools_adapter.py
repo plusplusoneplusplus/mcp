@@ -21,8 +21,8 @@ from mcp_tools.plugin import registry, discover_and_register_tools
 # Import dependency injector
 from mcp_tools.dependency import injector
 
-# For backward compatibility with MCP types
-from mcp.types import TextContent, Tool
+# Use local types instead of mcp.types
+from mcp_core.types import TextContent, Tool
 
 logger = logging.getLogger(__name__)
 

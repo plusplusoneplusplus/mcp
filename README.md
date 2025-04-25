@@ -2,6 +2,49 @@
 
 The MCP Server provides a flexible framework for AI-powered command execution and tool management.
 
+## Installation
+
+The MCP server uses a local package structure with several components:
+
+1. **mcp_core**: Core types and adapters
+2. **mcp_tools**: Utility tools for command execution, browser automation, etc.
+3. **server**: The main MCP server implementation
+
+To install the project in development mode:
+
+### Using the provided scripts
+
+#### On Unix-like systems (Linux/macOS):
+```bash
+# Make the script executable if needed
+chmod +x install.sh
+# Run the installation script
+./install.sh
+```
+
+#### On Windows:
+```batch
+install.bat
+```
+
+### Manual installation
+
+If you prefer to install manually:
+
+```bash
+# Using uv (recommended):
+uv pip install -e ./mcp_core
+uv pip install -e ./mcp_tools
+uv pip install -e .
+
+# Or using pip:
+pip install -e ./mcp_core
+pip install -e ./mcp_tools
+pip install -e .
+```
+
+This will install all the local packages in development mode, allowing you to make changes to the code while using the packages.
+
 ## Configuration 
 
 The MCP server uses a flexible configuration system that supports both default and user-specific settings. Configuration files are stored in YAML format.
@@ -204,14 +247,45 @@ if %ERRORLEVEL% EQU 0 (
 
 ## Running Tests
 
-To run tests for the MCP server:
+The MCP project includes test suites for each component:
 
+- **mcp_core/tests**: Tests for the core types and adapters
+- **mcp_tools/tests**: Tests for utility tools and functionality
+- **server/tests**: Tests for server-specific functionality (if present)
+
+### Using the provided scripts
+
+To run all tests in the project, use:
+
+#### On Unix-like systems (Linux/macOS):
 ```bash
-# Run all tests with pytest
-python -m pytest
+# Make the script executable if needed
+chmod +x run_tests.sh
+# Run the test script
+./run_tests.sh
 ```
 
-# Config MCP server as part of cursor/vscode
+#### On Windows:
+```batch
+run_tests.bat
+```
+
+These scripts will run tests for all components and provide a summary of the results.
+
+### Running tests manually
+
+You can also run tests manually using pytest:
+
+```bash
+# Run all tests
+python -m pytest
+
+# Run tests for a specific component
+python -m pytest mcp_core/tests
+python -m pytest mcp_tools/tests
+```
+
+## Config MCP server as part of cursor/vscode
 ```json
 {
     "mcpServers": {
@@ -230,8 +304,8 @@ python -m pytest
   }
 ```
 
-# Demo: Basic Command Execution
+## Demo: Basic Command Execution
 ![MCP Server Configuration](assets/mcp-server.png)
 
-# Demo: Async Command Execution
+## Demo: Async Command Execution
 ![MCP Server async command execution](assets/mcp-async-command.png)

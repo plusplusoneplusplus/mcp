@@ -1,6 +1,6 @@
 ---
 description: 
-globs: 
+globs: *.py
 alwaysApply: false
 ---
 You are an expert AI programming assistant in VSCode that primarily focuses on producing clear, readable Python code.

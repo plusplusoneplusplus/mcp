@@ -5,19 +5,15 @@ from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 
-# Update import to use local browser_utils
-import sys
-from pathlib import Path
-
-# Add the parent directory to the path so we can import server modules
+# Add the parent directory to the path so we can import modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from mcp_tools.browser_utils import BrowserUtils
+from mcp_tools.browser.client import BrowserClient
 
 
 def test_get_windows_chrome_path():
     """Test the Chrome path detection"""
-    if BrowserUtils.in_wsl():
-        chrome_path = BrowserUtils.get_windows_chrome_path()
+    if BrowserClient.in_wsl():
+        chrome_path = BrowserClient.get_windows_chrome_path()
         # Since we're in WSL, at least one of these paths should exist
         possible_paths = [
             "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe",
@@ -31,7 +27,7 @@ def test_get_windows_chrome_path():
 def test_setup_browser():
     """Test browser setup with headless mode"""
     try:
-        driver = BrowserUtils.setup_browser(headless=True)
+        driver = BrowserClient.setup_browser(headless=True)
         assert isinstance(driver, webdriver.Chrome)
         assert "--headless" in driver.options.arguments
         driver.quit()
@@ -43,7 +39,7 @@ def test_get_page_html():
     """Test fetching HTML content from a test URL"""
     test_url = "https://www.google.com"
     try:
-        html_content = BrowserUtils.get_page_html(test_url, wait_time=2)
+        html_content = BrowserClient.get_page_html(test_url, wait_time=2)
         assert html_content is not None
         assert isinstance(html_content, str)
         assert len(html_content) > 0
@@ -67,7 +63,7 @@ def test_browser_setup_failure():
     subprocess.getoutput = mock_getoutput
 
     with pytest.raises(Exception):
-        BrowserUtils.setup_browser()
+        BrowserClient.setup_browser()
 
     # Restore the original function
     subprocess.getoutput = original_getoutput
@@ -76,5 +72,5 @@ def test_browser_setup_failure():
 def test_get_page_html_invalid_url():
     """Test handling of invalid URL"""
     invalid_url = "https://thisurldoesnotexistatall.com"
-    result = BrowserUtils.get_page_html(invalid_url, wait_time=2)
+    result = BrowserClient.get_page_html(invalid_url, wait_time=2)
     assert result is None  # Should return None for failed requests
