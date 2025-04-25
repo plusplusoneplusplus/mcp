@@ -15,6 +15,8 @@ from mcp_tools.interfaces import (
 
 # Import plugin system
 from mcp_tools.plugin import registry, discover_and_register_tools
+# Import dependency injector
+from mcp_tools.dependency import injector
 
 # For backward compatibility with MCP types
 from mcp.types import TextContent, Tool
@@ -29,11 +31,14 @@ class ToolsAdapter:
         # Discover and register all available tools
         discover_and_register_tools()
         
-        # Get tool instances from the registry
-        self.command_executor = registry.get_tool_instance("command_executor")
-        self.azure_repo_client = registry.get_tool_instance("azure_repo_client")
-        self.browser_client = registry.get_tool_instance("browser_client")
-        self.environment_manager = registry.get_tool_instance("environment_manager")
+        # Resolve all dependencies
+        injector.resolve_all_dependencies()
+        
+        # Get tool instances from the dependency injector
+        self.command_executor = injector.get_tool_instance("command_executor")
+        self.azure_repo_client = injector.get_tool_instance("azure_repo_client")
+        self.browser_client = injector.get_tool_instance("browser_client")
+        self.environment_manager = injector.get_tool_instance("environment_manager")
         
         # Load environment
         if self.environment_manager:
@@ -49,7 +54,7 @@ class ToolsAdapter:
     def _register_default_tools(self):
         """Register the default tools that are part of the original implementation."""
         # Register all tools from the registry
-        for tool in registry.get_all_instances():
+        for tool in injector.instances.values():
             self._register_tool_interface(tool)
         
         # Register additional backwards-compatibility tools

@@ -23,6 +23,12 @@ from mcp_tools.plugin import (
     PluginRegistry
 )
 
+# Import dependency injection system
+from mcp_tools.dependency import (
+    injector,
+    DependencyInjector
+)
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -45,4 +51,8 @@ __all__ = [
     "registry",
     "discover_and_register_tools",
     "PluginRegistry",
+    
+    # Dependency injection
+    "injector",
+    "DependencyInjector",
 ]

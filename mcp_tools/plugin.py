@@ -3,7 +3,7 @@ import inspect
 import logging
 import os
 import pkgutil
-from typing import Dict, List, Type, Set, Optional
+from typing import Dict, List, Type, Set, Optional, Any
 
 from mcp_tools.interfaces import ToolInterface
 
@@ -53,6 +53,23 @@ class PluginRegistry:
     
     def get_tool_instance(self, tool_name: str) -> Optional[ToolInterface]:
         """Get or create an instance of a registered tool.
+        
+        Args:
+            tool_name: Name of the tool to get
+            
+        Returns:
+            Instance of the tool, or None if not found
+        """
+        # Use the dependency injector if available
+        try:
+            from mcp_tools.dependency import injector
+            return injector.get_tool_instance(tool_name)
+        except ImportError:
+            # Fallback to simple instantiation
+            return self._simple_get_tool_instance(tool_name)
+    
+    def _simple_get_tool_instance(self, tool_name: str) -> Optional[ToolInterface]:
+        """Simple tool instantiation without dependency injection.
         
         Args:
             tool_name: Name of the tool to get
@@ -145,12 +162,18 @@ class PluginRegistry:
         Returns:
             List of tool instances
         """
-        # Create instances for all registered tools
-        for tool_name in self.tools:
-            if tool_name not in self.instances:
-                self.get_tool_instance(tool_name)
-                
-        return list(self.instances.values())
+        # Use the dependency injector if available
+        try:
+            from mcp_tools.dependency import injector
+            instances = injector.resolve_all_dependencies()
+            return list(instances.values())
+        except ImportError:
+            # Fallback to simple instantiation
+            for tool_name in self.tools:
+                if tool_name not in self.instances:
+                    self._simple_get_tool_instance(tool_name)
+                    
+            return list(self.instances.values())
     
     def clear(self) -> None:
         """Clear all registered tools and instances."""
