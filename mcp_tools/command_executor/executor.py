@@ -1,0 +1,924 @@
+import platform
+import subprocess
+import asyncio
+import uuid
+from typing import Dict, Any, List, Optional, Union
+import logging
+import shlex
+import time
+import psutil
+import json
+import os
+import tempfile
+from datetime import datetime, UTC
+from pathlib import Path
+import traceback
+
+g_config_sleep_when_running = True
+
+# Create logger with the module name
+logger = logging.getLogger(__name__)
+
+def _log_with_context(log_level: int, msg: str, context: Dict[str, Any] = None) -> None:
+    """Helper function for structured logging with context
+
+    Args:
+        log_level: The logging level to use
+        msg: The message to log
+        context: Optional dictionary of contextual information
+    """
+    if context is None:
+        context = {}
+    
+    # Add timestamp in ISO format using timezone-aware UTC
+    context['timestamp'] = datetime.now(UTC).isoformat()
+    
+    # Format the log message with context
+    structured_msg = f"{msg} | Context: {json.dumps(context, default=str)}"
+    logger.log(log_level, structured_msg)
+
+class CommandExecutor:
+    """Command executor that can run processes synchronously or asynchronously,
+    using temporary files for stdout/stderr capture.
+
+    Example:
+        # Synchronous execution
+        executor = CommandExecutor()
+        result = executor.execute("ls -la")
+
+        # Asynchronous execution
+        async def run_command():
+            executor = CommandExecutor()
+
+            # Start the command
+            response = await executor.execute_async("long-running-command")
+            token = response["token"]
+
+            # Later, check status
+            status = await executor.get_process_status(token)
+
+            # Wait for completion
+            result = await executor.wait_for_process(token)
+
+            # Or combined query and wait
+            result = await executor.query_process(token, wait=True, timeout=30)
+
+            # To terminate early
+            executor.terminate_by_token(token)
+    """
+
+    def __init__(self, temp_dir: Optional[str] = None):
+        self.os_type = platform.system().lower()
+        self.running_processes = {}
+        self.process_tokens = {}  # Maps tokens to process IDs
+        self.completed_processes = {}  # Store results of completed processes
+        self.temp_files = {}  # Maps PIDs to (stdout_file, stderr_file) tuples
+        self.cleanup_lock = asyncio.Lock()  # Lock to protect temp file operations
+        
+        # Use specified temp dir or system default
+        self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
+        
+        # Ensure temp directory exists
+        os.makedirs(self.temp_dir, exist_ok=True)
+        
+        _log_with_context(
+            logging.INFO,
+            "Initialized CommandExecutor",
+            {"temp_dir": self.temp_dir, "os_type": self.os_type}
+        )
+
+    def _create_temp_files(self, prefix: str = "cmd_") -> tuple:
+        """Create temporary files for stdout and stderr
+
+        Args:
+            prefix: Prefix for the temporary files
+
+        Returns:
+            Tuple of (stdout_path, stderr_path, stdout_file, stderr_file)
+        """
+        stdout_fd, stdout_path = tempfile.mkstemp(prefix=f"{prefix}out_", dir=self.temp_dir, text=True)
+        stderr_fd, stderr_path = tempfile.mkstemp(prefix=f"{prefix}err_", dir=self.temp_dir, text=True)
+        
+        # Convert file descriptors to file objects
+        stdout_file = os.fdopen(stdout_fd, 'w')
+        stderr_file = os.fdopen(stderr_fd, 'w')
+        
+        _log_with_context(
+            logging.DEBUG,
+            "Created temp files",
+            {"stdout_path": stdout_path, "stderr_path": stderr_path}
+        )
+        
+        return stdout_path, stderr_path, stdout_file, stderr_file
+
+    def _read_temp_file(self, file_path: str) -> str:
+        """Read the contents of a temporary file
+
+        Args:
+            file_path: Path to the file to read
+
+        Returns:
+            Contents of the file as a string
+        """
+        try:
+            if not os.path.exists(file_path):
+                _log_with_context(
+                    logging.WARNING,
+                    f"Temp file does not exist: {file_path}",
+                    {"path": file_path}
+                )
+                return ""
+                
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                content = f.read()
+                _log_with_context(
+                    logging.DEBUG,
+                    f"Read temp file: {file_path}",
+                    {"path": file_path, "content_length": len(content), "content_sample": content[:100] if content else ""}
+                )
+                return content
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                f"Error reading temp file: {file_path}",
+                {"error": str(e), "path": file_path}
+            )
+            return f"[Error reading output: {str(e)}]"
+
+    async def _cleanup_temp_files(self, pid: int, from_monitor: bool = False) -> None:
+        """Clean up temporary files associated with a process
+
+        Args:
+            pid: Process ID
+            from_monitor: Whether this is called from the monitor task
+        """
+        # Skip the lock acquisition if called from monitor to avoid deadlocks
+        if from_monitor:
+            _log_with_context(
+                logging.DEBUG,
+                f"Monitor skipping cleanup for PID {pid}",
+                {"pid": pid, "from_monitor": from_monitor}
+            )
+            return
+            
+        # Use a lock to prevent race conditions when cleaning up files
+        async with self.cleanup_lock:
+            if pid in self.temp_files:
+                stdout_path, stderr_path = self.temp_files[pid]
+                
+                _log_with_context(
+                    logging.DEBUG,
+                    f"Cleaning up temp files for PID {pid}",
+                    {"pid": pid, "stdout_path": stdout_path, "stderr_path": stderr_path, "from_monitor": from_monitor}
+                )
+                
+                # Remove stdout file
+                try:
+                    if os.path.exists(stdout_path):
+                        os.remove(stdout_path)
+                        _log_with_context(
+                            logging.DEBUG,
+                            f"Removed stdout temp file: {stdout_path}",
+                            {"pid": pid, "path": stdout_path}
+                        )
+                except Exception as e:
+                    _log_with_context(
+                        logging.WARNING,
+                        f"Error removing stdout temp file",
+                        {"pid": pid, "path": stdout_path, "error": str(e)}
+                    )
+                    
+                # Remove stderr file
+                try:
+                    if os.path.exists(stderr_path):
+                        os.remove(stderr_path)
+                        _log_with_context(
+                            logging.DEBUG,
+                            f"Removed stderr temp file: {stderr_path}",
+                            {"pid": pid, "path": stderr_path}
+                        )
+                except Exception as e:
+                    _log_with_context(
+                        logging.WARNING,
+                        f"Error removing stderr temp file",
+                        {"pid": pid, "path": stderr_path, "error": str(e)}
+                    )
+                
+                # Remove the temp files entry
+                del self.temp_files[pid]
+                
+    def _prepare_redirected_command(self, command: str, stdout_path: str, stderr_path: str) -> str:
+        """Prepare a command with output redirection
+
+        Args:
+            command: The command to execute
+            stdout_path: Path to redirect stdout to
+            stderr_path: Path to redirect stderr to
+
+        Returns:
+            Modified command with redirection
+        """
+        if self.os_type == "windows":
+            # Windows - using cmd.exe
+            return f"cmd.exe /c \"{command} > \"{stdout_path}\" 2> \"{stderr_path}\"\""
+        else:
+            # Unix/Linux/macOS
+            return f"{command} > \"{stdout_path}\" 2> \"{stderr_path}\""
+            
+    def execute(self, command: str, timeout: Optional[float] = None) -> Dict[str, Any]:
+        """Execute a command synchronously
+
+        Args:
+            command: The command to execute
+            timeout: Optional timeout in seconds
+
+        Returns:
+            Dictionary with execution results
+        """
+        # Create temporary files for output capture
+        stdout_path, stderr_path, stdout_file, stderr_file = self._create_temp_files()
+        
+        try:
+            _log_with_context(
+                logging.INFO,
+                f"Executing command synchronously",
+                {"command": command, "timeout": timeout}
+            )
+            
+            # Prepare the command with output redirection
+            redirected_command = self._prepare_redirected_command(command, stdout_path, stderr_path)
+            
+            # Close the files - they'll be written to by the subprocess
+            stdout_file.close()
+            stderr_file.close()
+            
+            # Execute the command
+            if self.os_type == "windows":
+                # On Windows, use shell=True to interpret the redirections
+                process = subprocess.run(
+                    redirected_command, 
+                    shell=True,
+                    timeout=timeout,
+                    check=False
+                )
+            else:
+                # On Unix, use a list of arguments and shell=True
+                process = subprocess.run(
+                    redirected_command, 
+                    shell=True,
+                    timeout=timeout,
+                    check=False
+                )
+            
+            # Read output from temp files
+            stdout_content = self._read_temp_file(stdout_path)
+            stderr_content = self._read_temp_file(stderr_path)
+            
+            _log_with_context(
+                logging.INFO,
+                f"Command completed synchronously",
+                {
+                    "command": command,
+                    "return_code": process.returncode,
+                    "stdout_length": len(stdout_content),
+                    "stderr_length": len(stderr_content)
+                }
+            )
+            
+            # Return the result
+            return {
+                "success": process.returncode == 0,
+                "return_code": process.returncode,
+                "output": stdout_content,
+                "error": stderr_content
+            }
+            
+        except subprocess.TimeoutExpired:
+            _log_with_context(
+                logging.WARNING,
+                f"Command timed out after {timeout} seconds",
+                {"command": command}
+            )
+            
+            # Read any partial output
+            stdout_content = self._read_temp_file(stdout_path)
+            stderr_content = self._read_temp_file(stderr_path)
+            
+            return {
+                "success": False,
+                "return_code": -1,
+                "output": stdout_content,
+                "error": f"Command timed out after {timeout} seconds\n{stderr_content}"
+            }
+            
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                f"Error executing command",
+                {"command": command, "error": str(e), "traceback": traceback.format_exc()}
+            )
+            
+            return {
+                "success": False,
+                "return_code": -1,
+                "output": "",
+                "error": f"Error executing command: {str(e)}"
+            }
+            
+        finally:
+            # Clean up temp files
+            try:
+                if os.path.exists(stdout_path):
+                    os.remove(stdout_path)
+                if os.path.exists(stderr_path):
+                    os.remove(stderr_path)
+            except Exception as e:
+                _log_with_context(
+                    logging.WARNING,
+                    f"Error cleaning up temp files",
+                    {"error": str(e)}
+                )
+
+    async def _monitor_async_process(self, token: str, timeout: Optional[float] = None) -> None:
+        """Monitor an asynchronous process until completion
+
+        Args:
+            token: Process token to monitor
+            timeout: Optional timeout in seconds
+        """
+        if token not in self.process_tokens:
+            _log_with_context(
+                logging.WARNING,
+                f"Monitor task: Process token not found: {token}",
+                {"token": token}
+            )
+            return
+            
+        pid = self.process_tokens[token]
+        if pid not in self.running_processes:
+            _log_with_context(
+                logging.WARNING,
+                f"Monitor task: Process PID not found: {pid}",
+                {"token": token, "pid": pid}
+            )
+            return
+            
+        process = self.running_processes[pid]["process"]
+        
+        _log_with_context(
+            logging.INFO,
+            f"Monitor task: Started monitoring process",
+            {"token": token, "pid": pid}
+        )
+        
+        # Wait for the process to complete
+        start_time = time.time()
+        try:
+            await asyncio.wait_for(process.wait(), timeout)
+            
+            _log_with_context(
+                logging.INFO,
+                f"Monitor task: Process completed normally",
+                {"token": token, "pid": pid, "returncode": process.returncode}
+            )
+            
+        except asyncio.TimeoutError:
+            # Process didn't complete within timeout
+            _log_with_context(
+                logging.WARNING,
+                f"Monitor task: Process timeout after {timeout} seconds",
+                {"token": token, "pid": pid}
+            )
+            
+            # Try to terminate the process
+            self.terminate_process(pid)
+            
+            # Update status
+            await self.wait_for_process(token, timeout=5, from_monitor=True)  # Short additional wait
+            
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                f"Monitor task: Error monitoring process",
+                {"token": token, "pid": pid, "error": str(e)}
+            )
+            
+            # Try to clean up
+            await self.wait_for_process(token, timeout=5, from_monitor=True)
+            
+    async def execute_async(self, command: str, timeout: Optional[float] = None) -> Dict[str, Any]:
+        """Execute a command asynchronously
+
+        Args:
+            command: The command to execute
+            timeout: Optional timeout in seconds (for process completion)
+
+        Returns:
+            Dictionary with process token and initial status
+        """
+        # Create temporary files for output capture
+        stdout_path, stderr_path, stdout_file, stderr_file = self._create_temp_files()
+        
+        try:
+            # Generate a unique token for this process
+            token = str(uuid.uuid4())
+            
+            _log_with_context(
+                logging.INFO,
+                f"Starting async command",
+                {"command": command, "token": token}
+            )
+            
+            # Prepare the command with output redirection
+            redirected_command = self._prepare_redirected_command(command, stdout_path, stderr_path)
+            
+            # Close the files - they'll be written to by the subprocess
+            stdout_file.close()
+            stderr_file.close()
+            
+            # Start the process
+            if self.os_type == "windows":
+                # On Windows, use shell=True to interpret the redirections
+                process = await asyncio.create_subprocess_shell(
+                    redirected_command,
+                    stdout=None,  # Already redirected in the command
+                    stderr=None   # Already redirected in the command
+                )
+            else:
+                # On Unix, use a list of arguments
+                process = await asyncio.create_subprocess_shell(
+                    redirected_command,
+                    stdout=None,  # Already redirected in the command
+                    stderr=None   # Already redirected in the command
+                )
+            
+            # Store the process and associate it with the token
+            pid = process.pid
+            self.process_tokens[token] = pid
+            self.running_processes[pid] = {
+                "process": process,
+                "command": command,
+                "stdout_path": stdout_path,
+                "stderr_path": stderr_path,
+                "token": token,
+                "start_time": time.time()
+            }
+            
+            # Store temp file locations for cleanup
+            self.temp_files[pid] = (stdout_path, stderr_path)
+            
+            _log_with_context(
+                logging.INFO,
+                f"Started async command",
+                {"command": command, "token": token, "pid": pid}
+            )
+            
+            # Start a task to monitor the process if timeout is specified
+            if timeout:
+                asyncio.create_task(self._monitor_async_process(token, timeout))
+            
+            # Return the token and initial status
+            return {
+                "token": token,
+                "status": "running",
+                "pid": pid
+            }
+            
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                f"Error starting async command",
+                {"command": command, "error": str(e), "traceback": traceback.format_exc()}
+            )
+            
+            # Clean up temp files
+            try:
+                if os.path.exists(stdout_path):
+                    os.remove(stdout_path)
+                if os.path.exists(stderr_path):
+                    os.remove(stderr_path)
+            except Exception as cleanup_error:
+                _log_with_context(
+                    logging.WARNING,
+                    f"Error cleaning up temp files after failed start",
+                    {"error": str(cleanup_error)}
+                )
+            
+            return {
+                "token": "error",
+                "status": "error",
+                "error": f"Error starting command: {str(e)}"
+            }
+
+    async def get_process_status(self, token: str) -> Dict[str, Any]:
+        """Get the status of an asynchronous process
+
+        Args:
+            token: Process token to check
+
+        Returns:
+            Dictionary with process status information
+        """
+        # Check if the token exists
+        if token not in self.process_tokens:
+            # Check if it's in completed processes
+            if token in self.completed_processes:
+                return self.completed_processes[token]
+                
+            _log_with_context(
+                logging.WARNING,
+                f"Process token not found: {token}",
+                {"token": token}
+            )
+            return {
+                "status": "not_found",
+                "error": f"Process with token {token} not found"
+            }
+        
+        # Get the process ID
+        pid = self.process_tokens[token]
+        
+        # Check if the process is still running
+        if pid not in self.running_processes:
+            _log_with_context(
+                logging.WARNING,
+                f"Process PID not found in running processes: {pid}",
+                {"token": token, "pid": pid}
+            )
+            return {
+                "status": "unknown",
+                "error": f"Process with PID {pid} not found in running processes"
+            }
+        
+        process_data = self.running_processes[pid]
+        process = process_data["process"]
+        
+        # Check if the process has exited
+        if process.returncode is not None:
+            # Process has completed
+            _log_with_context(
+                logging.INFO,
+                f"Process status check found completed process",
+                {"token": token, "pid": pid, "returncode": process.returncode}
+            )
+            
+            # Get final result
+            result = await self.wait_for_process(token)
+            return result
+        
+        # Process is still running
+        # Get additional process info if psutil is available
+        process_info = self.get_process_info(pid)
+        
+        status_info = {
+            "status": "running",
+            "pid": pid,
+            "token": token,
+            "command": process_data["command"],
+            "runtime": time.time() - process_data["start_time"]
+        }
+        
+        # Add psutil info if available
+        if process_info:
+            status_info.update(process_info)
+        
+        return status_info
+
+    def get_allowed_commands(self) -> List[str]:
+        """Get list of allowed commands (for security/filtering)"""
+        # Implement command allowlisting if needed
+        return []
+        
+    def terminate_process(self, pid: int) -> bool:
+        """Terminate a running process by PID
+
+        Args:
+            pid: Process ID to terminate
+
+        Returns:
+            True if termination was successful, False otherwise
+        """
+        if pid not in self.running_processes:
+            _log_with_context(
+                logging.WARNING,
+                f"Cannot terminate: Process PID not found: {pid}",
+                {"pid": pid}
+            )
+            return False
+            
+        process_data = self.running_processes[pid]
+        process = process_data["process"]
+        
+        # Process already exited
+        if process.returncode is not None:
+            _log_with_context(
+                logging.INFO,
+                f"Process already completed, no need to terminate",
+                {"pid": pid, "returncode": process.returncode}
+            )
+            return True
+            
+        _log_with_context(
+            logging.INFO,
+            f"Terminating process",
+            {"pid": pid, "command": process_data["command"]}
+        )
+        
+        try:
+            # Try to terminate gracefully first
+            process.terminate()
+            
+            # For Windows, no additional steps needed
+            # For Unix, we need to create a process group if we want to kill child processes too
+            # This requires changes at process creation time
+            
+            _log_with_context(
+                logging.INFO,
+                f"Sent termination signal to process",
+                {"pid": pid}
+            )
+            
+            return True
+            
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                f"Error terminating process",
+                {"pid": pid, "error": str(e)}
+            )
+            return False
+
+    def get_process_info(self, pid: int) -> Optional[Dict[str, Any]]:
+        """Get detailed process information using psutil
+
+        Args:
+            pid: Process ID to get information for
+
+        Returns:
+            Dictionary with process information or None if not available
+        """
+        try:
+            # Attempt to get process via psutil
+            p = psutil.Process(pid)
+            
+            # Basic process info
+            info = {
+                "create_time": p.create_time(),
+                "username": p.username(),
+                "status": p.status(),
+            }
+            
+            # Add CPU and memory usage if possible
+            try:
+                info["cpu_percent"] = p.cpu_percent(interval=0.1)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+                
+            try:
+                mem = p.memory_info()
+                info["memory_info"] = {
+                    "rss": mem.rss,  # Resident Set Size
+                    "vms": mem.vms,  # Virtual Memory Size
+                    "rss_mb": mem.rss / (1024 * 1024),  # RSS in MB
+                    "vms_mb": mem.vms / (1024 * 1024)   # VMS in MB
+                }
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+                
+            # Add io counters if possible
+            try:
+                io = p.io_counters()
+                info["io_counters"] = {
+                    "read_count": io.read_count,
+                    "write_count": io.write_count,
+                    "read_bytes": io.read_bytes,
+                    "write_bytes": io.write_bytes
+                }
+            except (psutil.NoSuchProcess, psutil.AccessDenied, AttributeError):
+                pass
+                
+            # Add children count if possible
+            try:
+                info["num_children"] = len(p.children())
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+                
+            return info
+                
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # Process no longer exists or can't be accessed
+            return None
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                f"Error getting process info",
+                {"pid": pid, "error": str(e)}
+            )
+            return None
+
+    def terminate_by_token(self, token: str) -> bool:
+        """Terminate a running process by token
+
+        Args:
+            token: Process token to terminate
+
+        Returns:
+            True if termination was successful, False otherwise
+        """
+        # Check if the token exists
+        if token not in self.process_tokens:
+            # Check if it's already in completed processes
+            if token in self.completed_processes:
+                _log_with_context(
+                    logging.INFO,
+                    f"Process already completed, no need to terminate",
+                    {"token": token}
+                )
+                return True
+                
+            _log_with_context(
+                logging.WARNING,
+                f"Cannot terminate: Process token not found: {token}",
+                {"token": token}
+            )
+            return False
+            
+        # Get the process ID and terminate
+        pid = self.process_tokens[token]
+        result = self.terminate_process(pid)
+        
+        if result:
+            _log_with_context(
+                logging.INFO,
+                f"Successfully terminated process by token",
+                {"token": token, "pid": pid}
+            )
+        else:
+            _log_with_context(
+                logging.WARNING,
+                f"Failed to terminate process by token",
+                {"token": token, "pid": pid}
+            )
+            
+        return result
+
+    async def query_process(
+        self, token: str, wait: bool = False, timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Query a process status or wait for completion
+
+        Args:
+            token: Process token to query
+            wait: Whether to wait for process completion
+            timeout: Optional timeout in seconds if waiting
+
+        Returns:
+            Dictionary with process status or final result
+        """
+        if not wait:
+            # Just return current status without waiting
+            return await self.get_process_status(token)
+            
+        # Wait for the process to complete with timeout
+        return await self.wait_for_process(token, timeout)
+
+    async def wait_for_process(self, token: str, timeout: Optional[float] = None, from_monitor: bool = False) -> Dict[str, Any]:
+        """Wait for a process to complete
+
+        Args:
+            token: Process token to wait for
+            timeout: Optional timeout in seconds
+            from_monitor: Whether this is called from the monitor task
+
+        Returns:
+            Dictionary with final process result
+        """
+        # Check if already in completed processes
+        if token in self.completed_processes:
+            return self.completed_processes[token]
+            
+        # Check if the token exists
+        if token not in self.process_tokens:
+            _log_with_context(
+                logging.WARNING,
+                f"Wait process: Process token not found: {token}",
+                {"token": token}
+            )
+            return {
+                "status": "not_found",
+                "error": f"Process with token {token} not found"
+            }
+            
+        # Get the process ID
+        pid = self.process_tokens[token]
+        
+        # Check if the process exists in running processes
+        if pid not in self.running_processes:
+            _log_with_context(
+                logging.WARNING,
+                f"Wait process: Process PID not found in running processes: {pid}",
+                {"token": token, "pid": pid}
+            )
+            return {
+                "status": "unknown",
+                "error": f"Process with PID {pid} not found in running processes"
+            }
+            
+        process_data = self.running_processes[pid]
+        process = process_data["process"]
+        stdout_path = process_data["stdout_path"]
+        stderr_path = process_data["stderr_path"]
+        
+        # Check if already completed
+        if process.returncode is not None:
+            # Already completed
+            _log_with_context(
+                logging.INFO,
+                f"Wait process: Process already completed",
+                {"token": token, "pid": pid, "returncode": process.returncode}
+            )
+        else:
+            # Not completed yet, wait with timeout
+            try:
+                _log_with_context(
+                    logging.INFO,
+                    f"Wait process: Waiting for process to complete",
+                    {"token": token, "pid": pid, "timeout": timeout}
+                )
+                
+                # Wait for the process to complete
+                await asyncio.wait_for(process.wait(), timeout)
+                
+                _log_with_context(
+                    logging.INFO,
+                    f"Wait process: Process completed after waiting",
+                    {"token": token, "pid": pid, "returncode": process.returncode}
+                )
+                
+            except asyncio.TimeoutError:
+                # Process didn't complete within timeout
+                _log_with_context(
+                    logging.WARNING,
+                    f"Wait process: Timeout waiting for process after {timeout} seconds",
+                    {"token": token, "pid": pid}
+                )
+                
+                return {
+                    "status": "timeout",
+                    "pid": pid,
+                    "error": f"Timeout waiting for process after {timeout} seconds"
+                }
+                
+            except Exception as e:
+                # Error waiting for process
+                _log_with_context(
+                    logging.ERROR,
+                    f"Wait process: Error waiting for process",
+                    {"token": token, "pid": pid, "error": str(e)}
+                )
+                
+                return {
+                    "status": "error",
+                    "pid": pid,
+                    "error": f"Error waiting for process: {str(e)}"
+                }
+                
+        # Process completed, read output
+        returncode = process.returncode
+        stdout_content = self._read_temp_file(stdout_path)
+        stderr_content = self._read_temp_file(stderr_path)
+        
+        # Clean up process and temp files
+        del self.running_processes[pid]
+        del self.process_tokens[token]
+        
+        # Clean up temp files if not called from monitor
+        if not from_monitor:
+            await self._cleanup_temp_files(pid)
+        
+        # Prepare result
+        result = {
+            "status": "completed",
+            "success": returncode == 0,
+            "return_code": returncode,
+            "output": stdout_content,
+            "error": stderr_content,
+            "pid": pid
+        }
+        
+        # Store in completed processes
+        self.completed_processes[token] = result
+        
+        _log_with_context(
+            logging.INFO,
+            f"Wait process: Returning final result",
+            {
+                "token": token, 
+                "pid": pid, 
+                "returncode": returncode,
+                "stdout_length": len(stdout_content),
+                "stderr_length": len(stderr_content)
+            }
+        )
+        
+        return result 
