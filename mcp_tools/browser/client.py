@@ -13,7 +13,10 @@ from datetime import datetime
 import socket
 from typing import Optional, Dict, Any, List
 
-class BrowserClient:
+# Import interface
+from mcp_tools.interfaces import BrowserClientInterface
+
+class BrowserClient(BrowserClientInterface):
     """Client for browser automation operations.
     
     This class provides a simplified interface for browser operations like opening pages,
@@ -26,7 +29,85 @@ class BrowserClient:
         # Get HTML content of a page
         html = browser.get_page_html("https://example.com")
     """
-    
+    # Implement ToolInterface properties
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "browser_client"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Browser automation for web scraping and testing"
+        
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        """Get the JSON schema for the tool input."""
+        return {
+            "type": "object",
+            "properties": {
+                "operation": {
+                    "type": "string",
+                    "description": "The operation to perform (get_page_html, take_screenshot)",
+                    "enum": ["get_page_html", "take_screenshot"]
+                },
+                "url": {
+                    "type": "string",
+                    "description": "The URL to visit"
+                },
+                "wait_time": {
+                    "type": "integer",
+                    "description": "Time to wait for page load in seconds",
+                    "default": 30
+                },
+                "output_path": {
+                    "type": "string",
+                    "description": "Path where the screenshot should be saved (for take_screenshot)",
+                    "nullable": True
+                }
+            },
+            "required": ["operation", "url"]
+        }
+        
+    async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the tool with the provided arguments.
+        
+        Args:
+            arguments: Dictionary of arguments for the tool
+            
+        Returns:
+            Tool execution result
+        """
+        operation = arguments.get("operation", "")
+        url = arguments.get("url", "")
+        wait_time = arguments.get("wait_time", 30)
+        
+        if operation == "get_page_html":
+            html = self.get_page_html(url, wait_time)
+            if html:
+                return {
+                    "success": True,
+                    "html": html[:10000] + ("..." if len(html) > 10000 else ""),
+                    "html_length": len(html)
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Failed to retrieve HTML from {url}"
+                }
+        elif operation == "take_screenshot":
+            output_path = arguments.get("output_path", f"screenshot_{int(time.time())}.png")
+            success = self.take_screenshot(url, output_path, wait_time)
+            return {
+                "success": success,
+                "output_path": output_path
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Unknown operation: {operation}"
+            }
+
     @staticmethod
     def in_wsl() -> bool:
         """Check if running in Windows Subsystem for Linux.

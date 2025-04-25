@@ -2,8 +2,11 @@ import logging
 import json
 from typing import Dict, Any, List, Optional, Union
 
+# Import interface
+from mcp_tools.interfaces import RepoClientInterface
+
 # Now we'll accept the CommandExecutor as a dependency rather than importing it directly
-class AzureRepoClient:
+class AzureRepoClient(RepoClientInterface):
     """Client for interacting with Azure DevOps Repositories using Azure CLI commands.
 
     This class provides methods to manage pull requests and other repo operations
@@ -28,6 +31,66 @@ class AzureRepoClient:
         # Get PR details
         pr_details = await az_client.get_pull_request(123)
     """
+    # Implement ToolInterface properties
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "azure_repo_client"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Interact with Azure DevOps repositories and pull requests"
+        
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        """Get the JSON schema for the tool input."""
+        return {
+            "type": "object",
+            "properties": {
+                "operation": {
+                    "type": "string",
+                    "description": "The operation to perform (list_pull_requests, get_pull_request, create_pull_request, etc.)",
+                    "enum": ["list_pull_requests", "get_pull_request", "create_pull_request", "update_pull_request"]
+                },
+                "pull_request_id": {
+                    "type": ["string", "integer"],
+                    "description": "ID of the pull request",
+                    "nullable": True
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Title for the pull request",
+                    "nullable": True
+                },
+                "source_branch": {
+                    "type": "string",
+                    "description": "Name of the source branch",
+                    "nullable": True
+                },
+                "target_branch": {
+                    "type": "string",
+                    "description": "Name of the target branch",
+                    "nullable": True
+                },
+                "repository": {
+                    "type": "string",
+                    "description": "Name or ID of the repository",
+                    "nullable": True
+                },
+                "project": {
+                    "type": "string",
+                    "description": "Name or ID of the project",
+                    "nullable": True
+                },
+                "organization": {
+                    "type": "string",
+                    "description": "Azure DevOps organization URL",
+                    "nullable": True
+                }
+            },
+            "required": ["operation"]
+        }
 
     def __init__(self, command_executor):
         """Initialize the AzureRepoClient with a command executor.
@@ -360,4 +423,47 @@ class AzureRepoClient:
         if organization:
             command += f" --org {organization}"
 
-        return await self._run_az_command(command) 
+        return await self._run_az_command(command)
+
+    async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the tool with the provided arguments.
+        
+        Args:
+            arguments: Dictionary of arguments for the tool
+            
+        Returns:
+            Tool execution result
+        """
+        operation = arguments.get("operation", "")
+        
+        if operation == "list_pull_requests":
+            return await self.list_pull_requests(
+                repository=arguments.get("repository"),
+                project=arguments.get("project"),
+                organization=arguments.get("organization"),
+                creator=arguments.get("creator"),
+                reviewer=arguments.get("reviewer"),
+                status=arguments.get("status"),
+                source_branch=arguments.get("source_branch"),
+                target_branch=arguments.get("target_branch")
+            )
+        elif operation == "get_pull_request":
+            return await self.get_pull_request(
+                pull_request_id=arguments.get("pull_request_id"),
+                organization=arguments.get("organization")
+            )
+        elif operation == "create_pull_request":
+            return await self.create_pull_request(
+                title=arguments.get("title"),
+                source_branch=arguments.get("source_branch"),
+                target_branch=arguments.get("target_branch"),
+                description=arguments.get("description"),
+                repository=arguments.get("repository"),
+                project=arguments.get("project"),
+                organization=arguments.get("organization")
+            )
+        else:
+            return {
+                "success": False,
+                "error": f"Unknown operation: {operation}"
+            } 

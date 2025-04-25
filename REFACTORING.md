@@ -9,9 +9,11 @@ The new project structure decouples tools into their own packages:
 ```
 /mcp_core/       # Core MCP functionality
   - mcp/         # MCP server and core components
+  - tools_adapter.py  # Adapter for backwards compatibility
   - ...
 
 /mcp_tools/      # Decoupled tool modules
+  - interfaces.py  # Shared interfaces for all tools
   - command_executor/  # Command execution functionality
   - azrepo/       # Azure repo integration
   - browser/      # Browser automation 
@@ -21,19 +23,21 @@ The new project structure decouples tools into their own packages:
 
 ## Refactoring Plan
 
-### Phase 1: Tool Isolation (Current Phase)
+### Phase 1: Tool Isolation (Complete)
 
-We're extracting each tool into its own package without changing functionality:
+We've extracted each tool into its own package without changing functionality:
 
 1. ✅ Create new directory structure
 2. ✅ Move each tool to its own package
 3. ✅ Create adapter to maintain backward compatibility
 
-### Phase 2: Interface Definition
+### Phase 2: Interface Definition (Current Phase)
 
-1. Define clean interfaces for each tool
-2. Adapt tools to implement these interfaces
-3. Update MCP to use interface methods instead of direct calls
+We've defined clean interfaces for each tool to standardize interactions:
+
+1. ✅ Define common interfaces for all tools
+2. ✅ Adapt tools to implement these interfaces
+3. ✅ Update MCP to use interface methods instead of direct calls
 
 ### Phase 3: Plugin System
 
@@ -62,7 +66,31 @@ tool_list = tools.get_tools()
 result = await tools.call_tool("execute_command", {"command": "ls -la"})
 ```
 
-### New Approach (direct usage)
+### Interface-Based Approach
+
+```python
+# Using the interfaces for better extensibility
+from mcp_tools import CommandExecutorInterface, CommandExecutor
+
+# Function that accepts any command executor implementation
+async def run_my_command(executor: CommandExecutorInterface):
+    result = await executor.execute_command("ls -la")
+    print(result)
+    
+# Use with the default implementation
+executor = CommandExecutor()
+await run_my_command(executor)
+
+# Or create a custom implementation
+class MyCustomExecutor(CommandExecutorInterface):
+    # Implement the required interface methods
+    ...
+
+custom_executor = MyCustomExecutor()
+await run_my_command(custom_executor)
+```
+
+### Direct Usage Approach
 
 ```python
 # New code can use the decoupled modules directly
@@ -97,7 +125,7 @@ pip install -e .
 
 ## Status
 
-- ✅ Phase 1: Tool Isolation (In progress)
-- ❌ Phase 2: Interface Definition
+- ✅ Phase 1: Tool Isolation (Complete)
+- ✅ Phase 2: Interface Definition (Complete)
 - ❌ Phase 3: Plugin System
 - ❌ Phase 4: Dependency Injection 

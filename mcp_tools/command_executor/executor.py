@@ -14,6 +14,9 @@ from datetime import datetime, UTC
 from pathlib import Path
 import traceback
 
+# Import the interface
+from mcp_tools.interfaces import CommandExecutorInterface
+
 g_config_sleep_when_running = True
 
 # Create logger with the module name
@@ -37,7 +40,7 @@ def _log_with_context(log_level: int, msg: str, context: Dict[str, Any] = None) 
     structured_msg = f"{msg} | Context: {json.dumps(context, default=str)}"
     logger.log(log_level, structured_msg)
 
-class CommandExecutor:
+class CommandExecutor(CommandExecutorInterface):
     """Command executor that can run processes synchronously or asynchronously,
     using temporary files for stdout/stderr capture.
 
@@ -66,6 +69,49 @@ class CommandExecutor:
             # To terminate early
             executor.terminate_by_token(token)
     """
+    # Implement ToolInterface properties
+    @property
+    def name(self) -> str:
+        """Get the tool name."""
+        return "command_executor"
+        
+    @property
+    def description(self) -> str:
+        """Get the tool description."""
+        return "Execute shell commands synchronously or asynchronously"
+        
+    @property
+    def input_schema(self) -> Dict[str, Any]:
+        """Get the JSON schema for the tool input."""
+        return {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "The command to execute"
+                },
+                "timeout": {
+                    "type": "number",
+                    "description": "Optional timeout in seconds",
+                    "nullable": True
+                }
+            },
+            "required": ["command"]
+        }
+
+    async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the tool with the provided arguments.
+        
+        Args:
+            arguments: Dictionary of arguments for the tool
+            
+        Returns:
+            Tool execution result
+        """
+        command = arguments.get("command", "")
+        timeout = arguments.get("timeout")
+        
+        return self.execute(command, timeout)
 
     def __init__(self, temp_dir: Optional[str] = None):
         self.os_type = platform.system().lower()

@@ -2,7 +2,16 @@
 
 import asyncio
 import logging
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Type
+
+# Import interfaces
+from mcp_tools.interfaces import (
+    ToolInterface,
+    CommandExecutorInterface,
+    RepoClientInterface,
+    BrowserClientInterface,
+    EnvironmentManagerInterface,
+)
 
 # Import the new tool modules
 from mcp_tools.command_executor import CommandExecutor
@@ -20,12 +29,14 @@ class ToolsAdapter:
     
     def __init__(self):
         """Initialize the tools adapter with instances of the new tool modules."""
-        self.command_executor = CommandExecutor()
-        self.azure_repo_client = AzureRepoClient(self.command_executor)
-        self.browser_client = BrowserClient()
+        # Create instances using their interfaces
+        self.command_executor: CommandExecutorInterface = CommandExecutor()
+        self.azure_repo_client: RepoClientInterface = AzureRepoClient(self.command_executor)
+        self.browser_client: BrowserClientInterface = BrowserClient()
+        self.environment_manager: EnvironmentManagerInterface = env
         
         # Load environment
-        env.load()
+        self.environment_manager.load()
         
         # Store registered tools
         self._tools: Dict[str, Dict[str, Any]] = {}
@@ -36,10 +47,13 @@ class ToolsAdapter:
     
     def _register_default_tools(self):
         """Register the default tools that are part of the original implementation."""
-        # This will be expanded with all the original tools
-        # For now, just adding a few examples
+        # Register tools directly using their interfaces
+        self._register_tool_interface(self.command_executor)
+        self._register_tool_interface(self.azure_repo_client)
+        self._register_tool_interface(self.browser_client)
+        self._register_tool_interface(self.environment_manager)
         
-        # Register command execution tools
+        # Register additional backwards-compatibility tools
         self._register_tool(
             name="execute_command",
             description="Execute a command",
@@ -57,7 +71,6 @@ class ToolsAdapter:
             executor=self._execute_command_async
         )
         
-        # Register Azure repo tools
         self._register_tool(
             name="list_pull_requests",
             description="List pull requests in the Azure DevOps repository",
@@ -70,7 +83,6 @@ class ToolsAdapter:
             executor=self._list_pull_requests
         )
         
-        # Register browser tools
         self._register_tool(
             name="get_page_html",
             description="Open a webpage and get its HTML content",
@@ -80,6 +92,20 @@ class ToolsAdapter:
             }},
             executor=self._get_page_html
         )
+    
+    def _register_tool_interface(self, tool: ToolInterface):
+        """Register a tool from its interface.
+        
+        Args:
+            tool: The tool interface to register
+        """
+        self._tools[tool.name] = {
+            "name": tool.name,
+            "description": tool.description,
+            "inputSchema": tool.input_schema
+        }
+        self._tool_executors[tool.name] = tool.execute_tool
+        logger.info(f"Registered tool from interface: {tool.name}")
     
     def _register_tool(self, name: str, description: str, input_schema: Dict[str, Any], executor: callable):
         """Register a tool with the adapter.
@@ -125,13 +151,52 @@ class ToolsAdapter:
         try:
             executor = self._tool_executors[name]
             result = await executor(arguments)
-            return result
+            
+            # Convert result to TextContent if it's not already
+            if isinstance(result, list) and all(isinstance(item, TextContent) for item in result):
+                return result
+            
+            # Convert result to TextContent
+            if isinstance(result, dict):
+                return [TextContent(
+                    type="text",
+                    text=self._format_result_as_text(result)
+                )]
+            else:
+                return [TextContent(
+                    type="text",
+                    text=str(result)
+                )]
         except Exception as e:
             logger.exception(f"Error executing tool {name}")
             return [TextContent(
                 type="text",
                 text=f"Error executing tool {name}: {str(e)}"
             )]
+            
+    def _format_result_as_text(self, result: Dict[str, Any]) -> str:
+        """Format a result dictionary as text.
+        
+        Args:
+            result: Result dictionary
+            
+        Returns:
+            Formatted text
+        """
+        if not result.get("success", True):
+            return f"Error: {result.get('error', 'Unknown error')}"
+            
+        # Different formatting based on the type of result
+        if "output" in result:
+            return result.get("output", "")
+        elif "html" in result:
+            return f"HTML content (length: {result.get('html_length', 0)}):\n{result.get('html', '')}"
+        elif "parameters" in result:
+            params = result.get("parameters", {})
+            return "Environment parameters:\n" + "\n".join(f"{k}: {v}" for k, v in params.items())
+        else:
+            # Generic formatting
+            return "\n".join(f"{k}: {v}" for k, v in result.items() if k != "success")
     
     # Example tool executors that use the new modules:
     
