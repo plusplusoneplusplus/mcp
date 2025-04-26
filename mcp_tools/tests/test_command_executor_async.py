@@ -242,7 +242,7 @@ class TestCommandExecutorAsync:
         # Check all are running
         for token in tokens:
             status = await executor.get_process_status(token)
-            assert status["status"] == "running"
+            assert status["status"] in ["running", "sleeping"]  # Process could be in running or sleeping state
 
         # Wait for all to complete with timeout
         results = await asyncio.gather(*[executor.wait_for_process(token, timeout=10.0) for token in tokens])
