@@ -1,105 +1,16 @@
-import os
-import json
-import platform
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable
 from config.types import RepositoryInfo
 
-# Import interface
-from mcp_tools.interfaces import EnvironmentManagerInterface
-
-# NOTE: Removed the register_tool decorator to avoid circular imports
-
-class EnvironmentManager(EnvironmentManagerInterface):
+class EnvironmentManager:
     """
     Environment manager to handle repository and environment information
     that is passed from IDE to the server.
     """
     _instance = None
     
-    # Implement ToolInterface properties
-    @property
-    def name(self) -> str:
-        """Get the tool name."""
-        return "environment_manager"
-        
-    @property
-    def description(self) -> str:
-        """Get the tool description."""
-        return "Manage environment information and repository details"
-        
-    @property
-    def input_schema(self) -> Dict[str, Any]:
-        """Get the JSON schema for the tool input."""
-        return {
-            "type": "object",
-            "properties": {
-                "operation": {
-                    "type": "string",
-                    "description": "The operation to perform (get_parameter_dict, get_git_root, etc.)",
-                    "enum": ["get_parameter_dict", "get_git_root", "get_workspace_folder", "get_project_name", "get_path", "get_private_tool_root", "get_azrepo_parameters"]
-                },
-                "path_name": {
-                    "type": "string",
-                    "description": "Path name to retrieve (for get_path operation)",
-                    "nullable": True
-                }
-            },
-            "required": ["operation"]
-        }
-    
-    async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the tool with the provided arguments.
-        
-        Args:
-            arguments: Dictionary of arguments for the tool
-            
-        Returns:
-            Tool execution result
-        """
-        operation = arguments.get("operation", "")
-        
-        if operation == "get_parameter_dict":
-            return {
-                "success": True,
-                "parameters": self.get_parameter_dict()
-            }
-        elif operation == "get_git_root":
-            return {
-                "success": True,
-                "git_root": self.get_git_root()
-            }
-        elif operation == "get_workspace_folder":
-            return {
-                "success": True,
-                "workspace_folder": self.get_workspace_folder()
-            }
-        elif operation == "get_project_name":
-            return {
-                "success": True,
-                "project_name": self.get_project_name()
-            }
-        elif operation == "get_path":
-            path_name = arguments.get("path_name", "")
-            return {
-                "success": True,
-                "path": self.get_path(path_name)
-            }
-        elif operation == "get_private_tool_root":
-            return {
-                "success": True,
-                "private_tool_root": self.get_private_tool_root()
-            }
-        elif operation == "get_azrepo_parameters":
-            return {
-                "success": True,
-                "azrepo_parameters": self.get_azrepo_parameters()
-            }
-        else:
-            return {
-                "success": False,
-                "error": f"Unknown operation: {operation}"
-            }
+    # Remove the ToolInterface properties (name, description, input_schema)
+    # Remove the execute_tool method
     
     def __new__(cls):
         if cls._instance is None:

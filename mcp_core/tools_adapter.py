@@ -13,7 +13,6 @@ from mcp_tools.interfaces import (
     CommandExecutorInterface,
     RepoClientInterface,
     BrowserClientInterface,
-    EnvironmentManagerInterface,
 )
 
 # Import plugin system
@@ -23,6 +22,9 @@ from mcp_tools.dependency import injector
 
 # Use local types instead of mcp.types
 from mcp_core.types import TextContent, Tool
+
+# Import environment directly from config
+from config import env_manager
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ class ToolsAdapter:
         self.command_executor = injector.get_tool_instance("command_executor")
         self.azure_repo_client = injector.get_tool_instance("azure_repo_client")
         self.browser_client = injector.get_tool_instance("browser_client")
-        self.environment_manager = injector.get_tool_instance("environment_manager")
+        self.environment_manager = env_manager
         
         # Load environment
         if self.environment_manager:

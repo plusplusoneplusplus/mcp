@@ -6,14 +6,13 @@ from mcp_tools.interfaces import (
     CommandExecutorInterface,
     RepoClientInterface,
     BrowserClientInterface,
-    EnvironmentManagerInterface,
 )
 
 # Import concrete implementations
 from mcp_tools.command_executor import CommandExecutor
 from mcp_tools.azrepo import AzureRepoClient
 from mcp_tools.browser import BrowserClient
-from config import EnvironmentManager, env
+from config import env
 
 # Import plugin system
 from mcp_tools.plugin import (
@@ -37,13 +36,11 @@ __all__ = [
     "CommandExecutorInterface",
     "RepoClientInterface",
     "BrowserClientInterface",
-    "EnvironmentManagerInterface",
     
     # Implementations
     "CommandExecutor",
     "AzureRepoClient",
     "BrowserClient",
-    "EnvironmentManager",
     "env",
     
     # Plugin system
