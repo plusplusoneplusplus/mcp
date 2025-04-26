@@ -1,0 +1,50 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          
+      # - name: Install Chrome
+      #   run: |
+      #     wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+      #     echo "deb http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+      #     sudo apt-get update
+      #     sudo apt-get install -y google-chrome-stable
+          
+      # - name: Install ChromeDriver
+      #   run: |
+      #     CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1)
+      #     CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
+      #     wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+      #     unzip chromedriver_linux64.zip
+      #     sudo mv chromedriver /usr/local/bin/
+      #     sudo chmod +x /usr/local/bin/chromedriver
+          
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        run: |
+          uv pip install pytest pytest-asyncio
+          uv pip install -e .
+          
+      - name: Run tests
+        run: |
+          chmod +x ./scripts/run_tests.sh
+          ./scripts/run_tests.sh 
