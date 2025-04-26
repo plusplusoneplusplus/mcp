@@ -86,7 +86,7 @@ class BrowserClient(BrowserClientInterface):
         wait_time = arguments.get("wait_time", 30)
         
         if operation == "get_page_html":
-            html = self.get_page_html(url, wait_time)
+            html = BrowserClient.get_page_html(url, wait_time)
             if html:
                 return {
                     "success": True,
@@ -100,7 +100,7 @@ class BrowserClient(BrowserClientInterface):
                 }
         elif operation == "take_screenshot":
             output_path = arguments.get("output_path", f"screenshot_{int(time.time())}.png")
-            success = self.take_screenshot(url, output_path, wait_time)
+            success = BrowserClient.take_screenshot(url, output_path, wait_time)
             return {
                 "success": success,
                 "output_path": output_path
@@ -193,7 +193,8 @@ class BrowserClient(BrowserClientInterface):
             print("   WSL: pkill chrome")
             raise
 
-    def get_page_html(self, url: str, wait_time: int = 30) -> Optional[str]:
+    @staticmethod
+    def get_page_html(url: str, wait_time: int = 30) -> Optional[str]:
         """Open a webpage and get its HTML content.
         
         Args:
@@ -203,7 +204,7 @@ class BrowserClient(BrowserClientInterface):
         Returns:
             HTML content of the page or None if an error occurred
         """
-        driver = self.setup_browser(headless=False)  # Set to True if you don't want to see the browser
+        driver = BrowserClient.setup_browser(headless=True)  # Set to True for headless mode
 
         try:
             # Navigate to the page
@@ -231,7 +232,8 @@ class BrowserClient(BrowserClientInterface):
                     pass
             driver.quit()
             
-    def take_screenshot(self, url: str, output_path: str, wait_time: int = 30) -> bool:
+    @staticmethod
+    def take_screenshot(url: str, output_path: str, wait_time: int = 30) -> bool:
         """Navigate to a URL and take a screenshot.
         
         Args:
@@ -242,7 +244,7 @@ class BrowserClient(BrowserClientInterface):
         Returns:
             True if screenshot was successful, False otherwise
         """
-        driver = self.setup_browser(headless=True)
+        driver = BrowserClient.setup_browser(headless=True)
 
         try:
             # Navigate to the page

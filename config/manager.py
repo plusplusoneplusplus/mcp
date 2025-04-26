@@ -161,6 +161,31 @@ class EnvironmentManager:
         """Load all environment information"""
         self._load_from_env_file()
         
+        # Import os here to avoid circular imports
+        import os
+        
+        # Load variables from OS environment
+        for key, value in os.environ.items():
+            self.env_variables[key] = value
+            
+            # Update repository info if applicable
+            if key == "GIT_ROOT":
+                self.repository_info.git_root = value
+            elif key == "WORKSPACE_FOLDER":
+                self.repository_info.workspace_folder = value
+            elif key == "PROJECT_NAME":
+                self.repository_info.project_name = value
+            elif key == "PRIVATE_TOOL_ROOT":
+                self.repository_info.private_tool_root = value
+            # Handle MCP_PATH_ prefixed variables
+            elif key.startswith("MCP_PATH_"):
+                path_name = key[9:].lower()
+                self.repository_info.additional_paths[path_name] = value
+            # Handle AZREPO_ prefixed variables
+            elif key.startswith("AZREPO_"):
+                param_name = key[7:].lower()
+                self.azrepo_parameters[param_name] = value
+        
         # Call all registered providers
         for provider in self._providers:
             try:
