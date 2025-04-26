@@ -22,8 +22,15 @@ from mcp.types import (
 from mcp_tools.plugin import registry, discover_and_register_tools
 from mcp_tools.dependency import injector
 from mcp_tools.interfaces import ToolInterface
+
+# Import plugin configuration
+from mcp_tools.plugin_config import config
+
 import prompts
 from config import env
+
+# The configuration is already loaded from environment variables in PluginConfig.__init__
+# No need to override it here
 
 # Create the server
 server = Server("mymcp")
@@ -32,17 +39,33 @@ server = Server("mymcp")
 discover_and_register_tools()
 injector.resolve_all_dependencies()
 
-# Log information about registered tools
-tool_instances = list(injector.instances.values())
-logging.info(f"Loaded {len(tool_instances)} tools:")
-for tool in tool_instances:
+# Get all tools and filtered active tools
+all_tool_instances = list(injector.get_all_instances().values())
+active_tool_instances = list(injector.get_filtered_instances().values())
+
+# Log information about registered and active tools
+logging.info(f"Registered {len(all_tool_instances)} total tools, {len(active_tool_instances)} active tools")
+
+# Log tool sources
+tool_sources = registry.get_tool_sources()
+code_tools = [name for name, source in tool_sources.items() if source == "code"]
+yaml_tools = [name for name, source in tool_sources.items() if source == "yaml"]
+active_tools = [tool.name for tool in active_tool_instances]
+inactive_tools = [name for name in tool_sources.keys() if name not in active_tools]
+
+logging.info(f"Code tools ({len(code_tools)}): {', '.join(code_tools) if code_tools else 'None'}")
+logging.info(f"YAML tools ({len(yaml_tools)}): {', '.join(yaml_tools) if yaml_tools else 'None'}")
+logging.info(f"Active tools ({len(active_tools)}): {', '.join(active_tools) if active_tools else 'None'}")
+logging.info(f"Inactive tools ({len(inactive_tools)}): {', '.join(inactive_tools) if inactive_tools else 'None'}")
+
+for tool in active_tool_instances:
     logging.info(f"  - {tool.name}: {tool.description}")
 
 # Setup tools using the direct plugin system
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    # Get all tool instances
-    tool_instances = list(injector.instances.values())
+    # Get all tool instances that are active according to config
+    tool_instances = list(injector.get_filtered_instances().values())
     mcp_tools = []
     
     for tool in tool_instances:
@@ -65,6 +88,16 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
         return [TextContent(
             type="text",
             text=f"Error: Tool '{name}' not found."
+        )]
+    
+    # Check if this tool is from an active source
+    tool_sources = registry.get_tool_sources()
+    source = tool_sources.get(name, "unknown")
+    
+    if not config.is_source_enabled(source):
+        return [TextContent(
+            type="text",
+            text=f"Error: Tool '{name}' is disabled. Source '{source}' is not active."
         )]
     
     try:

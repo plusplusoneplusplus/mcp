@@ -209,7 +209,7 @@ class DependencyInjector:
         """Resolve dependencies for all registered tools.
         
         Returns:
-            Dictionary of tool instances
+            Dictionary of tool instances filtered by tool source based on config
         """
         # Discover all dependencies from constructor parameters
         for tool_name, tool_class in registry.tools.items():
@@ -234,7 +234,42 @@ class DependencyInjector:
         for tool_name in registry.tools:
             self.get_tool_instance(tool_name)
             
-        return self.instances
+        # Return filtered instances based on configuration
+        return self.get_filtered_instances()
+    
+    def get_all_instances(self) -> Dict[str, ToolInterface]:
+        """Get all tool instances without filtering.
+        
+        Returns:
+            Dictionary of all tool instances regardless of source
+        """
+        return self.instances.copy()
+    
+    def get_filtered_instances(self) -> Dict[str, ToolInterface]:
+        """Get tool instances filtered by configuration settings.
+        
+        Returns:
+            Dictionary of tool instances filtered by tool source based on config
+        """
+        from mcp_tools.plugin_config import config
+        
+        # If both sources are enabled, return all instances
+        if config.register_code_tools and config.register_yaml_tools:
+            return self.instances.copy()
+        
+        # Get tool sources
+        tool_sources = registry.get_tool_sources()
+        
+        # Filter instances based on config
+        filtered_instances = {}
+        for tool_name, instance in self.instances.items():
+            source = tool_sources.get(tool_name, "unknown")
+            
+            # Use the plugin_config to check if source is enabled
+            if config.is_source_enabled(source):
+                filtered_instances[tool_name] = instance
+                
+        return filtered_instances
     
     def clear(self) -> None:
         """Clear all registered dependencies and instances."""

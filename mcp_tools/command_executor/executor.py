@@ -16,7 +16,6 @@ import traceback
 
 # Import the interface
 from mcp_tools.interfaces import CommandExecutorInterface
-# Import the plugin decorator
 from mcp_tools.plugin import register_tool
 
 g_config_sleep_when_running = True

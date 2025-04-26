@@ -339,50 +339,52 @@ class YamlToolBase(ToolInterface):
         """
         yaml_data = {}
         
-        # Define possible locations to look for the file
-        # 1. Server directory
-        server_dir = self._get_server_dir()
-        # 2. Private directory in server
-        private_dir = server_dir / ".private"
-        # 3. Current directory
-        current_dir = Path(os.getcwd())
-        
-        # Check all locations in priority order
-        for location in [private_dir, server_dir, current_dir]:
-            yaml_path = location / filename
-            if yaml_path.exists():
-                logger.info(f"Loading {filename} from {yaml_path}")
-                try:
-                    with open(yaml_path, 'r') as file:
-                        content = file.read()
-                        try:
-                            yaml_data = yaml.safe_load(content)
-                            
-                            # Validate the loaded YAML data
-                            if not isinstance(yaml_data, dict):
-                                logger.error(f"Invalid YAML format in {yaml_path}: root must be a dictionary")
-                                yaml_data = {}
-                            
-                            # Make sure 'tools' key exists and is a dictionary
-                            if 'tools' in yaml_data and not isinstance(yaml_data['tools'], dict):
-                                logger.error(f"Invalid 'tools' section in {yaml_path}: must be a dictionary")
-                                yaml_data['tools'] = {}
-                            
-                            # Make sure 'tasks' key exists and is a dictionary if present
-                            if 'tasks' in yaml_data and not isinstance(yaml_data['tasks'], dict):
-                                logger.error(f"Invalid 'tasks' section in {yaml_path}: must be a dictionary")
-                                yaml_data['tasks'] = {}
+        try:
+            # Import the plugin config
+            from mcp_tools.plugin_config import config
+            
+            # Get paths from configuration
+            locations = config.get_yaml_tool_paths()
+            
+            # Check all locations in order
+            for location in locations:
+                yaml_path = location / filename
+                if yaml_path.exists():
+                    logger.info(f"Loading {filename} from {yaml_path}")
+                    try:
+                        with open(yaml_path, 'r') as file:
+                            content = file.read()
+                            try:
+                                yaml_data = yaml.safe_load(content)
                                 
-                            return yaml_data
-                        except yaml.YAMLError as e:
-                            logger.error(f"YAML parsing error in {yaml_path}: {e}")
-                            # Return empty dict instead of invalid data
-                            return {}
-                except Exception as e:
-                    logger.error(f"Error loading {filename} from {yaml_path}: {e}")
-        
-        # If we got here, we didn't find a valid file
-        logger.warning(f"Could not find {filename} in any of the expected locations")
+                                # Validate the loaded YAML data
+                                if not isinstance(yaml_data, dict):
+                                    logger.error(f"Invalid YAML format in {yaml_path}: root must be a dictionary")
+                                    yaml_data = {}
+                                
+                                # Make sure 'tools' key exists and is a dictionary
+                                if 'tools' in yaml_data and not isinstance(yaml_data['tools'], dict):
+                                    logger.error(f"Invalid 'tools' section in {yaml_path}: must be a dictionary")
+                                    yaml_data['tools'] = {}
+                                
+                                # Make sure 'tasks' key exists and is a dictionary if present
+                                if 'tasks' in yaml_data and not isinstance(yaml_data['tasks'], dict):
+                                    logger.error(f"Invalid 'tasks' section in {yaml_path}: must be a dictionary")
+                                    yaml_data['tasks'] = {}
+                                    
+                                return yaml_data
+                            except yaml.YAMLError as e:
+                                logger.error(f"YAML parsing error in {yaml_path}: {e}")
+                                # Return empty dict instead of invalid data
+                                return {}
+                    except Exception as e:
+                        logger.error(f"Error loading {filename} from {yaml_path}: {e}")
+            
+            # If we got here, we didn't find a valid file
+            logger.warning(f"Could not find {filename} in any of the expected locations: {[str(p) for p in locations]}")
+        except Exception as e:
+            logger.error(f"Error finding {filename}: {e}")
+            
         return yaml_data
     
     def _get_server_dir(self) -> Path:
@@ -398,12 +400,51 @@ class YamlToolBase(ToolInterface):
         # Get the server directory
         return project_root / "server"
 
+def get_yaml_tool_names() -> set:
+    """Get the names of tools defined in YAML.
+    
+    Returns:
+        Set of tool names defined in YAML
+    """
+    logger.info("Getting YAML tool names")
+    
+    try:
+        # Import plugin config
+        from mcp_tools.plugin_config import config
+        
+        # Create a base instance to load YAML
+        base_tool = YamlToolBase()
+        yaml_data = base_tool._load_yaml_from_locations("tools.yaml")
+        tools_data = yaml_data.get('tools', {})
+        
+        # Get tool names and filter out disabled tools
+        tool_names = {
+            name for name, data in tools_data.items() 
+            if data.get('enabled', True) != False
+        }
+        
+        logger.info(f"Found {len(tool_names)} tools in YAML: {', '.join(tool_names)}")
+        return tool_names
+    except Exception as e:
+        logger.error(f"Error getting YAML tool names: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return set()
+
 def load_yaml_tools() -> List[Type[ToolInterface]]:
     """Load tools from tools.yaml and register them.
     
     Returns:
         List of registered YAML tool classes
     """
+    # Import plugin config
+    from mcp_tools.plugin_config import config
+    
+    # Skip if YAML tools are disabled
+    if not config.register_yaml_tools:
+        logger.info("YAML tool registration is disabled, skipping")
+        return []
+    
     logger.info("Loading YAML-defined tools")
     
     try:
@@ -493,7 +534,7 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
                     
                     # Register the tool
                     logger.info(f"Registering YAML tool: {name}")
-                    tool_class = register_tool(tool_class)
+                    tool_class = register_tool(source="yaml")(tool_class)
                     yaml_tool_classes.append(tool_class)
                 except Exception as create_error:
                     logger.error(f"Error creating or registering class for YAML tool '{name}': {create_error}")
