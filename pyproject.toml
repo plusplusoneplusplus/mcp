@@ -9,7 +9,7 @@ description = "MCP configuration based server"
 authors = [
     {name = "Yiheng Tao", email = "example@example.com"}
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 classifiers = [
     "Programming Language :: Python :: 3",
