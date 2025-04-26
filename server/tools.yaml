@@ -1,17 +1,4 @@
 tools:
-  execute_command: # deprecated
-    enabled: false
-    name: execute_command
-    description: Execute a command
-    inputSchema:
-      type: object
-      properties:
-        command:
-          type: string
-          description: The command to execute
-      required:
-        - command
-
   execute_command_async:
     enabled: false
     name: execute_command_async

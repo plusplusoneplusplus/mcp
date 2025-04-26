@@ -28,6 +28,12 @@ from mcp_tools.dependency import (
     DependencyInjector
 )
 
+# Import YAML tools system
+from mcp_tools.yaml_tools import (
+    YamlToolBase,
+    discover_and_register_yaml_tools
+)
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -52,4 +58,8 @@ __all__ = [
     # Dependency injection
     "injector",
     "DependencyInjector",
+    
+    # YAML tools
+    "YamlToolBase",
+    "discover_and_register_yaml_tools",
 ]

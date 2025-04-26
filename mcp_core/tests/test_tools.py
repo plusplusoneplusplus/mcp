@@ -18,8 +18,9 @@ parent_dir = str(Path(__file__).resolve().parent.parent.parent)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-# Import the ToolsAdapter
-from mcp_core.tools_adapter import ToolsAdapter
+# Import the direct tool system
+from mcp_tools.plugin import registry, discover_and_register_tools
+from mcp_tools.dependency import injector
 
 @pytest.fixture
 def yaml_data():
@@ -36,9 +37,11 @@ def yaml_data():
         return yaml.safe_load(f)
 
 @pytest.fixture
-def tools_adapter():
-    """Create a ToolsAdapter instance as a fixture"""
-    return ToolsAdapter()
+def tool_system():
+    """Initialize the tool system and return registry and injector"""
+    discover_and_register_tools()
+    injector.resolve_all_dependencies()
+    return {"registry": registry, "injector": injector}
 
 def test_tools_yaml_exists():
     """Test that tools.yaml exists in the server directory"""
@@ -46,26 +49,27 @@ def test_tools_yaml_exists():
     yaml_path = server_dir / "tools.yaml"
     assert yaml_path.exists(), f"tools.yaml not found at {yaml_path}"
 
-def test_tools_adapter_initialization(tools_adapter):
-    """Test that ToolsAdapter can be initialized"""
-    assert tools_adapter is not None
+def test_tool_system_initialization(tool_system):
+    """Test that the tool system can be initialized"""
+    assert tool_system["registry"] is not None
+    assert tool_system["injector"] is not None
     
     # Get all registered tools
-    tools = tools_adapter.get_tools()
+    tools = list(tool_system["injector"].instances.values())
     assert len(tools) > 0, "No tools were registered"
 
-def test_tools_from_yaml_are_registered(yaml_data, tools_adapter):
-    """Test that tools defined in tools.yaml are registered in the adapter"""
+def test_tools_from_yaml_are_registered(yaml_data, tool_system):
+    """Test that tools defined in tools.yaml are registered in the system"""
     # Get tools from yaml
     yaml_tool_names = yaml_data.get('tools', {}).keys()
     assert len(yaml_tool_names) > 0, "No tools found in tools.yaml"
     
     # Get registered tools
-    tools = tools_adapter.get_tools()
+    tools = list(tool_system["injector"].instances.values())
     registered_tool_names = [tool.name for tool in tools]
     
     # Verify at least some tools are registered
-    assert len(registered_tool_names) > 0, "No tools registered in the adapter"
+    assert len(registered_tool_names) > 0, "No tools registered in the system"
     
     # Count how many tools from yaml are registered
     registered_count = 0

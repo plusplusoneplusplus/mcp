@@ -18,30 +18,39 @@ from mcp.types import (
     PromptsCapability
 )
 
-# Local and MCP Core imports
-from mcp_core.tools_adapter import ToolsAdapter
+# Import tools directly from mcp_tools
+from mcp_tools.plugin import registry, discover_and_register_tools
+from mcp_tools.dependency import injector
+from mcp_tools.interfaces import ToolInterface
 import prompts
 from config import env
 
 # Create the server
 server = Server("mymcp")
 
-# Create tools adapter instance
-tools_adapter = ToolsAdapter()
+# Initialize tools system directly
+discover_and_register_tools()
+injector.resolve_all_dependencies()
 
-# Setup tools using the new tools adapter
+# Log information about registered tools
+tool_instances = list(injector.instances.values())
+logging.info(f"Loaded {len(tool_instances)} tools:")
+for tool in tool_instances:
+    logging.info(f"  - {tool.name}: {tool.description}")
+
+# Setup tools using the direct plugin system
 @server.list_tools()
 async def list_tools() -> list[Tool]:
-    # Convert our tools to the mcp.types.Tool format expected by the server
-    core_tools = tools_adapter.get_tools()
+    # Get all tool instances
+    tool_instances = list(injector.instances.values())
     mcp_tools = []
     
-    for core_tool in core_tools:
+    for tool in tool_instances:
         # Create a new mcp.types.Tool instance from our tool data
         mcp_tool = Tool(
-            name=core_tool.name,
-            description=core_tool.description,
-            inputSchema=core_tool.inputSchema
+            name=tool.name,
+            description=tool.description,
+            inputSchema=tool.input_schema
         )
         mcp_tools.append(mcp_tool)
     
@@ -49,20 +58,63 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
-    # Here we use the TextContent from mcp.types as defined above
-    result = await tools_adapter.call_tool(name, arguments)
+    # Get the tool instance from the injector
+    tool = injector.get_tool_instance(name)
     
-    # Convert our TextContent objects to mcp.types.TextContent objects if needed
-    mcp_result = []
-    for item in result:
-        mcp_text = TextContent(
-            type=item.type,
-            text=item.text,
-            annotations=item.annotations
-        )
-        mcp_result.append(mcp_text)
+    if not tool:
+        return [TextContent(
+            type="text",
+            text=f"Error: Tool '{name}' not found."
+        )]
+    
+    try:
+        # Call the tool directly
+        result = await tool.execute_tool(arguments)
         
-    return mcp_result
+        # Convert to TextContent if not already
+        if isinstance(result, list) and all(isinstance(item, dict) for item in result):
+            return [TextContent(**item) for item in result]
+        elif isinstance(result, list) and all(hasattr(item, 'type') and hasattr(item, 'text') for item in result):
+            return [TextContent(
+                type=item.type,
+                text=item.text,
+                annotations=getattr(item, 'annotations', None)
+            ) for item in result]
+        elif isinstance(result, dict):
+            # Format result as text
+            text = format_result_as_text(result)
+            return [TextContent(
+                type="text",
+                text=text
+            )]
+        else:
+            return [TextContent(
+                type="text",
+                text=str(result)
+            )]
+    except Exception as e:
+        logging.exception(f"Error executing tool {name}")
+        return [TextContent(
+            type="text",
+            text=f"Error executing tool {name}: {str(e)}"
+        )]
+
+def format_result_as_text(result: dict) -> str:
+    """Format a result dictionary as text."""
+    if not result.get("success", True):
+        return f"Error: {result.get('error', 'Unknown error')}"
+        
+    # Different formatting based on the type of result
+    if "output" in result:
+        return result.get("output", "")
+    elif "html" in result:
+        return f"HTML content (length: {result.get('html_length', 0)}):\n{result.get('html', '')}"
+    elif "parameters" in result:
+        params = result.get("parameters", {})
+        return "Environment parameters:\n" + "\n".join(f"{k}: {v}" for k, v in params.items())
+    else:
+        # Generic formatting
+        return "\n".join(f"{k}: {v}" for k, v in result.items() if k != "success")
 
 # Setup SSE transport
 sse = SseServerTransport("/messages/")
