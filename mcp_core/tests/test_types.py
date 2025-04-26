@@ -4,6 +4,7 @@
 import os
 import sys
 import logging
+import pytest
 from pathlib import Path
 
 # Set up logging
@@ -19,16 +20,25 @@ if parent_dir not in sys.path:
 # Import from the new types module
 from mcp_core.types import TextContent, Tool
 
-def main():
-    print("\n=== MCP Core Types Test ===\n")
-    
+def test_text_content():
+    """Test the TextContent class"""
     # Create a TextContent instance
     text_content = TextContent(
         type="text",
         text="This is a test message"
     )
-    print(f"TextContent: {text_content}")
     
+    # Verify properties
+    assert text_content.type == "text"
+    assert text_content.text == "This is a test message"
+    
+    # Test string representation
+    str_repr = str(text_content)
+    assert "text" in str_repr
+    assert "This is a test message" in str_repr
+
+def test_tool():
+    """Test the Tool class"""
     # Create a Tool instance
     tool = Tool(
         name="test_tool",
@@ -40,9 +50,13 @@ def main():
             }
         }
     )
-    print(f"Tool: {tool}")
     
-    print("\nTypes work correctly!\n")
-
-if __name__ == "__main__":
-    main() 
+    # Verify properties
+    assert tool.name == "test_tool"
+    assert tool.description == "A test tool"
+    assert "parameter" in tool.inputSchema["properties"]
+    
+    # Test string representation
+    str_repr = str(tool)
+    assert "test_tool" in str_repr
+    assert "A test tool" in str_repr 

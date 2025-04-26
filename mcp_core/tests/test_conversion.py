@@ -4,6 +4,7 @@
 import os
 import sys
 import logging
+import pytest
 from pathlib import Path
 
 # Set up logging
@@ -24,9 +25,8 @@ from mcp_core.types import Tool as CoreTool
 from mcp.types import TextContent as McpTextContent
 from mcp.types import Tool as McpTool
 
-def main():
-    print("\n=== Type Conversion Test ===\n")
-    
+def test_tool_conversion():
+    """Test conversion between CoreTool and McpTool"""
     # Create a CoreTool instance
     core_tool = CoreTool(
         name="test_tool",
@@ -38,7 +38,6 @@ def main():
             }
         }
     )
-    print(f"CoreTool: {core_tool}")
     
     # Convert to McpTool
     mcp_tool = McpTool(
@@ -46,14 +45,19 @@ def main():
         description=core_tool.description,
         inputSchema=core_tool.inputSchema
     )
-    print(f"McpTool: {mcp_tool}")
     
+    # Verify conversion preserves properties
+    assert mcp_tool.name == core_tool.name
+    assert mcp_tool.description == core_tool.description
+    assert mcp_tool.inputSchema == core_tool.inputSchema
+
+def test_text_content_conversion():
+    """Test conversion between CoreTextContent and McpTextContent"""
     # Create a CoreTextContent instance
     core_text = CoreTextContent(
         type="text",
         text="This is a test message"
     )
-    print(f"CoreTextContent: {core_text}")
     
     # Convert to McpTextContent
     mcp_text = McpTextContent(
@@ -61,9 +65,8 @@ def main():
         text=core_text.text,
         annotations=core_text.annotations
     )
-    print(f"McpTextContent: {mcp_text}")
     
-    print("\nType conversion works correctly!\n")
-
-if __name__ == "__main__":
-    main() 
+    # Verify conversion preserves properties
+    assert mcp_text.type == core_text.type
+    assert mcp_text.text == core_text.text
+    assert mcp_text.annotations == core_text.annotations 

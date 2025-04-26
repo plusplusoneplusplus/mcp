@@ -5,6 +5,7 @@ import os
 import sys
 import logging
 import yaml
+import pytest
 from pathlib import Path
 
 # Set up logging
@@ -20,47 +21,66 @@ if parent_dir not in sys.path:
 # Import the ToolsAdapter
 from mcp_core.tools_adapter import ToolsAdapter
 
-def main():
-    print("\n=== MCP Tools YAML Integration Test ===\n")
-    
+@pytest.fixture
+def yaml_data():
+    """Load tools.yaml data as a fixture"""
     # Get the server directory
     server_dir = Path(parent_dir) / "server"
     
     # Load tools.yaml content
     yaml_path = server_dir / "tools.yaml"
     if not yaml_path.exists():
-        print(f"ERROR: tools.yaml not found at {yaml_path}")
-        return
+        pytest.skip(f"tools.yaml not found at {yaml_path}")
     
     with open(yaml_path, 'r') as f:
-        yaml_data = yaml.safe_load(f)
-    
-    print(f"Found {len(yaml_data.get('tools', {}))} tools and {len(yaml_data.get('tasks', {}))} tasks in tools.yaml\n")
-    
-    # Create the ToolsAdapter instance
-    print("Initializing ToolsAdapter (this will load tools from plugins and tools.yaml)...")
-    adapter = ToolsAdapter()
+        return yaml.safe_load(f)
+
+@pytest.fixture
+def tools_adapter():
+    """Create a ToolsAdapter instance as a fixture"""
+    return ToolsAdapter()
+
+def test_tools_yaml_exists():
+    """Test that tools.yaml exists in the server directory"""
+    server_dir = Path(parent_dir) / "server"
+    yaml_path = server_dir / "tools.yaml"
+    assert yaml_path.exists(), f"tools.yaml not found at {yaml_path}"
+
+def test_tools_adapter_initialization(tools_adapter):
+    """Test that ToolsAdapter can be initialized"""
+    assert tools_adapter is not None
     
     # Get all registered tools
-    tools = adapter.get_tools()
-    print(f"\nRegistered tools: {len(tools)}")
-    
-    # Print all tools
-    for tool in tools:
-        print(f"  - {tool.name}: {tool.description[:60]}..." if len(tool.description) > 60 else f"  - {tool.name}: {tool.description}")
-    
-    # Check if specific tools from tools.yaml are registered
+    tools = tools_adapter.get_tools()
+    assert len(tools) > 0, "No tools were registered"
+
+def test_tools_from_yaml_are_registered(yaml_data, tools_adapter):
+    """Test that tools defined in tools.yaml are registered in the adapter"""
+    # Get tools from yaml
     yaml_tool_names = yaml_data.get('tools', {}).keys()
+    assert len(yaml_tool_names) > 0, "No tools found in tools.yaml"
+    
+    # Get registered tools
+    tools = tools_adapter.get_tools()
     registered_tool_names = [tool.name for tool in tools]
     
-    print("\nVerifying tools from tools.yaml:")
+    # Verify at least some tools are registered
+    assert len(registered_tool_names) > 0, "No tools registered in the adapter"
+    
+    # Count how many tools from yaml are registered
+    registered_count = 0
+    missing_tools = []
+    
     for name in yaml_tool_names:
         if name in registered_tool_names:
-            print(f"  ✓ {name}")
+            registered_count += 1
         else:
-            print(f"  ✗ {name} (not registered)")
+            missing_tools.append(name)
     
-    print("\nTest completed successfully!")
-
-if __name__ == "__main__":
-    main() 
+    # Log missing tools but don't fail the test
+    if missing_tools:
+        print(f"Note: {len(missing_tools)} tools from yaml are not registered: {', '.join(missing_tools)}")
+        print("This could be expected if those tools are conditionally registered or the environment is not fully set up.")
+    
+    # Check that at least one tool from yaml is registered
+    assert registered_count > 0, "None of the tools from tools.yaml are registered" 

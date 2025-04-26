@@ -29,7 +29,8 @@ run_component_tests() {
         echo -e "${BLUE}Running tests for ${component}...${NC}"
         
         # Run the tests and capture both exit code and output
-        output=$(python -m pytest "$test_path" 2>&1)
+        # Use uv instead of python directly
+        output=$(uv run python -m pytest "$test_path" 2>&1)
         exit_code=$?
         
         # Print the output
