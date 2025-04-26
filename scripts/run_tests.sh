@@ -2,7 +2,8 @@
 # Script to run all tests in the MCP project
 # This will run tests for mcp_core, mcp_tools, and any other tests in the project
 
-set -e  # Exit on error
+# Don't exit immediately on error - we want to run all test suites
+set +e
 
 # Define colors for output
 GREEN='\033[0;32m'
@@ -28,7 +29,7 @@ run_component_tests() {
         echo -e "${BLUE}Running tests for ${component}...${NC}"
         
         # Run the tests and capture both exit code and output
-        output=$(python -m pytest "$test_path" 2>&1) || true
+        output=$(python -m pytest "$test_path" 2>&1)
         exit_code=$?
         
         # Print the output
@@ -38,12 +39,14 @@ run_component_tests() {
         if [[ "$output" == *"no tests ran"* ]]; then
             echo -e "${YELLOW}⚠ No tests ran for ${component}${NC}"
             skipped=$((skipped + 1))
-        elif [[ $exit_code -ne 0 ]]; then
+        elif [[ $exit_code -ne 0 || "$output" == *"ERROR"* || "$output" == *"FAILED"* ]]; then
             # Get summary of failures/passed/skipped from the output
             if [[ "$output" == *"failed"*"passed"* ]]; then
                 # Extract numbers from the test summary line
                 summary=$(echo "$output" | grep -o '[0-9]* failed, [0-9]* passed, [0-9]* skipped' | head -1)
-                echo -e "${YELLOW}⚠ Some tests for ${component} failed: ${summary}${NC}"
+                echo -e "${RED}✗ Some tests for ${component} failed: ${summary}${NC}"
+            elif [[ "$output" == *"ERROR"* && "$output" == *"Interrupted"* ]]; then
+                echo -e "${RED}✗ Tests for ${component} failed due to import errors or collection failures${NC}"
             else
                 echo -e "${RED}✗ Tests for ${component} failed!${NC}"
             fi

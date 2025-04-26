@@ -232,6 +232,8 @@ async def test_async_with_termination(executor):
     assert terminated is True
     
     # Check that it's marked as terminated or completed
+    print("Waiting a moment for process status to update...")
+    await asyncio.sleep(2)  # Add a delay to allow the system to update the process status
     status = await executor.get_process_status(token)
     print(f"Status after termination: {status}")
     assert status["status"] in ["terminated", "completed"]

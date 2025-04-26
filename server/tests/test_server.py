@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 import yaml
-from src.main import SentinelServer
+from server.main import starlette_app, tools_adapter, server
 
 @pytest.fixture
 def test_config():
@@ -57,4 +57,33 @@ async def test_handle_semantic_search(server):
     
     result = await server.handle_semantic_search("test document")
     assert result["success"] is True
-    assert len(result["results"]) > 0 
+    assert len(result["results"]) > 0
+
+@pytest.mark.asyncio
+async def test_list_tools():
+    """Test that the server can list tools"""
+    # The decorator in main.py is @server.list_tools(), so use that function name
+    tools = await server.list_tools()
+    assert len(tools) > 0
+    # Verify at least one tool has required attributes
+    tool = tools[0]
+    assert hasattr(tool, 'name')
+    assert hasattr(tool, 'description')
+    assert hasattr(tool, 'inputSchema')
+
+@pytest.mark.asyncio
+async def test_tool_adapter():
+    """Test that the tools adapter returns tools"""
+    tools = tools_adapter.get_tools()
+    assert len(tools) > 0
+    # Basic check on the first tool
+    assert hasattr(tools[0], 'name')
+    assert hasattr(tools[0], 'description')
+    assert hasattr(tools[0], 'inputSchema')
+
+@pytest.mark.asyncio
+async def test_starlette_app():
+    """Test the Starlette app configuration"""
+    # Check that the app has routes
+    assert hasattr(starlette_app, 'routes')
+    assert len(starlette_app.routes) > 0 

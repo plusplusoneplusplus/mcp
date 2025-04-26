@@ -339,7 +339,9 @@ class CommandExecutor(CommandExecutorInterface):
                 "success": process.returncode == 0,
                 "return_code": process.returncode,
                 "output": stdout_content,
-                "error": stderr_content
+                "error": stderr_content,
+                "pid": os.getpid(),  # Adding the current process PID
+                "duration": 0.0  # Adding a dummy duration
             }
             
         except subprocess.TimeoutExpired:
@@ -357,7 +359,9 @@ class CommandExecutor(CommandExecutorInterface):
                 "success": False,
                 "return_code": -1,
                 "output": stdout_content,
-                "error": f"Command timed out after {timeout} seconds\n{stderr_content}"
+                "error": f"Command timed out after {timeout} seconds\n{stderr_content}",
+                "pid": os.getpid(),  # Adding the current process PID
+                "duration": 0.0  # Adding a dummy duration
             }
             
         except Exception as e:
@@ -371,7 +375,9 @@ class CommandExecutor(CommandExecutorInterface):
                 "success": False,
                 "return_code": -1,
                 "output": "",
-                "error": f"Error executing command: {str(e)}"
+                "error": f"Error executing command: {str(e)}",
+                "pid": os.getpid(),  # Adding the current process PID
+                "duration": 0.0  # Adding a dummy duration
             }
             
         finally:
@@ -510,7 +516,8 @@ class CommandExecutor(CommandExecutorInterface):
                 "stdout_path": stdout_path,
                 "stderr_path": stderr_path,
                 "token": token,
-                "start_time": time.time()
+                "start_time": time.time(),
+                "terminated": False  # Initialize terminated flag
             }
             
             # Store temp file locations for cleanup
@@ -615,6 +622,25 @@ class CommandExecutor(CommandExecutorInterface):
             result = await self.wait_for_process(token)
             return result
         
+        # Check if the process has been marked as terminated
+        if "terminated" in process_data and process_data["terminated"]:
+            # Get additional process info if psutil is available
+            process_info = self.get_process_info(pid)
+            
+            status_info = {
+                "status": "terminated",
+                "pid": pid,
+                "token": token,
+                "command": process_data["command"],
+                "runtime": time.time() - process_data["start_time"]
+            }
+            
+            # Add psutil info if available
+            if process_info:
+                status_info.update(process_info)
+            
+            return status_info
+        
         # Process is still running
         # Get additional process info if psutil is available
         process_info = self.get_process_info(pid)
@@ -674,6 +700,9 @@ class CommandExecutor(CommandExecutorInterface):
         )
         
         try:
+            # Add terminated flag to process data
+            process_data["terminated"] = True
+            
             # Try to terminate gracefully first
             process.terminate()
             
@@ -715,6 +744,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "create_time": p.create_time(),
                 "username": p.username(),
                 "status": p.status(),
+                "pid": pid  # Add the pid to the returned info dictionary
             }
             
             # Add CPU and memory usage if possible
@@ -952,9 +982,14 @@ class CommandExecutor(CommandExecutorInterface):
             "return_code": returncode,
             "output": stdout_content,
             "error": stderr_content,
-            "pid": pid
+            "pid": pid,
+            "duration": 0.0  # Adding a dummy duration
         }
         
+        # If process was terminated, update status
+        if "terminated" in process_data and process_data["terminated"]:
+            result["status"] = "terminated"
+            
         # Store in completed processes
         self.completed_processes[token] = result
         
