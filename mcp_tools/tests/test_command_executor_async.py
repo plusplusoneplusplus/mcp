@@ -140,7 +140,7 @@ class TestCommandExecutorAsync:
 
         # Query without waiting - provide a default timeout
         status = await executor.query_process(token, wait=False, timeout=1.0)
-        assert status["status"] == "running"
+        assert status["status"] in ["running", "sleeping"]  # Process could be in running or sleeping state
 
         # Wait for completion
         await asyncio.sleep(3)  # Wait a bit longer for Windows
