@@ -3,11 +3,14 @@ import sys
 import tempfile
 import shutil
 from pathlib import Path
+import pytest
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from server.environment import Environment, get_private_tool_root
+# Use config module instead of server.environment
+from config import env, env_manager
+
 
 def setup_test_directory():
     """Set up a temporary directory with test configuration files"""
@@ -71,73 +74,104 @@ prompts:
     
     return temp_dir
 
-def test_private_tool_root():
-    """Test loading tools from PRIVATE_TOOL_ROOT"""
+
+@pytest.fixture
+def private_tool_root():
+    """Fixture to set up and tear down a temporary private tool root directory"""
     # Set up test directory
     temp_dir = setup_test_directory()
     
-    try:
-        # Set PRIVATE_TOOL_ROOT environment variable
-        original_value = os.environ.get('PRIVATE_TOOL_ROOT')
-        os.environ['PRIVATE_TOOL_ROOT'] = temp_dir
-        
-        # Reset the Environment singleton
-        Environment._instance = None
-        new_env = Environment()
-        new_env.load()  # Explicitly load environment variables
-        
-        # Update the global env reference used by helper functions
-        import server.environment
-        server.environment.env = new_env
-        
-        # Verify the environment variable is loaded
-        private_tool_root = get_private_tool_root()
-        print(f"PRIVATE_TOOL_ROOT: {private_tool_root}")
-        assert private_tool_root == temp_dir
-        
-        # Import and test tools loading
-        # Only import these now after setting the environment variable
-        from mcp_tools.tools import load_tools_from_yaml, load_tasks_from_yaml
-        
-        # Load tools and verify the private test tool is loaded
-        tools = load_tools_from_yaml()
-        print("\nLoaded tools:")
-        for name, tool in tools.items():
-            print(f"- {name}: {tool.get('description', 'No description')}")
-        
-        assert 'private_test_tool' in tools, "Private test tool not found"
-        
-        # Load tasks and verify the private test task is loaded
-        tasks = load_tasks_from_yaml()
-        print("\nLoaded tasks:")
-        for name, task in tasks.items():
-            print(f"- {name}: {task.get('description', 'No description')}")
-        
-        assert 'private_test_task' in tasks, "Private test task not found"
-        
-        # Test prompts loading
-        from server.prompts import load_prompts_from_yaml
-        
-        # Load prompts and verify the private test prompt is loaded
-        prompts = load_prompts_from_yaml()
-        print("\nLoaded prompts:")
-        for name, prompt in prompts.items():
-            print(f"- {name}: {prompt.get('description', 'No description')}")
-        
-        assert 'private_test_prompt' in prompts, "Private test prompt not found"
-        
-    finally:
-        # Clean up
-        shutil.rmtree(temp_dir)
-        print(f"\nCleaned up temporary directory: {temp_dir}")
-        
-        # Restore original environment variable
-        if original_value:
-            os.environ['PRIVATE_TOOL_ROOT'] = original_value
-        else:
-            if 'PRIVATE_TOOL_ROOT' in os.environ:
-                del os.environ['PRIVATE_TOOL_ROOT']
+    # Store original value to restore later
+    original_value = os.environ.get('PRIVATE_TOOL_ROOT')
+    
+    # Set PRIVATE_TOOL_ROOT environment variable for the test
+    os.environ['PRIVATE_TOOL_ROOT'] = temp_dir
+    
+    # Reset the environment manager singleton
+    env_manager._initialize()
+    
+    # Manually set the repository_info.private_tool_root
+    env_manager.repository_info.private_tool_root = temp_dir
+    
+    # Load environment (this would normally come from .env files)
+    env_manager.env_variables['PRIVATE_TOOL_ROOT'] = temp_dir
+    
+    # Yield the temp directory path for the test to use
+    yield temp_dir
+    
+    # Clean up after the test
+    shutil.rmtree(temp_dir)
+    print(f"\nCleaned up temporary directory: {temp_dir}")
+    
+    # Restore original environment variable
+    if original_value:
+        os.environ['PRIVATE_TOOL_ROOT'] = original_value
+        env_manager.repository_info.private_tool_root = original_value
+        env_manager.env_variables['PRIVATE_TOOL_ROOT'] = original_value
+    else:
+        if 'PRIVATE_TOOL_ROOT' in os.environ:
+            del os.environ['PRIVATE_TOOL_ROOT']
+        env_manager.repository_info.private_tool_root = None
+        if 'PRIVATE_TOOL_ROOT' in env_manager.env_variables:
+            del env_manager.env_variables['PRIVATE_TOOL_ROOT']
+
+
+def test_private_tool_root_is_set(private_tool_root):
+    """Test that the PRIVATE_TOOL_ROOT environment variable is set correctly"""
+    # Verify the environment variable is loaded
+    tool_root = env.get_private_tool_root()
+    print(f"PRIVATE_TOOL_ROOT: {tool_root}")
+    assert tool_root == private_tool_root
+
+
+def test_private_tools_loading(private_tool_root):
+    """Test loading tools from PRIVATE_TOOL_ROOT"""
+    # Import and test tools loading
+    from mcp_tools.tools import load_tools_from_yaml
+    
+    # Load tools and verify the private test tool is loaded
+    tools = load_tools_from_yaml()
+    print("\nLoaded tools:")
+    for name, tool in tools.items():
+        print(f"- {name}: {tool.get('description', 'No description')}")
+    
+    assert 'private_test_tool' in tools
+    assert tools['private_test_tool']['description'] == "A private test tool loaded from PRIVATE_TOOL_ROOT"
+
+
+def test_private_tasks_loading(private_tool_root):
+    """Test loading tasks from PRIVATE_TOOL_ROOT"""
+    # Import and test tasks loading
+    from mcp_tools.tools import load_tasks_from_yaml
+    
+    # Load tasks and verify the private test task is loaded
+    tasks = load_tasks_from_yaml()
+    print("\nLoaded tasks:")
+    for name, task in tasks.items():
+        print(f"- {name}: {task.get('description', 'No description')}")
+    
+    assert 'private_test_task' in tasks
+    assert tasks['private_test_task']['description'] == "A private test task from PRIVATE_TOOL_ROOT"
+
+
+def test_private_prompts_loading(private_tool_root):
+    """Test loading prompts from PRIVATE_TOOL_ROOT"""
+    # Test prompts loading
+    from server.prompts import load_prompts_from_yaml
+    
+    # Ensure the config module knows about the private_tool_root
+    print(f"Private tool root before loading prompts: {env.get_private_tool_root()}")
+    
+    # Load prompts and verify the private test prompt is loaded
+    prompts = load_prompts_from_yaml()
+    print("\nLoaded prompts:")
+    for name, prompt in prompts.items():
+        print(f"- {name}: {prompt.get('description', 'No description')}")
+    
+    assert 'private_test_prompt' in prompts
+    assert prompts['private_test_prompt']['description'] == "A private test prompt loaded from PRIVATE_TOOL_ROOT"
+
 
 if __name__ == "__main__":
-    test_private_tool_root()
-    print("\nTest completed successfully!") 
+    # When running directly, use pytest to run the tests
+    pytest.main(["-xvs", __file__]) 

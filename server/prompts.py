@@ -14,10 +14,11 @@ from config import env
 
 def load_prompts_from_yaml() -> dict:
     """Load prompts from the prompts.yaml file."""
-    yaml_data = {}
+    all_prompts = {}
     
     # Priority 1: Load from PRIVATE_TOOL_ROOT if set
     private_tool_root = env.get_private_tool_root()
+    print(f"Using PRIVATE_TOOL_ROOT from config: {private_tool_root}")
     if private_tool_root:
         private_root_path = Path(private_tool_root)
         private_yaml_path = private_root_path / "prompts.yaml"
@@ -26,10 +27,11 @@ def load_prompts_from_yaml() -> dict:
             try:
                 with open(private_yaml_path, 'r') as file:
                     yaml_data = yaml.safe_load(file)
-                    prompts = yaml_data.get('prompts', {})
+                    private_prompts = yaml_data.get('prompts', {})
                     # Filter out disabled prompts
-                    prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
-                    return prompts
+                    private_prompts = {k: v for k, v in private_prompts.items() if v.get('enabled', True)}
+                    # Add private prompts to all_prompts
+                    all_prompts.update(private_prompts)
             except Exception as e:
                 print(f"Error loading prompts from PRIVATE_TOOL_ROOT: {e}")
     
@@ -40,10 +42,11 @@ def load_prompts_from_yaml() -> dict:
         try:
             with open(private_yaml_path, 'r') as file:
                 yaml_data = yaml.safe_load(file)
-                prompts = yaml_data.get('prompts', {})
+                private_prompts = yaml_data.get('prompts', {})
                 # Filter out disabled prompts
-                prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
-                return prompts
+                private_prompts = {k: v for k, v in private_prompts.items() if v.get('enabled', True)}
+                # Add private prompts to all_prompts
+                all_prompts.update(private_prompts)
         except Exception as e:
             print(f"Error loading prompts from private directory: {e}")
     
@@ -54,13 +57,15 @@ def load_prompts_from_yaml() -> dict:
         try:
             with open(yaml_path, 'r') as file:
                 yaml_data = yaml.safe_load(file)
+                default_prompts = yaml_data.get('prompts', {})
+                # Filter out disabled prompts
+                default_prompts = {k: v for k, v in default_prompts.items() if v.get('enabled', True)}
+                # Add default prompts to all_prompts
+                all_prompts.update(default_prompts)
         except Exception as e:
             print(f"Error loading prompts from default location: {e}")
     
-    prompts = yaml_data.get('prompts', {})
-    # Filter out disabled prompts
-    prompts = {k: v for k, v in prompts.items() if v.get('enabled', True)}
-    return prompts
+    return all_prompts
 
 def convert_yaml_to_prompts(yaml_prompts: dict) -> dict:
     """Convert YAML prompt definitions to Prompt objects."""

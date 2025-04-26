@@ -65,6 +65,7 @@ run_component_tests() {
 }
 
 # Run tests for each component
+run_component_tests "config" "config/tests"
 run_component_tests "mcp_core" "mcp_core/tests"
 run_component_tests "mcp_tools" "mcp_tools/tests"
 run_component_tests "server" "server/tests"
