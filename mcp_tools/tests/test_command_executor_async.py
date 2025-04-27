@@ -235,11 +235,9 @@ class TestCommandExecutorAsync:
 
         for i in range(3):
             if platform.system().lower() == "windows":
-                # Fix: Simplify command and use set spacing to avoid filename parse error 
                 cmd = f"cmd /c echo Process{i}"
             else:
-                # Ensure output is properly captured using bash -c
-                cmd = f'bash -c \'echo "Process {i}" && sleep 2\''
+                cmd = f'bash -c \'echo "Process{i}" && sleep 2\''
 
             response = await executor.execute_async(cmd)
             tokens.append(response["token"])
@@ -272,7 +270,6 @@ class TestCommandExecutorAsync:
         # Create a command that generates a lot of output
         lines = 500
         if platform.system().lower() == "windows":
-            # Fix: Simplify command for Windows
             cmd = f"cmd /c \"FOR /L %i IN (1,1,{lines}) DO @echo Line%i\""
         else:
             cmd = f"for i in $(seq 1 {lines}); do echo \"Line $i\"; done"
@@ -299,10 +296,9 @@ class TestCommandExecutorAsync:
         # Create a command that produces output over time
         count = 5
         if platform.system().lower() == "windows":
-            # Fix: Simplified command for Windows
             cmd = f"cmd /c FOR /L %i IN (1,1,{count}) DO @echo Stream%i"
         else:
-            cmd = f"for i in $(seq 1 {count}); do echo \"Stream $i\"; sleep 1; done"
+            cmd = f"for i in $(seq 1 {count}); do echo \"Stream$i\"; sleep 1; done"
 
         response = await executor.execute_async(cmd)
         token = response["token"]
