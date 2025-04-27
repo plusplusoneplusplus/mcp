@@ -52,10 +52,10 @@ class EnvironmentManager:
         return None
     
     def _load_from_env_file(self):
-        """Load environment configuration from .env file"""
-        # Try to find .env file in workspace folder or git root
+        """Find and load variables from a .env file"""
         env_file_paths = []
         
+        # Check workspace folder
         if self.repository_info.workspace_folder:
             env_file_paths.append(Path(self.repository_info.workspace_folder) / ".env")
         
@@ -65,8 +65,13 @@ class EnvironmentManager:
         # Also check current directory
         env_file_paths.append(Path.cwd() / ".env")
         
-        # Try additional common locations
-        env_file_paths.append(Path.home() / ".env")
+        # Try additional common locations - safely handle home directory
+        try:
+            home_env = Path.home() / ".env"
+            env_file_paths.append(home_env)
+        except (RuntimeError, OSError):
+            # Skip home directory if it can't be determined
+            pass
         
         # Try to find git root if not already set
         if not self.repository_info.git_root:

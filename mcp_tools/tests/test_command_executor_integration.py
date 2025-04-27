@@ -160,8 +160,8 @@ class TestWindowsCommands:
 
     def test_timeout(self, executor):
         """Test timeout functionality"""
-        # why cmd /c?  see https://stackoverflow.com/questions/74842935/powershell-batch-script-timeout-error-input-redirection-is-not-supported-exiti
-        result = executor.execute("cmd /c start /min timeout.exe 2", timeout=0.5)
+        # Fix: Replace start command with ping, which doesn't detach and will properly time out
+        result = executor.execute("ping -n 10 127.0.0.1", timeout=0.5)
         assert not result["success"]
         assert "timed out" in result["error"]
 
@@ -174,7 +174,8 @@ class TestCrossPlatformFeatures:
         """Test process information retrieval"""
         # Start a long-running command
         if platform.system().lower() == "windows":
-            cmd = "cmd /c start /min timeout.exe 2"
+            # Fix: Use ping instead of timeout.exe with start, as ping doesn't detach
+            cmd = "ping -n 10 127.0.0.1"  # Will take ~9 seconds
         else:
             cmd = "sleep 5"
 
@@ -211,7 +212,7 @@ class TestCrossPlatformFeatures:
         # Generate multi-line output
         if platform.system().lower() == "windows":
             # Windows echo with multiple lines
-            result = executor.execute("echo Line 1 & echo Line 2 & echo Line 3")
+            result = executor.execute("echo Line 1 ; echo Line 2 ; echo Line 3")
         else:
             # Linux/Unix multi-line echo
             result = executor.execute('echo -e "Line 1\nLine 2\nLine 3"')
