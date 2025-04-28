@@ -47,7 +47,9 @@ def test_get_page_html():
         assert "<html" in html_content.lower()
         assert "<body" in html_content.lower()
     except Exception as e:
-        pytest.skip(f"Page HTML fetch failed (this might be expected in some environments): {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        pytest.fail(f"Page HTML fetch failed (this might be expected in some environments).\nError: {e}\nTraceback: {error_trace}")
 
 
 def test_browser_setup_failure():
@@ -72,8 +74,5 @@ def test_browser_setup_failure():
 def test_get_page_html_invalid_url():
     """Test handling of invalid URL"""
     invalid_url = "https://thisurldoesnotexistatall.com"
-    try:
-        result = BrowserClient.get_page_html(invalid_url, wait_time=2)
-        assert result is None  # Should return None for failed requests
-    except Exception as e:
-        pytest.skip(f"Browser setup failed (this might be expected in some environments): {e}")
+    result = BrowserClient.get_page_html(invalid_url, wait_time=2)
+    assert result is None  # Should return None for failed requests

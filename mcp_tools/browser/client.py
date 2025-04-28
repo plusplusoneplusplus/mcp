@@ -32,6 +32,13 @@ class BrowserClient(BrowserClientInterface):
         # Get HTML content of a page
         html = browser.get_page_html("https://example.com")
     """
+    # Class-level cache for ChromeDriver paths
+    _driver_cache = {
+        "windows": None,
+        "macos": None,
+        "linux": None
+    }
+    
     # Implement ToolInterface properties
     @property
     def name(self) -> str:
@@ -163,12 +170,10 @@ class BrowserClient(BrowserClientInterface):
         if headless:
             chrome_options.add_argument("--headless")  # Run in headless mode if needed
 
-        # Set up Chrome driver 
-        if os.name == "nt":  # Windows
-            driver_path = subprocess.getoutput("where chromedriver").strip()
-        else:  # Linux/Unix
-            driver_path = subprocess.getoutput("which chromedriver").strip()
-        service = Service(driver_path)
+        # Add additional options for better stability and compatibility
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
 
         # Use a dynamic port for remote debugging to avoid conflicts
         def find_free_port():
@@ -179,18 +184,121 @@ class BrowserClient(BrowserClientInterface):
         debug_port = find_free_port()
         chrome_options.add_argument(f"--remote-debugging-port={debug_port}")
 
+        print("Setting up Chrome browser...")
         try:
+            # Detect operating system
+            import platform
+            system = platform.system()
+            
+            # Get cached driver path if available
+            driver_path = None
+            cache_key = None
+            
+            if system == "Darwin":  # macOS
+                cache_key = "macos"
+            elif system == "Windows":
+                cache_key = "windows"
+            else:  # Linux and others
+                cache_key = "linux"
+                
+            # Check if we have a cached driver path for this OS
+            if cache_key and BrowserClient._driver_cache[cache_key]:
+                cached_path = BrowserClient._driver_cache[cache_key]
+                if os.path.exists(cached_path) and os.access(cached_path, os.X_OK):
+                    print(f"Using cached ChromeDriver at: {cached_path}")
+                    driver_path = cached_path
+            
+            # If no valid cached path, find or download chromedriver
+            if not driver_path:
+                if system == "Darwin":  # macOS
+                    print("Using macOS-specific ChromeDriver setup...")
+                    try:
+                        # Try to find chromedriver using 'which' command
+                        import subprocess
+                        driver_path = subprocess.getoutput("which chromedriver").strip()
+                        if driver_path and os.path.exists(driver_path):
+                            print(f"Found ChromeDriver at: {driver_path}")
+                        else:
+                            # If not found, use webdriver_manager but ensure we get the correct driver
+                            print("ChromeDriver not found in PATH, using webdriver_manager...")
+                            from webdriver_manager.core.os_manager import ChromeType
+                            from webdriver_manager.chrome import ChromeDriverManager
+
+                            driver_path = ChromeDriverManager().install()
+                            chromedriver_dir = os.path.dirname(driver_path)
+                            # Look for the actual chromedriver binary in the same directory
+                            for file in os.listdir(chromedriver_dir):
+                                if file.startswith("chromedriver") and not file.endswith((".zip", ".chromedriver")):
+                                    potential_path = os.path.join(chromedriver_dir, file)
+                                    if os.access(potential_path, os.X_OK):
+                                        driver_path = potential_path
+                                        print(f"Using executable ChromeDriver at: {driver_path}")
+                                        break
+                        
+                        # Ensure chromedriver has execute permissions
+                        if not os.access(driver_path, os.X_OK):
+                            print(f"Adding execute permission to {driver_path}")
+                            os.chmod(driver_path, 0o755)
+                            
+                        # Remove macOS quarantine attribute if needed
+                        subprocess.run(["xattr", "-d", "com.apple.quarantine", driver_path], check=False)
+                    except Exception as e:
+                        print(f"Error setting up macOS ChromeDriver: {e}")
+                        raise
+                elif system == "Windows":
+                    # For Windows, first try 'where' command
+                    print("Using Windows-specific ChromeDriver setup...")
+                    try:
+                        import subprocess
+                        driver_path = subprocess.getoutput("where chromedriver").split('\n')[0].strip()
+                        if driver_path and os.path.exists(driver_path):
+                            print(f"Found ChromeDriver at: {driver_path}")
+                        else:
+                            print("ChromeDriver not found in PATH, using webdriver_manager...")
+                            driver_path = ChromeDriverManager().install()
+                    except Exception as e:
+                        print(f"Error with Windows 'where' command: {e}")
+                        print("Using webdriver_manager instead...")
+                        driver_path = ChromeDriverManager().install()
+                else:
+                    # For Linux, first try 'which' command
+                    print("Using Linux-specific ChromeDriver setup...")
+                    try:
+                        import subprocess
+                        driver_path = subprocess.getoutput("which chromedriver").strip()
+                        if driver_path and os.path.exists(driver_path):
+                            print(f"Found ChromeDriver at: {driver_path}")
+                        else:
+                            print("ChromeDriver not found in PATH, using webdriver_manager...")
+                            driver_path = ChromeDriverManager().install()
+                    except Exception as e:
+                        print(f"Error with Linux 'which' command: {e}")
+                        print("Using webdriver_manager instead...")
+                        driver_path = ChromeDriverManager().install()
+                
+                # Cache the driver path if we found one
+                if driver_path and os.path.exists(driver_path):
+                    BrowserClient._driver_cache[cache_key] = driver_path
+                    print(f"Caching ChromeDriver path for {system} at: {driver_path}")
+                
+            print(f"Using ChromeDriver at: {driver_path}")
+            service = Service(driver_path)
+            print("Creating Chrome WebDriver...")
             driver = webdriver.Chrome(service=service, options=chrome_options)
+            print("Chrome WebDriver successfully created")
             return driver
         except Exception as e:
             print(f"Error setting up Chrome: {e}")
             print("\nTroubleshooting steps:")
-            print("1. Make sure Chrome is installed in Windows")
-            print("2. Install chromedriver in WSL: `apt install chromium-chromedriver`")
-            print("3. Ensure you have X server running in Windows if not using headless mode")
-            print("4. Try killing any existing Chrome processes:")
+            print("1. Make sure Chrome is installed")
+            print("2. If using macOS, you can install ChromeDriver via Homebrew: brew install --cask chromedriver")
+            print("3. If using macOS and seeing permission issues, run: xattr -d com.apple.quarantine <path_to_chromedriver>")
+            print("4. If using Windows, ensure Chrome is installed and try installing chromedriver manually")
+            print("5. If using Linux, try: apt-get install chromium-chromedriver or equivalent for your distribution")
+            print("6. Ensure you have the latest Chrome browser installed")
+            print("7. Try killing any existing Chrome processes:")
             print("   Windows: taskkill /F /IM chrome.exe")
-            print("   WSL: pkill chrome")
+            print("   macOS/Linux: pkill chrome")
             raise
 
     @staticmethod
