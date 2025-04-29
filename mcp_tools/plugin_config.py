@@ -118,15 +118,35 @@ class PluginConfig:
         Returns:
             List of paths to check for tools.yaml
         """
-        if self.yaml_tool_paths:
-            return self.yaml_tool_paths
-            
-        # Default paths if none specified
-        server_dir = Path(__file__).resolve().parent.parent / "server"
-        private_dir = server_dir / ".private"
-        current_dir = Path(os.getcwd())
+        paths = []
         
-        return [private_dir, server_dir, current_dir]
+        # First priority: Check PRIVATE_TOOL_ROOT if set
+        private_tool_root = os.environ.get('PRIVATE_TOOL_ROOT')
+        if private_tool_root:
+            private_path = Path(private_tool_root)
+            if private_path.exists():
+                paths.append(private_path)
+                logger.info(f"Added PRIVATE_TOOL_ROOT path: {private_path}")
+        
+        # Second priority: Check MCP_YAML_TOOL_PATHS if set
+        yaml_paths = os.environ.get('MCP_YAML_TOOL_PATHS', '')
+        if yaml_paths:
+            for path in yaml_paths.split(','):
+                path = Path(path.strip())
+                if path.exists() and path not in paths:
+                    paths.append(path)
+                    logger.info(f"Added MCP_YAML_TOOL_PATHS path: {path}")
+        
+        # If no paths are configured, use defaults
+        if not paths:
+            server_dir = Path(__file__).resolve().parent.parent / "server"
+            private_dir = server_dir / ".private"
+            current_dir = Path(os.getcwd())
+            
+            paths = [private_dir, server_dir, current_dir]
+            logger.info(f"Using default paths: {paths}")
+        
+        return paths
     
     def is_source_enabled(self, source: str) -> bool:
         """Check if a specific tool source is enabled.
