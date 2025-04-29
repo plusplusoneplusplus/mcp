@@ -117,6 +117,15 @@ class YamlToolBase(ToolInterface):
         Returns:
             Script execution result
         """
+        # Validate input schema first
+        input_schema = self._tool_data.get('inputSchema', {})
+        validation_error = self._validate_input_schema(arguments, input_schema)
+        if validation_error:
+            return [{
+                "type": "text",
+                "text": f"Input validation error: {validation_error}"
+            }]
+
         # Get OS-specific script
         import platform
         os_type = platform.system().lower()
@@ -143,13 +152,29 @@ class YamlToolBase(ToolInterface):
                 'pwd': str(server_dir),
                 'private_tool_root': os.environ.get('PRIVATE_TOOL_ROOT', '')
             }
+
+            # Add additional parameters from tool data if specified
+            additional_params = self._tool_data.get('parameters', {})
+            for param_name, param_value in additional_params.items():
+                if param_name not in params:  # Don't override existing params
+                    params[param_name] = param_value
+            
             # Add user arguments
             params.update(arguments)
             
-            formatted_script = script.format(**params)
+            # Log parameters being used
+            logger.info(f"Executing script for tool '{self._name}' with parameters: {params}")
+            
+            try:
+                formatted_script = script.format(**params)
+            except KeyError as e:
+                return [{
+                    "type": "text",
+                    "text": f"Error: Missing required parameter in script: {str(e)}"
+                }]
             
             # Execute the script
-            logger.info(f"Executing script for tool '{self._name}': {formatted_script}")
+            logger.info(f"Executing script: {formatted_script}")
             result = await self._command_executor.execute_async(formatted_script)
             
             return [{
@@ -162,6 +187,58 @@ class YamlToolBase(ToolInterface):
                 "type": "text",
                 "text": f"Error executing script: {str(e)}"
             }]
+    
+    def _validate_input_schema(self, arguments: Dict[str, Any], schema: Dict[str, Any]) -> Optional[str]:
+        """Validate input arguments against the schema.
+        
+        Args:
+            arguments: The input arguments to validate
+            schema: The input schema to validate against
+            
+        Returns:
+            Error message if validation fails, None if validation succeeds
+        """
+        if not schema:
+            return None
+            
+        # Check required fields
+        required_fields = schema.get('required', [])
+        for field in required_fields:
+            if field not in arguments:
+                return f"Missing required field: {field}"
+        
+        # Validate properties
+        properties = schema.get('properties', {})
+        for arg_name, arg_value in arguments.items():
+            if arg_name in properties:
+                prop_schema = properties[arg_name]
+                # Validate type
+                expected_type = prop_schema.get('type')
+                if expected_type:
+                    if expected_type == 'string' and not isinstance(arg_value, str):
+                        return f"Field '{arg_name}' must be a string"
+                    elif expected_type == 'number' and not isinstance(arg_value, (int, float)):
+                        return f"Field '{arg_name}' must be a number"
+                    elif expected_type == 'integer' and not isinstance(arg_value, int):
+                        return f"Field '{arg_name}' must be an integer"
+                    elif expected_type == 'boolean' and not isinstance(arg_value, bool):
+                        return f"Field '{arg_name}' must be a boolean"
+                    elif expected_type == 'array' and not isinstance(arg_value, list):
+                        return f"Field '{arg_name}' must be an array"
+                    elif expected_type == 'object' and not isinstance(arg_value, dict):
+                        return f"Field '{arg_name}' must be an object"
+                
+                # Validate enum if specified
+                if 'enum' in prop_schema and arg_value not in prop_schema['enum']:
+                    return f"Field '{arg_name}' must be one of: {', '.join(map(str, prop_schema['enum']))}"
+                
+                # Validate pattern if specified
+                if 'pattern' in prop_schema:
+                    import re
+                    if not re.match(prop_schema['pattern'], str(arg_value)):
+                        return f"Field '{arg_name}' does not match required pattern: {prop_schema['pattern']}"
+        
+        return None
     
     async def _execute_task(self, arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Execute a predefined task.
