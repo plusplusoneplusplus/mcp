@@ -15,6 +15,10 @@ from mcp_tools.interfaces import ToolInterface, CommandExecutorInterface
 from mcp_tools.plugin import register_tool, registry
 from mcp_tools.dependency import injector
 
+# Configuration
+DEFAULT_WAIT_FOR_QUERY = True  # Default wait for task
+DEFAULT_STATUS_QUERY_TIMEOUT = 25  # Default timeout in seconds for status queries
+
 logger = logging.getLogger(__name__)
 
 class YamlToolBase(ToolInterface):
@@ -135,7 +139,10 @@ class YamlToolBase(ToolInterface):
         try:
             # Add server_dir parameter
             server_dir = self._get_server_dir()
-            params = {'pwd': str(server_dir)}
+            params = {
+                'pwd': str(server_dir),
+                'private_tool_root': os.environ.get('PRIVATE_TOOL_ROOT', '')
+            }
             # Add user arguments
             params.update(arguments)
             
@@ -201,7 +208,10 @@ class YamlToolBase(ToolInterface):
         # Format the command with parameters
         try:
             server_dir = self._get_server_dir()
-            params = {'pwd': str(server_dir)}
+            params = {
+                'pwd': str(server_dir),
+                'private_tool_root': os.environ.get('PRIVATE_TOOL_ROOT', '')
+            }
             # Format command with parameters
             formatted_command = command.format(**params)
             
@@ -236,29 +246,51 @@ class YamlToolBase(ToolInterface):
                 "text": "Error: Token is required"
             }]
         
-        wait = arguments.get('wait', False)
-        timeout = arguments.get('timeout')
+        wait = arguments.get('wait', DEFAULT_WAIT_FOR_QUERY)
+        timeout = arguments.get('timeout', DEFAULT_STATUS_QUERY_TIMEOUT)  # Use default timeout from config
         
         try:
-            result = await self._command_executor.query_process(token, wait, timeout)
+            import asyncio
+            start_time = asyncio.get_event_loop().time()
             
-            if result.get('status') == 'completed':
-                error_text = result.get('error')
-                error_section = f"\nError:\n{error_text}" if error_text and error_text.strip() else ""
+            while True:
+                result = await self._command_executor.query_process(token, wait=False, timeout=None)
+                current_time = asyncio.get_event_loop().time()
+                elapsed = current_time - start_time
                 
-                return [{
-                    "type": "text",
-                    "text": f"Process completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}{error_section}"
-                }]
-            else:
-                # Just returning status
-                status_text = f"Process status (token: {token}): {result.get('status')}"
-                if 'pid' in result:
-                    status_text += f"\nPID: {result.get('pid')}"
-                return [{
-                    "type": "text",
-                    "text": status_text
-                }]
+                # If process completed, return the result
+                if result.get('status') == 'completed':
+                    error_text = result.get('error')
+                    error_section = f"\nError:\n{error_text}" if error_text and error_text.strip() else ""
+                    
+                    return [{
+                        "type": "text",
+                        "text": f"Process completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}{error_section}"
+                    }]
+                
+                # If timeout specified and exceeded, return current status
+                if timeout is not None and elapsed >= timeout:
+                    status_text = f"Process status (token: {token}): {result.get('status')} (timeout after {elapsed:.1f}s)"
+                    if 'pid' in result:
+                        status_text += f"\nPID: {result.get('pid')}"
+                    return [{
+                        "type": "text",
+                        "text": status_text
+                    }]
+                
+                # If not waiting or no timeout specified, return current status
+                if not wait:
+                    status_text = f"Process status (token: {token}): {result.get('status')}"
+                    if 'pid' in result:
+                        status_text += f"\nPID: {result.get('pid')}"
+                    return [{
+                        "type": "text",
+                        "text": status_text
+                    }]
+                
+                # Wait 1 second before next check
+                await asyncio.sleep(1)
+                
         except Exception as e:
             logger.exception(f"Error querying process status")
             return [{
