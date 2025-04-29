@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "self": {
+      "url": "http://localhost:8000/sse",
+      "env": {
+      }
+    }
+  }
+}
