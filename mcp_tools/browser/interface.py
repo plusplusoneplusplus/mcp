@@ -15,7 +15,7 @@ class IBrowserClient(ABC):
     """
     
     @abstractmethod
-    def get_page_html(self, url: str, wait_time: int = 30, headless: bool = True, 
+    async def get_page_html(self, url: str, wait_time: int = 30, headless: bool = True, 
                      options: Any = None) -> Optional[str]:
         """Open a webpage and get its HTML content.
         
@@ -31,7 +31,7 @@ class IBrowserClient(ABC):
         pass
     
     @abstractmethod
-    def take_screenshot(self, url: str, output_path: str, wait_time: int = 30, 
+    async def take_screenshot(self, url: str, output_path: str, wait_time: int = 30, 
                        headless: bool = True, options: Any = None) -> bool:
         """Navigate to a URL and take a screenshot.
         

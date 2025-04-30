@@ -7,11 +7,12 @@ This program allows you to get HTML content or take screenshots of web pages.
 import os
 import argparse
 import time
+import asyncio
 from mcp_tools.browser.factory import BrowserClientFactory
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.edge.options import Options as EdgeOptions
 
-def main():
+async def main():
     # Get the scripts directory path
     script_dir = os.path.dirname(os.path.abspath(__file__))
     
@@ -97,14 +98,14 @@ def main():
         )
 
         if args.client_type == 'playwright':
-            browser_client.setup_google_auth(args.profile_path)
+            await browser_client.setup_google_auth(args.profile_path)
         
         if args.operation == 'html':
             # Get HTML content
             print("Getting page HTML...")
             
             # Get the HTML content
-            html = browser_client.get_page_html(
+            html = await browser_client.get_page_html(
                 args.url, 
                 wait_time=args.wait, 
                 headless=args.headless, 
@@ -139,7 +140,7 @@ def main():
             print(f"Taking screenshot, saving to {output_path}...")
             
             # Take the screenshot
-            success = browser_client.take_screenshot(
+            success = await browser_client.take_screenshot(
                 args.url, 
                 output_path, 
                 wait_time=args.wait, 
@@ -159,4 +160,4 @@ def main():
     return 0
 
 if __name__ == "__main__":
-    exit(main()) 
+    exit(asyncio.run(main())) 

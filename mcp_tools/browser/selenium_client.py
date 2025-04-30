@@ -9,7 +9,9 @@ import shutil
 import socket
 import subprocess
 import platform
+import asyncio
 from typing import Optional, Dict, Any, Union, Literal
+from concurrent.futures import ThreadPoolExecutor
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -61,8 +63,9 @@ class SeleniumBrowserClient(IBrowserClient):
                          If None, uses DEFAULT_BROWSER_TYPE.
         """
         self.browser_type = browser_type or self.DEFAULT_BROWSER_TYPE
+        self._executor = ThreadPoolExecutor(max_workers=1)
     
-    def get_page_html(self, url: str, wait_time: int = 30, headless: bool = True, 
+    async def get_page_html(self, url: str, wait_time: int = 30, headless: bool = True, 
                      options: Any = None) -> Optional[str]:
         """Open a webpage and get its HTML content.
         
@@ -75,29 +78,31 @@ class SeleniumBrowserClient(IBrowserClient):
         Returns:
             HTML content of the page or None if an error occurred
         """
-        driver = self._setup_browser(headless=headless, browser_options=options)
+        def _get_html():
+            driver = self._setup_browser(headless=headless, browser_options=options)
+            try:
+                # Navigate to the page
+                print(f"Opening {url} with {self.browser_type.capitalize()}...")
+                driver.get(url)
 
-        try:
-            # Navigate to the page
-            print(f"Opening {url} with {self.browser_type.capitalize()}...")
-            driver.get(url)
+                # Wait for the page to load
+                time.sleep(wait_time)
 
-            # Wait for the page to load
-            time.sleep(wait_time)
+                # Get the page source
+                html_content = driver.page_source
+                return html_content
 
-            # Get the page source
-            html_content = driver.page_source
-            return html_content
+            except Exception as e:
+                print(f"An error occurred: {e}")
+                return None
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            return None
-
-        finally:
-            # Clean up
-            self._cleanup_driver(driver)
+            finally:
+                # Clean up
+                self._cleanup_driver(driver)
+        
+        return await asyncio.get_event_loop().run_in_executor(self._executor, _get_html)
     
-    def take_screenshot(self, url: str, output_path: str, wait_time: int = 30, 
+    async def take_screenshot(self, url: str, output_path: str, wait_time: int = 30, 
                        headless: bool = True, options: Any = None) -> bool:
         """Navigate to a URL and take a screenshot.
         
@@ -111,29 +116,31 @@ class SeleniumBrowserClient(IBrowserClient):
         Returns:
             True if screenshot was successful, False otherwise
         """
-        driver = self._setup_browser(headless=headless, browser_options=options)
+        def _take_screenshot():
+            driver = self._setup_browser(headless=headless, browser_options=options)
+            try:
+                # Navigate to the page
+                print(f"Opening {url} with {self.browser_type.capitalize()} for screenshot...")
+                driver.get(url)
 
-        try:
-            # Navigate to the page
-            print(f"Opening {url} with {self.browser_type.capitalize()} for screenshot...")
-            driver.get(url)
+                # Wait for the page to load
+                time.sleep(wait_time)
 
-            # Wait for the page to load
-            time.sleep(wait_time)
+                # Take screenshot
+                driver.save_screenshot(output_path)
+                print(f"Screenshot saved to {output_path}")
+                
+                return True
 
-            # Take screenshot
-            driver.save_screenshot(output_path)
-            print(f"Screenshot saved to {output_path}")
-            
-            return True
+            except Exception as e:
+                print(f"Error taking screenshot: {e}")
+                return False
 
-        except Exception as e:
-            print(f"Error taking screenshot: {e}")
-            return False
-
-        finally:
-            # Clean up
-            self._cleanup_driver(driver)
+            finally:
+                # Clean up
+                self._cleanup_driver(driver)
+        
+        return await asyncio.get_event_loop().run_in_executor(self._executor, _take_screenshot)
     
     def _cleanup_driver(self, driver):
         """Clean up resources associated with a WebDriver.
