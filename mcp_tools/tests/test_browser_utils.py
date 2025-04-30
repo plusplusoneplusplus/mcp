@@ -8,25 +8,18 @@ from selenium.webdriver.chrome.service import Service
 
 # Add the parent directory to the path so we can import modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from mcp_tools.browser.client import BrowserClient, DEFAULT_BROWSER_TYPE
-
-
-def test_get_windows_browser_path():
-    """Test the browser path detection"""
-    if os.name == "nt" or BrowserClient.in_wsl():  # Windows or WSL
-        browser_path = BrowserClient.get_windows_browser_path()
-        # Path should exist if the browser is installed
-        if browser_path:
-            assert os.path.exists(browser_path)
-
+from mcp_tools.browser.selenium_client import SeleniumBrowserClient
+from mcp_tools.browser.factory import BrowserClientFactory
 
 def test_setup_browser():
     """Test browser setup with headless mode"""
     try:
-        driver = BrowserClient.setup_browser(headless=True)
-        if DEFAULT_BROWSER_TYPE == "chrome":
+        client = SeleniumBrowserClient()
+        driver = client._setup_browser(headless=True)
+        browser_type = client.browser_type
+        if browser_type == "chrome":
             assert isinstance(driver, webdriver.Chrome)
-        elif DEFAULT_BROWSER_TYPE == "edge":
+        elif browser_type == "edge":
             assert isinstance(driver, webdriver.Edge)
         assert "--headless" in driver.options.arguments
         driver.quit()
@@ -38,7 +31,8 @@ def test_get_page_html():
     """Test fetching HTML content from a test URL"""
     test_url = "https://www.google.com"
     try:
-        html_content = BrowserClient.get_page_html(test_url, wait_time=2)
+        client = BrowserClientFactory.create_client()
+        html_content = client.get_page_html(test_url, wait_time=2)
         assert html_content is not None
         assert isinstance(html_content, str)
         assert len(html_content) > 0
@@ -56,13 +50,20 @@ def test_browser_setup_failure():
     # Save original state
     import subprocess
     original_getoutput = subprocess.getoutput
-    original_driver_cache = BrowserClient._driver_cache.copy()
+    
+    # Create a client and save its driver cache
+    client = SeleniumBrowserClient()
+    original_driver_cache = {}
+    for browser_type in client._driver_cache:
+        original_driver_cache[browser_type] = {}
+        for platform_key in client._driver_cache[browser_type]:
+            original_driver_cache[browser_type][platform_key] = client._driver_cache[browser_type][platform_key]
     
     try:
         # Clear the driver cache to prevent using cached drivers
-        for browser in BrowserClient._driver_cache:
-            for platform in BrowserClient._driver_cache[browser]:
-                BrowserClient._driver_cache[browser][platform] = None
+        for browser_type in client._driver_cache:
+            for platform_key in client._driver_cache[browser_type]:
+                client._driver_cache[browser_type][platform_key] = None
         
         # Mock subprocess.getoutput to return invalid path
         def mock_getoutput(cmd):
@@ -81,17 +82,18 @@ def test_browser_setup_failure():
         
         # This should raise an exception now
         with pytest.raises(Exception):
-            BrowserClient.setup_browser()
+            client._setup_browser()
     
     finally:
         # Restore original state
         subprocess.getoutput = original_getoutput
         os.path.exists = original_exists
-        BrowserClient._driver_cache = original_driver_cache
+        client._driver_cache = original_driver_cache
 
 
 def test_get_page_html_invalid_url():
     """Test handling of invalid URL"""
     invalid_url = "https://thisurldoesnotexistatall.com"
-    result = BrowserClient.get_page_html(invalid_url, wait_time=2)
+    client = BrowserClientFactory.create_client()
+    result = client.get_page_html(invalid_url, wait_time=2)
     assert result is None  # Should return None for failed requests

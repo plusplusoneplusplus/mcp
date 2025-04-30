@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Standalone program for using the BrowserClient tool to test different web pages.
+Standalone program for using IBrowserClient to test different web pages.
 This program allows you to get HTML content or take screenshots of web pages.
 """
 
 import os
 import argparse
 import time
-from mcp_tools.browser.client import BrowserClient
+from mcp_tools.browser.factory import BrowserClientFactory
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.edge.options import Options as EdgeOptions
 
 def main():
     # Get the scripts directory path
@@ -22,7 +24,7 @@ def main():
     os.makedirs(default_profile_path, exist_ok=True)
     
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Test web pages using BrowserClient')
+    parser = argparse.ArgumentParser(description='Test web pages using a browser client')
     parser.add_argument('url', help='URL to visit')
     parser.add_argument('--operation', '-o', choices=['html', 'screenshot'], default='html',
                         help='Operation to perform: get HTML or take screenshot (default: html)')
@@ -40,13 +42,10 @@ def main():
                         help='Profile directory name within the profile path (default: Default)')
     parser.add_argument('--no-profile', action='store_true', default=False,
                         help='Do not use a profile (ignore profile-path and profile-dir)')
+    parser.add_argument('--client-type', choices=['selenium'], default='selenium',
+                        help='Type of browser client to use (default: selenium)')
     
     args = parser.parse_args()
-    
-    # Set the browser type
-    from mcp_tools.browser.client import DEFAULT_BROWSER_TYPE
-    import mcp_tools.browser.client as browser_module
-    browser_module.DEFAULT_BROWSER_TYPE = args.browser
     
     print(f"Using browser: {args.browser}")
     print(f"Operation: {args.operation}")
@@ -67,22 +66,31 @@ def main():
         browser_options = None
         if args.profile_path and not args.no_profile:
             if args.browser == 'chrome':
-                from selenium.webdriver.chrome.options import Options as ChromeOptions
                 browser_options = ChromeOptions()
                 browser_options.add_argument(f"user-data-dir={args.profile_path}")
                 browser_options.add_argument(f"profile-directory={args.profile_dir}")
             elif args.browser == 'edge':
-                from selenium.webdriver.edge.options import Options as EdgeOptions
                 browser_options = EdgeOptions()
                 browser_options.add_argument(f"user-data-dir={args.profile_path}")
                 browser_options.add_argument(f"profile-directory={args.profile_dir}")
+        
+        # Create a browser client
+        browser_client = BrowserClientFactory.create_client(
+            client_type=args.client_type,
+            browser_type=args.browser
+        )
         
         if args.operation == 'html':
             # Get HTML content
             print("Getting page HTML...")
             
             # Get the HTML content
-            html = BrowserClient.get_page_html(args.url, args.wait, options=browser_options, headless=args.headless)
+            html = browser_client.get_page_html(
+                args.url, 
+                wait_time=args.wait, 
+                headless=args.headless, 
+                options=browser_options
+            )
             
             if html:
                 # Determine output path
@@ -112,7 +120,13 @@ def main():
             print(f"Taking screenshot, saving to {output_path}...")
             
             # Take the screenshot
-            success = BrowserClient.take_screenshot(args.url, output_path, args.wait, options=browser_options, headless=args.headless)
+            success = browser_client.take_screenshot(
+                args.url, 
+                output_path, 
+                wait_time=args.wait, 
+                headless=args.headless, 
+                options=browser_options
+            )
             
             if success:
                 print(f"Screenshot saved successfully to {output_path}")

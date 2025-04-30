@@ -10,14 +10,14 @@ from selenium.webdriver.edge.options import Options as EdgeOptions
 
 # Add the parent directory to the path so we can import modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from mcp_tools.browser.client import BrowserClient
+from mcp_tools.browser.selenium_client import SeleniumBrowserClient
 
 
 class TestBrowserClientOptions:
-    """Tests for BrowserClient options merging functionality."""
+    """Tests for SeleniumBrowserClient options merging functionality."""
 
-    @patch('mcp_tools.browser.client.webdriver.Chrome')
-    @patch('mcp_tools.browser.client.ChromeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Chrome')
+    @patch('mcp_tools.browser.selenium_client.ChromeService')
     @patch('socket.socket')
     def test_default_options(self, mock_socket, mock_service, mock_chrome):
         """Test that default options are set correctly."""
@@ -31,9 +31,11 @@ class TestBrowserClientOptions:
         mock_chrome.return_value = mock_driver
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
-            # Call the setup_browser method
-            BrowserClient.setup_browser(browser_type="chrome")
+        with patch.object(SeleniumBrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="chrome")
+            # Call the _setup_browser method
+            client._setup_browser()
 
         # Check that Chrome was called with the expected options
         options = mock_chrome.call_args[1]['options']
@@ -43,8 +45,8 @@ class TestBrowserClientOptions:
         assert "--remote-debugging-port=12345" in options.arguments
         assert "--headless" not in options.arguments
 
-    @patch('mcp_tools.browser.client.webdriver.Chrome')
-    @patch('mcp_tools.browser.client.ChromeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Chrome')
+    @patch('mcp_tools.browser.selenium_client.ChromeService')
     @patch('socket.socket')
     def test_headless_option(self, mock_socket, mock_service, mock_chrome):
         """Test that headless mode is set correctly."""
@@ -58,16 +60,18 @@ class TestBrowserClientOptions:
         mock_chrome.return_value = mock_driver
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
-            # Call the setup_browser method with headless=True
-            BrowserClient.setup_browser(browser_type="chrome", headless=True)
+        with patch.object(SeleniumBrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="chrome")
+            # Call the _setup_browser method with headless=True
+            client._setup_browser(headless=True)
 
         # Check that Chrome was called with the expected options
         options = mock_chrome.call_args[1]['options']
         assert "--headless" in options.arguments
 
-    @patch('mcp_tools.browser.client.webdriver.Chrome')
-    @patch('mcp_tools.browser.client.ChromeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Chrome')
+    @patch('mcp_tools.browser.selenium_client.ChromeService')
     @patch('socket.socket')
     def test_custom_options_override(self, mock_socket, mock_service, mock_chrome):
         """Test that custom options override default options when they conflict."""
@@ -86,9 +90,11 @@ class TestBrowserClientOptions:
         custom_options.add_argument("--user-data-dir=/path/to/profile")  # Add new option
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
-            # Call the setup_browser method with custom options
-            BrowserClient.setup_browser(browser_type="chrome", browser_options=custom_options)
+        with patch.object(SeleniumBrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="chrome")
+            # Call the _setup_browser method with custom options
+            client._setup_browser(browser_options=custom_options)
 
         # Check that Chrome was called with the expected options
         options = mock_chrome.call_args[1]['options']
@@ -104,8 +110,8 @@ class TestBrowserClientOptions:
         # The new option should be present
         assert "--user-data-dir=/path/to/profile" in options.arguments
 
-    @patch('mcp_tools.browser.client.webdriver.Chrome')
-    @patch('mcp_tools.browser.client.ChromeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Chrome')
+    @patch('mcp_tools.browser.selenium_client.ChromeService')
     @patch('socket.socket')
     def test_experimental_options_merge(self, mock_socket, mock_service, mock_chrome):
         """Test that experimental options are properly merged."""
@@ -126,9 +132,11 @@ class TestBrowserClientOptions:
         })
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
-            # Call the setup_browser method with custom options
-            BrowserClient.setup_browser(browser_type="chrome", browser_options=custom_options)
+        with patch.object(SeleniumBrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="chrome")
+            # Call the _setup_browser method with custom options
+            client._setup_browser(browser_options=custom_options)
 
         # Check that Chrome was called with the expected options
         options = mock_chrome.call_args[1]['options']
@@ -139,8 +147,8 @@ class TestBrowserClientOptions:
         assert prefs.get("profile.default_content_settings.popups") == 0
         assert prefs.get("download.default_directory") == "/custom/download/path"
 
-    @patch('mcp_tools.browser.client.webdriver.Chrome')
-    @patch('mcp_tools.browser.client.ChromeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Chrome')
+    @patch('mcp_tools.browser.selenium_client.ChromeService')
     @patch('socket.socket')
     def test_profile_options(self, mock_socket, mock_service, mock_chrome):
         """Test that profile options are properly set."""
@@ -159,9 +167,11 @@ class TestBrowserClientOptions:
         custom_options.add_argument("--profile-directory=Profile 1")
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
-            # Call the setup_browser method with custom options
-            BrowserClient.setup_browser(browser_type="chrome", browser_options=custom_options)
+        with patch.object(SeleniumBrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="chrome")
+            # Call the _setup_browser method with custom options
+            client._setup_browser(browser_options=custom_options)
 
         # Check that Chrome was called with the expected options
         options = mock_chrome.call_args[1]['options']
@@ -175,8 +185,8 @@ class TestBrowserClientOptions:
         assert "--user-data-dir=/path/to/user/data" in options.arguments
         assert "--profile-directory=Profile 1" in options.arguments
 
-    @patch('mcp_tools.browser.client.webdriver.Edge')
-    @patch('mcp_tools.browser.client.EdgeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Edge')
+    @patch('mcp_tools.browser.selenium_client.EdgeService')
     @patch('socket.socket')
     def test_edge_browser_options(self, mock_socket, mock_service, mock_edge):
         """Test that options are correctly applied for Edge browser."""
@@ -195,9 +205,11 @@ class TestBrowserClientOptions:
         custom_options.add_argument("--profile-directory=Profile 1")
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_edge_driver', return_value='/path/to/msedgedriver'):
-            # Call the setup_browser method with custom options
-            BrowserClient.setup_browser(browser_type="edge", browser_options=custom_options)
+        with patch.object(SeleniumBrowserClient, '_setup_edge_driver', return_value='/path/to/msedgedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="edge")
+            # Call the _setup_browser method with custom options
+            client._setup_browser(browser_options=custom_options)
 
         # Check that Edge was called with the expected options
         options = mock_edge.call_args[1]['options']
@@ -211,8 +223,8 @@ class TestBrowserClientOptions:
         assert "--user-data-dir=/path/to/edge/user/data" in options.arguments
         assert "--profile-directory=Profile 1" in options.arguments
 
-    @patch('mcp_tools.browser.client.webdriver.Chrome')
-    @patch('mcp_tools.browser.client.ChromeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Chrome')
+    @patch('mcp_tools.browser.selenium_client.ChromeService')
     @patch('socket.socket')
     def test_headless_with_custom_options(self, mock_socket, mock_service, mock_chrome):
         """Test that headless mode is correctly applied when custom options are provided."""
@@ -230,9 +242,11 @@ class TestBrowserClientOptions:
         custom_options.add_argument("--user-data-dir=/path/to/user/data")
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
-            # Call the setup_browser method with custom options and headless=True
-            BrowserClient.setup_browser(browser_type="chrome", browser_options=custom_options, headless=True)
+        with patch.object(SeleniumBrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="chrome")
+            # Call the _setup_browser method with custom options and headless=True
+            client._setup_browser(browser_options=custom_options, headless=True)
 
         # Check that Chrome was called with the expected options
         options = mock_chrome.call_args[1]['options']
@@ -243,8 +257,8 @@ class TestBrowserClientOptions:
         # Custom options should be present
         assert "--user-data-dir=/path/to/user/data" in options.arguments
 
-    @patch('mcp_tools.browser.client.webdriver.Chrome')
-    @patch('mcp_tools.browser.client.ChromeService')
+    @patch('mcp_tools.browser.selenium_client.webdriver.Chrome')
+    @patch('mcp_tools.browser.selenium_client.ChromeService')
     @patch('socket.socket')
     def test_custom_headless_option_respected(self, mock_socket, mock_service, mock_chrome):
         """Test that custom headless option is respected and not duplicated."""
@@ -262,9 +276,11 @@ class TestBrowserClientOptions:
         custom_options.add_argument("--headless=new")  # Chrome's new headless mode
         
         # Setup mock driver path finding
-        with patch.object(BrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
-            # Call the setup_browser method with custom options and headless=True
-            BrowserClient.setup_browser(browser_type="chrome", browser_options=custom_options, headless=True)
+        with patch.object(SeleniumBrowserClient, '_setup_chrome_driver', return_value='/path/to/chromedriver'):
+            # Create a client
+            client = SeleniumBrowserClient(browser_type="chrome")
+            # Call the _setup_browser method with custom options and headless=True
+            client._setup_browser(browser_options=custom_options, headless=True)
 
         # Check that Chrome was called with the expected options
         options = mock_chrome.call_args[1]['options']
