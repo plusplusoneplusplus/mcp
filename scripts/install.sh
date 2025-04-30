@@ -25,6 +25,11 @@ $INSTALL_CMD ./mcp_tools
 echo "Installing main package..."
 $INSTALL_CMD .
 
+# Install Playwright browsers
+echo "Installing Playwright browsers..."
+playwright install
+playwright install msedge
+
 echo ""
 echo "Installation complete! You can now run:"
 echo "  - Python scripts directly"

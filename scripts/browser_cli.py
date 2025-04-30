@@ -32,8 +32,8 @@ def main():
                         help='Time to wait for page load in seconds (default: 30)')
     parser.add_argument('--output', '-f',
                         help=f'Output file path for screenshot or HTML (default: auto-generated in {output_dir})')
-    parser.add_argument('--browser', '-b', choices=['chrome', 'edge'], default='chrome',
-                        help='Browser to use (default: chrome)')
+    parser.add_argument('--browser', '-b', choices=['chrome', 'edge', 'chromium', 'firefox', 'webkit'], default='edge',
+                        help='Browser to use (default: edge)')
     parser.add_argument('--headless', action='store_true', default=False,
                         help='Run browser in headless mode (default: False)')
     parser.add_argument('--profile-path', '-p', default=default_profile_path,
@@ -42,11 +42,12 @@ def main():
                         help='Profile directory name within the profile path (default: Default)')
     parser.add_argument('--no-profile', action='store_true', default=False,
                         help='Do not use a profile (ignore profile-path and profile-dir)')
-    parser.add_argument('--client-type', choices=['selenium'], default='selenium',
-                        help='Type of browser client to use (default: selenium)')
+    parser.add_argument('--client-type', choices=['selenium', 'playwright'], default='playwright',
+                        help='Type of browser client to use (default: playwright)')
     
     args = parser.parse_args()
     
+    print(f"Using browser client: {args.client_type}")
     print(f"Using browser: {args.browser}")
     print(f"Operation: {args.operation}")
     print(f"URL: {args.url}")
@@ -62,22 +63,37 @@ def main():
         print(f"Profile directory: {args.profile_dir}")
     
     try:
-        # Set up browser options if profile is specified
+        # Set up browser options
         browser_options = None
-        if args.profile_path and not args.no_profile:
-            if args.browser == 'chrome':
-                browser_options = ChromeOptions()
-                browser_options.add_argument(f"user-data-dir={args.profile_path}")
-                browser_options.add_argument(f"profile-directory={args.profile_dir}")
-            elif args.browser == 'edge':
-                browser_options = EdgeOptions()
-                browser_options.add_argument(f"user-data-dir={args.profile_path}")
-                browser_options.add_argument(f"profile-directory={args.profile_dir}")
+        
+        if args.client_type == 'selenium':
+            # Selenium-specific options
+            if args.profile_path and not args.no_profile:
+                if args.browser == 'chrome':
+                    browser_options = ChromeOptions()
+                    browser_options.add_argument(f"user-data-dir={args.profile_path}")
+                    browser_options.add_argument(f"profile-directory={args.profile_dir}")
+                elif args.browser == 'edge':
+                    browser_options = EdgeOptions()
+                    browser_options.add_argument(f"user-data-dir={args.profile_path}")
+                    browser_options.add_argument(f"profile-directory={args.profile_dir}")
+        else:
+            # Playwright-specific options
+            if args.browser == 'edge':
+                # For Edge, we use Chromium with Edge-specific channel
+                browser_options = {
+                    "channel": "msedge"
+                }
+            elif args.profile_path and not args.no_profile:
+                # For other browsers, we can use the profile path
+                browser_options = {
+                    "user_data_dir": args.profile_path
+                }
         
         # Create a browser client
         browser_client = BrowserClientFactory.create_client(
             client_type=args.client_type,
-            browser_type=args.browser
+            browser_type='chromium' if args.client_type == 'playwright' and args.browser == 'edge' else args.browser
         )
         
         if args.operation == 'html':

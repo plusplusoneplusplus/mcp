@@ -5,6 +5,7 @@ This module provides browser automation capabilities for web scraping and testin
 
 from mcp_tools.browser.client import BrowserClient
 from mcp_tools.browser.selenium_client import SeleniumBrowserClient
+from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
 from mcp_tools.browser.interface import IBrowserClient
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.browser.types import (
@@ -16,6 +17,7 @@ from mcp_tools.browser.types import (
 __all__ = [
     "BrowserClient",  # For backward compatibility
     "SeleniumBrowserClient",
+    "PlaywrightBrowserClient",
     "IBrowserClient",
     "BrowserClientFactory",
     "PageContent",

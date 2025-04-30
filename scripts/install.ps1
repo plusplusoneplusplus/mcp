@@ -26,6 +26,11 @@ Invoke-Expression "$INSTALL_CMD ./mcp_tools"
 Write-Host "Installing main package..."
 Invoke-Expression "$INSTALL_CMD ."
 
+# Install Playwright browsers
+Write-Host "Installing Playwright browsers..."
+playwright install
+playwright install msedge
+
 Write-Host ""
 Write-Host "Installation complete! You can now run:"
 Write-Host "  - Python scripts directly"

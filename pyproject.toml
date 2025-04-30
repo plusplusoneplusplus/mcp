@@ -38,6 +38,7 @@ dependencies = [
     # Webdriver tools
     "selenium==4.18.1",
     "webdriver-manager==4.0.1",
+    "playwright>=1.42.0",  # Modern browser automation
     
     # Testing
     "pytest>=7.4.0",
