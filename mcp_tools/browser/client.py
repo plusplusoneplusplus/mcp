@@ -105,7 +105,7 @@ class BrowserClient(BrowserClientInterface):
         client = BrowserClientFactory.create_client(client_type, browser_type)
         
         if operation == "get_page_html":
-            html = client.get_page_html(url, wait_time, headless, browser_options)
+            html = await client.get_page_html(url, wait_time, headless, browser_options)
             if html:
                 return {
                     "success": True,
@@ -119,7 +119,7 @@ class BrowserClient(BrowserClientInterface):
                 }
         elif operation == "take_screenshot":
             output_path = arguments.get("output_path", f"screenshot_{int(time.time())}.png")
-            success = client.take_screenshot(url, output_path, wait_time, headless, browser_options)
+            success = await client.take_screenshot(url, output_path, wait_time, headless, browser_options)
             return {
                 "success": success,
                 "output_path": output_path
@@ -169,7 +169,7 @@ class BrowserClient(BrowserClientInterface):
         return DEFAULT_CLIENT_TYPE
     
     @staticmethod
-    def get_page_html(url: str, wait_time: int = 30, options = None, headless: bool = True) -> Optional[str]:
+    async def get_page_html(url: str, wait_time: int = 30, options = None, headless: bool = True) -> Optional[str]:
         """Open a webpage and get its HTML content.
         
         Args:
@@ -182,10 +182,10 @@ class BrowserClient(BrowserClientInterface):
             HTML content of the page or None if an error occurred
         """
         client = BrowserClientFactory.create_client(DEFAULT_CLIENT_TYPE, DEFAULT_BROWSER_TYPE)
-        return client.get_page_html(url, wait_time, headless, options)
+        return await client.get_page_html(url, wait_time, headless, options)
             
     @staticmethod
-    def take_screenshot(url: str, output_path: str, wait_time: int = 30, options = None, headless: bool = True) -> bool:
+    async def take_screenshot(url: str, output_path: str, wait_time: int = 30, options = None, headless: bool = True) -> bool:
         """Navigate to a URL and take a screenshot.
         
         Args:
@@ -199,4 +199,4 @@ class BrowserClient(BrowserClientInterface):
             True if screenshot was successful, False otherwise
         """
         client = BrowserClientFactory.create_client(DEFAULT_CLIENT_TYPE, DEFAULT_BROWSER_TYPE)
-        return client.take_screenshot(url, output_path, wait_time, headless, options)
+        return await client.take_screenshot(url, output_path, wait_time, headless, options)
