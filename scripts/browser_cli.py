@@ -95,6 +95,9 @@ def main():
             client_type=args.client_type,
             browser_type='chromium' if args.client_type == 'playwright' and args.browser == 'edge' else args.browser
         )
+
+        if args.client_type == 'playwright':
+            browser_client.setup_google_auth(args.profile_path)
         
         if args.operation == 'html':
             # Get HTML content
