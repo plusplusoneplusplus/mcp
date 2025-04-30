@@ -1,0 +1,5 @@
+# Ignore browser outputs directory
+browser_outputs/
+
+# Ignore browser profile directory
+.profile/ 

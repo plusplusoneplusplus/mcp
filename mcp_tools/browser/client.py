@@ -106,9 +106,11 @@ class BrowserClient(BrowserClientInterface):
         operation = arguments.get("operation", "")
         url = arguments.get("url", "")
         wait_time = arguments.get("wait_time", 30)
+        headless = arguments.get("headless", True)
+        browser_options = arguments.get("browser_options", None)
         
         if operation == "get_page_html":
-            html = BrowserClient.get_page_html(url, wait_time)
+            html = BrowserClient.get_page_html(url, wait_time, options=browser_options, headless=headless)
             if html:
                 return {
                     "success": True,
@@ -122,7 +124,7 @@ class BrowserClient(BrowserClientInterface):
                 }
         elif operation == "take_screenshot":
             output_path = arguments.get("output_path", f"screenshot_{int(time.time())}.png")
-            success = BrowserClient.take_screenshot(url, output_path, wait_time)
+            success = BrowserClient.take_screenshot(url, output_path, wait_time, options=browser_options, headless=headless)
             return {
                 "success": success,
                 "output_path": output_path
@@ -192,13 +194,15 @@ class BrowserClient(BrowserClientInterface):
         return None
 
     @staticmethod
-    def setup_browser(headless: bool = False, browser_type: Literal["chrome", "edge"] = None) -> Union[webdriver.Chrome, webdriver.Edge]:
+    def setup_browser(headless: bool = False, browser_type: Literal["chrome", "edge"] = None, browser_options = None) -> Union[webdriver.Chrome, webdriver.Edge]:
         """Set up and return a WebDriver instance for Chrome or Edge.
         
         Args:
             headless: Whether to run browser in headless mode
             browser_type: Type of browser to use ('chrome' or 'edge').
                           If None, uses DEFAULT_BROWSER_TYPE.
+            browser_options: Pre-configured browser options. If provided, these will be merged
+                          with default options, with browser_options taking precedence.
             
         Returns:
             Configured WebDriver instance
@@ -208,7 +212,8 @@ class BrowserClient(BrowserClientInterface):
         """
         if browser_type is None:
             browser_type = DEFAULT_BROWSER_TYPE
-            
+        
+        # Create default options based on browser type
         if browser_type == "chrome":
             options = ChromeOptions()
         elif browser_type == "edge":
@@ -216,10 +221,7 @@ class BrowserClient(BrowserClientInterface):
         else:
             raise ValueError(f"Unsupported browser type: {browser_type}")
             
-        if headless:
-            options.add_argument("--headless")  # Run in headless mode if needed
-
-        # Add additional options for better stability and compatibility
+        # Add default options for better stability and compatibility
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
@@ -232,6 +234,65 @@ class BrowserClient(BrowserClientInterface):
                 
         debug_port = find_free_port()
         options.add_argument(f"--remote-debugging-port={debug_port}")
+        
+        # Merge browser_options if provided
+        if browser_options is not None:
+            # Merge arguments from browser_options into options
+            # This will allow browser_options to override default options
+            if hasattr(browser_options, 'arguments') and browser_options.arguments:
+                for arg in browser_options.arguments:
+                    # Check if this is an argument that would override an existing one
+                    # For arguments with values (e.g., --user-data-dir=path), extract the arg name
+                    arg_name = arg.split('=')[0] if '=' in arg else arg
+                    
+                    # Remove any existing argument that starts with the same name
+                    # Since we can't modify options.arguments directly, we need to:
+                    # 1. Find conflicting arguments
+                    # 2. Clear all arguments 
+                    # 3. Add back non-conflicting ones
+                    conflicting_args = []
+                    non_conflicting_args = []
+                    
+                    for a in options.arguments:
+                        if a.startswith(arg_name):
+                            conflicting_args.append(a)
+                        else:
+                            non_conflicting_args.append(a)
+                    
+                    # If we found any conflicting args, clear and rebuild the arguments list
+                    if conflicting_args:
+                        # Clear all arguments
+                        while options.arguments:
+                            options.arguments.pop()
+                        
+                        # Add back non-conflicting args
+                        for a in non_conflicting_args:
+                            options.add_argument(a)
+                    
+                    # Add the new argument
+                    options.add_argument(arg)
+                    
+            # Copy other attributes from browser_options if they exist
+            if hasattr(browser_options, 'experimental_options') and browser_options.experimental_options:
+                for key, value in browser_options.experimental_options.items():
+                    options.add_experimental_option(key, value)
+                    
+            # Copy extension related settings if any
+            if hasattr(browser_options, 'extensions') and browser_options.extensions:
+                for extension in browser_options.extensions:
+                    options.add_extension(extension)
+        
+        # Set headless mode if needed (this should be last to ensure it's not overridden)
+        if headless:
+            # Check if any argument starts with --headless
+            has_headless = False
+            for arg in options.arguments:
+                if arg.startswith('--headless'):
+                    has_headless = True
+                    break
+            
+            if not has_headless:
+                options.add_argument("--headless")
 
         print(f"Setting up {browser_type.capitalize()} browser...")
         try:
@@ -431,17 +492,19 @@ class BrowserClient(BrowserClientInterface):
         return driver_path
 
     @staticmethod
-    def get_page_html(url: str, wait_time: int = 30) -> Optional[str]:
+    def get_page_html(url: str, wait_time: int = 30, options = None, headless: bool = True) -> Optional[str]:
         """Open a webpage and get its HTML content.
         
         Args:
             url: The URL to visit
             wait_time: Time to wait for page load in seconds
+            options: Browser options to use
+            headless: Whether to run browser in headless mode
             
         Returns:
             HTML content of the page or None if an error occurred
         """
-        driver = BrowserClient.setup_browser(headless=True)  # Uses DEFAULT_BROWSER_TYPE
+        driver = BrowserClient.setup_browser(headless=headless, browser_options=options)  # Uses DEFAULT_BROWSER_TYPE
 
         try:
             # Navigate to the page
@@ -470,18 +533,20 @@ class BrowserClient(BrowserClientInterface):
             driver.quit()
             
     @staticmethod
-    def take_screenshot(url: str, output_path: str, wait_time: int = 30) -> bool:
+    def take_screenshot(url: str, output_path: str, wait_time: int = 30, options = None, headless: bool = True) -> bool:
         """Navigate to a URL and take a screenshot.
         
         Args:
             url: The URL to visit
             output_path: Path where the screenshot should be saved
             wait_time: Time to wait for page load in seconds
+            options: Browser options to use
+            headless: Whether to run browser in headless mode
             
         Returns:
             True if screenshot was successful, False otherwise
         """
-        driver = BrowserClient.setup_browser(headless=True)  # Uses DEFAULT_BROWSER_TYPE
+        driver = BrowserClient.setup_browser(headless=headless, browser_options=options)  # Uses DEFAULT_BROWSER_TYPE
 
         try:
             # Navigate to the page
