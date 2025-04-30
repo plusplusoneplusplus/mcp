@@ -99,11 +99,15 @@ If you encounter issues:
 ## Usage Example
 
 ```python
+import asyncio
 from mcp_tools.browser.client import BrowserClient
 
-# Get HTML from a webpage
-html = BrowserClient.get_page_html("https://example.com")
-
-# Take a screenshot of a webpage
-BrowserClient.take_screenshot("https://example.com", "screenshot.png")
-``` 
+async def example():
+    # Get HTML from a webpage
+    html = await BrowserClient.get_page_html("https://example.com")
+    
+    # Take a screenshot of a webpage
+    success = await BrowserClient.take_screenshot("https://example.com", "screenshot.png")
+    
+# Run the async example
+asyncio.run(example()) 

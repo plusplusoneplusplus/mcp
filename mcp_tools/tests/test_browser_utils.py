@@ -2,6 +2,7 @@ import pytest
 import sys
 import os
 import platform
+import asyncio
 from pathlib import Path
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -27,12 +28,13 @@ def test_setup_browser():
         pytest.skip(f"Browser setup failed (this might be expected in some environments): {e}")
 
 
-def test_get_page_html():
+@pytest.mark.asyncio
+async def test_get_page_html():
     """Test fetching HTML content from a test URL"""
     test_url = "https://www.google.com"
     try:
         client = BrowserClientFactory.create_client()
-        html_content = client.get_page_html(test_url, wait_time=2)
+        html_content = await client.get_page_html(test_url, wait_time=2)
         assert html_content is not None
         assert isinstance(html_content, str)
         assert len(html_content) > 0
@@ -91,9 +93,10 @@ def test_browser_setup_failure():
         client._driver_cache = original_driver_cache
 
 
-def test_get_page_html_invalid_url():
+@pytest.mark.asyncio
+async def test_get_page_html_invalid_url():
     """Test handling of invalid URL"""
     invalid_url = "https://thisurldoesnotexistatall.com"
     client = BrowserClientFactory.create_client()
-    result = client.get_page_html(invalid_url, wait_time=2)
+    result = await client.get_page_html(invalid_url, wait_time=2)
     assert result is None  # Should return None for failed requests
