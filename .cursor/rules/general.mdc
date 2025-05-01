@@ -1,0 +1,7 @@
+---
+description: 
+globs: *.sh,*.md,*.py,*.ps1
+alwaysApply: false
+---
+1. Use uv for package management instead of pip
+2. Do not generate readme markdown files unless I explicitly ask
