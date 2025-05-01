@@ -1,0 +1,25 @@
+# Ignore all files and directories in the plugins folder
+/*
+
+# But track these specific files
+!.gitignore
+!README.md
+!__init__.py
+
+# Track the example plugin (text_summarizer)
+!text_summarizer/
+!text_summarizer/**
+
+# Ignore Python bytecode files
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ignore environment and IDE files
+.env
+.venv
+.idea/
+.vscode/
+*.swp
+*.swo 
