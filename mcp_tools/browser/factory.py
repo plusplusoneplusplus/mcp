@@ -18,14 +18,16 @@ class BrowserClientFactory:
     
     @staticmethod
     def create_client(client_type: str = "selenium", 
-                     browser_type: Optional[Literal["chrome", "edge", "chromium", "firefox", "webkit"]] = None) -> IBrowserClient:
+                      user_data_dir: Optional[str] = None,
+                     browser_type: Optional[Literal["chrome", "edge", "chromium"]] = None) -> IBrowserClient:
         """Create a browser client of the specified type.
         
         Args:
             client_type: Type of client to create ('selenium' or 'playwright')
+            user_data_dir: Path to user data directory for browser profiles
             browser_type: Type of browser to use:
                         - For selenium: 'chrome' or 'edge'
-                        - For playwright: 'chromium', 'firefox', or 'webkit'
+                        - For playwright: 'chrome' or 'edge'
             
         Returns:
             Browser client instance
@@ -38,10 +40,10 @@ class BrowserClientFactory:
         if client_type == "selenium":
             if browser_type not in [None, "chrome", "edge"]:
                 raise ValueError(f"Unsupported browser type for Selenium: {browser_type}")
-            return SeleniumBrowserClient(browser_type)
+            return SeleniumBrowserClient(browser_type or "chrome")
         elif client_type == "playwright":
-            if browser_type not in [None, "chromium", "firefox", "webkit"]:
+            if browser_type not in [None, "chrome", "edge"]:
                 raise ValueError(f"Unsupported browser type for Playwright: {browser_type}")
-            return PlaywrightBrowserClient(browser_type)
+            return PlaywrightBrowserClient(browser_type or "chrome", user_data_dir)
         else:
             raise ValueError(f"Unsupported client type: {client_type}") 

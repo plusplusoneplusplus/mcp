@@ -22,8 +22,8 @@ def test_factory_creates_correct_client_type():
 def test_factory_creates_with_browser_type():
     """Test that factory passes browser type to client"""
     # Create clients with different browser types
-    chrome_client = BrowserClientFactory.create_client("selenium", "chrome")
-    edge_client = BrowserClientFactory.create_client("selenium", "edge")
+    chrome_client = BrowserClientFactory.create_client("selenium", None, "chrome")
+    edge_client = BrowserClientFactory.create_client("selenium", None, "edge")
     
     # Check that browser type was set correctly
     assert chrome_client.browser_type == "chrome"

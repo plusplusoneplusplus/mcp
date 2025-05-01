@@ -29,8 +29,8 @@ async def main():
     parser.add_argument('url', help='URL to visit')
     parser.add_argument('--operation', '-o', choices=['html', 'screenshot'], default='html',
                         help='Operation to perform: get HTML or take screenshot (default: html)')
-    parser.add_argument('--wait', '-w', type=int, default=30,
-                        help='Time to wait for page load in seconds (default: 30)')
+    parser.add_argument('--wait', '-w', type=int, default=5,
+                        help='Time to wait for page load in seconds (default: 5)')
     parser.add_argument('--output', '-f',
                         help=f'Output file path for screenshot or HTML (default: auto-generated in {output_dir})')
     parser.add_argument('--browser', '-b', choices=['chrome', 'edge', 'chromium', 'firefox', 'webkit'], default='edge',
@@ -63,6 +63,7 @@ async def main():
         print(f"Profile path: {args.profile_path}")
         print(f"Profile directory: {args.profile_dir}")
     
+    browser_client = None
     try:
         # Set up browser options
         browser_options = None
@@ -94,68 +95,78 @@ async def main():
         # Create a browser client
         browser_client = BrowserClientFactory.create_client(
             client_type=args.client_type,
-            browser_type='chromium' if args.client_type == 'playwright' and args.browser == 'edge' else args.browser
+            user_data_dir=args.profile_path,
+            browser_type='edge' if args.client_type == 'playwright' and args.browser == 'edge' else args.browser
         )
 
-        if args.client_type == 'playwright':
-            await browser_client.setup_google_auth(args.profile_path)
-        
-        if args.operation == 'html':
-            # Get HTML content
-            print("Getting page HTML...")
+        async with browser_client:  # Use as async context manager
+            if args.operation == 'html':
+                # Get HTML content
+                print("Getting page HTML...")
+                
+                # Get the HTML content
+                html = await browser_client.get_page_html(
+                    args.url, 
+                    wait_time=args.wait, 
+                    headless=args.headless, 
+                    options=browser_options
+                )
+                
+                if html:
+                    # Determine output path
+                    output_path = args.output
+                    if not output_path:
+                        timestamp = int(time.time())
+                        filename = f"page_html_{timestamp}.html"
+                        output_path = os.path.join(output_dir, filename)
+                    
+                    # Save HTML to file
+                    with open(output_path, 'w', encoding='utf-8') as f:
+                        f.write(html)
+                    
+                    print(f"HTML content saved to {output_path}")
+                    print(f"HTML length: {len(html)} characters")
+                else:
+                    print("Failed to retrieve HTML content")
             
-            # Get the HTML content
-            html = await browser_client.get_page_html(
-                args.url, 
-                wait_time=args.wait, 
-                headless=args.headless, 
-                options=browser_options
-            )
-            
-            if html:
-                # Determine output path
+            elif args.operation == 'screenshot':
+                # Take screenshot
                 output_path = args.output
                 if not output_path:
                     timestamp = int(time.time())
-                    filename = f"page_html_{timestamp}.html"
+                    filename = f"screenshot_{timestamp}.png"
                     output_path = os.path.join(output_dir, filename)
                 
-                # Save HTML to file
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    f.write(html)
+                print(f"Taking screenshot, saving to {output_path}...")
                 
-                print(f"HTML content saved to {output_path}")
-                print(f"HTML length: {len(html)} characters")
-            else:
-                print("Failed to retrieve HTML content")
-        
-        elif args.operation == 'screenshot':
-            # Take screenshot
-            output_path = args.output
-            if not output_path:
-                timestamp = int(time.time())
-                filename = f"screenshot_{timestamp}.png"
-                output_path = os.path.join(output_dir, filename)
-            
-            print(f"Taking screenshot, saving to {output_path}...")
-            
-            # Take the screenshot
-            success = await browser_client.take_screenshot(
-                args.url, 
-                output_path, 
-                wait_time=args.wait, 
-                headless=args.headless, 
-                options=browser_options
-            )
-            
-            if success:
-                print(f"Screenshot saved successfully to {output_path}")
-            else:
-                print("Failed to take screenshot")
+                # Take the screenshot
+                success = await browser_client.take_screenshot(
+                    args.url, 
+                    output_path, 
+                    wait_time=args.wait, 
+                    headless=args.headless, 
+                    options=browser_options
+                )
+                
+                if success:
+                    print(f"Screenshot saved successfully to {output_path}")
+                else:
+                    print("Failed to take screenshot")
     
     except Exception as e:
         print(f"Error: {e}")
         return 1
+    finally:
+        # Ensure browser is properly closed, even if we didn't use the context manager
+        if browser_client and not isinstance(browser_client, type):
+            try:
+                await browser_client.close()
+            except Exception as e:
+                print(f"Error during browser cleanup: {e}")
+        
+        # Force garbage collection
+        import gc
+        gc.collect()
     
     return 0
 
