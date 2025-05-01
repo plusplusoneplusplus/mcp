@@ -46,6 +46,7 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertIsInstance(self.env_manager.env_variables, dict)
         self.assertIsInstance(self.env_manager._providers, list)
         self.assertIsInstance(self.env_manager.azrepo_parameters, dict)
+        self.assertIsInstance(self.env_manager.kusto_parameters, dict)
 
     def test_singleton_pattern(self):
         """Test that EnvironmentManager follows the singleton pattern."""
@@ -70,6 +71,8 @@ class TestEnvironmentManager(unittest.TestCase):
         PRIVATE_TOOL_ROOT=/path/to/private/tools
         MCP_PATH_DATA=/path/to/data
         AZREPO_ORG=test-org
+        KUSTO_CLUSTER=test-cluster
+        KUSTO_DATABASE=test-db
         """
         env_file = self.create_env_file(env_content)
         
@@ -83,6 +86,8 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(self.env_manager.repository_info.private_tool_root, "/path/to/private/tools")
         self.assertEqual(self.env_manager.repository_info.additional_paths.get("data"), "/path/to/data")
         self.assertEqual(self.env_manager.azrepo_parameters.get("org"), "test-org")
+        self.assertEqual(self.env_manager.kusto_parameters.get("cluster"), "test-cluster")
+        self.assertEqual(self.env_manager.kusto_parameters.get("database"), "test-db")
 
     def test_parse_env_file_with_quotes(self):
         """Test parsing an environment file with quoted values."""
@@ -111,6 +116,10 @@ class TestEnvironmentManager(unittest.TestCase):
             },
             "azrepo_parameters": {
                 "token": "provider-token"
+            },
+            "kusto_parameters": {
+                "app_id": "provider-app-id",
+                "app_secret": "provider-app-secret"
             }
         })
         
@@ -131,6 +140,8 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(self.env_manager.repository_info.workspace_folder, "/provider/workspace")
         self.assertEqual(self.env_manager.repository_info.additional_paths.get("logs"), "/provider/logs")
         self.assertEqual(self.env_manager.azrepo_parameters.get("token"), "provider-token")
+        self.assertEqual(self.env_manager.kusto_parameters.get("app_id"), "provider-app-id")
+        self.assertEqual(self.env_manager.kusto_parameters.get("app_secret"), "provider-app-secret")
 
     def test_provider_exception_handling(self):
         """Test that exceptions from providers are handled gracefully."""
@@ -156,6 +167,7 @@ class TestEnvironmentManager(unittest.TestCase):
         self.env_manager.repository_info.private_tool_root = "/test/private"
         self.env_manager.repository_info.additional_paths = {"data": "/test/data"}
         self.env_manager.azrepo_parameters = {"org": "test-org"}
+        self.env_manager.kusto_parameters = {"cluster": "test-cluster", "database": "test-db"}
         
         # Get the parameter dictionary
         params = self.env_manager.get_parameter_dict()
@@ -167,6 +179,8 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(params["private_tool_root"], "/test/private")
         self.assertEqual(params["path_data"], "/test/data")
         self.assertEqual(params["azrepo_org"], "test-org")
+        self.assertEqual(params["cluster"], "test-cluster")
+        self.assertEqual(params["database"], "test-db")
 
     def test_get_methods(self):
         """Test the getter methods."""
@@ -177,6 +191,7 @@ class TestEnvironmentManager(unittest.TestCase):
         self.env_manager.repository_info.private_tool_root = "/test/private"
         self.env_manager.repository_info.additional_paths = {"data": "/test/data"}
         self.env_manager.azrepo_parameters = {"org": "test-org"}
+        self.env_manager.kusto_parameters = {"cluster": "test-cluster", "database": "test-db"}
         
         # Test the getters
         self.assertEqual(self.env_manager.get_git_root(), "/test/git")
@@ -188,6 +203,11 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(self.env_manager.get_azrepo_parameter("org"), "test-org")
         self.assertIsNone(self.env_manager.get_azrepo_parameter("nonexistent"))
         self.assertEqual(self.env_manager.get_azrepo_parameter("nonexistent", "default"), "default")
+        self.assertEqual(self.env_manager.get_kusto_parameters(), {"cluster": "test-cluster", "database": "test-db"})
+        self.assertEqual(self.env_manager.get_kusto_parameter("cluster"), "test-cluster")
+        self.assertEqual(self.env_manager.get_kusto_parameter("database"), "test-db")
+        self.assertIsNone(self.env_manager.get_kusto_parameter("nonexistent"))
+        self.assertEqual(self.env_manager.get_kusto_parameter("nonexistent", "default"), "default")
 
     @mock.patch("config.manager.Path.exists")
     @mock.patch("config.manager.Path.is_file")

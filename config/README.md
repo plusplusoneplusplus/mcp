@@ -4,7 +4,7 @@ This directory contains configuration modules and templates for the MCP project.
 
 ## Environment Configuration
 
-The environment configuration manages repository information and environment settings through `.env` files.
+The environment configuration manages repository information and environment settings through `.env` files and environment variables.
 
 ### Template
 
@@ -17,25 +17,40 @@ cp config/templates/env.template .env
 
 ### Configuration Options
 
-The following configuration keys are recognized:
+The environment manager supports several categories of configuration:
 
-- `GIT_ROOT` - Path to the git repository root
-- `WORKSPACE_FOLDER` - Path to the workspace folder
-- `PROJECT_NAME` - Name of the project
-- `PRIVATE_TOOL_ROOT` - Path to the private tool root
-- `MCP_PATH_*` - Additional paths (e.g., `MCP_PATH_DATA=/path/to/data`)
+- Repository information (git root, workspace folder, etc.)
+- Project settings (name, paths, etc.)
+- Additional paths with the `MCP_PATH_` prefix
+- Azure Repo parameters with the `AZREPO_` prefix
+- Kusto parameters with the `KUSTO_` prefix
 
-### Azure Repo Parameters
+### Parameter Prefixes
 
-Special support is provided for Azure Repo parameters. Any `.env` entry with the prefix `AZREPO_` will be loaded as an Azure Repo parameter. For example:
+Special prefix support is provided for several parameter types:
 
+- `MCP_PATH_*` - Adds to `additional_paths` with the suffix as the key
+- `AZREPO_*` - Added to Azure Repo parameters
+- `KUSTO_*` - Added to Kusto parameters
+
+Example:
 ```
+MCP_PATH_DATA=/path/to/data
 AZREPO_ORG=myorg
-AZREPO_PROJECT=myproject
-AZREPO_REPO=myrepo
+KUSTO_CLUSTER=mycluster
 ```
 
-### Search Order
+### Configuration Sources and Precedence
+
+The environment manager loads configuration from multiple sources in the following order of precedence (highest to lowest):
+
+1. Custom providers (registered through `register_provider()`)
+2. OS environment variables
+3. `.env` file
+
+This means values from OS environment variables will override those from the `.env` file, and provider values will override both.
+
+### .env File Search Order
 
 The environment manager looks for `.env` files in the following locations (in order):
 
@@ -63,4 +78,7 @@ params = env_manager.get_parameter_dict()
 
 # Get Azure repo parameters
 azrepo_params = env_manager.get_azrepo_parameters()
+
+# Get Kusto parameters
+kusto_params = env_manager.get_kusto_parameters()
 ``` 
