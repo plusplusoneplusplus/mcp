@@ -25,6 +25,8 @@ class EnvironmentManager:
         self._providers: List[Callable[[], Dict[str, Any]]] = []
         # Dictionary to store azrepo parameters
         self.azrepo_parameters: Dict[str, Any] = {}
+        # Dictionary to store kusto parameters
+        self.kusto_parameters: Dict[str, Any] = {}
         self._load_from_env_file()
     
     def _get_git_root(self) -> Optional[Path]:
@@ -154,6 +156,10 @@ class EnvironmentManager:
                         elif key.startswith("AZREPO_"):
                             param_name = key[7:].lower()
                             self.azrepo_parameters[param_name] = value
+                        # Handle KUSTO_ prefixed variables
+                        elif key.startswith("KUSTO_"):
+                            param_name = key[6:].lower()
+                            self.kusto_parameters[param_name] = value
         except Exception as e:
             print(f"Error parsing .env file {env_file_path}: {e}")
     
@@ -190,6 +196,10 @@ class EnvironmentManager:
             elif key.startswith("AZREPO_"):
                 param_name = key[7:].lower()
                 self.azrepo_parameters[param_name] = value
+            # Handle KUSTO_ prefixed variables
+            elif key.startswith("KUSTO_"):
+                param_name = key[6:].lower()
+                self.kusto_parameters[param_name] = value
         
         # Call all registered providers
         for provider in self._providers:
@@ -219,6 +229,11 @@ class EnvironmentManager:
                 if azrepo_params := additional_data.get("azrepo_parameters", {}):
                     for key, value in azrepo_params.items():
                         self.azrepo_parameters[key] = value
+                
+                # Update kusto parameters if provided
+                if kusto_params := additional_data.get("kusto_parameters", {}):
+                    for key, value in kusto_params.items():
+                        self.kusto_parameters[key] = value
                     
             except Exception as e:
                 print(f"Error from provider: {e}")
@@ -241,6 +256,10 @@ class EnvironmentManager:
         # Add azrepo parameters
         for key, value in self.azrepo_parameters.items():
             result[f"azrepo_{key}"] = value
+        
+        # Add kusto parameters
+        for key, value in self.kusto_parameters.items():
+            result[key] = value
             
         return result
     
@@ -283,6 +302,26 @@ class EnvironmentManager:
             Parameter value or default if not found
         """
         return self.azrepo_parameters.get(name, default)
+    
+    def get_kusto_parameters(self) -> Dict[str, Any]:
+        """Get Kusto parameters
+        
+        Returns:
+            Dictionary of Kusto parameters loaded from environment
+        """
+        return self.kusto_parameters
+    
+    def get_kusto_parameter(self, name: str, default: Any = None) -> Any:
+        """Get a specific Kusto parameter
+        
+        Args:
+            name: Parameter name
+            default: Default value if parameter not found
+            
+        Returns:
+            Parameter value or default if not found
+        """
+        return self.kusto_parameters.get(name, default)
 
 
 # Create singleton instance

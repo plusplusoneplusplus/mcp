@@ -6,6 +6,7 @@ from mcp_tools.interfaces import (
     CommandExecutorInterface,
     RepoClientInterface,
     BrowserClientInterface,
+    KustoClientInterface,
 )
 
 # Import concrete implementations
@@ -34,6 +35,9 @@ from mcp_tools.yaml_tools import (
     discover_and_register_yaml_tools
 )
 
+# Import Kusto client
+from mcp_tools.kusto import KustoClient
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -42,11 +46,13 @@ __all__ = [
     "CommandExecutorInterface",
     "RepoClientInterface",
     "BrowserClientInterface",
+    "KustoClientInterface",
     
     # Implementations
     "CommandExecutor",
     "AzureRepoClient",
     "BrowserClient",
+    "KustoClient",
     "env",
     
     # Plugin system
@@ -61,5 +67,5 @@ __all__ = [
     
     # YAML tools
     "YamlToolBase",
-    "discover_and_register_yaml_tools",
+    "discover_and_register_yaml_tools"
 ]

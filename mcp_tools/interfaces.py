@@ -141,6 +141,42 @@ class RepoClientInterface(ToolInterface):
         """
         pass
 
+class KustoClientInterface(ToolInterface):
+    """Interface for Azure Data Explorer (Kusto) client tools."""
+    
+    @abstractmethod
+    def get_kusto_client(self, cluster_url: Optional[str] = None) -> Any:
+        """Initialize and return a Kusto client for Azure Data Explorer.
+        
+        Args:
+            cluster_url: Optional URL of the Kusto cluster
+            
+        Returns:
+            A configured Kusto client
+        """
+        pass
+    
+    @abstractmethod
+    async def execute_query(
+        self,
+        database: str,
+        query: str,
+        client: Optional[Any] = None,
+        cluster_url: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Execute a Kusto query and return the results.
+        
+        Args:
+            database: The name of the database to query
+            query: The KQL query to execute
+            client: Optional existing Kusto client to use
+            cluster_url: Optional URL of the Kusto cluster
+            
+        Returns:
+            Dictionary with query results
+        """
+        pass
+
 class BrowserClientInterface(ToolInterface):
     """Interface for browser client tools."""
     
