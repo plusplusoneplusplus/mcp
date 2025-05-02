@@ -1,9 +1,12 @@
 import importlib
+import importlib.util
 import inspect
 import logging
 import os
 import pkgutil
+import sys
 from typing import Dict, List, Type, Set, Optional, Any
+from pathlib import Path
 
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin_config import config
@@ -224,6 +227,64 @@ class PluginRegistry:
                 except Exception as e:
                     logger.warning(f"Error registering tool {name} from {module.__name__}: {e}")
     
+    def discover_plugin_directory(self, plugin_dir: Path) -> None:
+        """Discover and load plugins from a directory.
+        
+        Args:
+            plugin_dir: Path to the plugin directory
+        """
+        if not plugin_dir.exists() or not plugin_dir.is_dir():
+            logger.warning(f"Plugin directory does not exist or is not a directory: {plugin_dir}")
+            return
+            
+        logger.info(f"Discovering plugins in directory: {plugin_dir}")
+        
+        # Check if the directory contains Python files or subdirectories
+        plugin_items = list(plugin_dir.iterdir())
+        
+        for item in plugin_items:
+            # Handle plugin subdirectories
+            if item.is_dir() and (item / "__init__.py").exists():
+                try:
+                    plugin_name = item.name
+                    
+                    # Add parent directory to sys.path if not already there
+                    parent_dir = str(plugin_dir.resolve())
+                    if parent_dir not in sys.path:
+                        sys.path.insert(0, parent_dir)
+                        logger.debug(f"Added to sys.path: {parent_dir}")
+                    
+                    # Skip if already processed
+                    if plugin_name in self.discovered_paths:
+                        logger.debug(f"Skipping already processed plugin: {plugin_name}")
+                        continue
+                        
+                    # Add to discovered paths to avoid reprocessing
+                    self.discovered_paths.add(plugin_name)
+                    
+                    # Look for tool.py file
+                    tool_file = item / "tool.py"
+                    if tool_file.exists():
+                        try:
+                            # Import the module directly using importlib
+                            spec = importlib.util.spec_from_file_location(
+                                f"{plugin_name}.tool", str(tool_file)
+                            )
+                            if spec and spec.loader:
+                                module = importlib.util.module_from_spec(spec)
+                                sys.modules[spec.name] = module
+                                spec.loader.exec_module(module)
+                                
+                                # Scan for tools in the module
+                                self._scan_module_for_tools(module)
+                                logger.info(f"Successfully loaded plugin tool module: {plugin_name}.tool")
+                            else:
+                                logger.error(f"Failed to create spec for {tool_file}")
+                        except Exception as e:
+                            logger.error(f"Error importing tool module from {tool_file}: {e}")
+                except Exception as e:
+                    logger.error(f"Error loading plugin {item.name}: {e}")
+    
     def get_all_tools(self) -> List[Type[ToolInterface]]:
         """Get all registered tool classes.
         
@@ -338,7 +399,7 @@ def register_tool(cls=None, *, source="code"):
 
 # Auto-discovery function
 def discover_and_register_tools():
-    """Discover and register all tools in the mcp_tools package."""
+    """Discover and register all tools in the mcp_tools package and plugin directories."""
     # Load YAML tools first if enabled
     if config.register_yaml_tools:
         try:
@@ -362,7 +423,13 @@ def discover_and_register_tools():
     
     # Then discover code-based tools if enabled
     if config.register_code_tools:
+        # Discover tools in the mcp_tools package
         registry.discover_tools("mcp_tools")
+        
+        # Discover tools in plugin root directories
+        plugin_roots = config.get_plugin_roots()
+        for plugin_dir in plugin_roots:
+            registry.discover_plugin_directory(plugin_dir)
     
     # For debugging - Disable this logging in production
     tool_count = len(registry.tools)

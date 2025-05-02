@@ -31,6 +31,9 @@ class PluginConfig:
         # Path to YAML tool definitions
         self.yaml_tool_paths = []
         
+        # Path to plugin root directories
+        self.plugin_roots = []
+        
         # Tool names to always exclude regardless of source
         self.excluded_tool_names = set()
         
@@ -76,12 +79,24 @@ class PluginConfig:
         env_yaml_paths = os.environ.get("MCP_YAML_TOOL_PATHS", "")
         if env_yaml_paths:
             self.yaml_tool_paths = [Path(p.strip()) for p in env_yaml_paths.split(",") if p.strip()]
+            
+        # Get plugin root paths
+        env_plugin_roots = os.environ.get("MCP_PLUGIN_ROOTS", "")
+        if env_plugin_roots:
+            self.plugin_roots = [Path(p.strip()) for p in env_plugin_roots.split(",") if p.strip()]
+        else:
+            # Default plugin root if not specified
+            default_plugin_root = Path(__file__).resolve().parent.parent / "plugins"
+            if default_plugin_root.exists() and default_plugin_root.is_dir():
+                self.plugin_roots = [default_plugin_root]
+                logger.info(f"Using default plugin root: {default_plugin_root}")
         
         # Log the configuration
         logger.debug(f"Plugin configuration loaded from environment: "
                     f"register_code_tools={self.register_code_tools}, "
                     f"register_yaml_tools={self.register_yaml_tools}, "
-                    f"yaml_overrides_code={self.yaml_overrides_code}")
+                    f"yaml_overrides_code={self.yaml_overrides_code}, "
+                    f"plugin_roots={self.plugin_roots}")
     
     def should_register_tool_class(self, class_name: str, tool_name: str, yaml_tools: Set[str]) -> bool:
         """Determine if a tool class should be registered.
@@ -147,6 +162,14 @@ class PluginConfig:
             logger.info(f"Using default paths: {paths}")
         
         return paths
+    
+    def get_plugin_roots(self) -> List[Path]:
+        """Get the plugin root directories.
+        
+        Returns:
+            List of plugin root directories
+        """
+        return self.plugin_roots
     
     def is_source_enabled(self, source: str) -> bool:
         """Check if a specific tool source is enabled.

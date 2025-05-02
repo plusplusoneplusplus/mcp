@@ -1,8 +1,8 @@
-"""Text Summarizer Plugin for MCP Tools.
+"""Web Summarizer Plugin for MCP Tools.
 
-This plugin provides a tool for summarizing text content.
+This plugin provides tools for extracting content from HTML and URLs and converting it to markdown.
 """
 
-from plugins.text_summarizer.tool import TextSummarizerTool
+from plugins.text_summarizer.tool import WebSummarizerTool, UrlSummarizerTool
 
-__all__ = ["TextSummarizerTool"] 
+__all__ = ["WebSummarizerTool", "UrlSummarizerTool"] 

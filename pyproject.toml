@@ -40,6 +40,9 @@ dependencies = [
     "webdriver-manager==4.0.1",
     "playwright>=1.42.0",  # Modern browser automation
     
+    # Text processing
+    "trafilatura>=1.6.2",  # Web content extraction
+    
     # Testing
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.1",
