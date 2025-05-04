@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, Union, List
 
 from azure.kusto.data import KustoClient as AzureKustoClient, KustoConnectionStringBuilder
 from azure.kusto.data.exceptions import KustoServiceError
+from azure.kusto.data.response import KustoResponseDataSet
 from azure.identity import DefaultAzureCredential
 
 # Import interface
@@ -30,11 +31,8 @@ class KustoClient(KustoClientInterface):
         # Execute a query
         result = await kusto_client.execute_query("MyDatabase", "MyTable | limit 10")
         
-        # Get the primary results
-        primary_results = result.get("primary_results", [])
-        
-        # Get formatted results for LLM analysis
-        formatted_results = kusto_client.format_results(result)
+        # The result contains a formatted string representation of the query results
+        print(result["result"])
     """
     
     # Implement ToolInterface properties
@@ -198,30 +196,24 @@ class KustoClient(KustoClientInterface):
                         f"You can set KUSTO_APP_ID, KUSTO_APP_KEY, and KUSTO_TENANT_ID in your .env file "
                         f"or use az login to authenticate with Azure CLI.")
     
-    def format_results(self, result: Dict[str, Any], max_rows: int = 50) -> Dict[str, Any]:
+    def format_results(self, response: KustoResponseDataSet, max_rows: int = 100) -> Dict[str, Any]:
         """
-        Format the query results into a human-readable string suitable for LLM analysis.
-        Also simplify the return structure to just include success and result.
+        Format the Kusto response into a human-readable string suitable for LLM analysis.
+        Only formats the primary_results table from the response.
         
         Args:
-            result (dict): The query result dictionary returned by execute_query
-            max_rows (int, optional): Maximum number of rows to include. Defaults to 50.
+            response: A KustoResponseDataSet object returned from query execution
+            max_rows (int): Maximum number of rows to include per table. Defaults to 100.
             
         Returns:
-            dict: A simplified dictionary with just "success" and "result" keys
+            dict: A simplified dictionary with "success" and "result" keys
         """
-        if not result.get("success", False):
-            return {
-                "success": False,
-                "result": f"Error: {result.get('error', 'Unknown error')}"
-            }
-            
         output_parts = []
         
-        # Format all tables from the response
-        if "tables" in result:
-            for table_idx, table in enumerate(result["tables"]):
-                output_parts.append(f"Table {table_idx + 1}:")
+        try:
+            # Only format the primary_results table
+            if hasattr(response, 'primary_results') and response.primary_results:
+                table = response.primary_results[0]  # Get the first primary result table
                 
                 # Get columns information
                 if hasattr(table, "columns_name"):
@@ -255,20 +247,24 @@ class KustoClient(KustoClientInterface):
                                 
                         output_parts.append(" | ".join(formatted_values))
                         row_count += 1
-                        
-                output_parts.append("\n") # Add spacing between tables
+                
+                # Add summary information
+                total_rows = len(table.rows) if hasattr(table, "rows") else 0
+                output_parts.append(f"\nSummary: {total_rows} total row(s)")
+            else:
+                output_parts.append("No primary results found in the response.")
         
-        # Add summary information
-        if "tables" in result and result["tables"]:
-            total_tables = len(result["tables"])
-            total_rows = sum(len(table.rows) if hasattr(table, "rows") else 0 for table in result["tables"])
-            output_parts.append(f"Summary: {total_tables} table(s), {total_rows} total row(s)")
-        
-        # Return simplified output with just success and result
-        return {
-            "success": True,
-            "result": "\n".join(output_parts)
-        }
+            # Return simplified output with just success and result
+            return {
+                "success": True,
+                "result": "\n".join(output_parts)
+            }
+        except Exception as e:
+            self.logger.error(f"Error formatting results: {str(e)}")
+            return {
+                "success": False,
+                "result": f"Error formatting results: {str(e)}"
+            }
     
     async def execute_query(
         self,
@@ -289,7 +285,7 @@ class KustoClient(KustoClientInterface):
             format_results (bool, optional): Whether to format the results for LLM analysis. Default is True.
             
         Returns:
-            dict: The query results
+            dict: The query results with either formatted output or raw response
         """
         # Validate database
         if not database:
@@ -305,35 +301,37 @@ class KustoClient(KustoClientInterface):
             self.logger.error(f"Failed to create Kusto client: {str(e)}")
             return {
                 "success": False,
-                "error": f"Failed to create Kusto client: {str(e)}"
+                "result": f"Failed to create Kusto client: {str(e)}"
             }
         
         try:
+            # Execute the query
             response = kusto_client.execute(database, query)
-            # Extract the primary results table
-            result = {
+            
+            # Return formatted results if requested
+            if format_results:
+                return self.format_results(response)
+                
+            # Otherwise return the original structure for programmatic access
+            return {
                 "success": True,
                 "raw_response": response,
                 "primary_results": response.primary_results,
                 "tables": [table for table in response]
             }
-            
-            # Return formatted results if requested
-            if format_results:
-                return self.format_results(result)
-                
-            return result
         except KustoServiceError as e:
-            self.logger.error(f"Query execution failed: {str(e)}")
+            error_msg = f"Query execution failed: {str(e)}"
+            self.logger.error(error_msg)
             return {
                 "success": False,
-                "error": f"Query execution failed: {str(e)}"
+                "result": error_msg
             }
         except Exception as e:
-            self.logger.error(f"Error during query execution: {str(e)}")
+            error_msg = f"Error during query execution: {str(e)}"
+            self.logger.error(error_msg)
             return {
                 "success": False,
-                "error": f"Error during query execution: {str(e)}"
+                "result": error_msg
             }
     
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -343,7 +341,7 @@ class KustoClient(KustoClientInterface):
             arguments: Dictionary of arguments for the tool
             
         Returns:
-            Tool execution result
+            Tool execution result with formatted output
         """
         operation = arguments.get("operation", "")
         
