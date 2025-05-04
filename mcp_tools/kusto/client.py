@@ -196,69 +196,28 @@ class KustoClient(KustoClientInterface):
                         f"You can set KUSTO_APP_ID, KUSTO_APP_KEY, and KUSTO_TENANT_ID in your .env file "
                         f"or use az login to authenticate with Azure CLI.")
     
-    def format_results(self, response: KustoResponseDataSet, max_rows: int = 100) -> Dict[str, Any]:
+    def format_results(self, response: KustoResponseDataSet) -> Dict[str, Any]:
         """
-        Format the Kusto response into a human-readable string suitable for LLM analysis.
-        Only formats the primary_results table from the response.
+        Format the Kusto response using a simple approach that directly returns the primary results.
         
         Args:
             response: A KustoResponseDataSet object returned from query execution
-            max_rows (int): Maximum number of rows to include per table. Defaults to 100.
             
         Returns:
             dict: A simplified dictionary with "success" and "result" keys
         """
-        output_parts = []
-        
         try:
-            # Only format the primary_results table
+            # Simply return the primary results directly
             if hasattr(response, 'primary_results') and response.primary_results:
-                table = response.primary_results[0]  # Get the first primary result table
-                
-                # Get columns information
-                if hasattr(table, "columns_name"):
-                    columns = table.columns_name
-                    column_types = table.columns_type if hasattr(table, "columns_type") else [""] * len(columns)
-                    
-                    # Add column headers with types
-                    header = " | ".join([f"{col} ({col_type})" for col, col_type in zip(columns, column_types)])
-                    output_parts.append(header)
-                    output_parts.append("-" * len(header))
-                    
-                    # Add row data
-                    row_count = 0
-                    for row in table.rows:
-                        if row_count >= max_rows:
-                            output_parts.append(f"... {len(table.rows) - max_rows} more rows (showing first {max_rows} of {len(table.rows)} total)")
-                            break
-                            
-                        # Format row values, handling different data types appropriately
-                        formatted_values = []
-                        for val in row:
-                            if isinstance(val, (dict, list)):
-                                try:
-                                    formatted_values.append(json.dumps(val, ensure_ascii=False)[:100])
-                                except:
-                                    formatted_values.append(str(val)[:100])
-                            elif val is None:
-                                formatted_values.append("NULL")
-                            else:
-                                formatted_values.append(str(val)[:100])
-                                
-                        output_parts.append(" | ".join(formatted_values))
-                        row_count += 1
-                
-                # Add summary information
-                total_rows = len(table.rows) if hasattr(table, "rows") else 0
-                output_parts.append(f"\nSummary: {total_rows} total row(s)")
+                return {
+                    "success": True,
+                    "result": str(response.primary_results[0])
+                }
             else:
-                output_parts.append("No primary results found in the response.")
-        
-            # Return simplified output with just success and result
-            return {
-                "success": True,
-                "result": "\n".join(output_parts)
-            }
+                return {
+                    "success": True,
+                    "result": "No results found"
+                }
         except Exception as e:
             self.logger.error(f"Error formatting results: {str(e)}")
             return {

@@ -22,13 +22,8 @@ def mock_kusto_response():
     
     # Create a mock table with columns and rows
     mock_table = MagicMock()
-    mock_table.columns_name = ["id", "name", "value"]
-    mock_table.columns_type = ["int", "string", "real"]
-    mock_table.rows = [
-        [1, "test1", 10.5],
-        [2, "test2", 20.5],
-        [3, "test3", 30.5]
-    ]
+    # Set up __str__ to return a representative string
+    mock_table.__str__.return_value = "Table with 3 rows (id, name, value)"
     
     # Set up the primary results
     mock_response.primary_results = [mock_table]
@@ -45,16 +40,8 @@ def test_format_results(kusto_client, mock_kusto_response):
     assert formatted["success"] is True
     assert isinstance(formatted["result"], str)
     
-    # Check the formatted content
-    result_str = formatted["result"]
-    assert "id (int) | name (string) | value (real)" in result_str
-    assert "1 | test1 | 10.5" in result_str
-    assert "2 | test2 | 20.5" in result_str
-    assert "3 | test3 | 30.5" in result_str
-    assert "Summary: 3 total row(s)" in result_str
-    
-    # Table header should not be present since we only format primary results
-    assert "Table 1:" not in result_str
+    # Check that the result is the string representation of the primary_results table
+    assert formatted["result"] == "Table with 3 rows (id, name, value)"
 
 
 def test_format_results_with_complex_values(kusto_client):
@@ -62,15 +49,9 @@ def test_format_results_with_complex_values(kusto_client):
     # Create a mock KustoResponseDataSet
     mock_response = MagicMock(spec=KustoResponseDataSet)
     
-    # Create a mock table with columns and rows that include NULL and JSON values
+    # Create a mock table with string representation
     mock_table = MagicMock()
-    mock_table.columns_name = ["id", "data", "is_active"]
-    mock_table.columns_type = ["long", "dynamic", "bool"]
-    mock_table.rows = [
-        [1, {"key": "value"}, True],
-        [2, {"array": [1, 2, 3]}, False],
-        [3, None, None]
-    ]
+    mock_table.__str__.return_value = "Table with complex data types"
     
     # Set up the primary results
     mock_response.primary_results = [mock_table]
@@ -79,11 +60,8 @@ def test_format_results_with_complex_values(kusto_client):
     formatted = kusto_client.format_results(mock_response)
     
     # Check the content
-    result_str = formatted["result"]
-    assert 'id (long) | data (dynamic) | is_active (bool)' in result_str
-    assert '1 | {"key": "value"} | True' in result_str
-    assert '2 | {"array": [1, 2, 3]} | False' in result_str
-    assert '3 | NULL | NULL' in result_str
+    assert formatted["success"] is True
+    assert formatted["result"] == "Table with complex data types"
 
 
 def test_format_results_no_primary_results(kusto_client):
@@ -97,7 +75,7 @@ def test_format_results_no_primary_results(kusto_client):
     
     # Check the content
     assert formatted["success"] is True
-    assert "No primary results found in the response" in formatted["result"]
+    assert formatted["result"] == "No results found"
 
 
 def test_format_results_error_handling(kusto_client):
@@ -105,9 +83,8 @@ def test_format_results_error_handling(kusto_client):
     # Create a mock response that will cause an error when formatting
     mock_response = MagicMock(spec=KustoResponseDataSet)
     
-    # Set up primary_results to trigger an exception
-    mock_primary_results = PropertyMock(side_effect=Exception("Test formatting error"))
-    type(mock_response).primary_results = mock_primary_results
+    # Set up primary_results property to raise an exception when accessed
+    type(mock_response).primary_results = PropertyMock(side_effect=Exception("Test formatting error"))
     
     # Format the results
     formatted = kusto_client.format_results(mock_response)
@@ -115,6 +92,7 @@ def test_format_results_error_handling(kusto_client):
     # Check that error was handled
     assert formatted["success"] is False
     assert "Error formatting results" in formatted["result"]
+    assert "Test formatting error" in formatted["result"]
 
 
 @pytest.mark.asyncio
@@ -125,9 +103,7 @@ async def test_execute_query_with_formatting(kusto_client):
         # Mock the response
         mock_response = MagicMock(spec=KustoResponseDataSet)
         mock_table = MagicMock()
-        mock_table.columns_name = ["id", "name"]
-        mock_table.columns_type = ["int", "string"]
-        mock_table.rows = [[1, "test"]]
+        mock_table.__str__.return_value = "Table with id and name columns"
         
         # Set primary_results
         mock_response.primary_results = [mock_table]
@@ -150,8 +126,7 @@ async def test_execute_query_with_formatting(kusto_client):
             assert result["success"] is True
             
             # Verify formatted result contains expected data
-            assert "id (int) | name (string)" in result["result"]
-            assert "1 | test" in result["result"]
+            assert result["result"] == "Table with id and name columns"
 
 
 @pytest.mark.asyncio
@@ -162,8 +137,7 @@ async def test_execute_query_without_formatting(kusto_client):
         # Mock the response
         mock_response = MagicMock(spec=KustoResponseDataSet)
         mock_table = MagicMock()
-        mock_table.columns_name = ["id", "name"]
-        mock_table.rows = [[1, "test"]]
+        mock_table.__str__.return_value = "Table with id and name columns"
         
         mock_response.primary_results = [mock_table]
         
