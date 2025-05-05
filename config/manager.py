@@ -29,6 +29,8 @@ class EnvironmentManager:
         "tool_history_enabled": (True, bool),
         "tool_history_path": (".history", str),
         "browser_profile_path": (".browserprofile", str),
+        "browser_type": ("chrome", str),
+        "client_type": ("playwright", str),
     }
     
     # Create mapping dynamically - each setting can be set via its uppercase env var

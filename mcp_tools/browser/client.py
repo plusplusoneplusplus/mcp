@@ -10,10 +10,11 @@ from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import BrowserClientInterface
 import trafilatura
+from config.manager import EnvironmentManager
 
 # Global configuration
-DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = "chrome"
-DEFAULT_CLIENT_TYPE: str = "playwright"
+DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = EnvironmentManager().get_setting("browser_type", "chrome")
+DEFAULT_CLIENT_TYPE: str = EnvironmentManager().get_setting("client_type", "playwright")
 MAX_RETURN_CHARS: int = 100000
 
 @register_tool
@@ -90,6 +91,11 @@ class BrowserClient(BrowserClientInterface):
                 "include_images": {
                     "type": "boolean",
                     "description": "Whether to include image references in the extracted markdown (for get_page_markdown)",
+                    "default": False
+                },
+                "headless": {
+                    "type": "boolean",
+                    "description": "Whether to run the browser in headless mode.",
                     "default": False
                 }
             },
