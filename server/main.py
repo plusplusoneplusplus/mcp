@@ -3,6 +3,10 @@ from pathlib import Path
 import logging
 import click
 import asyncio
+import json
+import datetime
+import time
+from typing import Dict, Any, Optional
 
 # Starlette and uvicorn imports
 from starlette.applications import Starlette
@@ -61,6 +65,80 @@ logging.info(f"Inactive tools ({len(inactive_tools)}): {', '.join(inactive_tools
 for tool in active_tool_instances:
     logging.info(f"  - {tool.name}: {tool.description}")
 
+# Tool history recording functions
+def get_history_file_path() -> Path:
+    """Get the path to the history file based on configuration settings."""
+    # Check if history is enabled
+    if not env.is_tool_history_enabled():
+        return None
+    
+    # Get the base history path from settings
+    base_path = env.get_tool_history_path()
+    
+    # If it's a relative path, use the current Python file's directory as the base
+    if not os.path.isabs(base_path):
+        current_dir = Path(__file__).resolve().parent
+        base_path = current_dir / base_path
+    
+    # Create the directory if it doesn't exist
+    history_dir = Path(base_path)
+    history_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Use the current date and time (up to seconds) for the history file
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return history_dir / f"tool_history_{timestamp}.jsonl"
+
+def record_tool_invocation(tool_name: str, arguments: Dict[str, Any], 
+                          result: Any, duration_ms: float,
+                          success: bool = True, error: Optional[str] = None) -> bool:
+    """Record a tool invocation to the history file.
+    
+    Args:
+        tool_name: Name of the tool
+        arguments: Arguments passed to the tool
+        result: Result returned by the tool
+        duration_ms: Duration of the tool execution in milliseconds
+        success: Whether the tool execution was successful
+        error: Error message if the tool execution failed
+        
+    Returns:
+        True if the invocation was recorded, False otherwise
+    """
+    # Check if history is enabled
+    if not env.is_tool_history_enabled():
+        return False
+    
+    try:
+        # Create the record
+        record = {
+            "timestamp": datetime.datetime.now().isoformat(),
+            "tool": tool_name,
+            "arguments": arguments,
+            "result": result if isinstance(result, (dict, list, str, int, float, bool, type(None))) 
+                      else str(result),
+            "duration_ms": duration_ms,
+            "success": success
+        }
+        
+        if error:
+            record["error"] = error
+            
+        # Get the history file path
+        history_file = get_history_file_path()
+        
+        # Append the record to the history file in pretty format (4-space indentation)
+        with open(history_file, "a", encoding="utf-8") as f:
+            json_str = json.dumps(record, indent=4, sort_keys=True)
+            f.write(json_str + "\n\n")  # Add extra newline for better separation between records
+            
+        logging.debug(f"Recorded tool invocation for {tool_name}")
+        return True
+        
+    except Exception as e:
+        # Don't let history recording errors affect tool execution
+        logging.error(f"Error recording tool invocation: {e}")
+        return False
+
 # Setup tools using the direct plugin system
 @server.list_tools()
 async def list_tools() -> list[Tool]:
@@ -85,9 +163,12 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
     tool = injector.get_tool_instance(name)
     
     if not tool:
+        error_msg = f"Error: Tool '{name}' not found."
+        # Record the failed invocation
+        record_tool_invocation(name, arguments, error_msg, 0, False, error_msg)
         return [TextContent(
             type="text",
-            text=f"Error: Tool '{name}' not found."
+            text=error_msg
         )]
     
     # Check if this tool is from an active source
@@ -95,20 +176,32 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
     source = tool_sources.get(name, "unknown")
     
     if not config.is_source_enabled(source):
+        error_msg = f"Error: Tool '{name}' is disabled. Source '{source}' is not active."
+        # Record the failed invocation
+        record_tool_invocation(name, arguments, error_msg, 0, False, error_msg)
         return [TextContent(
             type="text",
-            text=f"Error: Tool '{name}' is disabled. Source '{source}' is not active."
+            text=error_msg
         )]
+    
+    # Measure execution time
+    start_time = time.time()
+    result = None
+    success = True
+    error_msg = None
     
     try:
         # Call the tool directly
         result = await tool.execute_tool(arguments)
         
+        # Calculate duration in milliseconds
+        duration_ms = (time.time() - start_time) * 1000
+        
         # Convert to TextContent if not already
         if isinstance(result, list) and all(isinstance(item, dict) for item in result):
-            return [TextContent(**item) for item in result]
+            text_content = [TextContent(**item) for item in result]
         elif isinstance(result, list) and all(hasattr(item, 'type') and hasattr(item, 'text') for item in result):
-            return [TextContent(
+            text_content = [TextContent(
                 type=item.type,
                 text=item.text,
                 annotations=getattr(item, 'annotations', None)
@@ -116,20 +209,35 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
         elif isinstance(result, dict):
             # Format result as text
             text = format_result_as_text(result)
-            return [TextContent(
+            text_content = [TextContent(
                 type="text",
                 text=text
             )]
         else:
-            return [TextContent(
+            text_content = [TextContent(
                 type="text",
                 text=str(result)
             )]
+        
+        # Record the successful invocation
+        record_tool_invocation(name, arguments, result, duration_ms, True)
+        
+        return text_content
+        
     except Exception as e:
         logging.exception(f"Error executing tool {name}")
+        error_msg = f"Error executing tool {name}: {str(e)}"
+        success = False
+        
+        # Calculate duration in milliseconds
+        duration_ms = (time.time() - start_time) * 1000
+        
+        # Record the failed invocation
+        record_tool_invocation(name, arguments, None, duration_ms, False, error_msg)
+        
         return [TextContent(
             type="text",
-            text=f"Error executing tool {name}: {str(e)}"
+            text=error_msg
         )]
 
 def format_result_as_text(result: dict) -> str:
@@ -215,6 +323,13 @@ def setup():
     env.load()
     logger.info(f"Initialized environment: Git root={env.get_git_root()}, " +
                 f"Workspace folder={env.get_workspace_folder()}")
+    
+    # Log tool history settings
+    if env.is_tool_history_enabled():
+        history_path = get_history_file_path()
+        logger.info(f"Tool history recording is enabled. Recording to: {history_path}")
+    else:
+        logger.info("Tool history recording is disabled")
 
 
 @click.command()

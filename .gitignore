@@ -98,3 +98,7 @@ MANIFEST
 
 # Private user configuration
 server/.private/
+
+# server runtime output
+server/.logs/
+server/.history/
