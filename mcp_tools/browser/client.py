@@ -9,11 +9,12 @@ from typing import Dict, Any, Optional, Literal
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import BrowserClientInterface
+import trafilatura
 
 # Global configuration
 DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = "chrome"
 DEFAULT_CLIENT_TYPE: str = "selenium"
-
+MAX_RETURN_CHARS: int = 100000
 
 @register_tool
 class BrowserClient(BrowserClientInterface):
@@ -63,8 +64,8 @@ class BrowserClient(BrowserClientInterface):
             "properties": {
                 "operation": {
                     "type": "string",
-                    "description": "The operation to perform (get_page_html, take_screenshot)",
-                    "enum": ["get_page_html", "take_screenshot"]
+                    "description": "The operation to perform (get_page_html, take_screenshot, get_page_markdown)",
+                    "enum": ["get_page_html", "take_screenshot", "get_page_markdown"]
                 },
                 "url": {
                     "type": "string",
@@ -79,6 +80,16 @@ class BrowserClient(BrowserClientInterface):
                     "type": "string",
                     "description": "Path where the screenshot should be saved (for take_screenshot)",
                     "nullable": True
+                },
+                "include_links": {
+                    "type": "boolean",
+                    "description": "Whether to include links in the extracted markdown (for get_page_markdown)",
+                    "default": True
+                },
+                "include_images": {
+                    "type": "boolean",
+                    "description": "Whether to include image references in the extracted markdown (for get_page_markdown)",
+                    "default": True
                 }
             },
             "required": ["operation", "url"]
@@ -109,7 +120,7 @@ class BrowserClient(BrowserClientInterface):
             if html:
                 return {
                     "success": True,
-                    "html": html[:10000] + ("..." if len(html) > 10000 else ""),
+                    "html": html[:MAX_RETURN_CHARS] + ("..." if len(html) > MAX_RETURN_CHARS else ""),
                     "html_length": len(html)
                 }
             else:
@@ -123,6 +134,34 @@ class BrowserClient(BrowserClientInterface):
             return {
                 "success": success,
                 "output_path": output_path
+            }
+        elif operation == "get_page_markdown":
+            include_links = arguments.get("include_links", True)
+            include_images = arguments.get("include_images", True)
+            
+            html = await client.get_page_html(url, wait_time, headless, browser_options)
+            if not html:
+                return {
+                    "success": False,
+                    "error": f"Failed to retrieve HTML from {url}"
+                }
+            
+            extracted_text = trafilatura.extract(
+                html,
+                output_format="markdown",
+                include_links=include_links,
+                include_images=include_images
+            )
+            
+            # If extraction failed, return an empty string
+            if not extracted_text:
+                extracted_text = ""
+                
+            return {
+                "success": True,
+                "markdown": extracted_text[:MAX_RETURN_CHARS] + ("..." if len(extracted_text) > MAX_RETURN_CHARS else ""),
+                "markdown_length": len(extracted_text),
+                "url": url
             }
         else:
             return {
@@ -167,36 +206,9 @@ class BrowserClient(BrowserClientInterface):
             Current default client type
         """
         return DEFAULT_CLIENT_TYPE
+
+    async def get_page_html(self, url: str, wait_time: int = 30) -> Optional[str]:
+        raise NotImplementedError("get_page_html should be implemented by the real client")
     
-    @staticmethod
-    async def get_page_html(url: str, wait_time: int = 30, options = None, headless: bool = True) -> Optional[str]:
-        """Open a webpage and get its HTML content.
-        
-        Args:
-            url: The URL to visit
-            wait_time: Time to wait for page load in seconds
-            options: Browser options to use
-            headless: Whether to run browser in headless mode
-            
-        Returns:
-            HTML content of the page or None if an error occurred
-        """
-        client = BrowserClientFactory.create_client(DEFAULT_CLIENT_TYPE, DEFAULT_BROWSER_TYPE)
-        return await client.get_page_html(url, wait_time, headless, options)
-            
-    @staticmethod
-    async def take_screenshot(url: str, output_path: str, wait_time: int = 30, options = None, headless: bool = True) -> bool:
-        """Navigate to a URL and take a screenshot.
-        
-        Args:
-            url: The URL to visit
-            output_path: Path where the screenshot should be saved
-            wait_time: Time to wait for page load in seconds
-            options: Browser options to use
-            headless: Whether to run browser in headless mode
-            
-        Returns:
-            True if screenshot was successful, False otherwise
-        """
-        client = BrowserClientFactory.create_client(DEFAULT_CLIENT_TYPE, DEFAULT_BROWSER_TYPE)
-        return await client.take_screenshot(url, output_path, wait_time, headless, options)
+    async def take_screenshot(self, url: str, output_path: str, wait_time: int = 30) -> bool:
+        raise NotImplementedError("take_screenshot should be implemented by the real client")

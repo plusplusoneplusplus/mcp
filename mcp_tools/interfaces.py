@@ -181,7 +181,7 @@ class BrowserClientInterface(ToolInterface):
     """Interface for browser client tools."""
     
     @abstractmethod
-    def get_page_html(self, url: str, wait_time: int = 30) -> Optional[str]:
+    async def get_page_html(self, url: str, wait_time: int = 30) -> Optional[str]:
         """Open a webpage and get its HTML content.
         
         Args:
@@ -194,7 +194,7 @@ class BrowserClientInterface(ToolInterface):
         pass
     
     @abstractmethod
-    def take_screenshot(self, url: str, output_path: str, wait_time: int = 30) -> bool:
+    async def take_screenshot(self, url: str, output_path: str, wait_time: int = 30) -> bool:
         """Navigate to a URL and take a screenshot.
         
         Args:
