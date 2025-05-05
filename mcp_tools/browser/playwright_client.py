@@ -57,10 +57,10 @@ class PlaywrightBrowserClient(IBrowserClient):
                             wait_time: int = 30,
                             headless: bool = True,
                             options: Any = None) -> Optional[str]:
-        page = await self._get_new_page(headless)
-        page.set_default_navigation_timeout(wait_time * 1000)
         try:
-            await page.goto(url, timeout=wait_time * 1000)
+            page = await self._get_new_page(headless)
+            page.set_default_navigation_timeout(wait_time * 1000)
+            await page.goto(url)
             # wait for network to be quiet, adjust as needed
             # await page.wait_for_load_state('networkidle', timeout=wait_time * 1000)
             await page.wait_for_timeout(wait_time * 1000)
@@ -76,10 +76,10 @@ class PlaywrightBrowserClient(IBrowserClient):
                               wait_time: int = 30,
                               headless: bool = True,
                               options: Any = None) -> bool:
-        page = await self._get_new_page(headless)
-        page.set_default_navigation_timeout(wait_time * 1000)
         try:
-            await page.goto(url, timeout=wait_time * 1000)
+            page = await self._get_new_page(headless)
+            page.set_default_navigation_timeout(wait_time * 1000)
+            await page.goto(url)
             # await page.wait_for_load_state('networkidle', timeout=wait_time * 1000)
             await page.wait_for_timeout(wait_time * 1000)
             await page.screenshot(path=output_path, full_page=True)
