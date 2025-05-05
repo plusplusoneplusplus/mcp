@@ -57,6 +57,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                             wait_time: int = 30,
                             headless: bool = True,
                             options: Any = None) -> Optional[str]:
+        page = None
         try:
             page = await self._get_new_page(headless)
             page.set_default_navigation_timeout(wait_time * 1000)
@@ -68,7 +69,8 @@ class PlaywrightBrowserClient(IBrowserClient):
         except Exception:
             return None
         finally:
-            await page.close()
+            if page is not None:
+                await page.close()
 
     async def take_screenshot(self,
                               url: str,
@@ -76,6 +78,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                               wait_time: int = 30,
                               headless: bool = True,
                               options: Any = None) -> bool:
+        page = None
         try:
             page = await self._get_new_page(headless)
             page.set_default_navigation_timeout(wait_time * 1000)
@@ -87,7 +90,8 @@ class PlaywrightBrowserClient(IBrowserClient):
         except Exception:
             return False
         finally:
-            await page.close()
+            if page is not None:
+                await page.close()
 
     async def close(self):
         """Clean up Playwright resources when you're done."""

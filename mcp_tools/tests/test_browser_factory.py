@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.browser.selenium_client import SeleniumBrowserClient
 from mcp_tools.browser.interface import IBrowserClient
+from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
 
 
 def test_factory_creates_correct_client_type():
@@ -36,8 +37,8 @@ def test_factory_default_parameters():
     client = BrowserClientFactory.create_client()
     
     # Check defaults
-    assert isinstance(client, SeleniumBrowserClient)
-    assert client.browser_type == "chrome"  # Default in SeleniumBrowserClient
+    assert isinstance(client, PlaywrightBrowserClient)
+    assert client.browser == "chrome"  # Default in PlaywrightBrowserClient
 
 
 def test_factory_invalid_client_type():

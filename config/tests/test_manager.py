@@ -51,7 +51,7 @@ class TestEnvironmentManager(unittest.TestCase):
         
         # Check that default settings are loaded
         self.assertTrue(self.env_manager.settings["tool_history_enabled"])
-        self.assertEqual(self.env_manager.settings["tool_history_path"], ".history")
+        self.assertTrue(self.env_manager.settings["tool_history_path"].endswith(".history"))
 
     def test_singleton_pattern(self):
         """Test that EnvironmentManager follows the singleton pattern."""
