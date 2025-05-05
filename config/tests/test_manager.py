@@ -47,6 +47,11 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertIsInstance(self.env_manager._providers, list)
         self.assertIsInstance(self.env_manager.azrepo_parameters, dict)
         self.assertIsInstance(self.env_manager.kusto_parameters, dict)
+        self.assertIsInstance(self.env_manager.settings, dict)
+        
+        # Check that default settings are loaded
+        self.assertTrue(self.env_manager.settings["tool_history_enabled"])
+        self.assertEqual(self.env_manager.settings["tool_history_path"], ".history")
 
     def test_singleton_pattern(self):
         """Test that EnvironmentManager follows the singleton pattern."""
@@ -73,6 +78,8 @@ class TestEnvironmentManager(unittest.TestCase):
         AZREPO_ORG=test-org
         KUSTO_CLUSTER=test-cluster
         KUSTO_DATABASE=test-db
+        TOOL_HISTORY_ENABLED=false
+        TOOL_HISTORY_PATH=/custom/history/path
         """
         env_file = self.create_env_file(env_content)
         
@@ -88,6 +95,8 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(self.env_manager.azrepo_parameters.get("org"), "test-org")
         self.assertEqual(self.env_manager.kusto_parameters.get("cluster"), "test-cluster")
         self.assertEqual(self.env_manager.kusto_parameters.get("database"), "test-db")
+        self.assertFalse(self.env_manager.settings["tool_history_enabled"])
+        self.assertEqual(self.env_manager.settings["tool_history_path"], "/custom/history/path")
 
     def test_parse_env_file_with_quotes(self):
         """Test parsing an environment file with quoted values."""
@@ -192,6 +201,8 @@ class TestEnvironmentManager(unittest.TestCase):
         self.env_manager.repository_info.additional_paths = {"data": "/test/data"}
         self.env_manager.azrepo_parameters = {"org": "test-org"}
         self.env_manager.kusto_parameters = {"cluster": "test-cluster", "database": "test-db"}
+        self.env_manager.settings["tool_history_enabled"] = False
+        self.env_manager.settings["tool_history_path"] = "/custom/history"
         
         # Test the getters
         self.assertEqual(self.env_manager.get_git_root(), "/test/git")
@@ -208,6 +219,8 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(self.env_manager.get_kusto_parameter("database"), "test-db")
         self.assertIsNone(self.env_manager.get_kusto_parameter("nonexistent"))
         self.assertEqual(self.env_manager.get_kusto_parameter("nonexistent", "default"), "default")
+        self.assertFalse(self.env_manager.is_tool_history_enabled())
+        self.assertEqual(self.env_manager.get_tool_history_path(), "/custom/history")
 
     @mock.patch("config.manager.Path.exists")
     @mock.patch("config.manager.Path.is_file")
@@ -240,6 +253,94 @@ class TestEnvironmentManager(unittest.TestCase):
             Path("/mock/cwd/.env")
         ]
         self.assertIn(call_arg, expected_paths)
+
+    def test_get_parameter_dict_includes_tool_history(self):
+        """Test that the parameter dictionary includes tool history settings."""
+        # Set up tool history settings
+        self.env_manager.settings["tool_history_enabled"] = False
+        self.env_manager.settings["tool_history_path"] = "/custom/history/path"
+        
+        # Get the parameter dictionary
+        params = self.env_manager.get_parameter_dict()
+        
+        # Check the tool history values are included
+        self.assertFalse(params["tool_history_enabled"])
+        self.assertEqual(params["tool_history_path"], "/custom/history/path")
+    
+    def test_env_mapping_dynamic_creation(self):
+        """Test that ENV_MAPPING is created dynamically from DEFAULT_SETTINGS."""
+        # Check that all DEFAULT_SETTINGS keys are in ENV_MAPPING as uppercase
+        for key in EnvironmentManager.DEFAULT_SETTINGS:
+            self.assertIn(key.upper(), EnvironmentManager.ENV_MAPPING)
+            self.assertEqual(EnvironmentManager.ENV_MAPPING[key.upper()], key)
+    
+    def test_get_setting(self):
+        """Test the get_setting method."""
+        # Set values in settings
+        self.env_manager.settings["test_setting"] = "test_value"
+        self.env_manager.settings["empty_setting"] = None
+        
+        # Test getting existing setting
+        self.assertEqual(self.env_manager.get_setting("test_setting"), "test_value")
+        
+        # Test getting setting with None value
+        self.assertIsNone(self.env_manager.get_setting("empty_setting"))
+        
+        # Test getting non-existent setting with default
+        self.assertEqual(self.env_manager.get_setting("nonexistent", "default"), "default")
+        
+        # Test getting non-existent setting without default
+        self.assertIsNone(self.env_manager.get_setting("nonexistent"))
+    
+    def test_sync_settings_to_repo(self):
+        """Test syncing settings to repository info."""
+        # Set values in settings
+        self.env_manager.settings["git_root"] = "/settings/git"
+        self.env_manager.settings["workspace_folder"] = "/settings/workspace"
+        self.env_manager.settings["project_name"] = "settings_project"
+        self.env_manager.settings["private_tool_root"] = "/settings/private"
+        
+        # Sync to repository info
+        self.env_manager._sync_settings_to_repo()
+        
+        # Check repository info was updated
+        self.assertEqual(self.env_manager.repository_info.git_root, "/settings/git")
+        self.assertEqual(self.env_manager.repository_info.workspace_folder, "/settings/workspace")
+        self.assertEqual(self.env_manager.repository_info.project_name, "settings_project")
+        self.assertEqual(self.env_manager.repository_info.private_tool_root, "/settings/private")
+    
+    def test_sync_repo_to_settings(self):
+        """Test syncing repository info to settings."""
+        # Set values in repository info
+        self.env_manager.repository_info.git_root = "/repo/git"
+        self.env_manager.repository_info.workspace_folder = "/repo/workspace"
+        self.env_manager.repository_info.project_name = "repo_project"
+        self.env_manager.repository_info.private_tool_root = "/repo/private"
+        
+        # Sync to settings
+        self.env_manager._sync_repo_to_settings()
+        
+        # Check settings were updated
+        self.assertEqual(self.env_manager.settings["git_root"], "/repo/git")
+        self.assertEqual(self.env_manager.settings["workspace_folder"], "/repo/workspace")
+        self.assertEqual(self.env_manager.settings["project_name"], "repo_project")
+        self.assertEqual(self.env_manager.settings["private_tool_root"], "/repo/private")
+    
+    def test_load_with_env_vars(self):
+        """Test loading from environment variables."""
+        # Use a context manager to temporarily set environment variables
+        with mock.patch.dict(os.environ, {
+            "TOOL_HISTORY_ENABLED": "false",
+            "TOOL_HISTORY_PATH": "/env/history/path"
+        }):
+            # Load from environment
+            self.env_manager.load()
+            
+            # Check the values were set correctly
+            self.assertFalse(self.env_manager.settings["tool_history_enabled"])
+            self.assertEqual(self.env_manager.settings["tool_history_path"], "/env/history/path")
+            self.assertFalse(self.env_manager.is_tool_history_enabled())
+            self.assertEqual(self.env_manager.get_tool_history_path(), "/env/history/path")
 
 
 if __name__ == "__main__":

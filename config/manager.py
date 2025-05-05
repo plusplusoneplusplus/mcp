@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Optional, List, Callable, Union
 from config.types import RepositoryInfo
 
 class EnvironmentManager:
@@ -9,8 +9,20 @@ class EnvironmentManager:
     """
     _instance = None
     
-    # Remove the ToolInterface properties (name, description, input_schema)
-    # Remove the execute_tool method
+    # Default settings with their types
+    DEFAULT_SETTINGS = {
+        # Repository info settings
+        "git_root": (None, str),
+        "workspace_folder": (None, str),
+        "project_name": (None, str),
+        "private_tool_root": (None, str),
+        # Tool history settings
+        "tool_history_enabled": (True, bool),
+        "tool_history_path": (".history", str),
+    }
+    
+    # Create mapping dynamically - each setting can be set via its uppercase env var
+    ENV_MAPPING = {setting.upper(): setting for setting in DEFAULT_SETTINGS.keys()}
     
     def __new__(cls):
         if cls._instance is None:
@@ -23,11 +35,31 @@ class EnvironmentManager:
         self.repository_info = RepositoryInfo()
         self.env_variables: Dict[str, str] = {}
         self._providers: List[Callable[[], Dict[str, Any]]] = []
-        # Dictionary to store azrepo parameters
         self.azrepo_parameters: Dict[str, Any] = {}
-        # Dictionary to store kusto parameters
         self.kusto_parameters: Dict[str, Any] = {}
+        self.settings: Dict[str, Any] = {}
+        
+        # Initialize settings with default values
+        for key, (default_value, _) in self.DEFAULT_SETTINGS.items():
+            self.settings[key] = default_value
+        
         self._load_from_env_file()
+        self._sync_settings_to_repo()
+    
+    def _sync_settings_to_repo(self):
+        """Sync settings to repository info object"""
+        repo_fields = ["git_root", "workspace_folder", "project_name", "private_tool_root"]
+        for field in repo_fields:
+            if value := self.settings.get(field):
+                setattr(self.repository_info, field, value)
+    
+    def _sync_repo_to_settings(self):
+        """Sync repository info to settings dictionary"""
+        repo_fields = ["git_root", "workspace_folder", "project_name", "private_tool_root"]
+        for field in repo_fields:
+            value = getattr(self.repository_info, field)
+            if value is not None:
+                self.settings[field] = value
     
     def _get_git_root(self) -> Optional[Path]:
         """Try to determine the git root directory
@@ -35,23 +67,26 @@ class EnvironmentManager:
         Returns:
             Path to the git root directory or None if not found
         """
-        # Start from the current directory
         current_dir = Path.cwd()
         
-        # Traverse up to find .git directory
         dir_to_check = current_dir
         for _ in range(10):  # Limit the search depth
             git_dir = dir_to_check / ".git"
             if git_dir.exists() and git_dir.is_dir():
                 return dir_to_check
             
-            # Move up one directory
             parent_dir = dir_to_check.parent
             if parent_dir == dir_to_check:  # Reached the root
                 break
             dir_to_check = parent_dir
         
         return None
+    
+    def _convert_value(self, value: str, target_type: type) -> Any:
+        """Convert string value to target type"""
+        if target_type == bool:
+            return value.lower() == "true"
+        return target_type(value)
     
     def _load_from_env_file(self):
         """Find and load variables from a .env file"""
@@ -112,11 +147,7 @@ class EnvironmentManager:
                 print("No .env file found. Create one to configure the environment.")
     
     def _parse_env_file(self, env_file_path: Path):
-        """Parse a .env file and load variables into environment
-        
-        Args:
-            env_file_path: Path to the .env file
-        """
+        """Parse a .env file and load variables into environment"""
         try:
             with open(env_file_path, "r") as f:
                 for line in f:
@@ -139,15 +170,16 @@ class EnvironmentManager:
                         # Update environment variables
                         self.env_variables[key] = value
                         
-                        # Update repository info if applicable
-                        if key == "GIT_ROOT":
-                            self.repository_info.git_root = value
-                        elif key == "WORKSPACE_FOLDER":
-                            self.repository_info.workspace_folder = value
-                        elif key == "PROJECT_NAME":
-                            self.repository_info.project_name = value
-                        elif key == "PRIVATE_TOOL_ROOT":
-                            self.repository_info.private_tool_root = value
+                        # Update mapped settings
+                        if key in self.ENV_MAPPING:
+                            setting_name = self.ENV_MAPPING[key]
+                            
+                            # Get the target type from default settings
+                            for default_key, (_, target_type) in self.DEFAULT_SETTINGS.items():
+                                if setting_name == default_key:
+                                    self.settings[setting_name] = self._convert_value(value, target_type)
+                                    break
+                                
                         # Handle MCP_PATH_ prefixed variables
                         elif key.startswith("MCP_PATH_"):
                             path_name = key[9:].lower()
@@ -160,6 +192,10 @@ class EnvironmentManager:
                         elif key.startswith("KUSTO_"):
                             param_name = key[6:].lower()
                             self.kusto_parameters[param_name] = value
+
+            # Sync settings to repository info after loading all values
+            self._sync_settings_to_repo()
+
         except Exception as e:
             print(f"Error parsing .env file {env_file_path}: {e}")
     
@@ -179,15 +215,16 @@ class EnvironmentManager:
         for key, value in os.environ.items():
             self.env_variables[key] = value
             
-            # Update repository info if applicable
-            if key == "GIT_ROOT":
-                self.repository_info.git_root = value
-            elif key == "WORKSPACE_FOLDER":
-                self.repository_info.workspace_folder = value
-            elif key == "PROJECT_NAME":
-                self.repository_info.project_name = value
-            elif key == "PRIVATE_TOOL_ROOT":
-                self.repository_info.private_tool_root = value
+            # Update mapped settings
+            if key in self.ENV_MAPPING:
+                setting_name = self.ENV_MAPPING[key]
+                
+                # Get the target type from default settings
+                for default_key, (_, target_type) in self.DEFAULT_SETTINGS.items():
+                    if setting_name == default_key:
+                        self.settings[setting_name] = self._convert_value(value, target_type)
+                        break
+            
             # Handle MCP_PATH_ prefixed variables
             elif key.startswith("MCP_PATH_"):
                 path_name = key[9:].lower()
@@ -201,6 +238,9 @@ class EnvironmentManager:
                 param_name = key[6:].lower()
                 self.kusto_parameters[param_name] = value
         
+        # Sync settings to repository info
+        self._sync_settings_to_repo()
+        
         # Call all registered providers
         for provider in self._providers:
             try:
@@ -208,18 +248,10 @@ class EnvironmentManager:
                 
                 # Update repository info if provided
                 repo_info = additional_data.get("repository", {})
-                if git_root := repo_info.get("git_root"):
-                    self.repository_info.git_root = git_root
-                    
-                if workspace_folder := repo_info.get("workspace_folder"):
-                    self.repository_info.workspace_folder = workspace_folder
-                    
-                if project_name := repo_info.get("project_name"):
-                    self.repository_info.project_name = project_name
-                    
-                # Update private tool root if provided
-                if private_tool_root := repo_info.get("private_tool_root"):
-                    self.repository_info.private_tool_root = private_tool_root
+                for field in ["git_root", "workspace_folder", "project_name", "private_tool_root"]:
+                    if value := repo_info.get(field):
+                        self.settings[field] = value
+                        setattr(self.repository_info, field, value)
                     
                 # Update additional paths
                 for key, value in repo_info.get("additional_paths", {}).items():
@@ -234,20 +266,31 @@ class EnvironmentManager:
                 if kusto_params := additional_data.get("kusto_parameters", {}):
                     for key, value in kusto_params.items():
                         self.kusto_parameters[key] = value
+                
+                # Update other settings
+                if settings := additional_data.get("settings", {}):
+                    for key, value in settings.items():
+                        if key in self.settings:
+                            self.settings[key] = value
                     
             except Exception as e:
                 print(f"Error from provider: {e}")
+        
+        # Final sync of settings to repository info
+        self._sync_settings_to_repo()
         
         return self
     
     def get_parameter_dict(self) -> Dict[str, Any]:
         """Return environment as a dictionary for command substitution"""
-        result = {
-            "git_root": self.repository_info.git_root,
-            "workspace_folder": self.repository_info.workspace_folder,
-            "project_name": self.repository_info.project_name,
-            "private_tool_root": self.repository_info.private_tool_root,
-        }
+        # Ensure repository info is reflected in settings
+        self._sync_repo_to_settings()
+        
+        result = {}
+        
+        # Add all settings
+        for key, value in self.settings.items():
+            result[key] = value
         
         # Add all additional paths
         for key, value in self.repository_info.additional_paths.items():
@@ -263,17 +306,26 @@ class EnvironmentManager:
             
         return result
     
+    def get_setting(self, name: str, default: Any = None) -> Any:
+        """Get a setting value by name"""
+        # If it's a repo setting, sync from repo first
+        if name in ["git_root", "workspace_folder", "project_name", "private_tool_root"]:
+            self._sync_repo_to_settings()
+        
+        return self.settings.get(name, default)
+    
+    # Public getters for backwards compatibility
     def get_git_root(self) -> Optional[str]:
         """Get git root directory"""
-        return self.repository_info.git_root
+        return self.get_setting("git_root")
 
     def get_workspace_folder(self) -> Optional[str]:
         """Get workspace folder"""
-        return self.repository_info.workspace_folder
+        return self.get_setting("workspace_folder")
 
     def get_project_name(self) -> Optional[str]:
         """Get project name"""
-        return self.repository_info.project_name
+        return self.get_setting("project_name")
 
     def get_path(self, name: str) -> Optional[str]:
         """Get a specific path by name"""
@@ -281,47 +333,31 @@ class EnvironmentManager:
 
     def get_private_tool_root(self) -> Optional[str]:
         """Get private tool root directory"""
-        return self.repository_info.private_tool_root
+        return self.get_setting("private_tool_root")
     
     def get_azrepo_parameters(self) -> Dict[str, Any]:
-        """Get Azure repo parameters
-        
-        Returns:
-            Dictionary of Azure repo parameters loaded from environment
-        """
+        """Get Azure repo parameters"""
         return self.azrepo_parameters
     
     def get_azrepo_parameter(self, name: str, default: Any = None) -> Any:
-        """Get a specific Azure repo parameter
-        
-        Args:
-            name: Parameter name
-            default: Default value if parameter not found
-            
-        Returns:
-            Parameter value or default if not found
-        """
+        """Get a specific Azure repo parameter"""
         return self.azrepo_parameters.get(name, default)
     
     def get_kusto_parameters(self) -> Dict[str, Any]:
-        """Get Kusto parameters
-        
-        Returns:
-            Dictionary of Kusto parameters loaded from environment
-        """
+        """Get Kusto parameters"""
         return self.kusto_parameters
     
     def get_kusto_parameter(self, name: str, default: Any = None) -> Any:
-        """Get a specific Kusto parameter
-        
-        Args:
-            name: Parameter name
-            default: Default value if parameter not found
-            
-        Returns:
-            Parameter value or default if not found
-        """
+        """Get a specific Kusto parameter"""
         return self.kusto_parameters.get(name, default)
+    
+    def is_tool_history_enabled(self) -> bool:
+        """Check if tool invoke history is enabled"""
+        return self.get_setting("tool_history_enabled", True)
+    
+    def get_tool_history_path(self) -> str:
+        """Get the path for storing tool invoke history"""
+        return self.get_setting("tool_history_path", ".history")
 
 
 # Create singleton instance
