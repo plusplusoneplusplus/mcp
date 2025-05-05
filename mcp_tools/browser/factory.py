@@ -8,6 +8,7 @@ from typing import Optional, Literal
 from mcp_tools.browser.interface import IBrowserClient
 from mcp_tools.browser.selenium_client import SeleniumBrowserClient
 from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
+from config.manager import EnvironmentManager
 
 
 class BrowserClientFactory:
@@ -17,7 +18,7 @@ class BrowserClientFactory:
     """
     
     @staticmethod
-    def create_client(client_type: str = "selenium", 
+    def create_client(client_type: str = "playwright", 
                       user_data_dir: Optional[str] = None,
                      browser_type: Optional[Literal["chrome", "edge", "chromium"]] = None) -> IBrowserClient:
         """Create a browser client of the specified type.
@@ -36,6 +37,10 @@ class BrowserClientFactory:
             ValueError: If an unsupported client type is specified
         """
         client_type = client_type.lower()
+
+        if user_data_dir is None:
+            user_data_dir = EnvironmentManager().get_setting("browser_profile_path", ".browserprofile")
+        # print(f"Creating browser client with user data directory: {user_data_dir}")
         
         if client_type == "selenium":
             if browser_type not in [None, "chrome", "edge"]:

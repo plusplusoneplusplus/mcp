@@ -9,6 +9,15 @@ class EnvironmentManager:
     """
     _instance = None
     
+    # List of all settings that are paths
+    PATH_SETTINGS = [
+        "git_root",
+        "workspace_folder",
+        "private_tool_root",
+        "tool_history_path",
+        "browser_profile_path",
+    ]
+    
     # Default settings with their types
     DEFAULT_SETTINGS = {
         # Repository info settings
@@ -19,6 +28,7 @@ class EnvironmentManager:
         # Tool history settings
         "tool_history_enabled": (True, bool),
         "tool_history_path": (".history", str),
+        "browser_profile_path": (".browserprofile", str),
     }
     
     # Create mapping dynamically - each setting can be set via its uppercase env var
@@ -45,6 +55,17 @@ class EnvironmentManager:
         
         self._load_from_env_file()
         self._sync_settings_to_repo()
+
+        # Resolve all path settings to absolute paths relative to server/main.py
+        server_main = Path(__file__).parent.parent / 'server' / 'main.py'
+        server_root = server_main.parent.resolve() if server_main.exists() else (Path(__file__).parent.parent / 'server').resolve()
+        for key in getattr(self, 'PATH_SETTINGS', []):
+            value = self.settings.get(key)
+            if value is not None:
+                p = Path(value)
+                if not p.is_absolute():
+                    p = server_root / p
+                self.settings[key] = str(p.resolve())
     
     def _sync_settings_to_repo(self):
         """Sync settings to repository info object"""

@@ -13,7 +13,7 @@ import trafilatura
 
 # Global configuration
 DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = "chrome"
-DEFAULT_CLIENT_TYPE: str = "selenium"
+DEFAULT_CLIENT_TYPE: str = "playwright"
 MAX_RETURN_CHARS: int = 100000
 
 @register_tool
@@ -65,7 +65,8 @@ class BrowserClient(BrowserClientInterface):
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform (get_page_html, take_screenshot, get_page_markdown)",
-                    "enum": ["get_page_html", "take_screenshot", "get_page_markdown"]
+                    "enum": ["get_page_html", "take_screenshot", "get_page_markdown"],
+                    "default": "get_page_markdown"
                 },
                 "url": {
                     "type": "string",
@@ -74,7 +75,7 @@ class BrowserClient(BrowserClientInterface):
                 "wait_time": {
                     "type": "integer",
                     "description": "Time to wait for page load in seconds",
-                    "default": 30
+                    "default": 7 
                 },
                 "output_path": {
                     "type": "string",
@@ -89,7 +90,7 @@ class BrowserClient(BrowserClientInterface):
                 "include_images": {
                     "type": "boolean",
                     "description": "Whether to include image references in the extracted markdown (for get_page_markdown)",
-                    "default": True
+                    "default": False
                 }
             },
             "required": ["operation", "url"]
@@ -106,14 +107,14 @@ class BrowserClient(BrowserClientInterface):
         """
         operation = arguments.get("operation", "")
         url = arguments.get("url", "")
-        wait_time = arguments.get("wait_time", 30)
-        headless = arguments.get("headless", True)
+        wait_time = arguments.get("wait_time", 7)
+        headless = arguments.get("headless", False)
         browser_options = arguments.get("browser_options", None)
         browser_type = arguments.get("browser_type", self.browser_type)
         client_type = arguments.get("client_type", self.client_type)
         
         # Use the BrowserClientFactory to create the client
-        client = BrowserClientFactory.create_client(client_type, browser_type)
+        client = BrowserClientFactory.create_client(client_type, user_data_dir=None, browser_type=browser_type)
         
         if operation == "get_page_html":
             html = await client.get_page_html(url, wait_time, headless, browser_options)
