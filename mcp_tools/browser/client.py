@@ -118,63 +118,57 @@ class BrowserClient(BrowserClientInterface):
         browser_options = arguments.get("browser_options", None)
         browser_type = arguments.get("browser_type", self.browser_type)
         client_type = arguments.get("client_type", self.client_type)
-        
-        # Use the BrowserClientFactory to create the client
-        client = BrowserClientFactory.create_client(client_type, user_data_dir=None, browser_type=browser_type)
-        
-        if operation == "get_page_html":
-            html = await client.get_page_html(url, wait_time, headless, browser_options)
-            if html:
+
+        async with BrowserClientFactory.create_client(client_type, user_data_dir=None, browser_type=browser_type) as client:
+            if operation == "get_page_html":
+                html = await client.get_page_html(url, wait_time, headless, browser_options)
+                if html:
+                    return {
+                        "success": True,
+                        "html": html[:MAX_RETURN_CHARS] + ("..." if len(html) > MAX_RETURN_CHARS else ""),
+                        "html_length": len(html)
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Failed to retrieve HTML from {url}"
+                    }
+            elif operation == "take_screenshot":
+                output_path = arguments.get("output_path", f"screenshot_{int(time.time())}.png")
+                success = await client.take_screenshot(url, output_path, wait_time, headless, browser_options)
+                return {
+                    "success": success,
+                    "output_path": output_path
+                }
+            elif operation == "get_page_markdown":
+                include_links = arguments.get("include_links", True)
+                include_images = arguments.get("include_images", True)
+                html = await client.get_page_html(url, wait_time, headless, browser_options)
+                if not html:
+                    return {
+                        "success": False,
+                        "error": f"Failed to retrieve HTML from {url}"
+                    }
+                extracted_text = trafilatura.extract(
+                    html,
+                    output_format="markdown",
+                    include_links=include_links,
+                    include_images=include_images
+                )
+                # If extraction failed, return an empty string
+                if not extracted_text:
+                    extracted_text = ""
                 return {
                     "success": True,
-                    "html": html[:MAX_RETURN_CHARS] + ("..." if len(html) > MAX_RETURN_CHARS else ""),
-                    "html_length": len(html)
+                    "markdown": extracted_text[:MAX_RETURN_CHARS] + ("..." if len(extracted_text) > MAX_RETURN_CHARS else ""),
+                    "markdown_length": len(extracted_text),
+                    "url": url
                 }
             else:
                 return {
                     "success": False,
-                    "error": f"Failed to retrieve HTML from {url}"
+                    "error": f"Unknown operation: {operation}"
                 }
-        elif operation == "take_screenshot":
-            output_path = arguments.get("output_path", f"screenshot_{int(time.time())}.png")
-            success = await client.take_screenshot(url, output_path, wait_time, headless, browser_options)
-            return {
-                "success": success,
-                "output_path": output_path
-            }
-        elif operation == "get_page_markdown":
-            include_links = arguments.get("include_links", True)
-            include_images = arguments.get("include_images", True)
-            
-            html = await client.get_page_html(url, wait_time, headless, browser_options)
-            if not html:
-                return {
-                    "success": False,
-                    "error": f"Failed to retrieve HTML from {url}"
-                }
-            
-            extracted_text = trafilatura.extract(
-                html,
-                output_format="markdown",
-                include_links=include_links,
-                include_images=include_images
-            )
-            
-            # If extraction failed, return an empty string
-            if not extracted_text:
-                extracted_text = ""
-                
-            return {
-                "success": True,
-                "markdown": extracted_text[:MAX_RETURN_CHARS] + ("..." if len(extracted_text) > MAX_RETURN_CHARS else ""),
-                "markdown_length": len(extracted_text),
-                "url": url
-            }
-        else:
-            return {
-                "success": False,
-                "error": f"Unknown operation: {operation}"
-            }
     
     @classmethod
     def set_default_browser_type(cls, browser_type: Literal["chrome", "edge"]):
