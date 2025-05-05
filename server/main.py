@@ -191,11 +191,17 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
     error_msg = None
     
     try:
+        # Log that we're executing the tool
+        logging.info(f"Executing tool '{name}' with arguments: {arguments}")
+        
         # Call the tool directly
         result = await tool.execute_tool(arguments)
         
         # Calculate duration in milliseconds
         duration_ms = (time.time() - start_time) * 1000
+        
+        # Log successful execution
+        logging.info(f"Tool '{name}' executed successfully in {duration_ms:.2f}ms")
         
         # Convert to TextContent if not already
         if isinstance(result, list) and all(isinstance(item, dict) for item in result):

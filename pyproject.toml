@@ -31,7 +31,7 @@ dependencies = [
     
     # HTTP/SSE server
     "uvicorn>=0.25.0",  # ASGI server
-    "starlette>=0.35.0",  # ASGI framework
+    "starlette>=0.37.0",  # ASGI framework
     "httpx>=0.26.0",  # HTTP client
     "httpx-sse>=0.4.0",  # SSE client for httpx
     
