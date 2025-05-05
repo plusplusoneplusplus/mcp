@@ -180,15 +180,36 @@ def setup():
     log_dir = SCRIPT_DIR / ".logs"
     log_dir.mkdir(exist_ok=True)
 
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.FileHandler(os.path.join(SCRIPT_DIR, ".logs", "server.log")),
-            logging.StreamHandler(),
-        ],
-    )
-    logger = logging.getLogger(__name__)
+    # Use Path consistently for the log file path
+    log_file = log_dir / "server.log"
+    
+    # Reset the logging configuration
+    # This is important as basicConfig won't do anything if the root logger 
+    # already has handlers configured
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+        handler.close()
+    
+    # Configure logging with explicit handler setup
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
+    
+    # File handler
+    file_handler = logging.FileHandler(str(log_file.absolute()))
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    
+    # Formatter
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+    
+    # Add handlers
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
     
     # Initialize environment using the new module
     env.load()
