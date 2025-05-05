@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 import uvicorn
+from starlette.middleware.timeout import TimeoutMiddleware
 
 # MCP imports
 from mcp.server import Server
@@ -279,6 +280,8 @@ routes = [
 
 # Create Starlette app
 starlette_app = Starlette(routes=routes)
+# Add 30-second timeout middleware
+starlette_app.add_middleware(TimeoutMiddleware, timeout=30)
 
 # Setup function for logging and environment
 def setup():
