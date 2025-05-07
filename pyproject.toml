@@ -42,6 +42,8 @@ dependencies = [
     
     # Text processing
     "trafilatura>=1.6.2",  # Web content extraction
+    "beautifulsoup4>=4.12.0",  # HTML parsing for extraction
+    "markdownify>=0.11.6",  # HTML to markdown conversion
     
     # Testing
     "pytest>=7.4.0",
