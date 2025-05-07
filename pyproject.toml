@@ -52,6 +52,9 @@ dependencies = [
     # Azure Data Explorer (Kusto)
     "azure-kusto-data>=5.0.0",  # Azure Data Explorer client
     "azure-identity>=1.15.0",  # Azure authentication
+    
+    # Embedding models
+    "sentence-transformers>=2.7.0",  # Lightweight embedding model for tests
 ]
 
 [project.optional-dependencies]
