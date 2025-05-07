@@ -4,6 +4,7 @@ Azure Data Explorer (Kusto) client setup.
 import logging
 import json
 import re
+import traceback
 from typing import Dict, Any, Optional, Union, List
 
 from azure.kusto.data import KustoClient as AzureKustoClient, KustoConnectionStringBuilder
@@ -222,7 +223,9 @@ class KustoClient(KustoClientInterface):
             self.logger.error(f"Error formatting results: {str(e)}")
             return {
                 "success": False,
-                "result": f"Error formatting results: {str(e)}"
+                "result": f"Error formatting results: {str(e)}",
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
             }
     
     async def execute_query(
@@ -251,16 +254,26 @@ class KustoClient(KustoClientInterface):
             # Try to get database from environment if not specified
             database = env.get_kusto_parameter("database")
             if not database:
-                raise ValueError("No database specified. Please provide a database name.")
+                error_msg = "No database specified. Please provide a database name."
+                self.logger.error(error_msg)
+                return {
+                    "success": False,
+                    "result": error_msg,
+                    "error_type": "ValueError",
+                    "traceback": traceback.format_exc()
+                }
         
         # Use provided client or create a new one
         try:
             kusto_client = client or self.get_kusto_client(cluster)
         except Exception as e:
-            self.logger.error(f"Failed to create Kusto client: {str(e)}")
+            error_msg = f"Failed to create Kusto client: {str(e)}"
+            self.logger.error(error_msg)
             return {
                 "success": False,
-                "result": f"Failed to create Kusto client: {str(e)}"
+                "result": error_msg,
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
             }
         
         try:
@@ -283,14 +296,20 @@ class KustoClient(KustoClientInterface):
             self.logger.error(error_msg)
             return {
                 "success": False,
-                "result": error_msg
+                "result": error_msg,
+                "error_type": "KustoServiceError",
+                "error_code": getattr(e, "error_code", None),
+                "error_category": getattr(e, "error_category", None),
+                "traceback": traceback.format_exc()
             }
         except Exception as e:
             error_msg = f"Error during query execution: {str(e)}"
             self.logger.error(error_msg)
             return {
                 "success": False,
-                "result": error_msg
+                "result": error_msg,
+                "error_type": type(e).__name__,
+                "traceback": traceback.format_exc()
             }
     
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -306,14 +325,16 @@ class KustoClient(KustoClientInterface):
         
         if operation == "execute_query":
             # Always format results for LLM when using execute_tool
-            return await self.execute_query(
+            result = await self.execute_query(
                 database=arguments.get("database"),
                 query=arguments.get("query"),
                 cluster=arguments.get("cluster"),
                 format_results=True  # Always format results
             )
+            return result
         else:
             return {
                 "success": False,
-                "result": f"Unknown operation: {operation}"
+                "result": f"Unknown operation: {operation}",
+                "error_type": "InvalidOperation"
             } 
