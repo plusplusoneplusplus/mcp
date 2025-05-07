@@ -27,6 +27,31 @@ def test_add_and_query():
     assert "ids" in result
     assert len(result["ids"][0]) > 0
 
+def test_query_with_metadata_filter():
+    store = ChromaVectorStore(collection_name="test_metadata_query")
+    ids = ["id1", "id2", "id3"]
+    documents = [
+        "Document about apples.",
+        "Document about bananas.",
+        "Document about apples and bananas."
+    ]
+    metadatas = [
+        {"fruit": "apple"},
+        {"fruit": "banana"},
+        {"fruit": "apple"}
+    ]
+    embeddings = EMBED_MODEL.encode(documents).tolist()
+    store.add(ids=ids, embeddings=embeddings, metadatas=metadatas, documents=documents)
+    # Query for 'apple' fruit only
+    query = EMBED_MODEL.encode(["A text about apples."]).tolist()
+    result = store.query(query_embeddings=query, n_results=3, where={"fruit": "apple"})
+    # All returned metadatas should have fruit == 'apple'
+    for meta in result["metadatas"][0]:
+        assert meta["fruit"] == "apple"
+    # Should not return the banana-only doc
+    for doc in result["documents"][0]:
+        assert "banana" not in doc or "apple" in doc
+
 def test_delete():
     store = ChromaVectorStore(collection_name="test_delete")
     ids = ["id1", "id2"]

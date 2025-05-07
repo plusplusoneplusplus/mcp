@@ -34,18 +34,20 @@ class ChromaVectorStore:
             documents=documents
         )
 
-    def query(self, query_embeddings: List[List[float]], n_results: int = 5) -> Dict[str, Any]:
+    def query(self, query_embeddings: List[List[float]], n_results: int = 5, where: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Query the collection for similar vectors.
+        Query the collection for similar vectors, with optional metadata filtering.
         Args:
             query_embeddings (List[List[float]]): Embedding vectors to query.
             n_results (int): Number of results to return.
+            where (Optional[Dict[str, Any]]): Metadata filter for the query.
         Returns:
             Dict[str, Any]: Query results including ids, distances, metadatas, and documents.
         """
         return self.collection.query(
             query_embeddings=query_embeddings,
-            n_results=n_results
+            n_results=n_results,
+            where=where
         )
 
     def delete(self, ids: List[str]):
