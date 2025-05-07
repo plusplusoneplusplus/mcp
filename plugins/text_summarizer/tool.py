@@ -7,7 +7,7 @@ from typing import Dict, Any
 # Import the required interfaces and decorators
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
-import trafilatura
+from utils.html_to_markdown import extract_and_format_html
 
 
 @register_tool
@@ -61,25 +61,12 @@ class WebSummarizerTool(ToolInterface):
         include_links = arguments.get("include_links", True)
         include_images = arguments.get("include_images", True)
         
-        # Use trafilatura to extract the main content from HTML
-        # and convert it to markdown
-        extracted_text = trafilatura.extract(
+        # Use the utility function to extract and format HTML
+        return extract_and_format_html(
             html,
-            output_format="markdown",
             include_links=include_links,
             include_images=include_images
         )
-        
-        # If extraction failed, return an empty string
-        if not extracted_text:
-            extracted_text = ""
-        
-        return {
-            "markdown": extracted_text,
-            "extraction_success": bool(extracted_text),
-            "original_size": len(html),
-            "extracted_size": len(extracted_text)
-        }
 
 
 @register_tool
@@ -153,23 +140,14 @@ class UrlSummarizerTool(ToolInterface):
                 "url": url
             }
         
-        # Use trafilatura to extract the main content from HTML
-        # and convert it to markdown
-        extracted_text = trafilatura.extract(
+        # Use the utility function to extract and format HTML
+        result = extract_and_format_html(
             html,
-            output_format="markdown",
             include_links=include_links,
             include_images=include_images
         )
         
-        # If extraction failed, return an empty string
-        if not extracted_text:
-            extracted_text = ""
+        # Add the URL to the result
+        result["url"] = url
         
-        return {
-            "markdown": extracted_text,
-            "extraction_success": bool(extracted_text),
-            "url": url,
-            "original_size": len(html),
-            "extracted_size": len(extracted_text)
-        } 
+        return result 

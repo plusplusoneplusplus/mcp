@@ -69,6 +69,7 @@ run_component_tests "config" "config/tests"
 run_component_tests "mcp_core" "mcp_core/tests"
 run_component_tests "mcp_tools" "mcp_tools/tests"
 run_component_tests "server" "server/tests"
+run_component_tests "utils.html_to_markdown" "utils/html_to_markdown/tests"
 # Add more components as needed
 
 # Run project-level tests if they exist

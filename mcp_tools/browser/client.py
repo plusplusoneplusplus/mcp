@@ -11,6 +11,7 @@ from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import BrowserClientInterface
 import trafilatura
 from config.manager import EnvironmentManager
+from utils.html_to_markdown import extract_and_format_html
 
 # Global configuration
 DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = EnvironmentManager().get_setting("browser_type", "chrome")
@@ -149,21 +150,14 @@ class BrowserClient(BrowserClientInterface):
                         "success": False,
                         "error": f"Failed to retrieve HTML from {url}"
                     }
-                extracted_text = trafilatura.extract(
+                result = extract_and_format_html(
                     html,
-                    output_format="markdown",
                     include_links=include_links,
                     include_images=include_images
                 )
-                # If extraction failed, return an empty string
-                if not extracted_text:
-                    extracted_text = ""
-                return {
-                    "success": True,
-                    "markdown": extracted_text[:MAX_RETURN_CHARS] + ("..." if len(extracted_text) > MAX_RETURN_CHARS else ""),
-                    "markdown_length": len(extracted_text),
-                    "url": url
-                }
+                result["success"] = result.get("extraction_success", False)
+                result["url"] = url
+                return result
             else:
                 return {
                     "success": False,

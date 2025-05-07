@@ -23,6 +23,9 @@ Invoke-Expression "$INSTALL_CMD ./mcp_core"
 Write-Host "Installing mcp_tools..."
 Invoke-Expression "$INSTALL_CMD ./mcp_tools"
 
+Write-Host "Installing utils..."
+Invoke-Expression "$INSTALL_CMD ./utils"
+
 Write-Host "Installing main package..."
 Invoke-Expression "$INSTALL_CMD ."
 

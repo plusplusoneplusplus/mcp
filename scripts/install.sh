@@ -22,6 +22,9 @@ $INSTALL_CMD ./mcp_core
 echo "Installing mcp_tools..."
 $INSTALL_CMD ./mcp_tools
 
+echo "Installing utils..."
+$INSTALL_CMD ./utils
+
 echo "Installing main package..."
 $INSTALL_CMD .
 
