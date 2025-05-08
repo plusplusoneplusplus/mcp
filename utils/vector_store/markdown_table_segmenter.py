@@ -13,24 +13,19 @@ class MarkdownTableSegmenter:
     Utility for segmenting markdown tables and storing them in a vector database.
     """
     def __init__(
-        self, 
-        model_name: str = "all-MiniLM-L6-v2", 
-        collection_name: str = "markdown_tables",
-        persist_directory: Optional[str] = None
+        self,
+        vector_store: ChromaVectorStore,
+        model_name: str = "all-MiniLM-L6-v2"
     ):
         """
         Initialize the table segmenter with an embedding model and vector store.
         
         Args:
+            vector_store: An instance of ChromaVectorStore to use for storing segments.
             model_name: Name of the sentence transformer model to use for embeddings
-            collection_name: Name of the vector store collection
-            persist_directory: Directory for persistent storage. If None, uses in-memory DB.
         """
         self.model = SentenceTransformer(model_name)
-        self.vector_store = ChromaVectorStore(
-            collection_name=collection_name,
-            persist_directory=persist_directory
-        )
+        self.vector_store = vector_store
     
     def extract_tables(self, markdown_content: str) -> List[Dict[str, Any]]:
         """

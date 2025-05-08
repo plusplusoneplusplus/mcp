@@ -17,7 +17,7 @@ project_root = Path(__file__).parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
-from utils.vector_store.table_segmenter import MarkdownTableSegmenter
+from utils.vector_store.markdown_table_segmenter import MarkdownTableSegmenter
 
 # Sample markdown content with multiple tables
 SAMPLE_MARKDOWN = """

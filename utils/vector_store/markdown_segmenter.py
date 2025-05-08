@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from utils.vector_store.vector_store import ChromaVectorStore
-from utils.vector_store.table_segmenter import MarkdownTableSegmenter
+from utils.vector_store.markdown_table_segmenter import MarkdownTableSegmenter
 
 class MarkdownSegmenter:
     """
@@ -15,9 +15,8 @@ class MarkdownSegmenter:
     """
     def __init__(
         self, 
+        vector_store: ChromaVectorStore,
         model_name: str = "all-MiniLM-L6-v2", 
-        collection_name: str = "markdown_segments",
-        persist_directory: Optional[str] = None,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         table_max_rows: int = 15
@@ -26,9 +25,8 @@ class MarkdownSegmenter:
         Initialize the markdown segmenter with an embedding model and vector store.
         
         Args:
+            vector_store: An instance of ChromaVectorStore to use for storing segments.
             model_name: Name of the sentence transformer model to use for embeddings
-            collection_name: Name of the vector store collection
-            persist_directory: Directory for persistent storage. If None, uses in-memory DB.
             chunk_size: Maximum size of text chunks in characters
             chunk_overlap: Overlap between text chunks in characters
             table_max_rows: Maximum number of rows in a table before splitting
@@ -37,19 +35,15 @@ class MarkdownSegmenter:
         if chunk_overlap >= chunk_size:
             chunk_overlap = max(0, chunk_size - 1)
         self.model = SentenceTransformer(model_name)
-        self.vector_store = ChromaVectorStore(
-            collection_name=collection_name,
-            persist_directory=persist_directory
-        )
+        self.vector_store = vector_store
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.table_max_rows = table_max_rows
         
         # Create a table segmenter for handling tables
-        self.table_segmenter = MarkdownTableSegmenter(
+        self.markdown_table_segmenter = MarkdownTableSegmenter(
             model_name=model_name,
-            collection_name=f"{collection_name}_tables",
-            persist_directory=persist_directory
+            vector_store=self.vector_store
         )
     
     def segment_markdown(self, markdown_content: str) -> List[Dict[str, Any]]:
@@ -66,7 +60,7 @@ class MarkdownSegmenter:
         global_headings = self._extract_headings(markdown_content)
         
         # First, extract tables and their positions
-        tables = self.table_segmenter.extract_tables(markdown_content)
+        tables = self.markdown_table_segmenter.extract_tables(markdown_content)
         
         # Ensure all tables have a 'type' key
         for table in tables:

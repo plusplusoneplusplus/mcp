@@ -20,7 +20,7 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from utils.html_to_markdown import html_to_markdown
-from utils.vector_store.table_segmenter import MarkdownTableSegmenter
+from utils.vector_store.markdown_table_segmenter import MarkdownTableSegmenter
 
 def process_html_file(html_file_path, persist_dir=None, collection_name="html_tables"):
     """

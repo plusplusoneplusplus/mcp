@@ -22,6 +22,7 @@ if str(project_root) not in sys.path:
 
 # Import the fixed segmenter
 from utils.vector_store.markdown_segmenter import MarkdownSegmenter
+from utils.vector_store.vector_store import ChromaVectorStore
 
 
 class TestMarkdownSegmenter(unittest.TestCase):
@@ -29,11 +30,39 @@ class TestMarkdownSegmenter(unittest.TestCase):
 
     def setUp(self):
         """Set up the segmenter for each test."""
+        # Create an in-memory vector store for testing
+        self.test_collection_name = "test_markdown_segments"
+        self.vector_store = ChromaVectorStore(
+            collection_name=self.test_collection_name,
+            persist_directory=None  # In-memory
+        )
         self.segmenter = MarkdownSegmenter(
+            vector_store=self.vector_store,
             chunk_size=200,
             chunk_overlap=50,
             table_max_rows=3
         )
+
+    def tearDown(self):
+        """Clean up the vector store after each test if necessary."""
+        # This ensures the collection is cleaned up, especially if it were persisted.
+        # For an in-memory store, this might not be strictly necessary for cleanup
+        # but good practice if tests were to involve adding data.
+        # Chroma's delete_collection might be an option, or re-creating the store.
+        # For now, since tests primarily focus on segmentation logic before storage,
+        # we can skip explicit cleanup for in-memory, or manage it if issues arise.
+        # If the collection was persisted, os.rmdir or similar would be needed.
+        # Let's try to delete the collection to be safe.
+        try:
+            # Chroma client is usually accessible via vector_store.client
+            if hasattr(self.vector_store, 'client') and self.vector_store.client:
+                self.vector_store.client.delete_collection(name=self.test_collection_name)
+        except Exception:
+            # pass # Or log an error if deletion fails
+            # It's possible the collection doesn't exist if a test failed before its creation
+            # or if client is not exposed in a way that allows direct deletion.
+            # For in-memory, it's often sufficient that the instance goes out of scope.
+            pass
 
     def test_basic_text_chunking(self):
         """Test basic text chunking functionality."""
@@ -156,7 +185,9 @@ Some text between tables.
 
     def test_edge_case_tiny_chunk_size(self):
         """Test with a very small chunk size that could cause issues."""
+        tiny_vector_store = ChromaVectorStore(collection_name="tiny_chunk_test", persist_directory=None)
         tiny_segmenter = MarkdownSegmenter(
+            vector_store=tiny_vector_store,
             chunk_size=10,  # Very small chunk size
             chunk_overlap=5,
             table_max_rows=3
@@ -174,7 +205,9 @@ Some text between tables.
 
     def test_edge_case_overlap_equals_chunk_size(self):
         """Test with overlap equal to chunk size (potential infinite loop case)."""
+        problematic_vector_store = ChromaVectorStore(collection_name="overlap_equals_test", persist_directory=None)
         problematic_segmenter = MarkdownSegmenter(
+            vector_store=problematic_vector_store,
             chunk_size=100,
             chunk_overlap=100,  # Equal to chunk size
             table_max_rows=3
@@ -188,7 +221,9 @@ Some text between tables.
 
     def test_edge_case_overlap_greater_than_chunk_size(self):
         """Test with overlap greater than chunk size (potential infinite loop case)."""
+        problematic_vector_store = ChromaVectorStore(collection_name="overlap_greater_test", persist_directory=None)
         problematic_segmenter = MarkdownSegmenter(
+            vector_store=problematic_vector_store,
             chunk_size=50,
             chunk_overlap=100,  # Greater than chunk size
             table_max_rows=3
