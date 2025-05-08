@@ -379,15 +379,38 @@ class TestCommandExecutorAsync:
         if not os.path.exists(".git") and not os.path.exists("../.git"):
             pytest.skip("Not in a git repository")
 
-        cmd = "git branch --show-current"
+        # Store original directory
+        original_dir = os.getcwd()
+        try:
+            # Change to the directory containing this test file
+            test_file_dir = os.path.dirname(os.path.abspath(__file__))
+            os.chdir(test_file_dir)
+            
+            # Find the git root directory (assuming we're in a git repo)
+            response = await executor.execute_async("git rev-parse --show-toplevel")
+            token = response["token"]
+            result = await executor.wait_for_process(token, timeout=5.0)
+            
+            assert result["status"] == "completed"
+            assert result["output"].strip() != "", "Not in a git repository"
+            git_root = result["output"].strip()
+            
+            # Change to git root directory
+            os.chdir(git_root)
+            
+            # Run the branch command
+            cmd = "git branch --show-current"
+            response = await executor.execute_async(cmd)
+            token = response["token"]
 
-        response = await executor.execute_async(cmd)
-        token = response["token"]
+            # Wait for completion
+            result = await executor.wait_for_process(token, timeout=5.0)
 
-        # Wait for completion
-        result = await executor.wait_for_process(token, timeout=5.0)
-
-        # Verify it completed
-        assert result["status"] == "completed"
-        assert result["output"].strip() != ""  # Should return a branch name
-        # The branch name validation depends on the repo state
+            # Verify it completed
+            assert result["status"] == "completed"
+            assert result["output"].strip() != "", "Branch name should not be empty"
+            # Branch name should be a valid git branch name (no spaces or special chars except - _ /)
+            assert all(c.isalnum() or c in "-_/" for c in result["output"].strip()), "Invalid branch name characters"
+        finally:
+            # Restore original directory
+            os.chdir(original_dir)
