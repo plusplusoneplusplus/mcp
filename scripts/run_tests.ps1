@@ -89,6 +89,7 @@ Run-ComponentTests "mcp_tools" "mcp_tools/tests"
 Run-ComponentTests "server" "server/tests"
 Run-ComponentTests "utils.html_to_markdown" "utils/html_to_markdown/tests"
 Run-ComponentTests "utils.vector_store" "utils/vector_store/tests"
+Run-ComponentTests "utils.secret_scanner" "utils/secret_scanner/tests"
 # Add more components as needed
 
 # Run project-level tests if they exist

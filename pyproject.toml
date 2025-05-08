@@ -55,6 +55,7 @@ dependencies = [
     
     # Embedding models
     "sentence-transformers>=2.7.0",  # Lightweight embedding model for tests
+    "detect-secrets>=1.4.0",  # Secret scanning
 ]
 
 [project.optional-dependencies]
