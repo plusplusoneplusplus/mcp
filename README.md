@@ -29,15 +29,10 @@ The MCP project is organized into several components:
 ### Manual installation
 
 ```bash
-# Using uv (recommended):
-uv pip install -e ./mcp_core
-uv pip install -e ./mcp_tools
-uv pip install -e .
+scripts/install.sh
 
-# Or using pip:
-pip install -e ./mcp_core
-pip install -e ./mcp_tools
-pip install -e .
+# or on windows
+scripts\install.ps1
 ```
 
 This will install all the local packages in development mode, allowing you to make changes to the code while using the packages.
@@ -154,17 +149,13 @@ The MCP server supports several types of tools:
 
 ## Running Tests
 
-The MCP project includes test suites for each component:
-
-- **mcp_core/tests/**: Tests for the core types and adapters
-- **mcp_tools/tests/**: Tests for utility tools and functionality
-- **server/tests/**: Tests for server-specific functionality
+The MCP project includes test suites.
 
 You can run tests manually using pytest:
 
 ```bash
 # Run all tests
-python -m pytest
+scripts/run_tests.sh
 
 # Run tests for a specific component
 python -m pytest mcp_core/tests
