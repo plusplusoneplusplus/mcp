@@ -170,13 +170,6 @@ The recommended way to configure MCP server is through the `.env` file. However,
 ```json
 {
     "mcpServers": {
-      "mymcp": {
-        "command": "python",
-        "args": ["server/main.py"],
-        "env": {
-          "GIT_ROOT": "${workspaceFolder}"
-        }
-      },
       "mymcp-sse" : {
         "url": "http://0.0.0.0:8000/sse"
       }
