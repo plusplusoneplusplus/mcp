@@ -14,6 +14,18 @@ OutputType = TypeVar('OutputType')
 class ToolInterface(ABC):
     """Base interface for all tools."""
     
+    def __init__(self):
+        self._diagnostic_dir: Optional[str] = None
+
+    @property
+    def diagnostic_dir(self) -> Optional[str]:
+        """Get the diagnostic directory path for this tool instance."""
+        return self._diagnostic_dir
+
+    @diagnostic_dir.setter
+    def diagnostic_dir(self, value: Optional[str]):
+        self._diagnostic_dir = value
+
     @property
     @abstractmethod
     def name(self) -> str:
