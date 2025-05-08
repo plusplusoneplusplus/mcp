@@ -9,7 +9,6 @@ from typing import Dict, Any, Optional, Literal
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import BrowserClientInterface
-import trafilatura
 from config.manager import EnvironmentManager
 from utils.html_to_markdown import extract_and_format_html
 

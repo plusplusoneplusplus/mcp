@@ -9,6 +9,8 @@ import argparse
 import time
 import asyncio
 from mcp_tools.browser.factory import BrowserClientFactory
+from mcp_tools.browser.client import BrowserClient
+from utils.html_to_markdown import extract_and_format_html
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.edge.options import Options as EdgeOptions
 
@@ -27,8 +29,8 @@ async def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Test web pages using a browser client')
     parser.add_argument('url', help='URL to visit')
-    parser.add_argument('--operation', '-o', choices=['html', 'screenshot'], default='html',
-                        help='Operation to perform: get HTML or take screenshot (default: html)')
+    parser.add_argument('--operation', '-o', choices=['html', 'screenshot', 'markdown'], default='html',
+                        help='Operation to perform: get HTML, take screenshot, or get markdown (default: html)')
     parser.add_argument('--wait', '-w', type=int, default=5,
                         help='Time to wait for page load in seconds (default: 5)')
     parser.add_argument('--output', '-f',
@@ -45,6 +47,10 @@ async def main():
                         help='Do not use a profile (ignore profile-path and profile-dir)')
     parser.add_argument('--client-type', choices=['selenium', 'playwright'], default='playwright',
                         help='Type of browser client to use (default: playwright)')
+    parser.add_argument('--include-links', action='store_true', default=True,
+                        help='Include links in the extracted markdown (default: True, for markdown operation)')
+    parser.add_argument('--include-images', action='store_true', default=False,
+                        help='Include image references in the extracted markdown (default: False, for markdown operation)')
     
     args = parser.parse_args()
     
@@ -152,6 +158,52 @@ async def main():
                     print(f"Screenshot saved successfully to {output_path}")
                 else:
                     print("Failed to take screenshot")
+            
+            elif args.operation == 'markdown':
+                # Get page markdown
+                print("Getting page markdown...")
+                
+                # Get the HTML content first
+                html_content = await browser_client.get_page_html(
+                    args.url,
+                    wait_time=args.wait,
+                    headless=args.headless,
+                    options=browser_options
+                )
+
+                if html_content:
+                    # Convert HTML to Markdown
+                    markdown_result = extract_and_format_html(
+                        html_content,
+                        include_links=args.include_links,
+                        include_images=args.include_images
+                    )
+
+                    if markdown_result.get("extraction_success"):
+                        markdown_content = markdown_result.get("markdown", "")
+                        # Determine output path
+                        output_path = args.output
+                        if not output_path:
+                            timestamp = int(time.time())
+                            # Ensure the filename indicates it's a markdown file
+                            base_name = os.path.splitext(os.path.basename(args.url.rstrip('/')))[0]
+                            if not base_name or base_name == "index": # handle cases like example.com/ or example.com/index.html
+                                base_name = "page"
+                            filename = f"{base_name}_markdown_{timestamp}.md"
+                            output_path = os.path.join(output_dir, filename)
+                        
+                        # Save Markdown to file
+                        with open(output_path, 'w', encoding='utf-8') as f:
+                            f.write(markdown_content)
+                        
+                        print(f"Markdown content saved to {output_path}")
+                        print(f"Markdown length: {len(markdown_content)} characters")
+                        if markdown_result.get("title"):
+                            print(f"Page Title: {markdown_result.get('title')}")
+                    else:
+                        print(f"Failed to extract markdown from HTML. Error: {markdown_result.get('error')}")
+                else:
+                    print(f"Failed to retrieve HTML from {args.url} to generate markdown.")
     
     except Exception as e:
         print(f"Error: {e}")

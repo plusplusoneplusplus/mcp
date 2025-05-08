@@ -19,7 +19,7 @@ class MarkdownSegmenter:
         model_name: str = "all-MiniLM-L6-v2", 
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
-        table_max_rows: int = 15
+        table_max_rows: int = 500
     ):
         """
         Initialize the markdown segmenter with an embedding model and vector store.
