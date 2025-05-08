@@ -11,10 +11,11 @@ except ImportError:
 
 def parse_delta_string(delta_str: str) -> datetime.timedelta:
     """
-    Parse a delta string like '5m', '2d', '3h', '42s' into a timedelta.
+    Parse a delta string like '5m', '-2d', '3h', '-42s' into a timedelta.
     Supports: s (seconds), m (minutes), h (hours), d (days)
+    Allows optional leading minus for negative deltas.
     """
-    match = re.fullmatch(r"(\d+)([smhd])", delta_str.strip())
+    match = re.fullmatch(r"([+-]?\d+)([smhd])", delta_str.strip())
     if not match:
         raise ValueError(f"Invalid delta string: {delta_str}")
     value, unit = match.groups()
@@ -68,7 +69,8 @@ class TimeTool(ToolInterface):
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform (get_time)",
-                    "enum": ["get_time"]
+                    "enum": ["get_time"],
+                    "default": "get_time"
                 },
                 "time_point": {
                     "type": "string",
@@ -93,7 +95,7 @@ class TimeTool(ToolInterface):
         }
 
     async def execute_tool(self, arguments: Dict[str, Any]):
-        op = arguments.get("operation")
+        op = arguments.get("operation", "get_time")
         timezone = arguments.get("timezone", "UTC")
         if op == "get_time":
             time_point = arguments.get("time_point")

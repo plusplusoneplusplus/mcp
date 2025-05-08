@@ -57,6 +57,11 @@ def test_get_time_invalid_timezone():
     result = get_time(time_point=base, delta="1m", timezone="Invalid/Zone")
     assert result == "2024-07-01 12:01:00"
 
+def test_get_time_with_negative_delta_minutes():
+    base = "2024-07-01 12:00:00"
+    result = get_time(time_point=base, delta="-5m", timezone="UTC")
+    assert result == "2024-07-01 11:55:00"
+
 # Async tests for TimeTool
 import asyncio
 
@@ -88,4 +93,10 @@ async def test_time_tool_unknown_operation():
     tool = TimeTool()
     res = await tool.execute_tool({"operation": "unknown_op"})
     assert not res["success"]
-    assert "Unknown operation" in res["error"] 
+    assert "Unknown operation" in res["error"]
+
+async def test_time_tool_get_time_with_negative_delta():
+    tool = TimeTool()
+    base = "2024-07-01 12:00:00"
+    result = await tool.execute_tool({"operation": "get_time", "time_point": base, "delta": "-5m", "timezone": "UTC"})
+    assert result == "2024-07-01 11:55:00" 
