@@ -117,69 +117,120 @@ class MarkdownSegmenter:
         return all_segments
     
     def _chunk_text(self, text: str, global_headings=None, offset=0) -> List[Dict[str, Any]]:
-        """
-        Split text into overlapping chunks. Robust version to avoid infinite loops and handle edge cases.
-        
-        Args:
-            text: Text to chunk
-            global_headings: List of all headings in the markdown
-            offset: Offset for text position
-            
-        Returns:
-            List of dictionaries containing chunk information
-        """
         chunks = []
         if global_headings is None:
             headings = self._extract_headings(text)
-            offset = 0
+            # offset parameter is still relevant for the initial position of this 'text' block
         else:
             headings = global_headings
-        if len(text) <= self.chunk_size:
-            chunk_info = {
-                "id": f"text_{uuid.uuid4().hex[:8]}",
-                "content": text,
-                "type": "text",
-                "position": offset,
-                "heading": self._get_nearest_heading(headings, offset)
-            }
-            chunks.append(chunk_info)
+        
+        if not text.strip(): # Handle empty or whitespace-only text
             return chunks
-        start = 0
-        chunk_id = 0
-        while start < len(text):
-            end = start + self.chunk_size
-            if end >= len(text):
-                chunk_text = text[start:].strip()
-                if chunk_text:
-                    nearest_heading = self._get_nearest_heading(headings, offset + start)
-                    chunk_info = {
-                        "id": f"text_{chunk_id}_{uuid.uuid4().hex[:8]}",
-                        "content": chunk_text,
-                        "type": "text",
-                        "position": offset + start,
-                        "heading": nearest_heading
-                    }
-                    chunks.append(chunk_info)
-                break
-            split_point = text.rfind("\n", start, end)
-            if split_point == -1 or split_point <= start:
-                split_point = text.rfind(" ", start, end)
-            if split_point == -1 or split_point <= start:
-                split_point = end
-            chunk_text = text[start:split_point].strip()
-            if chunk_text:
-                nearest_heading = self._get_nearest_heading(headings, offset + start)
+
+        # If the entire text is smaller than or equal to chunk_size, treat it as a single chunk.
+        if len(text) <= self.chunk_size:
+            chunk_content = text.strip()
+            if chunk_content: # Only add if there's actual content after stripping
                 chunk_info = {
-                    "id": f"text_{chunk_id}_{uuid.uuid4().hex[:8]}",
-                    "content": chunk_text,
+                    "id": f"text_{uuid.uuid4().hex[:8]}",
+                    "content": chunk_content,
                     "type": "text",
-                    "position": offset + start,
+                    "position": offset, # Global position of the start of this text block
+                    "heading": self._get_nearest_heading(headings, offset)
+                }
+                chunks.append(chunk_info)
+            return chunks
+
+        start = 0
+        chunk_id_counter = 0
+        # When to attempt to extend a chunk if it's too short. e.g., 60% of chunk_size.
+        min_chunk_len_factor = 0.6 
+        # Allow chunks to slightly exceed chunk_size if an extension is made, e.g., by 10%.
+        max_chunk_len_factor_after_extension = 1.1
+
+        while start < len(text):
+            current_chunk_actual_start_in_text = start # Relative to 'text'
+
+            # Determine the ideal end of the chunk
+            potential_end = start + self.chunk_size
+            
+            # Find the initial split point
+            final_split_point: int
+            if potential_end >= len(text):
+                final_split_point = len(text)
+            else:
+                # Try to split at a newline first, looking backwards from potential_end
+                p1 = text.rfind("\\n", start, potential_end)
+                # If no newline or if it's at the very start (not useful), try space
+                if p1 == -1 or p1 <= start: # Check p1 <= start, not just p1 == start
+                    p1 = text.rfind(" ", start, potential_end)
+                
+                if p1 != -1 and p1 > start: # Found a good split point
+                    final_split_point = p1
+                else: # No good split point before potential_end, so take up to potential_end
+                    final_split_point = potential_end
+            
+            current_chunk_content = text[start:final_split_point].strip()
+            
+            # Extension Logic: If chunk is too short and there's more text, try to extend it
+            if len(current_chunk_content) < self.chunk_size * min_chunk_len_factor and \
+               final_split_point < len(text):
+                
+                space_to_fill = self.chunk_size - len(current_chunk_content)
+                extension_search_start = final_split_point # Start searching from end of current short chunk
+                extension_search_end = min(len(text), extension_search_start + space_to_fill)
+
+                if extension_search_end > extension_search_start: # Only if there's a zone to search for extension
+                    extended_split_candidate = -1
+                    # Find best split in the extension zone (newline then space)
+                    p_ext = text.rfind("\\n", extension_search_start, extension_search_end)
+                    if p_ext == -1 or p_ext <= extension_search_start:
+                        p_ext = text.rfind(" ", extension_search_start, extension_search_end)
+                    
+                    # If a split is found within the extension zone (and it's forward)
+                    if p_ext != -1 and p_ext > extension_search_start:
+                        extended_split_candidate = p_ext
+                    else:
+                        # If no clean break, consider extending to the end of the search zone
+                        # if it means we grab more meaningful content.
+                        # This might happen if the extension zone is all one long word/line.
+                        extended_split_candidate = extension_search_end
+                        
+                    if extended_split_candidate > final_split_point: # Ensure we actually extend
+                        candidate_content_text = text[start:extended_split_candidate].strip()
+                        # Only accept extension if it adds content and is within reasonable size limits
+                        if len(candidate_content_text) > len(current_chunk_content) and \
+                           len(candidate_content_text) <= self.chunk_size * max_chunk_len_factor_after_extension:
+                            current_chunk_content = candidate_content_text
+                            final_split_point = extended_split_candidate
+            
+            if current_chunk_content:
+                # Global position for this chunk
+                global_chunk_start_position = offset + current_chunk_actual_start_in_text
+                nearest_heading = self._get_nearest_heading(headings, global_chunk_start_position)
+                chunk_info = {
+                    "id": f"text_{chunk_id_counter}_{uuid.uuid4().hex[:8]}",
+                    "content": current_chunk_content,
+                    "type": "text",
+                    "position": global_chunk_start_position,
                     "heading": nearest_heading
                 }
                 chunks.append(chunk_info)
-                chunk_id += 1
-            # Ensure we make progress by moving forward at least 1 character
-            start = max(start + 1, split_point - self.chunk_overlap)
+                chunk_id_counter += 1
+            
+            if final_split_point >= len(text): # Reached the end of the text
+                break
+            
+            # Advance start for the next iteration, ensuring progress
+            new_start_raw = final_split_point - self.chunk_overlap
+            # Ensure 'start' advances by at least 1 from its value at the beginning of this iteration
+            # or from old 'start' if new_start_raw is too small.
+            start = max(current_chunk_actual_start_in_text + 1, new_start_raw)
+            start = max(0, start) # Ensure start is not negative
+            
+            if start >= len(text): # Safety break if overlap calculation itself goes beyond text length
+                break
+                
         return chunks
     
     def _extract_headings(self, text: str) -> List[Tuple[int, str, int]]:
