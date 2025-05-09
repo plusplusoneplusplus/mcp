@@ -131,10 +131,12 @@ Here's a simple table:
         for i in range(1, 10):  # 9 data rows
             table_rows.append(f"| Value {i} | Value {i*2} |")
         
+        # Join the table rows beforehand to avoid backslash in f-string
+        table_content = "\n".join(table_rows)
         markdown = f"""
 # Large Table Test
 
-{'\n'.join(table_rows)}
+{table_content}
 """
         segments = self.segmenter.segment_markdown(markdown)
         
