@@ -1,0 +1,5 @@
+.env 
+
+server/.history/
+server/.logs/
+server/.browserprofile/
