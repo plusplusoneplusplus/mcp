@@ -51,6 +51,14 @@ async def main():
                         help='Include links in the extracted markdown (default: True, for markdown operation)')
     parser.add_argument('--include-images', action='store_true', default=False,
                         help='Include image references in the extracted markdown (default: False, for markdown operation)')
+    parser.add_argument('--auto-scroll', action='store_true', default=False,
+                        help='Automatically scroll through the page before taking screenshot (for screenshot operation)')
+    parser.add_argument('--scroll-timeout', type=int, default=30,
+                        help='Maximum time to spend auto-scrolling in seconds (default: 30)')
+    parser.add_argument('--scroll-step', type=int, default=300,
+                        help='Pixel distance to scroll in each step (default: 300)')
+    parser.add_argument('--scroll-delay', type=float, default=0.3,
+                        help='Delay between scroll steps in seconds (default: 0.3)')
     
     args = parser.parse_args()
     
@@ -145,13 +153,17 @@ async def main():
                 
                 print(f"Taking screenshot, saving to {output_path}...")
                 
-                # Take the screenshot
+                # Use the built-in auto-scroll functionality in the browser client
                 success = await browser_client.take_screenshot(
                     args.url, 
                     output_path, 
                     wait_time=args.wait, 
                     headless=args.headless, 
-                    options=browser_options
+                    options=browser_options,
+                    auto_scroll=args.auto_scroll,
+                    scroll_timeout=args.scroll_timeout,
+                    scroll_step=args.scroll_step,
+                    scroll_delay=args.scroll_delay
                 )
                 
                 if success:

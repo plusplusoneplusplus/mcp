@@ -103,7 +103,8 @@ class SeleniumBrowserClient(IBrowserClient):
         return await asyncio.get_event_loop().run_in_executor(self._executor, _get_html)
     
     async def take_screenshot(self, url: str, output_path: str, wait_time: int = 30, 
-                       headless: bool = True, options: Any = None) -> bool:
+                       headless: bool = True, options: Any = None, auto_scroll: bool = False,
+                       scroll_timeout: int = 30, scroll_step: int = 300, scroll_delay: float = 0.3) -> bool:
         """Navigate to a URL and take a screenshot.
         
         Args:
@@ -112,10 +113,21 @@ class SeleniumBrowserClient(IBrowserClient):
             wait_time: Time to wait for page load in seconds
             headless: Whether to run browser in headless mode
             options: Browser-specific options
+            auto_scroll: Whether to automatically scroll through the page before taking the screenshot
+                        (Not implemented for Selenium client)
+            scroll_timeout: Maximum time to spend auto-scrolling in seconds
+                          (Not implemented for Selenium client)
+            scroll_step: Pixel distance to scroll in each step
+                       (Not implemented for Selenium client)
+            scroll_delay: Delay between scroll steps in seconds
+                        (Not implemented for Selenium client)
             
         Returns:
             True if screenshot was successful, False otherwise
         """
+        if auto_scroll:
+            print("Warning: Auto-scroll is not implemented for SeleniumBrowserClient")
+            
         def _take_screenshot():
             driver = self._setup_browser(headless=headless, browser_options=options)
             try:

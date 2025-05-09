@@ -32,7 +32,8 @@ class IBrowserClient(ABC):
     
     @abstractmethod
     async def take_screenshot(self, url: str, output_path: str, wait_time: int = 30, 
-                       headless: bool = True, options: Any = None) -> bool:
+                       headless: bool = True, options: Any = None, auto_scroll: bool = False,
+                       scroll_timeout: int = 30, scroll_step: int = 300, scroll_delay: float = 0.3) -> bool:
         """Navigate to a URL and take a screenshot.
         
         Args:
@@ -41,6 +42,10 @@ class IBrowserClient(ABC):
             wait_time: Time to wait for page load in seconds
             headless: Whether to run browser in headless mode
             options: Browser-specific options
+            auto_scroll: Whether to automatically scroll through the page before taking the screenshot
+            scroll_timeout: Maximum time to spend auto-scrolling in seconds
+            scroll_step: Pixel distance to scroll in each step
+            scroll_delay: Delay between scroll steps in seconds
             
         Returns:
             True if screenshot was successful, False otherwise
