@@ -1,0 +1,92 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: MCP Server",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/server/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Python: UV Run",
+            "type": "python",
+            "request": "launch",
+            "module": "uv run",
+            "args": [
+                "${workspaceFolder}/server/main.py"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Python: Debug YAML Tools",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/server/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "PYTHONDEBUG": "1",
+                "MCP_DEBUG_MODULES": "mcp_tools.yaml_tools,mcp_tools.plugin,mcp_tools.plugin_config"
+            }
+        },
+        {
+            "name": "Python: YAML Tools Only",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/server/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "MCP_REGISTER_CODE_TOOLS": "false",
+                "MCP_REGISTER_YAML_TOOLS": "true"
+            }
+        },
+        {
+            "name": "Python: Code Tools Only",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/server/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "MCP_REGISTER_CODE_TOOLS": "true",
+                "MCP_REGISTER_YAML_TOOLS": "false"
+            }
+        },
+        {
+            "name": "Python: Exclude YamlToolBase",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/server/main.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "MCP_EXCLUDED_BASE_CLASSES": "YamlToolBase,CommandExecutorBase"
+            }
+        }
+    ]
+} 
