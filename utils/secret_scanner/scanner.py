@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Tuple
 from detect_secrets.core.plugins import initialize
 from detect_secrets.settings import get_settings
 import io
@@ -153,3 +153,36 @@ def check_secrets(raw_content: str) -> List[dict]:
             seen.add(finding_key)
             
     return leaks 
+
+def redact_secrets(content: str) -> Tuple[str, List[Dict]]:
+    """
+    Scan content for secrets and redact them with '[REDACTED]'.
+    
+    Args:
+        content: The text content to scan and redact.
+        
+    Returns:
+        A tuple containing:
+        - The redacted content
+        - A list of findings that were redacted
+    """
+    findings = check_secrets(content)
+    redacted_content = content
+    
+    # Sort findings by line number and then by position within the line (if available)
+    # to process from end to beginning to avoid affecting positions
+    sorted_findings = sorted(
+        findings, 
+        key=lambda x: (x['LineNumber'], -len(x['SecretValue'])), 
+        reverse=True
+    )
+    
+    lines = redacted_content.splitlines(True)  # Keep line endings
+    
+    for finding in sorted_findings:
+        line_num = finding['LineNumber'] - 1  # Convert to 0-indexed
+        if 0 <= line_num < len(lines):
+            secret_value = finding['SecretValue']
+            lines[line_num] = lines[line_num].replace(secret_value, '[REDACTED]')
+    
+    return ''.join(lines), findings 

@@ -1,5 +1,5 @@
 import pytest
-from utils.secret_scanner import check_secrets
+from utils.secret_scanner import check_secrets, redact_secrets
 
 
 def test_no_secrets():
@@ -82,4 +82,38 @@ def test_single_class_string_not_detected():
 def test_high_entropy_string_detected():
     content = "z8J!kL2@xQw9#rT7$uV6"
     result = check_secrets(content)
-    assert any(f['RuleID'] == 'PasswordLikeString' and f['SecretValue'] == 'z8J!kL2@xQw9#rT7$uV6' for f in result) 
+    assert any(f['RuleID'] == 'PasswordLikeString' and f['SecretValue'] == 'z8J!kL2@xQw9#rT7$uV6' for f in result)
+
+
+def test_redact_secrets():
+    content = """
+    api_key = "AKIAIOSFODNN7EXAMPLE"
+    password = "hunter2"
+    """
+    redacted_content, findings = redact_secrets(content)
+    assert "[REDACTED]" in redacted_content
+    assert "AKIAIOSFODNN7EXAMPLE" not in redacted_content
+    assert "hunter2" not in redacted_content
+    assert len(findings) >= 2
+
+
+def test_redact_secrets_no_secrets():
+    content = "This is a normal text with no secrets."
+    redacted_content, findings = redact_secrets(content)
+    assert redacted_content == content
+    assert len(findings) == 0
+
+
+def test_redact_secrets_multiline():
+    content = """
+    Line 1 with no secrets
+    Line 2 with api_key = "AKIAIOSFODNN7EXAMPLE"
+    Line 3 with no secrets
+    Line 4 with password = "hunter2"
+    """
+    redacted_content, findings = redact_secrets(content)
+    assert "[REDACTED]" in redacted_content
+    assert "AKIAIOSFODNN7EXAMPLE" not in redacted_content
+    assert "hunter2" not in redacted_content
+    assert "Line 1 with no secrets" in redacted_content
+    assert "Line 3 with no secrets" in redacted_content 

@@ -4,6 +4,8 @@ This module provides a client for browser automation operations.
 """
 
 import time
+import logging
+import urllib.parse
 from typing import Dict, Any, Optional, Literal
 
 from mcp_tools.browser.factory import BrowserClientFactory
@@ -11,11 +13,30 @@ from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import BrowserClientInterface
 from config.manager import EnvironmentManager
 from utils.html_to_markdown import extract_and_format_html
+from utils.secret_scanner import redact_secrets
 
 # Global configuration
 DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = EnvironmentManager().get_setting("browser_type", "chrome")
 DEFAULT_CLIENT_TYPE: str = EnvironmentManager().get_setting("client_type", "playwright")
 MAX_RETURN_CHARS: int = 100000
+
+# Configure logger
+logger = logging.getLogger(__name__)
+
+def _get_domain_from_url(url: str) -> str:
+    """Extract domain from URL.
+    
+    Args:
+        url: The URL to extract domain from
+        
+    Returns:
+        The domain part of the URL or 'unknown domain'
+    """
+    try:
+        parsed_url = urllib.parse.urlparse(url)
+        return parsed_url.netloc or 'unknown domain'
+    except Exception:
+        return 'unknown domain'
 
 @register_tool
 class BrowserClient(BrowserClientInterface):
@@ -101,7 +122,100 @@ class BrowserClient(BrowserClientInterface):
             },
             "required": ["operation", "url"]
         }
+    
+    def _log_detected_secrets(self, findings, source_url: str, content_type: str):
+        """Log information about detected secrets without revealing the secrets themselves.
         
+        Args:
+            findings: List of findings from the secret scanner
+            source_url: URL where the content was retrieved from
+            content_type: Type of content (HTML or Markdown)
+        """
+        if not findings:
+            return
+            
+        # Extract domain from URL for more informative messages
+        domain = _get_domain_from_url(source_url)
+        
+        # Group findings by type to provide more organized error messages
+        secret_types = {}
+        for finding in findings:
+            secret_type = finding.get('SecretType', 'Unknown')
+            line_num = finding.get('LineNumber', 0)
+            
+            if secret_type not in secret_types:
+                secret_types[secret_type] = []
+            
+            secret_types[secret_type].append(line_num)
+        
+        # Log an overall warning first with asterisks to make it stand out
+        logger.warning(
+            f"*******************************************************************\n"
+            f"*** SECURITY ALERT: Detected and redacted {len(findings)} potential secrets\n"
+            f"*** Content type: {content_type}\n"
+            f"*** Domain: {domain}\n"
+            f"*** URL: {source_url}\n"
+            f"*******************************************************************"
+        )
+        
+        # Log details for each type of secret found
+        for secret_type, line_numbers in secret_types.items():
+            line_ranges = self._summarize_line_numbers(line_numbers)
+            logger.warning(
+                f"SECURITY DETAIL: Found {len(line_numbers)} instance(s) of '{secret_type}' "
+                f"at {line_ranges} in {content_type} from {domain}"
+            )
+    
+    def _summarize_line_numbers(self, line_numbers):
+        """Create a readable summary of line numbers.
+        
+        Args:
+            line_numbers: List of line numbers
+            
+        Returns:
+            A string representation of the line numbers in a readable format
+        """
+        if not line_numbers:
+            return "unknown locations"
+            
+        # Sort line numbers
+        sorted_lines = sorted(line_numbers)
+        
+        if len(sorted_lines) == 1:
+            return f"line {sorted_lines[0]}"
+        elif len(sorted_lines) == 2:
+            return f"lines {sorted_lines[0]} and {sorted_lines[1]}"
+        else:
+            # Group consecutive numbers into ranges
+            ranges = []
+            range_start = sorted_lines[0]
+            range_end = range_start
+            
+            for line in sorted_lines[1:]:
+                if line == range_end + 1:
+                    range_end = line
+                else:
+                    if range_start == range_end:
+                        ranges.append(f"{range_start}")
+                    else:
+                        ranges.append(f"{range_start}-{range_end}")
+                    range_start = line
+                    range_end = line
+            
+            # Add the last range
+            if range_start == range_end:
+                ranges.append(f"{range_start}")
+            else:
+                ranges.append(f"{range_start}-{range_end}")
+            
+            if len(ranges) == 1:
+                return f"lines {ranges[0]}"
+            elif len(ranges) == 2:
+                return f"lines {ranges[0]} and {ranges[1]}"
+            else:
+                last_range = ranges.pop()
+                return f"lines {', '.join(ranges)}, and {last_range}"
+    
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments.
         
@@ -123,6 +237,13 @@ class BrowserClient(BrowserClientInterface):
             if operation == "get_page_html":
                 html = await client.get_page_html(url, wait_time, headless, browser_options)
                 if html:
+                    # Always apply secret redaction
+                    html, findings = redact_secrets(html)
+                    
+                    # Log warnings if secrets were detected
+                    if findings:
+                        self._log_detected_secrets(findings, url, "HTML")
+                        
                     return {
                         "success": True,
                         "html": html[:MAX_RETURN_CHARS] + ("..." if len(html) > MAX_RETURN_CHARS else ""),
@@ -149,13 +270,42 @@ class BrowserClient(BrowserClientInterface):
                         "success": False,
                         "error": f"Failed to retrieve HTML from {url}"
                     }
+                
+                # Always apply secret redaction to the HTML content
+                redacted_html, html_findings = redact_secrets(html)
+                
+                # Log warnings if secrets were detected in HTML
+                if html_findings:
+                    self._log_detected_secrets(html_findings, url, "HTML")
+                    
                 result = extract_and_format_html(
-                    html,
+                    redacted_html,
                     include_links=include_links,
                     include_images=include_images
                 )
+                
+                # Always scan the resulting markdown for any missed secrets
+                markdown_findings = []
+                if "markdown" in result:
+                    redacted_markdown, md_findings = redact_secrets(result["markdown"])
+                    result["markdown"] = redacted_markdown
+                    
+                    # Log warnings if additional secrets were detected in markdown
+                    if md_findings:
+                        self._log_detected_secrets(md_findings, url, "Markdown")
+                        markdown_findings = md_findings
+                
                 result["success"] = result.get("extraction_success", False)
                 result["url"] = url
+                
+                # Log a summary if secrets were detected in either HTML or markdown
+                if html_findings or markdown_findings:
+                    total_secrets = len(html_findings) + len(markdown_findings)
+                    logger.warning(
+                        f"SECURITY SUMMARY: Total of {total_secrets} potential secrets detected and "
+                        f"redacted from {url}"
+                    )
+                
                 return result
             else:
                 return {
