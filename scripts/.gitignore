@@ -3,3 +3,6 @@ browser_outputs/
 
 # Ignore browser profile directory
 .profile/ 
+
+# Ignore extracted charts directory
+.extracted_charts/

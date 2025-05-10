@@ -56,6 +56,11 @@ dependencies = [
     # Embedding models
     "sentence-transformers>=2.7.0",  # Lightweight embedding model for tests
     "detect-secrets>=1.4.0",  # Secret scanning
+    
+    # Image processing (for chart extractor)
+    "opencv-python>=4.8.0",  # OpenCV for image processing
+    "numpy>=1.24.0",  # NumPy for numerical operations
+    "pillow>=9.5.0",  # PIL for image handling
 ]
 
 [project.optional-dependencies]
