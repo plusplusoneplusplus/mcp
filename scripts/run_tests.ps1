@@ -1,5 +1,9 @@
 # Script to run all tests in the MCP project
 # This will run tests for mcp_core, mcp_tools, and any other tests in the project
+#
+# Usage:
+#   ./run_tests.ps1 [partial_test_name]
+#   If [partial_test_name] is provided, only tests matching that pattern will run.
 
 # We'll continue execution even if a test fails
 $ErrorActionPreference = "Continue"
@@ -29,7 +33,8 @@ $skipped = 0
 function Run-ComponentTests {
     param(
         [string]$Component,
-        [string]$TestPath
+        [string]$TestPath,
+        [string]$TestPattern = ""
     )
     
     if (Test-Path $TestPath -PathType Container) {
@@ -38,7 +43,11 @@ function Run-ComponentTests {
         # Run the tests and capture output
         try {
             # Use uv instead of python directly
-            $output = & uv run python -m pytest "$TestPath" 2>&1 | Out-String
+            if ($TestPattern -ne "") {
+                $output = & uv run python -m pytest "$TestPath" -k "$TestPattern" 2>&1 | Out-String
+            } else {
+                $output = & uv run python -m pytest "$TestPath" 2>&1 | Out-String
+            }
             $exitCode = $LASTEXITCODE
             
             # Print the output
@@ -47,6 +56,10 @@ function Run-ComponentTests {
             # Parse output to get test statistics
             if ($output -match "no tests ran") {
                 Write-ColorMessage "! No tests ran for $Component" "Yellow"
+                $script:skipped++
+            }
+            elseif ($output -match "collected \d+ items / \d+ deselected / 0 selected") {
+                Write-ColorMessage "No matching tests for $Component, skipping." "Yellow"
                 $script:skipped++
             }
             elseif (($exitCode -ne 0) -or ($output -match "ERROR") -or ($output -match "FAILED")) {
@@ -82,19 +95,23 @@ function Run-ComponentTests {
     }
 }
 
+# Parse optional test pattern argument
+$TestPattern = if ($args.Count -ge 1) { $args[0] } else { "" }
+
 # Run tests for each component
-Run-ComponentTests "config" "config/tests"
-Run-ComponentTests "mcp_core" "mcp_core/tests"
-Run-ComponentTests "mcp_tools" "mcp_tools/tests"
-Run-ComponentTests "server" "server/tests"
-Run-ComponentTests "utils.html_to_markdown" "utils/html_to_markdown/tests"
-Run-ComponentTests "utils.vector_store" "utils/vector_store/tests"
-Run-ComponentTests "utils.secret_scanner" "utils/secret_scanner/tests"
+Run-ComponentTests "config" "config/tests" $TestPattern
+Run-ComponentTests "mcp_core" "mcp_core/tests" $TestPattern
+Run-ComponentTests "mcp_tools" "mcp_tools/tests" $TestPattern
+Run-ComponentTests "server" "server/tests" $TestPattern
+Run-ComponentTests "utils.html_to_markdown" "utils/html_to_markdown/tests" $TestPattern
+Run-ComponentTests "utils.vector_store" "utils/vector_store/tests" $TestPattern
+Run-ComponentTests "utils.secret_scanner" "utils/secret_scanner/tests" $TestPattern
+Run-ComponentTests "utils.ocr_extractor" "utils/ocr_extractor/tests" $TestPattern
 # Add more components as needed
 
 # Run project-level tests if they exist
 if (Test-Path "tests" -PathType Container) {
-    Run-ComponentTests "project" "tests"
+    Run-ComponentTests "project" "tests" $TestPattern
 }
 
 # Print summary

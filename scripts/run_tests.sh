@@ -24,13 +24,18 @@ skipped=0
 run_component_tests() {
     component=$1
     test_path=$2
+    test_pattern=$3
     
     if [ -d "$test_path" ]; then
         echo -e "${BLUE}Running tests for ${component}...${NC}"
         
         # Run the tests and capture both exit code and output
         # Use uv instead of python directly
-        output=$(uv run python -m pytest "$test_path" 2>&1)
+        if [ -n "$test_pattern" ]; then
+            output=$(uv run python -m pytest "$test_path" -k "$test_pattern" 2>&1)
+        else
+            output=$(uv run python -m pytest "$test_path" 2>&1)
+        fi
         exit_code=$?
         
         # Print the output
@@ -38,22 +43,26 @@ run_component_tests() {
         
         # Parse output to get test statistics
         if [[ "$output" == *"no tests ran"* ]]; then
-            echo -e "${YELLOW}⚠ No tests ran for ${component}${NC}"
+            echo -e "${YELLOW}\u26a0 No tests ran for ${component}${NC}"
+            skipped=$((skipped + 1))
+        elif echo "$output" | grep -qE "collected [0-9]+ items / [0-9]+ deselected / 0 selected"; then
+            # All tests were deselected, treat as skipped/ignored, no arrow
+            echo -e "${YELLOW}No matching tests for ${component}, skipping.${NC}"
             skipped=$((skipped + 1))
         elif [[ $exit_code -ne 0 || "$output" == *"ERROR"* || "$output" == *"FAILED"* ]]; then
             # Get summary of failures/passed/skipped from the output
             if [[ "$output" == *"failed"*"passed"* ]]; then
                 # Extract numbers from the test summary line
                 summary=$(echo "$output" | grep -o '[0-9]* failed, [0-9]* passed, [0-9]* skipped' | head -1)
-                echo -e "${RED}✗ Some tests for ${component} failed: ${summary}${NC}"
+                echo -e "${RED}\u2717 Some tests for ${component} failed: ${summary}${NC}"
             elif [[ "$output" == *"ERROR"* && "$output" == *"Interrupted"* ]]; then
-                echo -e "${RED}✗ Tests for ${component} failed due to import errors or collection failures${NC}"
+                echo -e "${RED}\u2717 Tests for ${component} failed due to import errors or collection failures${NC}"
             else
-                echo -e "${RED}✗ Tests for ${component} failed!${NC}"
+                echo -e "${RED}\u2717 Tests for ${component} failed!${NC}"
             fi
             failures=$((failures + 1))
         else
-            echo -e "${GREEN}✓ All tests for ${component} passed!${NC}"
+            echo -e "${GREEN}\u2713 All tests for ${component} passed!${NC}"
             passed=$((passed + 1))
         fi
         echo ""
@@ -64,19 +73,23 @@ run_component_tests() {
     fi
 }
 
+# Parse optional test pattern argument
+TEST_PATTERN="$1"
+
 # Run tests for each component
-run_component_tests "config" "config/tests"
-run_component_tests "mcp_core" "mcp_core/tests"
-run_component_tests "mcp_tools" "mcp_tools/tests"
-run_component_tests "server" "server/tests"
-run_component_tests "utils.html_to_markdown" "utils/html_to_markdown/tests"
-run_component_tests "utils.vector_store" "utils/vector_store/tests"
-run_component_tests "utils.secret_scanner" "utils/secret_scanner/tests"
+run_component_tests "config" "config/tests" "$TEST_PATTERN"
+run_component_tests "mcp_core" "mcp_core/tests" "$TEST_PATTERN"
+run_component_tests "mcp_tools" "mcp_tools/tests" "$TEST_PATTERN"
+run_component_tests "server" "server/tests" "$TEST_PATTERN"
+run_component_tests "utils.html_to_markdown" "utils/html_to_markdown/tests" "$TEST_PATTERN"
+run_component_tests "utils.vector_store" "utils/vector_store/tests" "$TEST_PATTERN"
+run_component_tests "utils.secret_scanner" "utils/secret_scanner/tests" "$TEST_PATTERN"
+run_component_tests "utils.ocr_extractor" "utils/ocr_extractor/tests" "$TEST_PATTERN"
 # Add more components as needed
 
 # Run project-level tests if they exist
 if [ -d "tests" ]; then
-    run_component_tests "project" "tests"
+    run_component_tests "project" "tests" "$TEST_PATTERN"
 fi
 
 # Print summary

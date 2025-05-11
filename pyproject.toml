@@ -58,6 +58,7 @@ dependencies = [
     "detect-secrets>=1.4.0",  # Secret scanning
     
     # Image processing (for chart extractor)
+    "easyocr>=1.7.1",  # Fast OCR for text extraction from images
     "opencv-python>=4.8.0",  # OpenCV for image processing
     "numpy>=1.24.0",  # NumPy for numerical operations
     "pillow>=9.5.0",  # PIL for image handling
