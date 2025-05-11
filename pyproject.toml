@@ -61,6 +61,12 @@ dependencies = [
     "opencv-python>=4.8.0",  # OpenCV for image processing
     "numpy>=1.24.0",  # NumPy for numerical operations
     "pillow>=9.5.0",  # PIL for image handling
+    
+    # Log compression and parsing
+    "msgpack>=1.0.5",  # MessagePack serialization
+    "zstandard>=0.21.0",  # Zstandard compression
+    "logparser==0.8.4",  # Log parsing library
+    "click>=8.1.3",  # Command line interface
 ]
 
 [project.optional-dependencies]
