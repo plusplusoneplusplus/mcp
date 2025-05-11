@@ -5,11 +5,12 @@ Example:
     python dashgrab.py https://play.grafana.org/d/000000016/time-series-graphs?orgId=1&from=now-1h&to=now&timezone=browser \
         -s ".react-grid-item" -t $GRAFANA_TOKEN
 """
+import os
 import pathlib
 import re
 import click
 import asyncio
-from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
+from mcp_tools.browser.browser_client import BrowserClientFactory
 
 @click.command(help="Capture each matching element as an image")
 @click.argument('url')
@@ -26,7 +27,15 @@ def capture(url, selector, out, width, height, token):
     out_dir.mkdir(exist_ok=True)
 
     async def run_capture():
-        client = PlaywrightBrowserClient()
+        # Use the same default profile path as browser_cli.py
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        default_profile_path = os.path.join(script_dir, '.profile')
+        browser_type = 'edge'  # or 'chrome', depending on your default preference
+        client = BrowserClientFactory.create_client(
+            client_type='playwright',
+            user_data_dir=default_profile_path,
+            browser_type=browser_type
+        )
         try:
             count = await client.capture_panels(
                 url=url,
