@@ -3,7 +3,7 @@
 This module provides browser automation capabilities for web scraping and testing.
 """
 
-from mcp_tools.browser.client import BrowserClient
+from mcp_tools.browser.browser_client import BrowserClient
 from mcp_tools.browser.selenium_client import SeleniumBrowserClient
 from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
 from mcp_tools.browser.interface import IBrowserClient
