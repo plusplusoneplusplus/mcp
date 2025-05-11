@@ -5,4 +5,5 @@ browser_outputs/
 .profile/ 
 
 # Ignore extracted charts directory
+.charts/
 .extracted_charts/

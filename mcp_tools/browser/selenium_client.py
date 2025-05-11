@@ -32,7 +32,7 @@ from mcp_tools.browser.interface import IBrowserClient
 from mcp_tools.plugin import register_tool
 
 class SeleniumBrowserClient(IBrowserClient):
-    async def capture_panels(self, url: str, selector: str = ".react-grid-item", out_dir: str = "charts", width: int = 1600, height: int = 900, token: Optional[str] = None, wait_time: int = 30, headless: bool = True, options: Any = None) -> int:
+    async def capture_panels(self, url: str, selector: str = ".react-grid-item", out_dir: str = "charts", width: int = 1600, height: int = 900, token: Optional[str] = None, wait_time: int = 30, headless: bool = True, options: Any = None, autoscroll: bool = False) -> int:
         """
         Capture each matching element as an image and save to the output directory.
         """
@@ -80,6 +80,13 @@ class SeleniumBrowserClient(IBrowserClient):
                         ActionChains(driver).move_to_element(el).perform()
                     except Exception:
                         pass
+                    if autoscroll:
+                        # Scroll element into view
+                        driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", el)
+                        time.sleep(0.5)
+                        # Scroll element's contents
+                        driver.execute_script("var el = arguments[0]; el.scrollTop = 0; var scrollStep = 100; function scrollDown() { if (el.scrollTop + el.clientHeight < el.scrollHeight) { el.scrollTop += scrollStep; setTimeout(scrollDown, 50); } }; scrollDown();", el)
+                        time.sleep(0.8)
                     el.screenshot(str(out_path / f"panel_{pid}.png"))
                     print(f"Saved panel_{pid}.png")
                     count += 1

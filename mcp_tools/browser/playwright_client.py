@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright, Playwright, BrowserContext
 from mcp_tools.browser.interface import IBrowserClient
 
 class PlaywrightBrowserClient(IBrowserClient):
-    async def capture_panels(self, url: str, selector: str = ".react-grid-item", out_dir: str = "charts", width: int = 1600, height: int = 900, token: Optional[str] = None, wait_time: int = 30, headless: bool = True, options: Any = None) -> int:
+    async def capture_panels(self, url: str, selector: str = ".react-grid-item", out_dir: str = "charts", width: int = 1600, height: int = 900, token: Optional[str] = None, wait_time: int = 30, headless: bool = True, options: Any = None, autoscroll: bool = False) -> int:
         """
         Capture each matching element as an image and save to the output directory.
         """
@@ -31,6 +31,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                 await page.set_extra_http_headers({"Authorization": f"Bearer {token}"})
             await page.goto(url, wait_until="networkidle")
             await page.wait_for_timeout(wait_time * 1000)
+            await self._auto_scroll_page(page)
             panels = await page.locator(selector).all()
             if not panels:
                 print(f"No elements matched '{selector}'.")
@@ -49,6 +50,10 @@ class PlaywrightBrowserClient(IBrowserClient):
                         break
                 if not pid:
                     pid = f"{idx:02d}"
+                # Check if element handle is valid and attached
+                if not el or (hasattr(el, 'is_detached') and el.is_detached()):
+                    print(f"Warning: Element for panel {pid} is not attached or not found. Skipping.")
+                    continue
                 await el.screenshot(path=str(out_path / f"panel_{pid}.png"))
                 print(f"Saved panel_{pid}.png")
                 count += 1
@@ -122,11 +127,13 @@ class PlaywrightBrowserClient(IBrowserClient):
             if page is not None:
                 await page.close()
 
-    async def _auto_scroll_page(self, 
-                              page, 
-                              timeout: int = 30, 
-                              scroll_step: int = 300, 
-                              scroll_delay: float = 0.3) -> None:
+    async def _auto_scroll_page(
+        self,
+        page,
+        timeout: int = 30,
+        scroll_step: int = 80,
+        scroll_delay: float = 0.5
+    ) -> None:
         """
         Auto-scroll a page to ensure all content is loaded.
         

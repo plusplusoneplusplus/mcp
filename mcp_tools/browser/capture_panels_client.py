@@ -74,6 +74,11 @@ class CapturePanelsClient(CapturePanelsClientInterface):
                     "type": "boolean",
                     "description": "Whether to run browser in headless mode.",
                     "default": False
+                },
+                "autoscroll": {
+                    "type": "boolean",
+                    "description": "If true, autoscroll each panel into view and scroll its contents before capturing.",
+                    "default": False
                 }
             },
             "required": ["operation", "url"]
@@ -93,7 +98,8 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         headless = arguments.get("headless", False)
         browser_options = arguments.get("browser_options", None)
         browser_type = arguments.get("browser_type", self.browser_type)
-        count = await self.capture_panels(url, selector, out_dir, width, height, token, wait_time, headless, browser_options)
+        autoscroll = arguments.get("autoscroll", False)
+        count = await self.capture_panels(url, selector, out_dir, width, height, token, wait_time, headless, browser_options, autoscroll)
         return {
             "success": True if count > 0 else False,
             "captured": count,
@@ -111,7 +117,8 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         token: Optional[str] = None,
         wait_time: int = 30,
         headless: bool = True,
-        options: Any = None
+        options: Any = None,
+        autoscroll: bool = False
     ) -> int:
         """
         Capture each matching element as an image and save to the output directory.
@@ -125,9 +132,10 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             wait_time: Time to wait for page load in seconds
             headless: Whether to run browser in headless mode
             options: Browser-specific options
+            autoscroll: If true, autoscroll each panel into view and scroll its contents before capturing.
         Returns:
             The number of panels captured (saved as PNGs)
         """
         browser_type = self.browser_type
         client = BrowserClientFactory.get_client(self.client_type, browser_type)
-        return await client.capture_panels(url, selector, out_dir, width, height, token, wait_time, headless, options)
+        return await client.capture_panels(url, selector, out_dir, width, height, token, wait_time, headless, options, autoscroll=autoscroll)

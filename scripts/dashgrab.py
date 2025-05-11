@@ -13,17 +13,20 @@ import asyncio
 from mcp_tools.browser.browser_client import BrowserClientFactory
 
 @click.command(help="Capture each matching element as an image")
+# test url: https://play.grafana.org/d/000000016/time-series-graphs\?orgId\=1\&from\=now-1h\&to\=now\&timezone\=browser
 @click.argument('url')
 @click.option('--selector', '-s', default=".react-grid-item",
              help="CSS selector for chart containers")
-@click.option('--out', '-o', default="charts", type=click.Path(),
+@click.option('--out', '-o', default=".charts", type=click.Path(),
              help="Directory to write PNGs")
 @click.option('--width', '-w', default=1600, type=int)
 @click.option('--height', '-h', default=900, type=int)
 @click.option('--token', '-t', help="Bearer token for Authorization header")
 def capture(url, selector, out, width, height, token):
     """Capture each matching element as an image using the PlaywrightBrowserClient."""
-    out_dir = pathlib.Path(out)
+    # Always use a '.charts' subdirectory in the same directory as this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    out_dir = pathlib.Path(os.path.join(script_dir, out))
     out_dir.mkdir(exist_ok=True)
 
     async def run_capture():
@@ -44,9 +47,10 @@ def capture(url, selector, out, width, height, token):
                 width=width,
                 height=height,
                 token=token,
-                wait_time=30,
-                headless=True,
-                options=None
+                wait_time=10,
+                headless=False,
+                options=None,
+                autoscroll=True
             )
             if count > 0:
                 click.echo(f"Successfully captured {count} panels.")
