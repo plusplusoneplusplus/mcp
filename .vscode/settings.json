@@ -3,5 +3,19 @@
       "**/*.egg-info/": true,
       "**/.pytest_cache/": true,
       "**/__pycache__/": true
-    }
+    },
+    "editor.formatOnSave": true,
+    "python.formatting.provider": "black",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    },
+    "emeraldwalk.runonsave": {
+      "commands": [
+        {
+          "match": "\\.py$",
+          "cmd": "uv run docformatter --in-place --wrap-summaries 88 --wrap-descriptions 88 ${file}"
+        }
+      ]
+    },
+    "editor.rulers": [88]
   }

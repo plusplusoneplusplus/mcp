@@ -32,7 +32,7 @@ ENV/
 
 # IDE specific files
 .idea/
-.vscode/
+
 *.swp
 *.swo
 .DS_Store
