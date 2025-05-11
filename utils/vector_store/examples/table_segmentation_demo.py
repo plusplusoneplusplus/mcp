@@ -66,6 +66,7 @@ This table shows the price breakdown by configuration:
 | Lenovo ThinkPad | 4.2/5 | 4.4/5 | 4.6/5 | 4.4/5 |
 """
 
+
 def main():
     """Run the table segmentation and search demonstration."""
     # Initialize the table segmenter with in-memory database (no persist_directory)
@@ -73,13 +74,13 @@ def main():
         collection_name="laptop_comparison"
         # No persist_directory means in-memory database
     )
-    
+
     print("Using in-memory vector database")
-    
+
     # Segment and store tables
     num_tables, table_ids = segmenter.segment_and_store(SAMPLE_MARKDOWN)
     print(f"Extracted and stored {num_tables} tables.")
-    
+
     # Show the extracted tables
     tables = segmenter.extract_tables(SAMPLE_MARKDOWN)
     print("\n=== Extracted Tables ===")
@@ -88,33 +89,36 @@ def main():
         print(f"Heading: {table['heading']}")
         print(f"ID: {table['id']}")
         print("-" * 50)
-        print(table['content'])
+        print(table["content"])
         print("-" * 50)
-    
+
     # Perform semantic searches
     search_queries = [
         "Which laptop has the best battery life?",
         "What are the prices of the laptops?",
         "How much does RAM upgrade cost?",
         "Which laptop has the best customer support?",
-        "What are the performance benchmarks?"
+        "What are the performance benchmarks?",
     ]
-    
+
     print("\n=== Semantic Search Results ===")
     for query in search_queries:
         print(f"\nQuery: {query}")
         results = segmenter.search_tables(query, n_results=2)
-        
-        for i, (doc, metadata, distance) in enumerate(zip(
-            results['documents'][0], 
-            results['metadatas'][0],
-            results['distances'][0]
-        )):
+
+        for i, (doc, metadata, distance) in enumerate(
+            zip(
+                results["documents"][0],
+                results["metadatas"][0],
+                results["distances"][0],
+            )
+        ):
             print(f"\nResult {i+1} (similarity: {1-distance:.4f}):")
             print(f"Heading: {metadata['heading']}")
             print("-" * 50)
             print(doc)
             print("-" * 50)
 
+
 if __name__ == "__main__":
-    main() 
+    main()

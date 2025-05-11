@@ -1,15 +1,19 @@
 """
 OCR extraction utility using EasyOCR.
 """
+
 from pathlib import Path
 from typing import List
 
 try:
     import easyocr
 except ImportError:
-    raise ImportError("EasyOCR is not installed. Please run: pip install easyocr pillow")
+    raise ImportError(
+        "EasyOCR is not installed. Please run: pip install easyocr pillow"
+    )
 
 from PIL import Image
+
 
 def extract_text_from_image(image_path: Path) -> List[str]:
     """
@@ -21,6 +25,6 @@ def extract_text_from_image(image_path: Path) -> List[str]:
     Returns:
         List[str]: List of extracted text strings.
     """
-    reader = easyocr.Reader(['en'], gpu=False)
+    reader = easyocr.Reader(["en"], gpu=False)
     results = reader.readtext(str(image_path))
     return [text for _, text, _ in results]

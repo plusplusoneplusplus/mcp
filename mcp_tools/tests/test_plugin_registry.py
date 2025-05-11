@@ -11,38 +11,38 @@ from mcp_tools.plugin_config import config, PluginConfig
 # Mock tool classes for testing
 class MockCodeTool(ToolInterface):
     """Mock tool for testing code-based tools."""
-    
+
     @property
     def name(self) -> str:
         return "mock_code_tool"
-        
+
     @property
     def description(self) -> str:
         return "A mock code-based tool for testing"
-        
+
     @property
     def input_schema(self) -> dict:
         return {"type": "object", "properties": {}}
-    
+
     async def execute_tool(self, arguments: dict) -> any:
         return {"success": True, "message": "Code tool executed"}
 
 
 class MockYamlTool(ToolInterface):
     """Mock tool for testing YAML-based tools."""
-    
+
     @property
     def name(self) -> str:
         return "mock_yaml_tool"
-        
+
     @property
     def description(self) -> str:
         return "A mock YAML-based tool for testing"
-        
+
     @property
     def input_schema(self) -> dict:
         return {"type": "object", "properties": {}}
-    
+
     async def execute_tool(self, arguments: dict) -> any:
         return {"success": True, "message": "YAML tool executed"}
 
@@ -55,12 +55,12 @@ def clean_registry():
     original_instances = registry.instances.copy()
     original_yaml_tool_names = registry.yaml_tool_names.copy()
     original_tool_sources = registry.tool_sources.copy()
-    
+
     # Clear the registry
     registry.clear()
-    
+
     yield registry
-    
+
     # Restore the original registry state
     registry.tools = original_tools
     registry.instances = original_instances
@@ -75,14 +75,14 @@ def mock_config():
     original_register_code_tools = config.register_code_tools
     original_register_yaml_tools = config.register_yaml_tools
     original_yaml_overrides_code = config.yaml_overrides_code
-    
+
     # Reset to defaults for testing
     config.register_code_tools = True
     config.register_yaml_tools = True
     config.yaml_overrides_code = False  # Disable YAML overriding code
-    
+
     yield config
-    
+
     # Restore original config
     config.register_code_tools = original_register_code_tools
     config.register_yaml_tools = original_register_yaml_tools
@@ -94,11 +94,11 @@ def test_register_tool_with_source(clean_registry):
     # Register tools with explicit sources
     clean_registry.register_tool(MockCodeTool, source="code")
     clean_registry.register_tool(MockYamlTool, source="yaml")
-    
+
     # Check if tools are registered
     assert "mock_code_tool" in clean_registry.tools
     assert "mock_yaml_tool" in clean_registry.tools
-    
+
     # Check sources
     tool_sources = clean_registry.get_tool_sources()
     assert "mock_code_tool" in tool_sources
@@ -109,46 +109,47 @@ def test_register_tool_with_source(clean_registry):
 
 def test_register_tool_decorator(clean_registry):
     """Test registering tools using the decorator."""
+
     # Use decorator with default source (code)
     @register_tool
     class DecoratedCodeTool(ToolInterface):
         @property
         def name(self) -> str:
             return "decorated_code_tool"
-            
+
         @property
         def description(self) -> str:
             return "A decorated code tool"
-            
+
         @property
         def input_schema(self) -> dict:
             return {"type": "object", "properties": {}}
-        
+
         async def execute_tool(self, arguments: dict) -> any:
             return {"success": True}
-    
+
     # Use decorator with explicit source (yaml)
     @register_tool(source="yaml")
     class DecoratedYamlTool(ToolInterface):
         @property
         def name(self) -> str:
             return "decorated_yaml_tool"
-            
+
         @property
         def description(self) -> str:
             return "A decorated yaml tool"
-            
+
         @property
         def input_schema(self) -> dict:
             return {"type": "object", "properties": {}}
-        
+
         async def execute_tool(self, arguments: dict) -> any:
             return {"success": True}
-    
+
     # Check if tools are registered
     assert "decorated_code_tool" in clean_registry.tools
     assert "decorated_yaml_tool" in clean_registry.tools
-    
+
     # Check sources
     tool_sources = clean_registry.get_tool_sources()
     assert tool_sources["decorated_code_tool"] == "code"
@@ -160,11 +161,11 @@ def test_get_tools_by_source(clean_registry):
     # Register tools with different sources
     clean_registry.register_tool(MockCodeTool, source="code")
     clean_registry.register_tool(MockYamlTool, source="yaml")
-    
+
     # Get tools by source
     code_tools = clean_registry.get_tools_by_source("code")
     yaml_tools = clean_registry.get_tools_by_source("yaml")
-    
+
     # Check results
     assert len(code_tools) == 1
     assert len(yaml_tools) == 1
@@ -172,26 +173,31 @@ def test_get_tools_by_source(clean_registry):
     assert yaml_tools[0] == MockYamlTool
 
 
-@pytest.mark.parametrize("code_enabled,yaml_enabled,expected_count", [
-    (True, True, 2),   # Both enabled -> 2 tools
-    (True, False, 1),  # Only code enabled -> 1 tool
-    (False, True, 1),  # Only yaml enabled -> 1 tool
-    (False, False, 0), # Both disabled -> 0 tools
-])
-def test_filtered_instances(clean_registry, mock_config, code_enabled, yaml_enabled, expected_count):
+@pytest.mark.parametrize(
+    "code_enabled,yaml_enabled,expected_count",
+    [
+        (True, True, 2),  # Both enabled -> 2 tools
+        (True, False, 1),  # Only code enabled -> 1 tool
+        (False, True, 1),  # Only yaml enabled -> 1 tool
+        (False, False, 0),  # Both disabled -> 0 tools
+    ],
+)
+def test_filtered_instances(
+    clean_registry, mock_config, code_enabled, yaml_enabled, expected_count
+):
     """Test filtered instances based on configuration."""
     # Configure enabled sources
     mock_config.register_code_tools = code_enabled
     mock_config.register_yaml_tools = yaml_enabled
-    
+
     # Register tools with different sources
     clean_registry.register_tool(MockCodeTool, source="code")
     clean_registry.register_tool(MockYamlTool, source="yaml")
-    
+
     # Create instances
     clean_registry._simple_get_tool_instance("mock_code_tool")
     clean_registry._simple_get_tool_instance("mock_yaml_tool")
-    
+
     # Use mock dependency injector to avoid circular imports in test
     with patch("mcp_tools.dependency.injector") as mock_injector:
         # Setup mock injector
@@ -207,22 +213,26 @@ def test_filtered_instances(clean_registry, mock_config, code_enabled, yaml_enab
             }
         else:
             mock_injector.get_filtered_instances.return_value = {}
-            
+
         # Get filtered instances
         filtered_instances = clean_registry.get_all_instances()
-        
+
         # Check results
         assert len(filtered_instances) == expected_count
-        
+
         if code_enabled:
             assert any(isinstance(inst, MockCodeTool) for inst in filtered_instances)
         else:
-            assert not any(isinstance(inst, MockCodeTool) for inst in filtered_instances)
-            
+            assert not any(
+                isinstance(inst, MockCodeTool) for inst in filtered_instances
+            )
+
         if yaml_enabled:
             assert any(isinstance(inst, MockYamlTool) for inst in filtered_instances)
         else:
-            assert not any(isinstance(inst, MockYamlTool) for inst in filtered_instances)
+            assert not any(
+                isinstance(inst, MockYamlTool) for inst in filtered_instances
+            )
 
 
 def test_plugin_config_source_enabled(mock_config):
@@ -230,31 +240,31 @@ def test_plugin_config_source_enabled(mock_config):
     # Test with both sources enabled
     mock_config.register_code_tools = True
     mock_config.register_yaml_tools = True
-    
+
     assert mock_config.is_source_enabled("code") is True
     assert mock_config.is_source_enabled("yaml") is True
     assert mock_config.is_source_enabled("unknown") is True
-    
+
     # Test with only code enabled
     mock_config.register_code_tools = True
     mock_config.register_yaml_tools = False
-    
+
     assert mock_config.is_source_enabled("code") is True
     assert mock_config.is_source_enabled("yaml") is False
     assert mock_config.is_source_enabled("unknown") is False
-    
+
     # Test with only yaml enabled
     mock_config.register_code_tools = False
     mock_config.register_yaml_tools = True
-    
+
     assert mock_config.is_source_enabled("code") is False
     assert mock_config.is_source_enabled("yaml") is True
     assert mock_config.is_source_enabled("unknown") is False
-    
+
     # Test with both sources disabled
     mock_config.register_code_tools = False
     mock_config.register_yaml_tools = False
-    
+
     assert mock_config.is_source_enabled("code") is False
     assert mock_config.is_source_enabled("yaml") is False
     assert mock_config.is_source_enabled("unknown") is False
@@ -262,25 +272,28 @@ def test_plugin_config_source_enabled(mock_config):
 
 def test_valid_tool_sources():
     """Test that only the expected tool source types exist.
-    
+
     This test intentionally breaks when a new tool source type is added,
     forcing developers to update tests for the new source type.
     """
     # Register tools with different valid sources
     clean_registry = PluginRegistry()
     clean_registry._initialize()  # Reset to clean state
-    
+
     # Register tools with different sources
     clean_registry.register_tool(MockCodeTool, source="code")
     clean_registry.register_tool(MockYamlTool, source="yaml")
-    
+
     # Get all unique sources
     tool_sources = clean_registry.get_tool_sources()
     unique_sources = set(tool_sources.values())
-    
-    # This assertion will fail when a new source type is added, 
+
+    # This assertion will fail when a new source type is added,
     # forcing developers to update the test
-    assert unique_sources == {"code", "yaml"}, f"""
+    assert unique_sources == {
+        "code",
+        "yaml",
+    }, f"""
     =====================================================================
     ATTENTION: Tool source types have changed!
     
@@ -292,4 +305,4 @@ def test_valid_tool_sources():
     2. Add tests for the new source type's behavior
     3. Update the plugin_config.is_source_enabled method to handle the new source
     =====================================================================
-    """ 
+    """

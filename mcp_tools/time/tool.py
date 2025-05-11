@@ -3,6 +3,7 @@ from typing import Union, Dict, Any
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 import re
+
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
@@ -20,19 +21,23 @@ def parse_delta_string(delta_str: str) -> datetime.timedelta:
         raise ValueError(f"Invalid delta string: {delta_str}")
     value, unit = match.groups()
     value = int(value)
-    if unit == 's':
+    if unit == "s":
         return datetime.timedelta(seconds=value)
-    elif unit == 'm':
+    elif unit == "m":
         return datetime.timedelta(minutes=value)
-    elif unit == 'h':
+    elif unit == "h":
         return datetime.timedelta(hours=value)
-    elif unit == 'd':
+    elif unit == "d":
         return datetime.timedelta(days=value)
     else:
         raise ValueError(f"Unknown delta unit: {unit}")
 
 
-def get_time(time_point: Union[str, None] = None, delta: Union[str, None] = None, timezone: str = "UTC") -> str:
+def get_time(
+    time_point: Union[str, None] = None,
+    delta: Union[str, None] = None,
+    timezone: str = "UTC",
+) -> str:
     try:
         tz = ZoneInfo(timezone)
     except Exception:
@@ -46,6 +51,7 @@ def get_time(time_point: Union[str, None] = None, delta: Union[str, None] = None
         delta_td = parse_delta_string(delta)
         base_time = base_time + delta_td
     return base_time.strftime("%Y-%m-%d %H:%M:%S")
+
 
 @register_tool
 class TimeTool(ToolInterface):
@@ -70,12 +76,12 @@ class TimeTool(ToolInterface):
                     "type": "string",
                     "description": "The operation to perform (get_time)",
                     "enum": ["get_time"],
-                    "default": "get_time"
+                    "default": "get_time",
                 },
                 "time_point": {
                     "type": "string",
                     "description": "The base time as a string (optional, defaults to now). Use 'now' for current time.",
-                    "nullable": True
+                    "nullable": True,
                 },
                 "delta": {
                     "type": "string",
@@ -83,15 +89,15 @@ class TimeTool(ToolInterface):
                         "A delta string to add to the time_point (e.g., '5m', '2d', '3h', '42s'). "
                         "Optional."
                     ),
-                    "nullable": True
+                    "nullable": True,
                 },
                 "timezone": {
                     "type": "string",
                     "description": "The timezone name (IANA, e.g. 'UTC', 'Asia/Shanghai'). Default is 'UTC'",
-                    "default": "UTC"
-                }
+                    "default": "UTC",
+                },
             },
-            "required": ["operation"]
+            "required": ["operation"],
         }
 
     async def execute_tool(self, arguments: Dict[str, Any]):
@@ -107,4 +113,5 @@ class TimeTool(ToolInterface):
         else:
             return {"success": False, "error": f"Unknown operation: {op}"}
 
-__all__ = ["TimeTool", "get_time"] 
+
+__all__ = ["TimeTool", "get_time"]

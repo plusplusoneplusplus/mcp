@@ -20,20 +20,14 @@ from mcp_tools.plugin import (
     register_tool,
     registry,
     discover_and_register_tools,
-    PluginRegistry
+    PluginRegistry,
 )
 
 # Import dependency injection system
-from mcp_tools.dependency import (
-    injector,
-    DependencyInjector
-)
+from mcp_tools.dependency import injector, DependencyInjector
 
 # Import YAML tools system
-from mcp_tools.yaml_tools import (
-    YamlToolBase,
-    discover_and_register_yaml_tools
-)
+from mcp_tools.yaml_tools import YamlToolBase, discover_and_register_yaml_tools
 
 # Import Kusto client
 from mcp_tools.kusto import KustoClient
@@ -47,25 +41,21 @@ __all__ = [
     "RepoClientInterface",
     "BrowserClientInterface",
     "KustoClientInterface",
-    
     # Implementations
     "CommandExecutor",
     "AzureRepoClient",
     "BrowserClient",
     "KustoClient",
     "env",
-    
     # Plugin system
     "register_tool",
     "registry",
     "discover_and_register_tools",
     "PluginRegistry",
-    
     # Dependency injection
     "injector",
     "DependencyInjector",
-    
     # YAML tools
     "YamlToolBase",
-    "discover_and_register_yaml_tools"
+    "discover_and_register_yaml_tools",
 ]

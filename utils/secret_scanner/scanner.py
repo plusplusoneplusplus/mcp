@@ -22,13 +22,13 @@ def is_password_like(s: str) -> bool:
     if len(s) < 12:
         return False
     classes = 0
-    if re.search(r'[A-Z]', s):
+    if re.search(r"[A-Z]", s):
         classes += 1
-    if re.search(r'[a-z]', s):
+    if re.search(r"[a-z]", s):
         classes += 1
-    if re.search(r'\d', s):
+    if re.search(r"\d", s):
         classes += 1
-    if re.search(r'[^A-Za-z0-9]', s):
+    if re.search(r"[^A-Za-z0-9]", s):
         classes += 1
     if classes < 3:
         return False
@@ -41,15 +41,17 @@ def find_password_like_strings(raw_content: str) -> List[dict]:
     findings = []
     for i, line in enumerate(raw_content.splitlines(), 1):
         # Tokenize by whitespace and quotes
-        tokens = re.findall(r'\b\w[\w!@#$%^&*()_+\-=\[\]{};:\'\",.<>/?`~|]+\b', line)
+        tokens = re.findall(r"\b\w[\w!@#$%^&*()_+\-=\[\]{};:\'\",.<>/?`~|]+\b", line)
         for token in tokens:
             if is_password_like(token):
-                findings.append({
-                    'RuleID': 'PasswordLikeString',
-                    'LineNumber': i,
-                    'SecretType': 'PasswordLikeString',
-                    'SecretValue': token,
-                })
+                findings.append(
+                    {
+                        "RuleID": "PasswordLikeString",
+                        "LineNumber": i,
+                        "SecretType": "PasswordLikeString",
+                        "SecretValue": token,
+                    }
+                )
     return findings
 
 
@@ -57,13 +59,13 @@ def is_password_like_loose(s: str) -> bool:
     if len(s) < 12:
         return False
     classes = 0
-    if re.search(r'[A-Z]', s):
+    if re.search(r"[A-Z]", s):
         classes += 1
-    if re.search(r'[a-z]', s):
+    if re.search(r"[a-z]", s):
         classes += 1
-    if re.search(r'\d', s):
+    if re.search(r"\d", s):
         classes += 1
-    if re.search(r'[^A-Za-z0-9]', s):
+    if re.search(r"[^A-Za-z0-9]", s):
         classes += 1
     if classes >= 2 or shannon_entropy(s) > 3.0:
         return True
@@ -74,15 +76,17 @@ def find_custom_password_like_strings(raw_content: str) -> List[dict]:
     findings = []
     for i, line in enumerate(raw_content.splitlines(), 1):
         # Find any sequence of 12+ non-whitespace characters
-        tokens = re.findall(r'\S{12,}', line)
+        tokens = re.findall(r"\S{12,}", line)
         for token in tokens:
             if is_password_like_loose(token):
-                findings.append({
-                    'RuleID': 'PasswordLikeString',
-                    'LineNumber': i,
-                    'SecretType': 'PasswordLikeString',
-                    'SecretValue': token,
-                })
+                findings.append(
+                    {
+                        "RuleID": "PasswordLikeString",
+                        "LineNumber": i,
+                        "SecretType": "PasswordLikeString",
+                        "SecretValue": token,
+                    }
+                )
     return findings
 
 
@@ -97,9 +101,9 @@ def check_secrets(raw_content: str) -> List[dict]:
     # These are added with default configurations if not already present in settings.
     # (e.g., loaded from a baseline file or user-defined config)
     essential_plugins_config = {
-        'KeywordDetector': {},  # Default config is empty
-        'Base64HighEntropyString': {'base64_limit': 4.5}, # Default from detect-secrets
-        'HexHighEntropyString': {'hex_limit': 3.0}        # Default from detect-secrets
+        "KeywordDetector": {},  # Default config is empty
+        "Base64HighEntropyString": {"base64_limit": 4.5},  # Default from detect-secrets
+        "HexHighEntropyString": {"hex_limit": 3.0},  # Default from detect-secrets
     }
 
     for class_name, config in essential_plugins_config.items():
@@ -122,45 +126,54 @@ def check_secrets(raw_content: str) -> List[dict]:
             pass
 
     leaks = []
-    seen = set() # To avoid duplicate findings
+    seen = set()  # To avoid duplicate findings
 
     # Run detect-secrets plugins
     for i, line_content in enumerate(raw_content.splitlines(), 1):
         for plugin in plugins:
             try:
-                results = plugin.analyze_line(filename='in-memory', line=line_content, line_number=i)
+                results = plugin.analyze_line(
+                    filename="in-memory", line=line_content, line_number=i
+                )
                 for secret in results:
                     # Create a unique key for the finding to avoid duplicates
                     finding_key = (i, secret.secret_value, secret.type)
                     if finding_key not in seen:
-                        leaks.append({
-                            'RuleID': secret.type, # Or plugin.secret_type for consistency
-                            'LineNumber': i,
-                            'SecretType': secret.type,
-                            'SecretValue': secret.secret_value,
-                        })
+                        leaks.append(
+                            {
+                                "RuleID": secret.type,  # Or plugin.secret_type for consistency
+                                "LineNumber": i,
+                                "SecretType": secret.type,
+                                "SecretValue": secret.secret_value,
+                            }
+                        )
                         seen.add(finding_key)
             except Exception as e:
                 # print(f"Error analyzing line with plugin {plugin.__class__.__name__}: {e}")
-                pass # Continue with other plugins/lines
+                pass  # Continue with other plugins/lines
 
     # Add custom password-like string findings
     custom_findings = find_custom_password_like_strings(raw_content)
     for finding in custom_findings:
-        finding_key = (finding['LineNumber'], finding['SecretValue'], finding['SecretType'])
+        finding_key = (
+            finding["LineNumber"],
+            finding["SecretValue"],
+            finding["SecretType"],
+        )
         if finding_key not in seen:
             leaks.append(finding)
             seen.add(finding_key)
-            
-    return leaks 
+
+    return leaks
+
 
 def redact_secrets(content: str) -> Tuple[str, List[Dict]]:
     """
     Scan content for secrets and redact them with '[REDACTED]'.
-    
+
     Args:
         content: The text content to scan and redact.
-        
+
     Returns:
         A tuple containing:
         - The redacted content
@@ -168,21 +181,19 @@ def redact_secrets(content: str) -> Tuple[str, List[Dict]]:
     """
     findings = check_secrets(content)
     redacted_content = content
-    
+
     # Sort findings by line number and then by position within the line (if available)
     # to process from end to beginning to avoid affecting positions
     sorted_findings = sorted(
-        findings, 
-        key=lambda x: (x['LineNumber'], -len(x['SecretValue'])), 
-        reverse=True
+        findings, key=lambda x: (x["LineNumber"], -len(x["SecretValue"])), reverse=True
     )
-    
+
     lines = redacted_content.splitlines(True)  # Keep line endings
-    
+
     for finding in sorted_findings:
-        line_num = finding['LineNumber'] - 1  # Convert to 0-indexed
+        line_num = finding["LineNumber"] - 1  # Convert to 0-indexed
         if 0 <= line_num < len(lines):
-            secret_value = finding['SecretValue']
-            lines[line_num] = lines[line_num].replace(secret_value, '[REDACTED]')
-    
-    return ''.join(lines), findings 
+            secret_value = finding["SecretValue"]
+            lines[line_num] = lines[line_num].replace(secret_value, "[REDACTED]")
+
+    return "".join(lines), findings

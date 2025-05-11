@@ -34,13 +34,13 @@ class TestMarkdownSegmenter(unittest.TestCase):
         self.test_collection_name = "test_markdown_segments"
         self.vector_store = ChromaVectorStore(
             collection_name=self.test_collection_name,
-            persist_directory=None  # In-memory
+            persist_directory=None,  # In-memory
         )
         self.segmenter = MarkdownSegmenter(
             vector_store=self.vector_store,
             chunk_size=200,
             chunk_overlap=50,
-            table_max_rows=3
+            table_max_rows=3,
         )
 
     def tearDown(self):
@@ -55,8 +55,10 @@ class TestMarkdownSegmenter(unittest.TestCase):
         # Let's try to delete the collection to be safe.
         try:
             # Chroma client is usually accessible via vector_store.client
-            if hasattr(self.vector_store, 'client') and self.vector_store.client:
-                self.vector_store.client.delete_collection(name=self.test_collection_name)
+            if hasattr(self.vector_store, "client") and self.vector_store.client:
+                self.vector_store.client.delete_collection(
+                    name=self.test_collection_name
+                )
         except Exception:
             # pass # Or log an error if deletion fails
             # It's possible the collection doesn't exist if a test failed before its creation
@@ -68,7 +70,7 @@ class TestMarkdownSegmenter(unittest.TestCase):
         """Test basic text chunking functionality."""
         text = "This is a simple text without any tables or headings."
         segments = self.segmenter._chunk_text(text)
-        
+
         self.assertEqual(len(segments), 1)
         self.assertEqual(segments[0]["type"], "text")
         self.assertEqual(segments[0]["content"], text)
@@ -82,7 +84,7 @@ class TestMarkdownSegmenter(unittest.TestCase):
 This is some content under the subheading.
 """
         segments = self.segmenter._chunk_text(text)
-        
+
         self.assertEqual(len(segments), 1)
         self.assertEqual(segments[0]["heading"], "Main Heading")
         self.assertTrue("Subheading" in segments[0]["content"])
@@ -90,10 +92,12 @@ This is some content under the subheading.
     def test_long_text_chunking(self):
         """Test chunking of long text."""
         # Create a text longer than the chunk size
-        long_text = "This is sentence number " + " ".join([f"{i}." for i in range(1, 50)])
-        
+        long_text = "This is sentence number " + " ".join(
+            [f"{i}." for i in range(1, 50)]
+        )
+
         segments = self.segmenter._chunk_text(long_text)
-        
+
         self.assertGreater(len(segments), 1)
         # Check that each chunk is smaller than or equal to chunk_size
         for segment in segments:
@@ -112,14 +116,14 @@ Here's a simple table:
 | Value 3  | Value 4  |
 """
         segments = self.segmenter.segment_markdown(markdown)
-        
+
         # Should have at least one text segment and one table segment
         self.assertGreater(len(segments), 1)
-        
+
         # Check if there's a table segment
         table_segments = [s for s in segments if s["type"] == "table"]
         self.assertEqual(len(table_segments), 1)
-        
+
         # Check table content
         self.assertIn("Column 1", table_segments[0]["content"])
         self.assertIn("Value 1", table_segments[0]["content"])
@@ -130,7 +134,7 @@ Here's a simple table:
         table_rows = ["| Column 1 | Column 2 |", "|----------|----------|"]
         for i in range(1, 10):  # 9 data rows
             table_rows.append(f"| Value {i} | Value {i*2} |")
-        
+
         # Join the table rows beforehand to avoid backslash in f-string
         table_content = "\n".join(table_rows)
         markdown = f"""
@@ -139,13 +143,13 @@ Here's a simple table:
 {table_content}
 """
         segments = self.segmenter.segment_markdown(markdown)
-        
+
         # Find table segments
         table_segments = [s for s in segments if s["type"] == "table"]
-        
+
         # Should have multiple table segments (chunks)
         self.assertGreater(len(table_segments), 1)
-        
+
         # Check if chunks have the right metadata
         for segment in table_segments:
             self.assertIn("is_chunk", segment)
@@ -173,74 +177,80 @@ Some text between tables.
 | Value A  | Value B  |
 """
         segments = self.segmenter.segment_markdown(markdown)
-        
+
         # Find text segments
         text_segments = [s for s in segments if s["type"] == "text"]
         text_content = " ".join([s["content"] for s in text_segments])
-        
+
         # Check if the text between tables is captured
         self.assertIn("Some text between tables", text_content)
-        
+
         # Check if we have two table segments
         table_segments = [s for s in segments if s["type"] == "table"]
         self.assertEqual(len(table_segments), 2)
 
     def test_edge_case_tiny_chunk_size(self):
         """Test with a very small chunk size that could cause issues."""
-        tiny_vector_store = ChromaVectorStore(collection_name="tiny_chunk_test", persist_directory=None)
+        tiny_vector_store = ChromaVectorStore(
+            collection_name="tiny_chunk_test", persist_directory=None
+        )
         tiny_segmenter = MarkdownSegmenter(
             vector_store=tiny_vector_store,
             chunk_size=10,  # Very small chunk size
             chunk_overlap=5,
-            table_max_rows=3
+            table_max_rows=3,
         )
-        
+
         text = "This is a longer text that should be split into many tiny chunks."
         segments = tiny_segmenter._chunk_text(text)
-        
+
         # Should have multiple chunks
         self.assertGreater(len(segments), 3)
-        
+
         # Each chunk should be small
         for segment in segments:
             self.assertLessEqual(len(segment["content"]), 10)
 
     def test_edge_case_overlap_equals_chunk_size(self):
         """Test with overlap equal to chunk size (potential infinite loop case)."""
-        problematic_vector_store = ChromaVectorStore(collection_name="overlap_equals_test", persist_directory=None)
+        problematic_vector_store = ChromaVectorStore(
+            collection_name="overlap_equals_test", persist_directory=None
+        )
         problematic_segmenter = MarkdownSegmenter(
             vector_store=problematic_vector_store,
             chunk_size=100,
             chunk_overlap=100,  # Equal to chunk size
-            table_max_rows=3
+            table_max_rows=3,
         )
-        
+
         text = "This is a text that would cause an infinite loop in the original implementation."
         segments = problematic_segmenter._chunk_text(text)
-        
+
         # Should still produce segments without infinite loop
         self.assertGreater(len(segments), 0)
 
     def test_edge_case_overlap_greater_than_chunk_size(self):
         """Test with overlap greater than chunk size (potential infinite loop case)."""
-        problematic_vector_store = ChromaVectorStore(collection_name="overlap_greater_test", persist_directory=None)
+        problematic_vector_store = ChromaVectorStore(
+            collection_name="overlap_greater_test", persist_directory=None
+        )
         problematic_segmenter = MarkdownSegmenter(
             vector_store=problematic_vector_store,
             chunk_size=50,
             chunk_overlap=100,  # Greater than chunk size
-            table_max_rows=3
+            table_max_rows=3,
         )
-        
+
         text = "This is another text that would cause an infinite loop in the original implementation."
         segments = problematic_segmenter._chunk_text(text)
-        
+
         # Should still produce segments without infinite loop
         self.assertGreater(len(segments), 0)
 
     def test_empty_markdown(self):
         """Test with empty markdown."""
         segments = self.segmenter.segment_markdown("")
-        
+
         # Should return an empty list
         self.assertEqual(len(segments), 0)
 
@@ -256,7 +266,7 @@ Some text between tables.
 | Value A  | Value B  |
 """
         segments = self.segmenter.segment_markdown(markdown)
-        
+
         # Should have only table segments
         table_segments = [s for s in segments if s["type"] == "table"]
         self.assertEqual(len(table_segments), 2)
@@ -274,7 +284,7 @@ This is some text.
 More text here.
 """
         segments = self.segmenter.segment_markdown(markdown)
-        
+
         # Should have only text segments
         text_segments = [s for s in segments if s["type"] == "text"]
         self.assertEqual(len(segments), len(text_segments))
@@ -282,11 +292,11 @@ More text here.
 
     def test_complex_markdown(self):
         """Test with complex markdown containing multiple headings, tables, and text."""
-        
+
         original_chunk_size = self.segmenter.chunk_size
         original_overlap = self.segmenter.chunk_overlap
         # Temporarily reduce chunk_size to ensure finer granularity for this test
-        self.segmenter.chunk_size = 60 
+        self.segmenter.chunk_size = 60
         # Ensure overlap is valid with new chunk_size (from __init__ logic)
         if self.segmenter.chunk_overlap >= self.segmenter.chunk_size:
             self.segmenter.chunk_overlap = max(0, self.segmenter.chunk_size - 1)
@@ -323,21 +333,27 @@ More content here.
 Concluding remarks.
 """
             segments = self.segmenter.segment_markdown(markdown)
-            
+
             # Should have both text and table segments
             text_segments = [s for s in segments if s["type"] == "text"]
             table_segments = [s for s in segments if s["type"] == "table"]
-            
+
             self.assertGreater(len(text_segments), 0)
             self.assertGreater(len(table_segments), 0)
-            
+
             # Check if the first table was split (it has more than 3 rows)
             table_chunks = [s for s in table_segments if s.get("is_chunk", False)]
             self.assertGreater(len(table_chunks), 0)
-            
+
             # Check heading association
-            intro_segments = [s for s in text_segments if s["heading"] == "Introduction"]
-            self.assertGreater(len(intro_segments), 0, "Should find segments under 'Introduction' heading")
+            intro_segments = [
+                s for s in text_segments if s["heading"] == "Introduction"
+            ]
+            self.assertGreater(
+                len(intro_segments),
+                0,
+                "Should find segments under 'Introduction' heading",
+            )
             # Optionally, check content of intro_segments if needed
             # self.assertTrue(any("This is an introduction paragraph." in s['content'] for s in intro_segments))
 
@@ -348,4 +364,4 @@ Concluding remarks.
 
 
 if __name__ == "__main__":
-    unittest.main() 
+    unittest.main()

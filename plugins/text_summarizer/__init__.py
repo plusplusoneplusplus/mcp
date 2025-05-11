@@ -5,4 +5,4 @@ This plugin provides tools for extracting content from HTML and URLs and convert
 
 from plugins.text_summarizer.tool import WebSummarizerTool, UrlSummarizerTool
 
-__all__ = ["WebSummarizerTool", "UrlSummarizerTool"] 
+__all__ = ["WebSummarizerTool", "UrlSummarizerTool"]

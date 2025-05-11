@@ -18,13 +18,13 @@ from test_markdown_segmenter import TestMarkdownSegmenter
 if __name__ == "__main__":
     # Create a test suite
     test_suite = unittest.TestSuite()
-    
+
     # Add tests
     test_suite.addTest(unittest.makeSuite(TestMarkdownSegmenter))
-    
+
     # Run tests
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(test_suite)
-    
+
     # Exit with non-zero code if tests failed
-    sys.exit(not result.wasSuccessful()) 
+    sys.exit(not result.wasSuccessful())

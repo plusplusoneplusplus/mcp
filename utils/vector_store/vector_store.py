@@ -1,11 +1,15 @@
 import chromadb
 from typing import List, Optional, Any, Dict
 
+
 class ChromaVectorStore:
     """
     Utility class for storing and accessing data through ChromaDB vector database.
     """
-    def __init__(self, collection_name: str = "default", persist_directory: Optional[str] = None):
+
+    def __init__(
+        self, collection_name: str = "default", persist_directory: Optional[str] = None
+    ):
         """
         Initialize the ChromaDB client and collection.
         Args:
@@ -18,7 +22,13 @@ class ChromaVectorStore:
             self.client = chromadb.EphemeralClient()
         self.collection = self.client.get_or_create_collection(collection_name)
 
-    def add(self, ids: List[str], embeddings: List[List[float]], metadatas: Optional[List[Dict[str, Any]]] = None, documents: Optional[List[str]] = None):
+    def add(
+        self,
+        ids: List[str],
+        embeddings: List[List[float]],
+        metadatas: Optional[List[Dict[str, Any]]] = None,
+        documents: Optional[List[str]] = None,
+    ):
         """
         Add vectors/documents to the collection.
         Args:
@@ -28,13 +38,15 @@ class ChromaVectorStore:
             documents (Optional[List[str]]): Raw documents (optional).
         """
         self.collection.add(
-            ids=ids,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            documents=documents
+            ids=ids, embeddings=embeddings, metadatas=metadatas, documents=documents
         )
 
-    def query(self, query_embeddings: List[List[float]], n_results: int = 5, where: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def query(
+        self,
+        query_embeddings: List[List[float]],
+        n_results: int = 5,
+        where: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """
         Query the collection for similar vectors, with optional metadata filtering.
         Args:
@@ -45,9 +57,7 @@ class ChromaVectorStore:
             Dict[str, Any]: Query results including ids, distances, metadatas, and documents.
         """
         return self.collection.query(
-            query_embeddings=query_embeddings,
-            n_results=n_results,
-            where=where
+            query_embeddings=query_embeddings, n_results=n_results, where=where
         )
 
     def delete(self, ids: List[str]):
@@ -72,4 +82,4 @@ class ChromaVectorStore:
         Args:
             collection_name (str): Name of the collection.
         """
-        self.collection = self.client.get_or_create_collection(collection_name) 
+        self.collection = self.client.get_or_create_collection(collection_name)

@@ -140,7 +140,10 @@ class TestCommandExecutorAsync:
 
         # Query without waiting - provide a default timeout
         status = await executor.query_process(token, wait=False, timeout=1.0)
-        assert status["status"] in ["running", "sleeping"]  # Process could be in running or sleeping state
+        assert status["status"] in [
+            "running",
+            "sleeping",
+        ]  # Process could be in running or sleeping state
 
         # Wait for completion
         await asyncio.sleep(3)  # Wait a bit longer for Windows
@@ -156,7 +159,7 @@ class TestCommandExecutorAsync:
             cmd = "cmd /c echo HelloTest"
         else:
             # Direct stdout to ensure it's properly captured
-            cmd = 'bash -c \'echo "Hello" && sleep 3\''
+            cmd = "bash -c 'echo \"Hello\" && sleep 3'"
 
         response = await executor.execute_async(cmd)
         token = response["token"]
@@ -223,7 +226,7 @@ class TestCommandExecutorAsync:
         # Ensure process is terminated
         await asyncio.sleep(0.5)
         status = await executor.get_process_status(token)
-        
+
         # In the actual implementation, the process might still be running after timeout
         # We simply verify it has a valid status field
         assert "status" in status
@@ -237,7 +240,7 @@ class TestCommandExecutorAsync:
             if platform.system().lower() == "windows":
                 cmd = f"cmd /c echo Process{i}"
             else:
-                cmd = f'bash -c \'echo "Process{i}" && sleep 2\''
+                cmd = f"bash -c 'echo \"Process{i}\" && sleep 2'"
 
             response = await executor.execute_async(cmd)
             tokens.append(response["token"])
@@ -245,10 +248,16 @@ class TestCommandExecutorAsync:
         # Check all are running
         for token in tokens:
             status = await executor.get_process_status(token)
-            assert status["status"] in ["running", "sleeping", "completed"]  # May complete quickly
+            assert status["status"] in [
+                "running",
+                "sleeping",
+                "completed",
+            ]  # May complete quickly
 
         # Wait for all to complete with timeout
-        results = await asyncio.gather(*[executor.wait_for_process(token, timeout=10.0) for token in tokens])
+        results = await asyncio.gather(
+            *[executor.wait_for_process(token, timeout=10.0) for token in tokens]
+        )
 
         # Verify all completed and have correct output
         for i, result in enumerate(results):
@@ -270,9 +279,9 @@ class TestCommandExecutorAsync:
         # Create a command that generates a lot of output
         lines = 500
         if platform.system().lower() == "windows":
-            cmd = f"cmd /c \"FOR /L %i IN (1,1,{lines}) DO @echo Line%i\""
+            cmd = f'cmd /c "FOR /L %i IN (1,1,{lines}) DO @echo Line%i"'
         else:
-            cmd = f"for i in $(seq 1 {lines}); do echo \"Line $i\"; done"
+            cmd = f'for i in $(seq 1 {lines}); do echo "Line $i"; done'
 
         response = await executor.execute_async(cmd)
         token = response["token"]
@@ -283,11 +292,17 @@ class TestCommandExecutorAsync:
         # Verify output length
         assert result["status"] == "completed"
         output_lines = result["output"].strip().split("\n")
-        assert len(output_lines) >= lines * 0.9  # Allow some tolerance for missing lines
-        
+        assert (
+            len(output_lines) >= lines * 0.9
+        )  # Allow some tolerance for missing lines
+
         # Check some random lines
-        line_25_expected = "Line25" if platform.system().lower() == "windows" else "Line 25"
-        line_250_expected = "Line250" if platform.system().lower() == "windows" else "Line 250"
+        line_25_expected = (
+            "Line25" if platform.system().lower() == "windows" else "Line 25"
+        )
+        line_250_expected = (
+            "Line250" if platform.system().lower() == "windows" else "Line 250"
+        )
         assert any(line_25_expected in line for line in output_lines)
         assert any(line_250_expected in line for line in output_lines)
 
@@ -298,7 +313,7 @@ class TestCommandExecutorAsync:
         if platform.system().lower() == "windows":
             cmd = f"cmd /c FOR /L %i IN (1,1,{count}) DO @echo Stream%i"
         else:
-            cmd = f"for i in $(seq 1 {count}); do echo \"Stream$i\"; sleep 1; done"
+            cmd = f'for i in $(seq 1 {count}); do echo "Stream$i"; sleep 1; done'
 
         response = await executor.execute_async(cmd)
         token = response["token"]
@@ -306,7 +321,7 @@ class TestCommandExecutorAsync:
         # Check for output incrementally - this is just an approximate check
         # since we can't directly check streaming, we're checking after waiting
         await asyncio.sleep(2)  # Wait for some output to be generated
-        
+
         # Wait for completion with a generous timeout
         result = await executor.wait_for_process(token, timeout=count * 2)
 
@@ -385,19 +400,19 @@ class TestCommandExecutorAsync:
             # Change to the directory containing this test file
             test_file_dir = os.path.dirname(os.path.abspath(__file__))
             os.chdir(test_file_dir)
-            
+
             # Find the git root directory (assuming we're in a git repo)
             response = await executor.execute_async("git rev-parse --show-toplevel")
             token = response["token"]
             result = await executor.wait_for_process(token, timeout=5.0)
-            
+
             assert result["status"] == "completed"
             assert result["output"].strip() != "", "Not in a git repository"
             git_root = result["output"].strip()
-            
+
             # Change to git root directory
             os.chdir(git_root)
-            
+
             # Run the branch command
             cmd = "git branch --show-current"
             response = await executor.execute_async(cmd)
@@ -410,7 +425,9 @@ class TestCommandExecutorAsync:
             assert result["status"] == "completed"
             assert result["output"].strip() != "", "Branch name should not be empty"
             # Branch name should be a valid git branch name (no spaces or special chars except - _ /)
-            assert all(c.isalnum() or c in "-_/" for c in result["output"].strip()), "Invalid branch name characters"
+            assert all(
+                c.isalnum() or c in "-_/" for c in result["output"].strip()
+            ), "Invalid branch name characters"
         finally:
             # Restore original directory
             os.chdir(original_dir)

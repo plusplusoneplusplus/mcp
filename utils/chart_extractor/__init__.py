@@ -2,4 +2,4 @@
 
 from utils.chart_extractor.extractor import extract_charts
 
-__all__ = ["extract_charts"] 
+__all__ = ["extract_charts"]

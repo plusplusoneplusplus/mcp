@@ -14,8 +14,11 @@ from pathlib import Path
 from utils.ocr_extractor import extract_text_from_image
 from PIL import Image
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Extract text from an image using EasyOCR.")
+    parser = argparse.ArgumentParser(
+        description="Extract text from an image using EasyOCR."
+    )
     parser.add_argument("image_path", type=Path, help="Path to the image file.")
     args = parser.parse_args()
 
@@ -36,6 +39,7 @@ def main():
         print("\n".join(texts))
     else:
         print("No text found in the image.")
+
 
 if __name__ == "__main__":
     main()

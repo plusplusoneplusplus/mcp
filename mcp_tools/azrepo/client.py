@@ -4,8 +4,10 @@ from typing import Dict, Any, List, Optional, Union
 
 # Import interface
 from mcp_tools.interfaces import RepoClientInterface
+
 # Import the plugin decorator
 from mcp_tools.plugin import register_tool
+
 
 # Now we'll accept the CommandExecutor as a dependency rather than importing it directly
 @register_tool
@@ -34,17 +36,18 @@ class AzureRepoClient(RepoClientInterface):
         # Get PR details
         pr_details = await az_client.get_pull_request(123)
     """
+
     # Implement ToolInterface properties
     @property
     def name(self) -> str:
         """Get the tool name."""
         return "azure_repo_client"
-        
+
     @property
     def description(self) -> str:
         """Get the tool description."""
         return "Interact with Azure DevOps repositories and pull requests"
-        
+
     @property
     def input_schema(self) -> Dict[str, Any]:
         """Get the JSON schema for the tool input."""
@@ -54,50 +57,55 @@ class AzureRepoClient(RepoClientInterface):
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform (list_pull_requests, get_pull_request, create_pull_request, etc.)",
-                    "enum": ["list_pull_requests", "get_pull_request", "create_pull_request", "update_pull_request"]
+                    "enum": [
+                        "list_pull_requests",
+                        "get_pull_request",
+                        "create_pull_request",
+                        "update_pull_request",
+                    ],
                 },
                 "pull_request_id": {
                     "type": ["string", "integer"],
                     "description": "ID of the pull request",
-                    "nullable": True
+                    "nullable": True,
                 },
                 "title": {
                     "type": "string",
                     "description": "Title for the pull request",
-                    "nullable": True
+                    "nullable": True,
                 },
                 "source_branch": {
                     "type": "string",
                     "description": "Name of the source branch",
-                    "nullable": True
+                    "nullable": True,
                 },
                 "target_branch": {
                     "type": "string",
                     "description": "Name of the target branch",
-                    "nullable": True
+                    "nullable": True,
                 },
                 "repository": {
                     "type": "string",
                     "description": "Name or ID of the repository",
-                    "nullable": True
+                    "nullable": True,
                 },
                 "project": {
                     "type": "string",
                     "description": "Name or ID of the project",
-                    "nullable": True
+                    "nullable": True,
                 },
                 "organization": {
                     "type": "string",
                     "description": "Azure DevOps organization URL",
-                    "nullable": True
-                }
+                    "nullable": True,
+                },
             },
-            "required": ["operation"]
+            "required": ["operation"],
         }
 
     def __init__(self, command_executor=None):
         """Initialize the AzureRepoClient with a command executor.
-        
+
         Args:
             command_executor: An instance of CommandExecutor to use for running commands.
                               If None, it will be obtained from the registry.
@@ -105,15 +113,18 @@ class AzureRepoClient(RepoClientInterface):
         if command_executor is None:
             # Get the command executor from the registry
             from mcp_tools.plugin import registry
+
             self.executor = registry.get_tool_instance("command_executor")
             if not self.executor:
                 raise ValueError("Command executor not found in registry")
         else:
             self.executor = command_executor
-            
+
         self.logger = logging.getLogger(__name__)
 
-    async def _run_az_command(self, command: str, timeout: Optional[float] = None) -> Dict[str, Any]:
+    async def _run_az_command(
+        self, command: str, timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
         """Run an Azure CLI command and parse the JSON output.
 
         Args:
@@ -146,7 +157,7 @@ class AzureRepoClient(RepoClientInterface):
             return {
                 "success": False,
                 "error": f"Failed to parse JSON output: {e}",
-                "raw_output": status.get("output", "")
+                "raw_output": status.get("output", ""),
             }
 
     async def list_pull_requests(
@@ -160,7 +171,7 @@ class AzureRepoClient(RepoClientInterface):
         source_branch: Optional[str] = None,
         target_branch: Optional[str] = None,
         top: Optional[int] = None,
-        skip: Optional[int] = None
+        skip: Optional[int] = None,
     ) -> Dict[str, Any]:
         """List pull requests in the repository.
 
@@ -206,9 +217,7 @@ class AzureRepoClient(RepoClientInterface):
         return await self._run_az_command(command)
 
     async def get_pull_request(
-        self,
-        pull_request_id: Union[int, str],
-        organization: Optional[str] = None
+        self, pull_request_id: Union[int, str], organization: Optional[str] = None
     ) -> Dict[str, Any]:
         """Get details of a specific pull request.
 
@@ -240,7 +249,7 @@ class AzureRepoClient(RepoClientInterface):
         draft: bool = False,
         auto_complete: bool = False,
         squash: bool = False,
-        delete_source_branch: bool = False
+        delete_source_branch: bool = False,
     ) -> Dict[str, Any]:
         """Create a new pull request.
 
@@ -265,7 +274,7 @@ class AzureRepoClient(RepoClientInterface):
         command = "repos pr create"
 
         # Required parameters
-        command += f" --title \"{title}\""
+        command += f' --title "{title}"'
         command += f" --source-branch {source_branch}"
 
         # Add optional parameters
@@ -273,9 +282,9 @@ class AzureRepoClient(RepoClientInterface):
             command += f" --target-branch {target_branch}"
         if description:
             # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split('\n')
+            desc_lines = description.replace('"', '\\"').split("\n")
             for line in desc_lines:
-                command += f" --description \"{line}\""
+                command += f' --description "{line}"'
         if repository:
             command += f" --repository {repository}"
         if project:
@@ -315,7 +324,7 @@ class AzureRepoClient(RepoClientInterface):
         auto_complete: Optional[bool] = None,
         squash: Optional[bool] = None,
         delete_source_branch: Optional[bool] = None,
-        draft: Optional[bool] = None
+        draft: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Update an existing pull request.
 
@@ -337,12 +346,12 @@ class AzureRepoClient(RepoClientInterface):
 
         # Add optional parameters
         if title:
-            command += f" --title \"{title}\""
+            command += f' --title "{title}"'
         if description:
             # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split('\n')
+            desc_lines = description.replace('"', '\\"').split("\n")
             for line in desc_lines:
-                command += f" --description \"{line}\""
+                command += f' --description "{line}"'
         if status:
             command += f" --status {status}"
         if organization:
@@ -354,7 +363,9 @@ class AzureRepoClient(RepoClientInterface):
         if squash is not None:
             command += f" --squash {'true' if squash else 'false'}"
         if delete_source_branch is not None:
-            command += f" --delete-source-branch {'true' if delete_source_branch else 'false'}"
+            command += (
+                f" --delete-source-branch {'true' if delete_source_branch else 'false'}"
+            )
         if draft is not None:
             command += f" --draft {'true' if draft else 'false'}"
 
@@ -364,7 +375,7 @@ class AzureRepoClient(RepoClientInterface):
         self,
         pull_request_id: Union[int, str],
         vote: str,
-        organization: Optional[str] = None
+        organization: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Set your vote on a pull request.
 
@@ -387,7 +398,7 @@ class AzureRepoClient(RepoClientInterface):
         self,
         pull_request_id: Union[int, str],
         reviewers: List[str],
-        organization: Optional[str] = None
+        organization: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add reviewers to a pull request.
 
@@ -414,7 +425,7 @@ class AzureRepoClient(RepoClientInterface):
         self,
         pull_request_id: Union[int, str],
         work_items: List[Union[int, str]],
-        organization: Optional[str] = None
+        organization: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add work items to a pull request.
 
@@ -439,15 +450,15 @@ class AzureRepoClient(RepoClientInterface):
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments.
-        
+
         Args:
             arguments: Dictionary of arguments for the tool
-            
+
         Returns:
             Tool execution result
         """
         operation = arguments.get("operation", "")
-        
+
         if operation == "list_pull_requests":
             return await self.list_pull_requests(
                 repository=arguments.get("repository"),
@@ -457,12 +468,12 @@ class AzureRepoClient(RepoClientInterface):
                 reviewer=arguments.get("reviewer"),
                 status=arguments.get("status"),
                 source_branch=arguments.get("source_branch"),
-                target_branch=arguments.get("target_branch")
+                target_branch=arguments.get("target_branch"),
             )
         elif operation == "get_pull_request":
             return await self.get_pull_request(
                 pull_request_id=arguments.get("pull_request_id"),
-                organization=arguments.get("organization")
+                organization=arguments.get("organization"),
             )
         elif operation == "create_pull_request":
             return await self.create_pull_request(
@@ -472,10 +483,7 @@ class AzureRepoClient(RepoClientInterface):
                 description=arguments.get("description"),
                 repository=arguments.get("repository"),
                 project=arguments.get("project"),
-                organization=arguments.get("organization")
+                organization=arguments.get("organization"),
             )
         else:
-            return {
-                "success": False,
-                "error": f"Unknown operation: {operation}"
-            } 
+            return {"success": False, "error": f"Unknown operation: {operation}"}

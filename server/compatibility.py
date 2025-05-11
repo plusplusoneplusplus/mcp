@@ -9,4 +9,4 @@ allowing server code to use the local implementation without directly depending 
 from mcp_core.types import TextContent, Tool
 
 # Re-export them for use in server/main.py
-__all__ = ["TextContent", "Tool"] 
+__all__ = ["TextContent", "Tool"]

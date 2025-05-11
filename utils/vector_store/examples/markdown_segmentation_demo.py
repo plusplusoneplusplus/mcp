@@ -131,6 +131,7 @@ Always consider starting with simpler models before moving to more complex ones,
 Machine learning algorithm selection is both an art and a science. Understanding the strengths and weaknesses of different algorithms helps in choosing the most appropriate one for a specific problem. Always experiment with multiple algorithms and use cross-validation to find the best performer for your particular use case.
 """
 
+
 def main():
     """Run the markdown segmentation and search demonstration."""
     # Initialize the markdown segmenter with in-memory database
@@ -138,20 +139,20 @@ def main():
         collection_name="ml_algorithms",
         chunk_size=500,  # Smaller chunks for demonstration
         chunk_overlap=100,
-        table_max_rows=5  # Small value to demonstrate table splitting
+        table_max_rows=5,  # Small value to demonstrate table splitting
     )
-    
+
     print("Using in-memory vector database")
-    
+
     # Segment and store markdown content
     num_segments, segment_ids = segmenter.segment_and_store(SAMPLE_MARKDOWN)
     print(f"Segmented and stored {num_segments} segments:")
     print(f"  - Text segments: {len(segment_ids['text'])}")
     print(f"  - Table segments: {len(segment_ids['table'])}")
-    
+
     # Show the segmentation results
     segments = segmenter.segment_markdown(SAMPLE_MARKDOWN)
-    
+
     # Display text segments
     text_segments = [s for s in segments if s["type"] == "text"]
     print(f"\n=== Text Segments ({len(text_segments)}) ===")
@@ -160,16 +161,20 @@ def main():
         if segment["heading"]:
             print(f"Heading: {segment['heading']}")
         print("-" * 50)
-        print(segment["content"][:150] + "..." if len(segment["content"]) > 150 else segment["content"])
+        print(
+            segment["content"][:150] + "..."
+            if len(segment["content"]) > 150
+            else segment["content"]
+        )
         print("-" * 50)
-    
+
     if len(text_segments) > 3:
         print(f"... and {len(text_segments) - 3} more text segments")
-    
+
     # Display table segments
     table_segments = [s for s in segments if s["type"] == "table"]
     print(f"\n=== Table Segments ({len(table_segments)}) ===")
-    
+
     # Group table chunks by parent ID
     table_groups = {}
     for segment in table_segments:
@@ -177,18 +182,20 @@ def main():
         if parent_id not in table_groups:
             table_groups[parent_id] = []
         table_groups[parent_id].append(segment)
-    
+
     # Sort chunks within each group
     for parent_id in table_groups:
         table_groups[parent_id].sort(key=lambda x: x.get("chunk_index", 0))
-    
+
     # Display information about each table group
-    for i, (parent_id, chunks) in enumerate(list(table_groups.items())[:3]):  # Show first 3 tables
+    for i, (parent_id, chunks) in enumerate(
+        list(table_groups.items())[:3]
+    ):  # Show first 3 tables
         print(f"\nTable {i+1}:")
         if chunks[0]["heading"]:
             print(f"Heading: {chunks[0]['heading']}")
         print(f"Number of chunks: {len(chunks)}")
-        
+
         # Show the first chunk of each table
         first_chunk = chunks[0]
         print("-" * 50)
@@ -196,45 +203,52 @@ def main():
         if len(chunks) > 1:
             print("\n... (table continues in additional chunks) ...")
         print("-" * 50)
-    
+
     if len(table_groups) > 3:
         print(f"... and {len(table_groups) - 3} more tables")
-    
+
     # Perform semantic searches
     search_queries = [
         "What are the strengths of convolutional neural networks?",
         "Which algorithm is best for image classification?",
         "How do you evaluate regression models?",
         "What are the weaknesses of clustering algorithms?",
-        "Which algorithms work well with small datasets?"
+        "Which algorithms work well with small datasets?",
     ]
-    
+
     print("\n=== Semantic Search Results ===")
     for query in search_queries:
         print(f"\nQuery: {query}")
-        
+
         # Search across all segment types
         results = segmenter.search(query, n_results=2)
-        
-        for i, (doc, metadata, distance) in enumerate(zip(
-            results['documents'][0], 
-            results['metadatas'][0],
-            results['distances'][0]
-        )):
+
+        for i, (doc, metadata, distance) in enumerate(
+            zip(
+                results["documents"][0],
+                results["metadatas"][0],
+                results["distances"][0],
+            )
+        ):
             similarity = 1 - distance
-            print(f"\nResult {i+1} (similarity: {similarity:.4f}, type: {metadata['type']}):")
+            print(
+                f"\nResult {i+1} (similarity: {similarity:.4f}, type: {metadata['type']}):"
+            )
             if metadata["heading"]:
                 print(f"Heading: {metadata['heading']}")
-            
+
             print("-" * 50)
             # For tables, show the whole content; for text, limit to first 200 chars
             if metadata["type"] == "table":
                 print(doc)
                 if metadata.get("is_chunk", False):
-                    print(f"(Chunk {metadata['chunk_index'] + 1} of {metadata['total_chunks']})")
+                    print(
+                        f"(Chunk {metadata['chunk_index'] + 1} of {metadata['total_chunks']})"
+                    )
             else:
                 print(doc[:200] + "..." if len(doc) > 200 else doc)
             print("-" * 50)
 
+
 if __name__ == "__main__":
-    main() 
+    main()

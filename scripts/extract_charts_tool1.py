@@ -22,7 +22,7 @@ def get_default_output_dir():
 def main():
     """Run the chart extraction tool from the command line."""
     default_output_dir = get_default_output_dir()
-    
+
     parser = argparse.ArgumentParser(
         description="Extract individual charts from dashboard screenshots or images.",
         epilog="Example: python extract_charts.py dashboard.png -o extracted_charts",
@@ -79,21 +79,21 @@ def main():
         action="store_true",
         help="Save intermediate processing images for debugging.",
     )
-    
+
     args = parser.parse_args()
-    
+
     try:
         print(f"Processing image: {args.image_path}")
         print(f"Saving extracted charts to: {args.output_dir}")
-        
+
         # Use adaptive boundary detection by default, unless explicitly disabled
         adaptive_boundary = not args.no_adaptive
-        
+
         if adaptive_boundary:
             print("Using adaptive boundary detection to include labels and text")
         else:
             print(f"Using fixed margin of {args.text_margin} pixels")
-        
+
         extracted_paths = extract_charts(
             args.image_path,
             args.output_dir,
@@ -105,21 +105,26 @@ def main():
             adaptive_boundary=adaptive_boundary,
             debug=args.debug,
         )
-        
+
         print(f"\nSuccessfully extracted {len(extracted_paths)} charts:")
         for i, path in enumerate(extracted_paths, 1):
             print(f"  {i}. {path}")
-        
+
         if args.debug:
             print("\nDebug images saved to output directory:")
             print("  - debug_edges.png: Edge detection result")
             print("  - debug_text_regions.png: Detected text regions")
-            print("  - debug_detected_charts.png: Original image with detected charts outlined")
-            
+            print(
+                "  - debug_detected_charts.png: Original image with detected charts outlined"
+            )
+
         return 0
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
-        print("Please check that the image file exists and the path is correct.", file=sys.stderr)
+        print(
+            "Please check that the image file exists and the path is correct.",
+            file=sys.stderr,
+        )
         return 1
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -127,4 +132,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main()) 
+    sys.exit(main())

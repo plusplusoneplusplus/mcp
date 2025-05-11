@@ -3,6 +3,7 @@ import json
 from typing import Dict, Any, List, Optional, Union
 from command_executor import CommandExecutor
 
+
 class AzureRepoUtils:
     """Utility class for interacting with Azure DevOps Repositories using Azure CLI commands.
 
@@ -32,7 +33,9 @@ class AzureRepoUtils:
         self.executor = CommandExecutor()
         self.logger = logging.getLogger(__name__)
 
-    async def _run_az_command(self, command: str, timeout: Optional[float] = None) -> Dict[str, Any]:
+    async def _run_az_command(
+        self, command: str, timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
         """Run an Azure CLI command and parse the JSON output.
 
         Args:
@@ -65,7 +68,7 @@ class AzureRepoUtils:
             return {
                 "success": False,
                 "error": f"Failed to parse JSON output: {e}",
-                "raw_output": status.get("output", "")
+                "raw_output": status.get("output", ""),
             }
 
     async def list_pull_requests(
@@ -79,7 +82,7 @@ class AzureRepoUtils:
         source_branch: Optional[str] = None,
         target_branch: Optional[str] = None,
         top: Optional[int] = None,
-        skip: Optional[int] = None
+        skip: Optional[int] = None,
     ) -> Dict[str, Any]:
         """List pull requests in the repository.
 
@@ -125,9 +128,7 @@ class AzureRepoUtils:
         return await self._run_az_command(command)
 
     async def get_pull_request(
-        self,
-        pull_request_id: Union[int, str],
-        organization: Optional[str] = None
+        self, pull_request_id: Union[int, str], organization: Optional[str] = None
     ) -> Dict[str, Any]:
         """Get details of a specific pull request.
 
@@ -159,7 +160,7 @@ class AzureRepoUtils:
         draft: bool = False,
         auto_complete: bool = False,
         squash: bool = False,
-        delete_source_branch: bool = False
+        delete_source_branch: bool = False,
     ) -> Dict[str, Any]:
         """Create a new pull request.
 
@@ -184,7 +185,7 @@ class AzureRepoUtils:
         command = "repos pr create"
 
         # Required parameters
-        command += f" --title \"{title}\""
+        command += f' --title "{title}"'
         command += f" --source-branch {source_branch}"
 
         # Add optional parameters
@@ -192,9 +193,9 @@ class AzureRepoUtils:
             command += f" --target-branch {target_branch}"
         if description:
             # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split('\n')
+            desc_lines = description.replace('"', '\\"').split("\n")
             for line in desc_lines:
-                command += f" --description \"{line}\""
+                command += f' --description "{line}"'
         if repository:
             command += f" --repository {repository}"
         if project:
@@ -226,7 +227,7 @@ class AzureRepoUtils:
         auto_complete: Optional[bool] = None,
         squash: Optional[bool] = None,
         delete_source_branch: Optional[bool] = None,
-        draft: Optional[bool] = None
+        draft: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Update an existing pull request.
 
@@ -248,12 +249,12 @@ class AzureRepoUtils:
 
         # Add optional parameters
         if title:
-            command += f" --title \"{title}\""
+            command += f' --title "{title}"'
         if description:
             # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split('\n')
+            desc_lines = description.replace('"', '\\"').split("\n")
             for line in desc_lines:
-                command += f" --description \"{line}\""
+                command += f' --description "{line}"'
         if status:
             command += f" --status {status}"
         if organization:
@@ -273,7 +274,7 @@ class AzureRepoUtils:
         self,
         pull_request_id: Union[int, str],
         vote: str,
-        organization: Optional[str] = None
+        organization: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Set your vote on a pull request.
 
@@ -296,7 +297,7 @@ class AzureRepoUtils:
         self,
         pull_request_id: Union[int, str],
         reviewers: List[str],
-        organization: Optional[str] = None
+        organization: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add reviewers to a pull request.
 
@@ -319,7 +320,7 @@ class AzureRepoUtils:
         self,
         pull_request_id: Union[int, str],
         work_items: List[Union[int, str]],
-        organization: Optional[str] = None
+        organization: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Link work items to a pull request.
 

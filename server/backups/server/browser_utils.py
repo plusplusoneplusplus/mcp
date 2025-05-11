@@ -12,11 +12,13 @@ import shutil
 from datetime import datetime
 import socket
 
+
 class BrowserUtils:
     @staticmethod
     def in_wsl():
         return (
-            os.path.exists("/proc/version") and "microsoft" in open("/proc/version").read().lower()
+            os.path.exists("/proc/version")
+            and "microsoft" in open("/proc/version").read().lower()
         )
 
     @staticmethod
@@ -58,9 +60,9 @@ class BrowserUtils:
         # Use a dynamic port for remote debugging to avoid conflicts
         def find_free_port():
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('', 0))
+                s.bind(("", 0))
                 return s.getsockname()[1]
-                
+
         debug_port = find_free_port()
         chrome_options.add_argument(f"--remote-debugging-port={debug_port}")
 
@@ -72,7 +74,9 @@ class BrowserUtils:
             print("\nTroubleshooting steps:")
             print("1. Make sure Chrome is installed in Windows")
             print("2. Install chromedriver in WSL: `apt install chromium-chromedriver`")
-            print("3. Ensure you have X server running in Windows if not using headless mode")
+            print(
+                "3. Ensure you have X server running in Windows if not using headless mode"
+            )
             print("4. Try killing any existing Chrome processes:")
             print("   Windows: taskkill /F /IM chrome.exe")
             print("   WSL: pkill chrome")
@@ -114,4 +118,4 @@ class BrowserUtils:
                     shutil.rmtree(driver.temp_dir, ignore_errors=True)
                 except Exception:
                     pass
-            driver.quit() 
+            driver.quit()
