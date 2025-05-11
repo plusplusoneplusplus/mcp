@@ -11,18 +11,8 @@ import sys
 import argparse
 from pathlib import Path
 
-try:
-    import easyocr
-except ImportError:
-    print("EasyOCR is not installed. Please run: pip install easyocr pillow")
-    sys.exit(1)
-
+from utils.ocr_extractor import extract_text_from_image
 from PIL import Image
-
-def extract_text(image_path):
-    reader = easyocr.Reader(['en'], gpu=False)
-    results = reader.readtext(str(image_path))
-    return [text for _, text, _ in results]
 
 def main():
     parser = argparse.ArgumentParser(description="Extract text from an image using EasyOCR.")
@@ -41,7 +31,7 @@ def main():
         sys.exit(1)
 
     print(f"Extracting text from: {args.image_path}")
-    texts = extract_text(args.image_path)
+    texts = extract_text_from_image(args.image_path)
     if texts:
         print("\n".join(texts))
     else:
