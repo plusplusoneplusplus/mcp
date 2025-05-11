@@ -11,6 +11,55 @@ from playwright.async_api import async_playwright, Playwright, BrowserContext
 from mcp_tools.browser.interface import IBrowserClient
 
 class PlaywrightBrowserClient(IBrowserClient):
+    async def capture_panels(self, url: str, selector: str = ".react-grid-item", out_dir: str = "charts", width: int = 1600, height: int = 900, token: Optional[str] = None, wait_time: int = 30, headless: bool = True, options: Any = None) -> int:
+        """
+        Capture each matching element as an image and save to the output directory.
+        """
+        import pathlib
+        import re
+        from playwright.async_api import Error as PlaywrightError
+        out_path = pathlib.Path(out_dir)
+        out_path.mkdir(exist_ok=True, parents=True)
+        count = 0
+        page = None
+        ctx = None
+        try:
+            ctx = await self._get_context(headless)
+            page = ctx.pages[0]
+            await page.set_viewport_size({"width": width, "height": height})
+            if token:
+                await page.set_extra_http_headers({"Authorization": f"Bearer {token}"})
+            await page.goto(url, wait_until="networkidle")
+            await page.wait_for_timeout(wait_time * 1000)
+            panels = await page.locator(selector).all()
+            if not panels:
+                print(f"No elements matched '{selector}'.")
+                return 0
+            for idx, el in enumerate(panels, 1):
+                pid = None
+                for attr in ["data-panelid", "data-griditem-key", "data-viz-panel-key"]:
+                    try:
+                        pid = await el.get_attribute(attr)
+                    except PlaywrightError:
+                        pid = None
+                    if pid:
+                        match = re.search(r'(?:panel|grid-item)-(\d+)', pid)
+                        if match:
+                            pid = match.group(1)
+                        break
+                if not pid:
+                    pid = f"{idx:02d}"
+                await el.screenshot(path=str(out_path / f"panel_{pid}.png"))
+                print(f"Saved panel_{pid}.png")
+                count += 1
+            return count
+        except Exception as e:
+            print(f"Error in capture_panels: {e}")
+            return count
+        finally:
+            if page is not None:
+                await page.close()
+
     def __init__(self,
                  browser: Literal['chrome', 'edge'],
                  user_data_dir: str):

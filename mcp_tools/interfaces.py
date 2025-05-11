@@ -219,6 +219,38 @@ class BrowserClientInterface(ToolInterface):
         """
         pass
 
+class CapturePanelsClientInterface(ToolInterface):
+    """Interface for dashboard panel capture tools."""
+    @abstractmethod
+    async def capture_panels(
+        self,
+        url: str,
+        selector: str = ".react-grid-item",
+        out_dir: str = "charts",
+        width: int = 1600,
+        height: int = 900,
+        token: Optional[str] = None,
+        wait_time: int = 30,
+        headless: bool = True,
+        options: Any = None
+    ) -> int:
+        """
+        Capture each matching element as an image and save to the output directory.
+        Args:
+            url: The dashboard URL to visit
+            selector: CSS selector for chart/panel containers
+            out_dir: Directory to write PNGs
+            width: Browser viewport width
+            height: Browser viewport height
+            token: Bearer token for Authorization header (optional)
+            wait_time: Time to wait for page load in seconds
+            headless: Whether to run browser in headless mode
+            options: Browser-specific options
+        Returns:
+            The number of panels captured (saved as PNGs)
+        """
+        pass
+
 class EnvironmentManagerInterface(ToolInterface):
     """Interface for environment management tools."""
     

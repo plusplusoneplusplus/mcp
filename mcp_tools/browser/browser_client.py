@@ -86,7 +86,7 @@ class BrowserClient(BrowserClientInterface):
             "properties": {
                 "operation": {
                     "type": "string",
-                    "description": "The operation to perform (get_page_html, take_screenshot, get_page_markdown)",
+                    "description": "The operation to perform (get_page_html, take_screenshot, get_page_markdown, capture_panels)",
                     "enum": ["get_page_html", "take_screenshot", "get_page_markdown"],
                     "default": "get_page_markdown"
                 },
@@ -307,12 +307,32 @@ class BrowserClient(BrowserClientInterface):
                     )
                 
                 return result
+            elif operation == "capture_panels":
+                selector = arguments.get("selector", ".react-grid-item")
+                out_dir = arguments.get("out_dir", "charts")
+                width = arguments.get("width", 1600)
+                height = arguments.get("height", 900)
+                token = arguments.get("token", None)
+                client = BrowserClientFactory.get_client(self.client_type, browser_type)
+                count = await client.capture_panels(url, selector, out_dir, width, height, token, wait_time, headless, browser_options)
+                return {
+                    "success": True if count > 0 else False,
+                    "captured": count,
+                    "output_dir": out_dir,
+                    "url": url
+                }
             else:
                 return {
                     "success": False,
                     "error": f"Unknown operation: {operation}"
                 }
     
+    async def get_page_html(self, url: str, wait_time: int = 30) -> Optional[str]:
+        raise NotImplementedError("get_page_html should be implemented by the real client")
+    
+    async def take_screenshot(self, url: str, output_path: str, wait_time: int = 30) -> bool:
+        raise NotImplementedError("take_screenshot should be implemented by the real client")
+
     @classmethod
     def set_default_browser_type(cls, browser_type: Literal["chrome", "edge"]):
         """Set the default browser type to use globally.
