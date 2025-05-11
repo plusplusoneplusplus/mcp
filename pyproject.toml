@@ -25,6 +25,7 @@ dependencies = [
     
     # YAML parser
     "pyyaml>=6.0.1",  # YAML parser
+    "black>=25.0.01", # Python formatter
     
     # Process utilities
     "psutil>=5.9.5",  # Process utilities for monitoring and management
