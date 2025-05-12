@@ -5,6 +5,7 @@ from typing import Dict, Any
 
 from mcp_tools import time_util
 
+
 @register_tool
 class TimeTool(ToolInterface):
     @property
@@ -64,6 +65,7 @@ class TimeTool(ToolInterface):
                 return {"success": False, "error": str(e)}
         else:
             return {"success": False, "error": f"Unknown operation: {op}"}
+
 
 get_time = time_util.get_time
 

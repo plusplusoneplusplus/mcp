@@ -14,10 +14,20 @@ class PlaywrightWrapper:
     DEFAULT_AUTO_SCROLL_TIMEOUT = 30  # Default timeout for auto_scroll (seconds)
 
     def __init__(
-        self, browser_type: str = "chromium", user_data_dir: Optional[str] = None
+        self,
+        browser_type: str = "chromium",
+        user_data_dir: Optional[str] = None,
+        headless: bool = False,
     ):
+        """
+        Args:
+            browser_type: Browser type string (e.g., 'chromium', 'firefox', 'webkit').
+            user_data_dir: Optional path for persistent context.
+            headless: Whether to run browser in headless mode (default: False).
+        """
         self.browser_type = browser_type
         self.user_data_dir = user_data_dir
+        self.headless = headless
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
@@ -28,11 +38,11 @@ class PlaywrightWrapper:
         browser_launcher = getattr(self.playwright, self.browser_type)
         if self.user_data_dir:
             self.browser = await browser_launcher.launch_persistent_context(
-                user_data_dir=self.user_data_dir, headless=True
+                user_data_dir=self.user_data_dir, headless=self.headless
             )
             self.context = self.browser
         else:
-            self.browser = await browser_launcher.launch(headless=True)
+            self.browser = await browser_launcher.launch(headless=self.headless)
             self.context = await self.browser.new_context()
         return self
 
@@ -83,7 +93,10 @@ class PlaywrightWrapper:
         await self.page.set_viewport_size({"width": width, "height": height})
 
     async def auto_scroll(
-        self, timeout: int = DEFAULT_AUTO_SCROLL_TIMEOUT, scroll_step: int = 80, scroll_delay: float = 0.5
+        self,
+        timeout: int = DEFAULT_AUTO_SCROLL_TIMEOUT,
+        scroll_step: int = 80,
+        scroll_delay: float = 0.5,
     ):
         """
         Automatically scrolls the page to the bottom, simulating user scrolling.

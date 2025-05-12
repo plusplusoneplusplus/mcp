@@ -9,6 +9,7 @@ try:
 except ImportError:
     from backports.zoneinfo import ZoneInfo  # For Python <3.9, if needed
 
+
 def parse_delta_string(delta_str: str) -> datetime.timedelta:
     """
     Parse a delta string like '5m', '-2d', '3h', '-42s' into a timedelta.
@@ -50,4 +51,3 @@ def get_time(
         delta_td = parse_delta_string(delta)
         base_time = base_time + delta_td
     return base_time.strftime("%Y-%m-%d %H:%M:%S")
-

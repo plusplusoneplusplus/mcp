@@ -1,8 +1,11 @@
 import asyncio
 from utils.playwright.playwright_script_runner import PlaywrightScriptRunner
 
+
 async def main():
-    print("Playwright Interactive CLI. Type 'help' for commands. Type 'exit' or 'quit' to leave.")
+    print(
+        "Playwright Interactive CLI. Type 'help' for commands. Type 'exit' or 'quit' to leave."
+    )
     runner = PlaywrightScriptRunner()
     async with runner:
         while True:
@@ -24,6 +27,7 @@ async def main():
                 print("[OK]")
             except Exception as e:
                 print(f"[ERROR] {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

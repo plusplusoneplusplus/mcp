@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+
 try:
     from unittest import mock
 except ImportError:
@@ -10,6 +11,7 @@ from utils.playwright.playwright_wrapper import PlaywrightWrapper
 pytestmark = pytest.mark.asyncio
 
 github_io_url = "https://github.com/"
+
 
 async def test_run_script_real():
     async with PlaywrightScriptRunner() as runner:
@@ -33,6 +35,6 @@ async def test_run_script_real():
         # Use Playwright's locator API: element_handle.evaluate('el => el.innerText')
         # Only check the first element for simplicity
         main_element = main_elements[0]
-        text_content = await main_element.evaluate('el => el.innerText')
+        text_content = await main_element.evaluate("el => el.innerText")
         assert isinstance(text_content, str)
         assert "GitHub" in text_content or len(text_content.strip()) > 0
