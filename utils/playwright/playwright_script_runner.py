@@ -1,6 +1,6 @@
 from typing import List, Optional
 import asyncio
-from mcp_tools.browser.playwright_wrapper import PlaywrightWrapper
+from utils.playwright.playwright_wrapper import PlaywrightWrapper
 from mcp_tools import time_util
 
 class PlaywrightScriptRunner:

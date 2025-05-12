@@ -107,6 +107,7 @@ Run-ComponentTests "utils.html_to_markdown" "utils/html_to_markdown/tests" $Test
 Run-ComponentTests "utils.vector_store" "utils/vector_store/tests" $TestPattern
 Run-ComponentTests "utils.secret_scanner" "utils/secret_scanner/tests" $TestPattern
 Run-ComponentTests "utils.ocr_extractor" "utils/ocr_extractor/tests" $TestPattern
+Run-ComponentTests "utils.playwright" "utils/playwright/tests" $TestPattern
 # Add more components as needed
 
 # Run project-level tests if they exist

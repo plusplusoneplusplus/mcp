@@ -3,7 +3,7 @@ import tempfile
 import pytest
 import asyncio
 from pathlib import Path
-from mcp_tools.browser.playwright_wrapper import PlaywrightWrapper
+from utils.playwright.playwright_wrapper import PlaywrightWrapper
 
 pytestmark = pytest.mark.asyncio
 

@@ -1,7 +1,7 @@
 import pytest
 import asyncio
-from mcp_tools.browser.playwright_script_runner import PlaywrightScriptRunner
-from mcp_tools.browser.playwright_wrapper import PlaywrightWrapper
+from utils.playwright.playwright_script_runner import PlaywrightScriptRunner
+from utils.playwright.playwright_wrapper import PlaywrightWrapper
 
 pytestmark = pytest.mark.asyncio
 
