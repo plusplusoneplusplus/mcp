@@ -49,6 +49,11 @@ jobs:
           uv pip install pytest pytest-asyncio
           uv pip install -e .
           
+      - name: Install Playwright Browsers
+        run: |
+          source .venv/bin/activate
+          playwright install chromium
+
       - name: Run tests
         run: |
           source .venv/bin/activate
