@@ -18,14 +18,30 @@ class PlaywrightWrapper:
         browser_type: str = "chromium",
         user_data_dir: Optional[str] = None,
         headless: bool = False,
+        channel: Optional[str] = None,
     ):
         """
         Args:
             browser_type: Browser type string (e.g., 'chromium', 'firefox', 'webkit').
+                For Chrome, use 'chrome' and for Edge, use 'edge'.
             user_data_dir: Optional path for persistent context.
             headless: Whether to run browser in headless mode (default: False).
+            channel: Optional browser channel (e.g., 'chrome', 'msedge').
         """
-        self.browser_type = browser_type
+        # Map browser_type to the actual Playwright engine
+        if browser_type in ["chrome", "edge"]:
+            self.browser_type = "chromium"  # Both Chrome and Edge use Chromium engine
+        else:
+            self.browser_type = browser_type
+            
+        # Map browser_type to channel for Chrome and Edge
+        if browser_type == "chrome":
+            self.channel = "chrome"
+        elif browser_type == "edge":
+            self.channel = "msedge"
+        else:
+            self.channel = channel
+            
         self.user_data_dir = user_data_dir
         self.headless = headless
         self.playwright: Optional[Playwright] = None
@@ -36,13 +52,22 @@ class PlaywrightWrapper:
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
         browser_launcher = getattr(self.playwright, self.browser_type)
+        
+        # Prepare launch options
+        launch_options = {"headless": self.headless}
+        if self.channel:
+            launch_options["channel"] = self.channel
+            
         if self.user_data_dir:
+            # For persistent context with user data directory
             self.browser = await browser_launcher.launch_persistent_context(
-                user_data_dir=self.user_data_dir, headless=self.headless
+                user_data_dir=self.user_data_dir,
+                **launch_options
             )
             self.context = self.browser
         else:
-            self.browser = await browser_launcher.launch(headless=self.headless)
+            # For regular browser launch
+            self.browser = await browser_launcher.launch(**launch_options)
             self.context = await self.browser.new_context()
         return self
 
@@ -152,6 +177,19 @@ class PlaywrightWrapper:
         if not self.page:
             raise RuntimeError("Page not initialized. Call open_page first.")
         await self.page.screenshot(path=output_path, full_page=full_page)
+
+    async def take_element_screenshot(self, element, output_path: str):
+        """
+        Take a screenshot of a specific element handle.
+        Args:
+            element: Playwright element handle (e.g., from locate_elements).
+            output_path: Path to save the screenshot.
+        """
+        if not self.page:
+            raise RuntimeError("Page not initialized. Call open_page first.")
+        if element is None:
+            raise ValueError("Element handle is None.")
+        await element.screenshot(path=output_path)
 
     async def close(self):
         if self.page:

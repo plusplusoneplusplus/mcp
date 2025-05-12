@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any, Union, Literal
 
 from playwright.async_api import async_playwright, Playwright, BrowserContext
 from mcp_tools.browser.interface import IBrowserClient
+from utils.playwright.playwright_wrapper import PlaywrightWrapper
 
 
 class PlaywrightBrowserClient(IBrowserClient):
@@ -25,60 +26,58 @@ class PlaywrightBrowserClient(IBrowserClient):
         options: Any = None,
         autoscroll: bool = False,
     ) -> int:
-        """Capture each matching element as an image and save to the output
-        directory."""
+        """Capture each matching element as an image and save to the output directory."""
         import pathlib
         import re
-        from playwright.async_api import Error as PlaywrightError
-
         out_path = pathlib.Path(out_dir)
         out_path.mkdir(exist_ok=True, parents=True)
         count = 0
-        page = None
-        ctx = None
+        browser_type = self.browser  # 'chrome' or 'edge'
         try:
-            ctx = await self._get_context(headless)
-            page = ctx.pages[0]
-            await page.set_viewport_size({"width": width, "height": height})
-            if token:
-                await page.set_extra_http_headers({"Authorization": f"Bearer {token}"})
-            await page.goto(url, wait_until="networkidle")
-            await page.wait_for_timeout(wait_time * 1000)
-            await self._auto_scroll_page(page)
-            panels = await page.locator(selector).all()
-            if not panels:
-                print(f"No elements matched '{selector}'.")
-                return 0
-            for idx, el in enumerate(panels, 1):
-                pid = None
-                for attr in ["data-panelid", "data-griditem-key", "data-viz-panel-key"]:
-                    try:
-                        pid = await el.get_attribute(attr)
-                    except PlaywrightError:
-                        pid = None
-                    if pid:
-                        match = re.search(r"(?:panel|grid-item)-(\d+)", pid)
-                        if match:
-                            pid = match.group(1)
-                        break
-                if not pid:
-                    pid = f"{idx:02d}"
-                # Check if element handle is valid and attached
-                if not el or (hasattr(el, "is_detached") and el.is_detached()):
-                    print(
-                        f"Warning: Element for panel {pid} is not attached or not found. Skipping."
-                    )
-                    continue
-                await el.screenshot(path=str(out_path / f"panel_{pid}.png"))
-                print(f"Saved panel_{pid}.png")
-                count += 1
-            return count
+            async with PlaywrightWrapper(
+                browser_type=browser_type,
+                headless=headless,
+                user_data_dir=self.user_data_dir
+            ) as wrapper:
+                extra_headers = {"Authorization": f"Bearer {token}"} if token else None
+                await wrapper.open_page(
+                    url,
+                    wait_until="networkidle",
+                    wait_time=wait_time,
+                    extra_http_headers=extra_headers
+                )
+                await wrapper.set_viewport_size(width, height)
+                if autoscroll:
+                    await wrapper.auto_scroll()
+                panels = await wrapper.locate_elements(selector)
+                if not panels:
+                    print(f"No elements matched '{selector}'.")
+                    return 0
+                for idx, el in enumerate(panels, 1):
+                    pid = None
+                    for attr in ["data-panelid", "data-griditem-key", "data-viz-panel-key"]:
+                        try:
+                            pid = await el.get_attribute(attr)
+                        except Exception:
+                            pid = None
+                        if pid:
+                            match = re.search(r"(?:panel|grid-item)-(\d+)", pid)
+                            if match:
+                                pid = match.group(1)
+                            break
+                    if not pid:
+                        pid = f"{idx:02d}"
+                    # Check if element handle is valid and attached
+                    if not el or (hasattr(el, "is_detached") and el.is_detached()):
+                        print(f"Warning: Element for panel {pid} is not attached or not found. Skipping.")
+                        continue
+                    await wrapper.take_element_screenshot(el, str(out_path / f"panel_{pid}.png"))
+                    print(f"Saved panel_{pid}.png")
+                    count += 1
+                return count
         except Exception as e:
             print(f"Error in capture_panels: {e}")
             return count
-        finally:
-            if page is not None:
-                await page.close()
 
     def __init__(self, browser: Literal["chrome", "edge"], user_data_dir: str):
         """
@@ -138,95 +137,6 @@ class PlaywrightBrowserClient(IBrowserClient):
             if page is not None:
                 await page.close()
 
-    async def _auto_scroll_page(
-        self, page, timeout: int = 30, scroll_step: int = 80, scroll_delay: float = 0.5
-    ) -> None:
-        """Auto-scroll a page to ensure all content is loaded.
-
-        Args:
-            page: Playwright page object
-            timeout: Maximum time to spend scrolling in seconds
-            scroll_step: Pixel distance to scroll in each step
-            scroll_delay: Delay between scroll steps in seconds
-
-        Returns:
-            None
-        """
-        # Get initial page height
-        initial_height = await page.evaluate(
-            """() => {
-            return document.body.scrollHeight;
-        }"""
-        )
-
-        print(f"Starting auto-scroll - Initial page height: {initial_height}px")
-
-        # Auto-scroll with timeout
-        start_time = time.time()
-        last_height = initial_height
-        total_scrolled = 0
-
-        while time.time() - start_time < timeout:
-            # Scroll down by step
-            current_position = await page.evaluate(
-                f"""(step) => {{
-                let currentPos = window.pageYOffset || document.documentElement.scrollTop;
-                let newPos = currentPos + step;
-                window.scrollTo(0, newPos);
-                return newPos;
-            }}""",
-                scroll_step,
-            )
-
-            total_scrolled += scroll_step
-            print(f"Scrolled to position: {current_position}px")
-
-            # Wait for content to load
-            await page.wait_for_timeout(scroll_delay * 1000)
-
-            # Check if we've reached the bottom
-            new_height = await page.evaluate(
-                """() => {
-                return document.body.scrollHeight;
-            }"""
-            )
-
-            # If height hasn't changed and we're at the bottom, we're done
-            current_scroll_position = await page.evaluate(
-                """() => {
-                return window.pageYOffset + window.innerHeight;
-            }"""
-            )
-
-            if new_height > last_height:
-                print(f"Page height increased: {last_height}px -> {new_height}px")
-                last_height = new_height
-
-            # If we've scrolled to the bottom, break
-            if current_scroll_position >= new_height:
-                print(f"Reached bottom of page at {current_scroll_position}px")
-                break
-
-        # Final wait to ensure all content is loaded
-        await page.wait_for_timeout(1000)
-
-        # Scroll back to top if needed
-        await page.evaluate(
-            """() => {
-            window.scrollTo(0, 0);
-        }"""
-        )
-
-        final_height = await page.evaluate(
-            """() => {
-            return document.body.scrollHeight;
-        }"""
-        )
-
-        print(f"Auto-scroll complete - Final page height: {final_height}px")
-        print(f"Height increased by: {final_height - initial_height}px")
-        print(f"Total time scrolling: {time.time() - start_time:.2f} seconds")
-
     async def take_screenshot(
         self,
         url: str,
@@ -239,34 +149,35 @@ class PlaywrightBrowserClient(IBrowserClient):
         scroll_step: int = 300,
         scroll_delay: float = 0.3,
     ) -> bool:
-        page = None
+
         try:
-            page = await self._get_new_page(headless)
-            page.set_default_navigation_timeout(wait_time * 1000)
-            await page.goto(url)
+            # Use the PlaywrightWrapper for screenshot functionality
+            # Map browser type from client to wrapper format
+            browser_type = self.browser  # 'chrome' or 'edge'
+            
+            async with PlaywrightWrapper(
+                browser_type=browser_type,
+                headless=headless,
+                user_data_dir=self.user_data_dir
+            ) as wrapper:
+                # Open the page using the wrapper
+                await wrapper.open_page(url, wait_time=wait_time)
 
-            # Wait for initial page load
-            await page.wait_for_timeout(wait_time * 1000)
+                # Auto-scroll if requested
+                if auto_scroll:
+                    print("Auto-scrolling page to load all content...")
+                    await wrapper.auto_scroll(
+                        timeout=scroll_timeout,
+                        scroll_step=scroll_step,
+                        scroll_delay=scroll_delay,
+                    )
 
-            # Auto-scroll if requested
-            if auto_scroll:
-                print("Auto-scrolling page to load all content...")
-                await self._auto_scroll_page(
-                    page,
-                    timeout=scroll_timeout,
-                    scroll_step=scroll_step,
-                    scroll_delay=scroll_delay,
-                )
-
-            # Take screenshot (full page)
-            await page.screenshot(path=output_path, full_page=True)
+                # Take screenshot using the wrapper
+                await wrapper.take_screenshot(output_path, full_page=True)
             return True
         except Exception as e:
             print(f"Error taking screenshot: {e}")
             return False
-        finally:
-            if page is not None:
-                await page.close()
 
     async def close(self):
         """Close the browser and clean up resources."""
