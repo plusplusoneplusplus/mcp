@@ -8,6 +8,7 @@ from playwright.async_api import (
 )
 import time
 
+
 class PlaywrightWrapper:
     DEFAULT_WAIT_TIME = 30  # Default extra wait time (seconds) after navigation
     DEFAULT_AUTO_SCROLL_TIMEOUT = 30  # Default timeout for auto_scroll (seconds)
@@ -32,7 +33,7 @@ class PlaywrightWrapper:
             self.browser_type = "chromium"  # Both Chrome and Edge use Chromium engine
         else:
             self.browser_type = browser_type
-            
+
         # Map browser_type to channel for Chrome and Edge
         if browser_type == "chrome":
             self.channel = "chrome"
@@ -40,7 +41,7 @@ class PlaywrightWrapper:
             self.channel = "msedge"
         else:
             self.channel = channel
-            
+
         self.user_data_dir = user_data_dir
         self.headless = headless
         self.playwright: Optional[Playwright] = None
@@ -51,17 +52,16 @@ class PlaywrightWrapper:
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
         browser_launcher = getattr(self.playwright, self.browser_type)
-        
+
         # Prepare launch options
         launch_options = {"headless": self.headless}
         if self.channel:
             launch_options["channel"] = self.channel
-            
+
         if self.user_data_dir:
             # For persistent context with user data directory
             self.browser = await browser_launcher.launch_persistent_context(
-                user_data_dir=self.user_data_dir,
-                **launch_options
+                user_data_dir=self.user_data_dir, **launch_options
             )
             self.context = self.browser
         else:

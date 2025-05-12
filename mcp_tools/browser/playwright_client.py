@@ -28,6 +28,7 @@ class PlaywrightBrowserClient(IBrowserClient):
         """Capture each matching element as an image and save to the output directory."""
         import pathlib
         import re
+
         out_path = pathlib.Path(out_dir)
         out_path.mkdir(exist_ok=True, parents=True)
         count = 0
@@ -37,7 +38,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                 url,
                 wait_until="networkidle",
                 wait_time=wait_time,
-                extra_http_headers=extra_headers
+                extra_http_headers=extra_headers,
             )
             await self.wrapper.set_viewport_size(width, height)
             if autoscroll:
@@ -62,9 +63,13 @@ class PlaywrightBrowserClient(IBrowserClient):
                     pid = f"{idx:02d}"
                 # Check if element handle is valid and attached
                 if not el or (hasattr(el, "is_detached") and el.is_detached()):
-                    print(f"Warning: Element for panel {pid} is not attached or not found. Skipping.")
+                    print(
+                        f"Warning: Element for panel {pid} is not attached or not found. Skipping."
+                    )
                     continue
-                await self.wrapper.take_element_screenshot(el, str(out_path / f"panel_{pid}.png"))
+                await self.wrapper.take_element_screenshot(
+                    el, str(out_path / f"panel_{pid}.png")
+                )
                 print(f"Saved panel_{pid}.png")
                 count += 1
             return count
@@ -81,8 +86,7 @@ class PlaywrightBrowserClient(IBrowserClient):
         self.browser = browser
         self.user_data_dir = user_data_dir
         self.wrapper: Optional[PlaywrightWrapper] = PlaywrightWrapper(
-            browser_type=browser,
-            user_data_dir=user_data_dir
+            browser_type=browser, user_data_dir=user_data_dir
         )
 
     async def __aenter__(self):
@@ -95,15 +99,12 @@ class PlaywrightBrowserClient(IBrowserClient):
         """Ensure resources are cleaned up when exiting context."""
         await self.close()
 
-
     async def get_page_html(
         self, url: str, wait_time: int = 30, headless: bool = True, options: Any = None
     ) -> Optional[str]:
         try:
             html = await self.wrapper.get_page_html(
-                url,
-                wait_until="networkidle",
-                wait_time=wait_time
+                url, wait_until="networkidle", wait_time=wait_time
             )
             return html
         except Exception:
