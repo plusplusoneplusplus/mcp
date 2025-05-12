@@ -122,20 +122,21 @@ class PlaywrightBrowserClient(IBrowserClient):
     async def get_page_html(
         self, url: str, wait_time: int = 30, headless: bool = True, options: Any = None
     ) -> Optional[str]:
-        page = None
         try:
-            page = await self._get_new_page(headless)
-            page.set_default_navigation_timeout(wait_time * 1000)
-            await page.goto(url)
-            # wait for network to be quiet, adjust as needed
-            # await page.wait_for_load_state('networkidle', timeout=wait_time * 1000)
-            await page.wait_for_timeout(wait_time * 1000)
-            return await page.content()
+            browser_type = self.browser  # 'chrome' or 'edge'
+            async with PlaywrightWrapper(
+                browser_type=browser_type,
+                headless=headless,
+                user_data_dir=self.user_data_dir
+            ) as wrapper:
+                html = await wrapper.get_page_html(
+                    url,
+                    wait_until="networkidle",
+                    wait_time=wait_time
+                )
+                return html
         except Exception:
             return None
-        finally:
-            if page is not None:
-                await page.close()
 
     async def take_screenshot(
         self,

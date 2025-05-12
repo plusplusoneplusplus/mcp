@@ -8,7 +8,6 @@ from playwright.async_api import (
 )
 import time
 
-
 class PlaywrightWrapper:
     DEFAULT_WAIT_TIME = 30  # Default extra wait time (seconds) after navigation
     DEFAULT_AUTO_SCROLL_TIMEOUT = 30  # Default timeout for auto_scroll (seconds)
@@ -190,6 +189,46 @@ class PlaywrightWrapper:
         if element is None:
             raise ValueError("Element handle is None.")
         await element.screenshot(path=output_path)
+
+    async def get_page_html(
+        self,
+        url: str,
+        wait_until: str = "domcontentloaded",
+        wait_time: int = 30,
+        extra_http_headers: dict = None,
+        goto_timeout: int = 30,
+    ) -> str:
+        """
+        Open a page and return its HTML content.
+        Args:
+            url: URL to open.
+            wait_until: When to consider navigation succeeded (default: 'domcontentloaded').
+            wait_time: Extra time (seconds) to wait after navigation.
+            extra_http_headers: Optional headers to set.
+            goto_timeout: Max seconds to wait for navigation.
+        Returns:
+            The HTML content of the page as a string.
+        """
+        await self.open_page(
+            url,
+            wait_until=wait_until,
+            wait_time=wait_time,
+            extra_http_headers=extra_http_headers,
+            goto_timeout=goto_timeout,
+        )
+        return await self.page.content()
+
+    async def get_current_content(self) -> str:
+        """
+        Return the HTML content of the currently loaded page.
+        Raises:
+            RuntimeError: If no page is initialized/open.
+        Returns:
+            The HTML content of the current page as a string.
+        """
+        if not self.page:
+            raise RuntimeError("Page not initialized. Call open_page first.")
+        return await self.page.content()
 
     async def close(self):
         if self.page:
