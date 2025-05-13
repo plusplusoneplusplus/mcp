@@ -98,7 +98,7 @@ class CapturePanelsClient(CapturePanelsClientInterface):
 
         browser_type = arguments.get("browser_type", self.browser_type)
         autoscroll = arguments.get("autoscroll", False)
-        count = await self.capture_panels(
+        return await self.capture_panels(
             url,
             selector,
             width,
@@ -108,12 +108,6 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             headless,
             autoscroll,
         )
-        return {
-            "success": True if count > 0 else False,
-            "captured": count,
-            "output_dir": out_dir,
-            "url": url,
-        }
 
     async def capture_panels(
         self,
@@ -143,8 +137,9 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             The number of panels captured (saved as PNGs)
         """
         browser_type = self.browser_type
-        client = BrowserClientFactory.create_client(self.client_type, browser_type)
-        out_dir = env.get_setting("image_dir", ".images")
+        client = BrowserClientFactory.create_client(
+            client_type=self.client_type, browser_type=browser_type
+        )
         return await client.capture_panels(
             url,
             selector,

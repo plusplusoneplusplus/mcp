@@ -86,6 +86,7 @@ class IBrowserClient(ABC):
         Returns:
             Dict[str, Any]:
                 - Count: Number of panels captured
+                - SessionId: Session ID
                 - Panels: List of panels captured
                     - PanelID: Panel ID
                     - Path: Path to the panel image

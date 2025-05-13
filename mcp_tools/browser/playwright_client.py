@@ -43,16 +43,21 @@ class PlaywrightBrowserClient(IBrowserClient):
         Capture each matching element as an image, extract OCR content, and return results.
         Returns:
             Dict[str, Any]:
+                - Success: Whether the operation was successful
+                - SessionId: Session ID
                 - Count: Number of panels captured
                 - Panels: List of dicts with PanelID, Path, Content
                 - URL: Dashboard URL visited
         """
         import pathlib
         import re
+        import datetime
 
         out_dir = env.get_setting("image_dir", ".images")
-        out_path = pathlib.Path(out_dir)
-        out_path.mkdir(exist_ok=True, parents=True)
+        # Generate session ID as timestamp to second (e.g., 20250513_094112)
+        session_id = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_dir = pathlib.Path(out_dir) / session_id
+        session_dir.mkdir(exist_ok=True, parents=True)
         panels_info = []
         try:
             extra_headers = {"Authorization": f"Bearer {token}"} if token else None
@@ -71,7 +76,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                 panels = await wrapper.locate_elements(selector)
                 if not panels:
                     print(f"No elements matched '{selector}'.")
-                    return {"Count": 0, "Panels": [], "URL": url}
+                    return {"Count": 0, "Panels": [], "URL": url, "SessionId": session_id}
                 for idx, el in enumerate(panels, 1):
                     pid = None
                     for attr in [
@@ -99,7 +104,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                         )
                         continue
 
-                    image_path = out_path / f"panel_{pid}.png"
+                    image_path = session_dir / f"panel_{pid}.png"
                     delay = 1
                     ocr_content = []
                     for attempt in range(self.max_retry_capture_panels):
@@ -137,7 +142,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                             "Content": ocr_content,
                         }
                     )
-                return {"Count": len(panels_info), "Panels": panels_info, "URL": url}
+                return {"Count": len(panels_info), "Panels": panels_info, "URL": url, "SessionId": session_id}
         except Exception as e:
             print(f"Error in capture_panels: {e}")
             return {"Count": len(panels_info), "Panels": panels_info, "URL": url}

@@ -11,15 +11,16 @@ from typing import Dict, Any, Optional, Literal
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import BrowserClientInterface
-from config.manager import EnvironmentManager
+from config import env
 from utils.html_to_markdown import extract_and_format_html
 from utils.secret_scanner import redact_secrets
 
+
 # Global configuration
-DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = EnvironmentManager().get_setting(
+DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = env.get_setting(
     "browser_type", "chrome"
 )
-DEFAULT_CLIENT_TYPE: str = EnvironmentManager().get_setting("client_type", "playwright")
+DEFAULT_CLIENT_TYPE: str = env.get_setting("client_type", "playwright")
 MAX_RETURN_CHARS: int = 100000
 
 # Configure logger
