@@ -44,16 +44,6 @@ injector.resolve_all_dependencies()
 
 from config import env
 
-def get_image_dir() -> Path:
-    # Uses the MCP config system: set IMAGE_DIR in your .env or settings
-    image_dir = env.get_setting("image_dir", None)
-    if not image_dir:
-        raise RuntimeError(
-            "IMAGE_DIR is not defined in your MCP configuration. "
-            "Set IMAGE_DIR in your .env file or MCP settings."
-        )
-    return Path(image_dir)
-
 # Get all tools and filtered active tools
 all_tool_instances = list(injector.get_all_instances().values())
 active_tool_instances = list(injector.get_filtered_instances().values())
