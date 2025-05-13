@@ -74,7 +74,7 @@ class PlaywrightBrowserClient(IBrowserClient):
         try:
             extra_headers = {"Authorization": f"Bearer {token}"} if token else None
             async with PlaywrightWrapper(
-                browser_type=self.browser, user_data_dir=self.user_data_dir
+                browser_type=self.browser, user_data_dir=self.user_data_dir, headless=headless
             ) as wrapper:
                 await wrapper.open_page(
                     url,
