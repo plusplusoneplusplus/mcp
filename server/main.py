@@ -159,15 +159,22 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
-
-    # Special case for image_tool
-    if name == "get_session_image":
-        return image_tool.handle_tool(arguments)
-
-    tool = injector.get_tool_instance(name)
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
     )
+
+    # Special case for image_tool
+    if name == "get_session_image":
+        try:
+            return image_tool.handle_tool(arguments)
+        except Exception as e:
+            return [TextContent(type="text", text=str(e))]
+        finally:
+            record_tool_invocation(
+                name, arguments, None, 0, False, str(e), invocation_dir
+            )
+
+    tool = injector.get_tool_instance(name)
     if tool and invocation_dir:
         tool.diagnostic_dir = str(invocation_dir)
     if not tool:
