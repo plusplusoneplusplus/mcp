@@ -6,12 +6,12 @@ from typing import Dict, Any, Optional, Literal
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import CapturePanelsClientInterface
-from config.manager import EnvironmentManager
+from config import env
 
-DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = EnvironmentManager().get_setting(
+DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = env.get_setting(
     "browser_type", "chrome"
 )
-DEFAULT_CLIENT_TYPE: str = EnvironmentManager().get_setting("client_type", "playwright")
+DEFAULT_CLIENT_TYPE: str = env.get_setting("client_type", "playwright")
 
 
 @register_tool
@@ -48,11 +48,6 @@ class CapturePanelsClient(CapturePanelsClientInterface):
                     "type": "string",
                     "description": "CSS selector for chart containers",
                     "default": ".react-grid-item",
-                },
-                "out_dir": {
-                    "type": "string",
-                    "description": "Directory to write PNGs",
-                    "default": "charts",
                 },
                 "width": {
                     "type": "integer",
@@ -94,7 +89,7 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             return {"success": False, "error": f"Unsupported operation: {operation}"}
         url = arguments.get("url", "")
         selector = arguments.get("selector", ".react-grid-item")
-        out_dir = arguments.get("out_dir", "charts")
+        out_dir = EnvironmentManager().get_setting("image_dir", ".images")
         width = arguments.get("width", 1600)
         height = arguments.get("height", 900)
         token = arguments.get("token", None)
@@ -106,7 +101,6 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         count = await self.capture_panels(
             url,
             selector,
-            out_dir,
             width,
             height,
             token,
@@ -126,7 +120,6 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         self,
         url: str,
         selector: str = ".react-grid-item",
-        out_dir: str = "charts",
         width: int = 1600,
         height: int = 900,
         token: Optional[str] = None,
@@ -153,10 +146,10 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         """
         browser_type = self.browser_type
         client = BrowserClientFactory.create_client(self.client_type, browser_type)
+        out_dir = env.get_setting("image_dir", ".images")
         return await client.capture_panels(
             url,
             selector,
-            out_dir,
             width,
             height,
             token,

@@ -67,7 +67,6 @@ class IBrowserClient(ABC):
         self,
         url: str,
         selector: str = ".react-grid-item",
-        out_dir: str = "charts",
         width: int = 1600,
         height: int = 900,
         token: Optional[str] = None,
@@ -76,11 +75,10 @@ class IBrowserClient(ABC):
         options: Any = None,
     ) -> int:
         """
-        Capture each matching element as an image and save to the output directory.
+        Capture each matching element as an image and save to the environment-configured output directory.
         Args:
             url: The dashboard URL to visit
             selector: CSS selector for chart/panel containers
-            out_dir: Directory to write PNGs
             width: Browser viewport width
             height: Browser viewport height
             token: Bearer token for Authorization header (optional)

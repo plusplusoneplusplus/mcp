@@ -86,6 +86,7 @@ def get_new_invocation_dir(tool_name: str) -> Path:
     invocation_dir.mkdir(parents=True, exist_ok=True)
     return invocation_dir
 
+
 def record_tool_invocation(
     tool_name: str,
     arguments: Dict[str, Any],
@@ -123,6 +124,7 @@ def record_tool_invocation(
         logging.error(f"Error recording tool invocation: {e}")
         return False
 
+
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     # Get all tool instances that are active according to config
@@ -138,6 +140,7 @@ async def list_tools() -> list[Tool]:
 
     mcp_tools.append(image_tool.get_tool_def())
     return mcp_tools
+
 
 @server.call_tool()
 async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
@@ -216,6 +219,7 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
         return [TextContent(type="text", text=error_msg)]
+
 
 def format_result_as_text(result: dict) -> str:
     """Format a result dictionary as text."""

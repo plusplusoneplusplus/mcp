@@ -6,6 +6,7 @@ from typing import Optional
 from config import env
 from mcp.types import ImageContent, TextContent, Tool
 
+
 def get_tool_def() -> Tool:
     return Tool(
         name="get_session_image",
@@ -20,11 +21,17 @@ def get_tool_def() -> Tool:
         },
     )
 
+
 def handle_tool(arguments: dict):
     if "session_id" not in arguments or "image_name" not in arguments:
-        return [TextContent(type="text", text="Error: session_id and image_name are required.")]
+        return [
+            TextContent(
+                type="text", text="Error: session_id and image_name are required."
+            )
+        ]
 
     return get_session_image(arguments["session_id"], arguments["image_name"])
+
 
 def get_image_dir() -> Path:
     """Get the image directory from configuration."""
@@ -50,5 +57,11 @@ def get_session_image(session_id: str, image_name: str) -> list[ImageContent]:
     mime_type, _ = mimetypes.guess_type(str(image_path))
     with open(image_path, "rb") as f:
         image_bytes = f.read()
-    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
-    return [ImageContent(type="image", data=image_b64, mimeType=mime_type or "application/octet-stream")]
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    return [
+        ImageContent(
+            type="image",
+            data=image_b64,
+            mimeType=mime_type or "application/octet-stream",
+        )
+    ]

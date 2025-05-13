@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any, Union, Literal
 
 from mcp_tools.browser.interface import IBrowserClient
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
+from config import env
 
 
 class PlaywrightBrowserClient(IBrowserClient):
@@ -16,7 +17,6 @@ class PlaywrightBrowserClient(IBrowserClient):
         self,
         url: str,
         selector: str = ".react-grid-item",
-        out_dir: str = "charts",
         width: int = 1600,
         height: int = 900,
         token: Optional[str] = None,
@@ -29,6 +29,7 @@ class PlaywrightBrowserClient(IBrowserClient):
         import pathlib
         import re
 
+        out_dir = env.get_setting("image_dir", ".images")
         out_path = pathlib.Path(out_dir)
         out_path.mkdir(exist_ok=True, parents=True)
         count = 0
