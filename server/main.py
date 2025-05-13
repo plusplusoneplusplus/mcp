@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import logging
 import click
-import asyncio
 import json
 import datetime
 import time
@@ -12,28 +11,23 @@ from typing import Dict, Any, Optional
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 
-
 import uvicorn
 
 # MCP imports
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from mcp.types import ImageContent, TextContent, Tool, PromptsCapability
+from mcp.types import TextContent, Tool, PromptsCapability
 
 # Import tools directly from mcp_tools
 from mcp_tools.plugin import registry, discover_and_register_tools
 from mcp_tools.dependency import injector
-from mcp_tools.interfaces import ToolInterface
 
 # Import plugin configuration
 from mcp_tools.plugin_config import config
 
-import prompts
-import image_tool
 from config import env
 
-# The configuration is already loaded from environment variables in PluginConfig.__init__
-# No need to override it here
+import image_tool
 
 # Create the server
 server = Server("mymcp")
@@ -41,8 +35,6 @@ server = Server("mymcp")
 # Initialize tools system directly
 discover_and_register_tools()
 injector.resolve_all_dependencies()
-
-from config import env
 
 # Get all tools and filtered active tools
 all_tool_instances = list(injector.get_all_instances().values())
@@ -161,7 +153,7 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
             return [TextContent(type="text", text=str(e))]
         finally:
             record_tool_invocation(
-                name, arguments, None, 0, False, str(e), invocation_dir
+                name, arguments, None, 0, False, None, invocation_dir
             )
 
     tool = injector.get_tool_instance(name)
