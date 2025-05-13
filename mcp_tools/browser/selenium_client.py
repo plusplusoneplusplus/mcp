@@ -38,98 +38,14 @@ class SeleniumBrowserClient(IBrowserClient):
         self,
         url: str,
         selector: str = ".react-grid-item",
-        out_dir: str = "charts",
         width: int = 1600,
         height: int = 900,
         token: Optional[str] = None,
         wait_time: int = 30,
         headless: bool = True,
-        options: Any = None,
         autoscroll: bool = False,
     ) -> int:
-        """
-        Capture each matching element as an image and save to the output directory.
-        """
-        import pathlib
-        import re
-        from selenium.webdriver.common.by import By
-        from selenium.webdriver.common.action_chains import ActionChains
-
-        out_path = pathlib.Path(out_dir)
-        out_path.mkdir(exist_ok=True, parents=True)
-
-        def _capture():
-            driver = self._setup_browser(headless=headless, browser_options=options)
-            try:
-                # Set viewport size
-                driver.set_window_size(width, height)
-                # Set Authorization header if possible
-                if token:
-                    try:
-                        driver.execute_cdp_cmd("Network.enable", {})
-                        driver.execute_cdp_cmd(
-                            "Network.setExtraHTTPHeaders",
-                            {"headers": {"Authorization": f"Bearer {token}"}},
-                        )
-                    except Exception:
-                        print(
-                            "Warning: Could not set Authorization header via Selenium. Proceeding without it."
-                        )
-                driver.get(url)
-                time.sleep(wait_time)
-                panels = driver.find_elements(By.CSS_SELECTOR, selector)
-                if not panels:
-                    print(f"No elements matched '{selector}'.")
-                    return 0
-                count = 0
-                for idx, el in enumerate(panels, 1):
-                    pid = None
-                    for attr in [
-                        "data-panelid",
-                        "data-griditem-key",
-                        "data-viz-panel-key",
-                    ]:
-                        try:
-                            pid = el.get_attribute(attr)
-                        except Exception:
-                            pid = None
-                        if pid:
-                            match = re.search(r"(?:panel|grid-item)-(\d+)", pid)
-                            if match:
-                                pid = match.group(1)
-                            break
-                    if not pid:
-                        pid = f"{idx:02d}"
-                    # Scroll element into view
-                    try:
-                        ActionChains(driver).move_to_element(el).perform()
-                    except Exception:
-                        pass
-                    if autoscroll:
-                        # Scroll element into view
-                        driver.execute_script(
-                            "arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});",
-                            el,
-                        )
-                        time.sleep(0.5)
-                        # Scroll element's contents
-                        driver.execute_script(
-                            "var el = arguments[0]; el.scrollTop = 0; var scrollStep = 100; function scrollDown() { if (el.scrollTop + el.clientHeight < el.scrollHeight) { el.scrollTop += scrollStep; setTimeout(scrollDown, 50); } }; scrollDown();",
-                            el,
-                        )
-                        time.sleep(0.8)
-                    el.screenshot(str(out_path / f"panel_{pid}.png"))
-                    print(f"Saved panel_{pid}.png")
-                    count += 1
-                return count
-            except Exception as e:
-                print(f"Error in capture_panels: {e}")
-                return 0
-            finally:
-                self._cleanup_driver(driver)
-
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(self._executor, _capture)
+        raise NotImplementedError
 
     """Selenium-based browser client implementation.
     

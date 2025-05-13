@@ -72,7 +72,7 @@ class IBrowserClient(ABC):
         token: Optional[str] = None,
         wait_time: int = 30,
         headless: bool = True,
-    ) -> int:
+    ) -> Dict[str, Any]:
         """
         Capture each matching element as an image and save to the environment-configured output directory.
         Args:
@@ -84,6 +84,12 @@ class IBrowserClient(ABC):
             wait_time: Time to wait for page load in seconds
             headless: Whether to run browser in headless mode
         Returns:
-            The number of panels captured (saved as PNGs)
+            Dict[str, Any]:
+                - Count: Number of panels captured
+                - Panels: List of panels captured
+                    - PanelID: Panel ID
+                    - Path: Path to the panel image
+                    - Content: The content inside the panel image recognized by OCR
+                - URL: Dashboard URL visited
         """
         pass

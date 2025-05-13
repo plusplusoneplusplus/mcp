@@ -13,6 +13,21 @@ from config import env
 
 
 class PlaywrightBrowserClient(IBrowserClient):
+    def __init__(self, browser: Literal["chrome", "edge"], user_data_dir: str):
+        """
+        Args:
+            browser: 'chrome' or 'edge'
+            user_data_dir: path to a folder where profile (cookies, history) is stored
+        """
+        self.browser = browser
+        self.user_data_dir = user_data_dir
+        self.wrapper: Optional[PlaywrightWrapper] = PlaywrightWrapper(
+            browser_type=browser, user_data_dir=user_data_dir
+        )
+        self.retry_capture_panels_keywords = [
+            "LOADING"
+        ]
+
     async def capture_panels(
         self,
         url: str,
@@ -77,18 +92,6 @@ class PlaywrightBrowserClient(IBrowserClient):
         except Exception as e:
             print(f"Error in capture_panels: {e}")
             return count
-
-    def __init__(self, browser: Literal["chrome", "edge"], user_data_dir: str):
-        """
-        Args:
-            browser: 'chrome' or 'edge'
-            user_data_dir: path to a folder where profile (cookies, history) is stored
-        """
-        self.browser = browser
-        self.user_data_dir = user_data_dir
-        self.wrapper: Optional[PlaywrightWrapper] = PlaywrightWrapper(
-            browser_type=browser, user_data_dir=user_data_dir
-        )
 
     async def __aenter__(self):
         """Support for async context manager."""
