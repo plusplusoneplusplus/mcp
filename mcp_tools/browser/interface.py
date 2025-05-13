@@ -72,7 +72,6 @@ class IBrowserClient(ABC):
         token: Optional[str] = None,
         wait_time: int = 30,
         headless: bool = True,
-        options: Any = None,
     ) -> int:
         """
         Capture each matching element as an image and save to the environment-configured output directory.
@@ -84,7 +83,6 @@ class IBrowserClient(ABC):
             token: Bearer token for Authorization header (optional)
             wait_time: Time to wait for page load in seconds
             headless: Whether to run browser in headless mode
-            options: Browser-specific options
         Returns:
             The number of panels captured (saved as PNGs)
         """

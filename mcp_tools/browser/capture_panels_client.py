@@ -95,7 +95,7 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         token = arguments.get("token", None)
         wait_time = arguments.get("wait_time", 7)
         headless = arguments.get("headless", False)
-        browser_options = arguments.get("browser_options", None)
+
         browser_type = arguments.get("browser_type", self.browser_type)
         autoscroll = arguments.get("autoscroll", False)
         count = await self.capture_panels(
@@ -106,7 +106,6 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             token,
             wait_time,
             headless,
-            browser_options,
             autoscroll,
         )
         return {
@@ -125,7 +124,6 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         token: Optional[str] = None,
         wait_time: int = 30,
         headless: bool = True,
-        options: Any = None,
         autoscroll: bool = False,
     ) -> int:
         """
@@ -155,6 +153,5 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             token,
             wait_time,
             headless,
-            options,
             autoscroll=autoscroll,
         )

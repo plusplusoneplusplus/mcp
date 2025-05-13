@@ -22,7 +22,6 @@ class PlaywrightBrowserClient(IBrowserClient):
         token: Optional[str] = None,
         wait_time: int = 30,
         headless: bool = True,
-        options: Any = None,
         autoscroll: bool = False,
     ) -> int:
         """Capture each matching element as an image and save to the output directory."""
