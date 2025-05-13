@@ -38,9 +38,21 @@ class PlaywrightBrowserClient(IBrowserClient):
         wait_time: int = 30,
         headless: bool = True,
         autoscroll: bool = False,
+        max_parallelism: int = 4,
     ) -> dict:
         """
         Capture each matching element as an image, extract OCR content, and return results.
+        Supports parallelism: up to max_parallelism panel captures (including retry) run concurrently.
+        Args:
+            url: The dashboard URL to visit
+            selector: CSS selector for chart/panel containers
+            width: Browser viewport width
+            height: Browser viewport height
+            token: Bearer token for Authorization header (optional)
+            wait_time: Time to wait for page load in seconds
+            headless: Whether to run browser in headless mode
+            autoscroll: If true, autoscroll each panel into view and scroll its contents before capturing.
+            max_parallelism: Maximum number of panels to capture in parallel (default 4)
         Returns:
             Dict[str, Any]:
                 - Success: Whether the operation was successful
@@ -77,7 +89,11 @@ class PlaywrightBrowserClient(IBrowserClient):
                 if not panels:
                     print(f"No elements matched '{selector}'.")
                     return {"Count": 0, "Panels": [], "URL": url, "SessionId": session_id}
-                for idx, el in enumerate(panels, 1):
+
+                semaphore = asyncio.Semaphore(max_parallelism)
+                panel_results = [None] * len(panels)
+
+                async def capture_panel(idx, el):
                     pid = None
                     for attr in [
                         "data-panelid",
@@ -93,16 +109,15 @@ class PlaywrightBrowserClient(IBrowserClient):
                             if match:
                                 pid = match.group(1)
                             break
-
                     if not pid:
-                        pid = f"{idx:02d}"
+                        pid = f"{idx+1:02d}"
 
                     # Check if element handle is valid and attached
                     if not el or (hasattr(el, "is_detached") and el.is_detached()):
                         print(
                             f"Warning: Element for panel {pid} is not attached or not found. Skipping."
                         )
-                        continue
+                        return None
 
                     image_path = session_dir / f"panel_{pid}.png"
                     delay = 1
@@ -134,14 +149,21 @@ class PlaywrightBrowserClient(IBrowserClient):
                         )
                         await asyncio.sleep(delay)
                         delay *= 2
+                    return {
+                        "PanelID": pid,
+                        "Path": str(image_path),
+                        "Content": ocr_content,
+                    }
 
-                    panels_info.append(
-                        {
-                            "PanelID": pid,
-                            "Path": str(image_path),
-                            "Content": ocr_content,
-                        }
-                    )
+                async def sem_task(idx, el):
+                    async with semaphore:
+                        result = await capture_panel(idx, el)
+                        panel_results[idx] = result
+
+                tasks = [asyncio.create_task(sem_task(idx, el)) for idx, el in enumerate(panels)]
+                await asyncio.gather(*tasks)
+
+                panels_info = [r for r in panel_results if r is not None]
                 return {"Count": len(panels_info), "Panels": panels_info, "URL": url, "SessionId": session_id}
         except Exception as e:
             print(f"Error in capture_panels: {e}")

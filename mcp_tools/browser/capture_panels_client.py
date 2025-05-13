@@ -119,6 +119,7 @@ class CapturePanelsClient(CapturePanelsClientInterface):
         wait_time: int = 30,
         headless: bool = True,
         autoscroll: bool = False,
+        max_parallelism: int = 4,
     ) -> int:
         """
         Capture each matching element as an image and save to the output directory.
@@ -133,6 +134,7 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             headless: Whether to run browser in headless mode
             options: Browser-specific options
             autoscroll: If true, autoscroll each panel into view and scroll its contents before capturing.
+            max_parallelism: Maximum number of panels to capture in parallel (default 4)
         Returns:
             The number of panels captured (saved as PNGs)
         """
@@ -149,4 +151,5 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             wait_time,
             headless,
             autoscroll=autoscroll,
+            max_parallelism=max_parallelism,
         )
