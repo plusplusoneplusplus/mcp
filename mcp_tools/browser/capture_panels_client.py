@@ -152,7 +152,7 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             The number of panels captured (saved as PNGs)
         """
         browser_type = self.browser_type
-        client = BrowserClientFactory.get_client(self.client_type, browser_type)
+        client = BrowserClientFactory.create_client(self.client_type, browser_type)
         return await client.capture_panels(
             url,
             selector,

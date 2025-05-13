@@ -34,45 +34,46 @@ class PlaywrightBrowserClient(IBrowserClient):
         count = 0
         try:
             extra_headers = {"Authorization": f"Bearer {token}"} if token else None
-            await self.wrapper.open_page(
-                url,
-                wait_until="networkidle",
-                wait_time=wait_time,
-                extra_http_headers=extra_headers,
-            )
-            await self.wrapper.set_viewport_size(width, height)
-            if autoscroll:
-                await self.wrapper.auto_scroll()
-            panels = await self.wrapper.locate_elements(selector)
-            if not panels:
-                print(f"No elements matched '{selector}'.")
-                return 0
-            for idx, el in enumerate(panels, 1):
-                pid = None
-                for attr in ["data-panelid", "data-griditem-key", "data-viz-panel-key"]:
-                    try:
-                        pid = await el.get_attribute(attr)
-                    except Exception:
-                        pid = None
-                    if pid:
-                        match = re.search(r"(?:panel|grid-item)-(\d+)", pid)
-                        if match:
-                            pid = match.group(1)
-                        break
-                if not pid:
-                    pid = f"{idx:02d}"
-                # Check if element handle is valid and attached
-                if not el or (hasattr(el, "is_detached") and el.is_detached()):
-                    print(
-                        f"Warning: Element for panel {pid} is not attached or not found. Skipping."
-                    )
-                    continue
-                await self.wrapper.take_element_screenshot(
-                    el, str(out_path / f"panel_{pid}.png")
+            async with PlaywrightWrapper(browser_type=self.browser, user_data_dir=self.user_data_dir) as wrapper:
+                await wrapper.open_page(
+                    url,
+                    wait_until="networkidle",
+                    wait_time=wait_time,
+                    extra_http_headers=extra_headers,
                 )
-                print(f"Saved panel_{pid}.png")
-                count += 1
-            return count
+                await wrapper.set_viewport_size(width, height)
+                if autoscroll:
+                    await wrapper.auto_scroll()
+                panels = await wrapper.locate_elements(selector)
+                if not panels:
+                    print(f"No elements matched '{selector}'.")
+                    return 0
+                for idx, el in enumerate(panels, 1):
+                    pid = None
+                    for attr in ["data-panelid", "data-griditem-key", "data-viz-panel-key"]:
+                        try:
+                            pid = await el.get_attribute(attr)
+                        except Exception:
+                            pid = None
+                        if pid:
+                            match = re.search(r"(?:panel|grid-item)-(\d+)", pid)
+                            if match:
+                                pid = match.group(1)
+                            break
+                    if not pid:
+                        pid = f"{idx:02d}"
+                    # Check if element handle is valid and attached
+                    if not el or (hasattr(el, "is_detached") and el.is_detached()):
+                        print(
+                            f"Warning: Element for panel {pid} is not attached or not found. Skipping."
+                        )
+                        continue
+                    await wrapper.take_element_screenshot(
+                        el, str(out_path / f"panel_{pid}.png")
+                    )
+                    print(f"Saved panel_{pid}.png")
+                    count += 1
+                return count
         except Exception as e:
             print(f"Error in capture_panels: {e}")
             return count
