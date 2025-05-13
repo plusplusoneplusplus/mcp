@@ -18,6 +18,7 @@ class EnvironmentManager:
         "private_tool_root",
         "tool_history_path",
         "browser_profile_path",
+        "image_dir",
     ]
 
     # Default settings with their types
@@ -33,6 +34,8 @@ class EnvironmentManager:
         "browser_profile_path": (".browserprofile", str),
         "browser_type": ("chrome", str),
         "client_type": ("playwright", str),
+        # Image serving
+        "image_dir": (".images", str),
     }
 
     # Create mapping dynamically - each setting can be set via its uppercase env var

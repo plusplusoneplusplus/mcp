@@ -11,12 +11,14 @@ from typing import Dict, Any, Optional
 # Starlette and uvicorn imports
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
+
+
 import uvicorn
 
 # MCP imports
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from mcp.types import TextContent, Tool, PromptsCapability
+from mcp.types import ImageContent, TextContent, Tool, PromptsCapability
 
 # Import tools directly from mcp_tools
 from mcp_tools.plugin import registry, discover_and_register_tools
@@ -27,6 +29,7 @@ from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin_config import config
 
 import prompts
+import image_tool
 from config import env
 
 # The configuration is already loaded from environment variables in PluginConfig.__init__
@@ -38,6 +41,18 @@ server = Server("mymcp")
 # Initialize tools system directly
 discover_and_register_tools()
 injector.resolve_all_dependencies()
+
+from config import env
+
+def get_image_dir() -> Path:
+    # Uses the MCP config system: set IMAGE_DIR in your .env or settings
+    image_dir = env.get_setting("image_dir", None)
+    if not image_dir:
+        raise RuntimeError(
+            "IMAGE_DIR is not defined in your MCP configuration. "
+            "Set IMAGE_DIR in your .env file or MCP settings."
+        )
+    return Path(image_dir)
 
 # Get all tools and filtered active tools
 all_tool_instances = list(injector.get_all_instances().values())
@@ -89,7 +104,6 @@ def get_new_invocation_dir(tool_name: str) -> Path:
     invocation_dir.mkdir(parents=True, exist_ok=True)
     return invocation_dir
 
-
 def record_tool_invocation(
     tool_name: str,
     arguments: Dict[str, Any],
@@ -127,8 +141,6 @@ def record_tool_invocation(
         logging.error(f"Error recording tool invocation: {e}")
         return False
 
-
-# Setup tools using the direct plugin system
 @server.list_tools()
 async def list_tools() -> list[Tool]:
     # Get all tool instances that are active according to config
@@ -142,11 +154,16 @@ async def list_tools() -> list[Tool]:
         )
         mcp_tools.append(mcp_tool)
 
+    mcp_tools.append(image_tool.get_tool_def())
     return mcp_tools
-
 
 @server.call_tool()
 async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
+
+    # Special case for image_tool
+    if name == "get_session_image":
+        return image_tool.handle_tool(arguments)
+
     tool = injector.get_tool_instance(name)
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
@@ -210,7 +227,6 @@ async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
         return [TextContent(type="text", text=error_msg)]
-
 
 def format_result_as_text(result: dict) -> str:
     """Format a result dictionary as text."""

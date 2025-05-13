@@ -104,3 +104,4 @@ server/.logs/
 server/.history/
 server/.browserprofile/
 server/.extracted_charts/
+server/.images/
