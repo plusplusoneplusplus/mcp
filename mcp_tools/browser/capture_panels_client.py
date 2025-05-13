@@ -89,7 +89,7 @@ class CapturePanelsClient(CapturePanelsClientInterface):
             return {"success": False, "error": f"Unsupported operation: {operation}"}
         url = arguments.get("url", "")
         selector = arguments.get("selector", ".react-grid-item")
-        out_dir = EnvironmentManager().get_setting("image_dir", ".images")
+        out_dir = env.get_setting("image_dir", ".images")
         width = arguments.get("width", 1600)
         height = arguments.get("height", 900)
         token = arguments.get("token", None)

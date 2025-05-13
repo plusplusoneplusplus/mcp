@@ -325,7 +325,7 @@ class BrowserClient(BrowserClientInterface):
                 height = arguments.get("height", 900)
                 token = arguments.get("token", None)
                 client = BrowserClientFactory.get_client(self.client_type, browser_type)
-                count = await client.capture_panels(
+                return await client.capture_panels(
                     url,
                     selector,
                     out_dir,
@@ -336,12 +336,6 @@ class BrowserClient(BrowserClientInterface):
                     headless,
                     browser_options,
                 )
-                return {
-                    "success": True if count > 0 else False,
-                    "captured": count,
-                    "output_dir": out_dir,
-                    "url": url,
-                }
             else:
                 return {"success": False, "error": f"Unknown operation: {operation}"}
 

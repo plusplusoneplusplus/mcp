@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any, Union, Literal
 from mcp_tools.browser.interface import IBrowserClient
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
 from config import env
+from utils.ocr_extractor import extract_text_from_image
 
 
 class PlaywrightBrowserClient(IBrowserClient):
@@ -24,9 +25,8 @@ class PlaywrightBrowserClient(IBrowserClient):
         self.wrapper: Optional[PlaywrightWrapper] = PlaywrightWrapper(
             browser_type=browser, user_data_dir=user_data_dir
         )
-        self.retry_capture_panels_keywords = [
-            "LOADING"
-        ]
+        self.retry_capture_panels_keywords = ["LOADING"]
+        self.max_retry_capture_panels = 3
 
     async def capture_panels(
         self,
@@ -38,18 +38,27 @@ class PlaywrightBrowserClient(IBrowserClient):
         wait_time: int = 30,
         headless: bool = True,
         autoscroll: bool = False,
-    ) -> int:
-        """Capture each matching element as an image and save to the output directory."""
+    ) -> dict:
+        """
+        Capture each matching element as an image, extract OCR content, and return results.
+        Returns:
+            Dict[str, Any]:
+                - Count: Number of panels captured
+                - Panels: List of dicts with PanelID, Path, Content
+                - URL: Dashboard URL visited
+        """
         import pathlib
         import re
 
         out_dir = env.get_setting("image_dir", ".images")
         out_path = pathlib.Path(out_dir)
         out_path.mkdir(exist_ok=True, parents=True)
-        count = 0
+        panels_info = []
         try:
             extra_headers = {"Authorization": f"Bearer {token}"} if token else None
-            async with PlaywrightWrapper(browser_type=self.browser, user_data_dir=self.user_data_dir) as wrapper:
+            async with PlaywrightWrapper(
+                browser_type=self.browser, user_data_dir=self.user_data_dir
+            ) as wrapper:
                 await wrapper.open_page(
                     url,
                     wait_until="networkidle",
@@ -62,10 +71,14 @@ class PlaywrightBrowserClient(IBrowserClient):
                 panels = await wrapper.locate_elements(selector)
                 if not panels:
                     print(f"No elements matched '{selector}'.")
-                    return 0
+                    return {"Count": 0, "Panels": [], "URL": url}
                 for idx, el in enumerate(panels, 1):
                     pid = None
-                    for attr in ["data-panelid", "data-griditem-key", "data-viz-panel-key"]:
+                    for attr in [
+                        "data-panelid",
+                        "data-griditem-key",
+                        "data-viz-panel-key",
+                    ]:
                         try:
                             pid = await el.get_attribute(attr)
                         except Exception:
@@ -75,23 +88,59 @@ class PlaywrightBrowserClient(IBrowserClient):
                             if match:
                                 pid = match.group(1)
                             break
+
                     if not pid:
                         pid = f"{idx:02d}"
+
                     # Check if element handle is valid and attached
                     if not el or (hasattr(el, "is_detached") and el.is_detached()):
                         print(
                             f"Warning: Element for panel {pid} is not attached or not found. Skipping."
                         )
                         continue
-                    await wrapper.take_element_screenshot(
-                        el, str(out_path / f"panel_{pid}.png")
+
+                    image_path = out_path / f"panel_{pid}.png"
+                    delay = 1
+                    ocr_content = []
+                    for attempt in range(self.max_retry_capture_panels):
+                        await wrapper.take_element_screenshot(el, str(image_path))
+                        print(f"Saved panel_{pid}.png (attempt {attempt+1})")
+                        try:
+                            ocr_content = extract_text_from_image(image_path)
+                        except Exception as ocr_e:
+                            print(f"OCR extraction failed for {image_path}: {ocr_e}")
+                            ocr_content = []
+                        # Check if any retry keyword is present in any extracted text
+                        found_keyword = False
+                        for text in ocr_content:
+                            for kw in self.retry_capture_panels_keywords:
+                                if kw in text:
+                                    found_keyword = True
+                                    break
+                            if found_keyword:
+                                break
+                        if (
+                            not found_keyword
+                            or attempt == self.max_retry_capture_panels - 1
+                        ):
+                            break
+                        print(
+                            f"Retrying screenshot/OCR for panel {pid} in {delay} seconds due to keyword match..."
+                        )
+                        await asyncio.sleep(delay)
+                        delay *= 2
+
+                    panels_info.append(
+                        {
+                            "PanelID": pid,
+                            "Path": str(image_path),
+                            "Content": ocr_content,
+                        }
                     )
-                    print(f"Saved panel_{pid}.png")
-                    count += 1
-                return count
+                return {"Count": len(panels_info), "Panels": panels_info, "URL": url}
         except Exception as e:
             print(f"Error in capture_panels: {e}")
-            return count
+            return {"Count": len(panels_info), "Panels": panels_info, "URL": url}
 
     async def __aenter__(self):
         """Support for async context manager."""
