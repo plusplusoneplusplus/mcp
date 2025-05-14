@@ -55,7 +55,8 @@ dependencies = [
     "azure-identity>=1.15.0",  # Azure authentication
     
     # Embedding models
-    "sentence-transformers>=2.7.0",  # Lightweight embedding model for tests
+    "sentence-transformers>=4.0.0",  # Lightweight embedding model for tests
+    "regex>=2024.11.6",
     "detect-secrets>=1.4.0",  # Secret scanning
     
     # Image processing (for chart extractor)
