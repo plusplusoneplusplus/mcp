@@ -48,6 +48,7 @@ class PlaywrightWrapper:
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
+        self.pages: list = []  # Track all open pages
 
     async def __aenter__(self):
         self.playwright = await async_playwright().start()
@@ -99,6 +100,7 @@ class PlaywrightWrapper:
                 "Context not initialized. Use 'async with PlaywrightWrapper()' block."
             )
         self.page = await self.context.new_page()
+        self.pages.append(self.page)
         if extra_http_headers:
             await self.page.set_extra_http_headers(extra_http_headers)
         await self.page.goto(url, wait_until=wait_until, timeout=goto_timeout * 1000)
@@ -231,9 +233,14 @@ class PlaywrightWrapper:
         return await self.page.content()
 
     async def close(self):
-        if self.page:
-            await self.page.close()
-            self.page = None
+        # Close all pages
+        for p in getattr(self, 'pages', []):
+            try:
+                await p.close()
+            except Exception:
+                pass
+        self.pages = []
+        self.page = None
         if self.context:
             await self.context.close()
             self.context = None
@@ -243,3 +250,39 @@ class PlaywrightWrapper:
         if self.playwright:
             await self.playwright.stop()
             self.playwright = None
+
+    async def list_tabs(self):
+        """Return a list of (index, url, title, is_active) for all open tabs."""
+        results = []
+        if not self.context:
+            return results
+        for idx, p in enumerate(self.pages):
+            try:
+                url = p.url if hasattr(p, 'url') else None
+                title = await p.title() if hasattr(p, 'title') else None
+            except Exception:
+                url = None
+                title = None
+            is_active = (p == self.page)
+            results.append((idx, url, title, is_active))
+        return results
+
+    async def switch_tab(self, index: int):
+        """Switch the active page/tab by index."""
+        if not self.pages or index < 0 or index >= len(self.pages):
+            raise IndexError(f"Tab index {index} out of range.")
+        self.page = self.pages[index]
+
+    async def close_tab(self, index: int):
+        """Close the tab at the given index and remove it from the list. Adjust active page if needed."""
+        if not self.pages or index < 0 or index >= len(self.pages):
+            raise IndexError(f"Tab index {index} out of range.")
+        page_to_close = self.pages[index]
+        await page_to_close.close()
+        del self.pages[index]
+        # If the closed tab was the active one, switch to another tab if available
+        if self.page == page_to_close:
+            if self.pages:
+                self.page = self.pages[min(index, len(self.pages)-1)]
+            else:
+                self.page = None

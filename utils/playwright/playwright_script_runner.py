@@ -61,9 +61,8 @@ class PlaywrightScriptRunner:
             try:
                 args = shlex.split(line[len("open ") :])
                 ctx = click.Context(open_cmd)
-                url = open_cmd.make_context(
-                    "open", args, parent=ctx
-                ).params.values()
+                params = open_cmd.make_context("open", args, parent=ctx).params
+                url = params["url"]
             except Exception as e:
                 raise ValueError(f"Failed to parse open command: {e}")
             if url is None:
@@ -184,6 +183,34 @@ class PlaywrightScriptRunner:
             except Exception as e:
                 raise ValueError(f"Invalid screenshot argument: {e}")
 
+        elif line.startswith("list_tabs"):
+            tabs = await self.wrapper.list_tabs()
+            if not tabs:
+                print("No open tabs.")
+            else:
+                print("Open tabs:")
+                for idx, url, title, is_active in tabs:
+                    active_marker = " *" if is_active else ""
+                    print(f"  [{idx}]{active_marker} {url or '<no url>'} | {title or '<no title>'}")
+
+        elif line.startswith("switch_tab "):
+            try:
+                idx_str = line[len("switch_tab "):].strip()
+                idx = int(idx_str)
+                await self.wrapper.switch_tab(idx)
+                print(f"Switched to tab {idx}.")
+            except Exception as e:
+                raise ValueError(f"Invalid switch_tab argument: {e}")
+
+        elif line.startswith("close_tab "):
+            try:
+                idx_str = line[len("close_tab "):].strip()
+                idx = int(idx_str)
+                await self.wrapper.close_tab(idx)
+                print(f"Closed tab {idx}.")
+            except Exception as e:
+                raise ValueError(f"Invalid close_tab argument: {e}")
+
         else:
             raise ValueError(f"Unknown script command: {line}")
 
@@ -212,6 +239,12 @@ class PlaywrightScriptRunner:
             "    - Scrolls the page to the bottom, simulating user scrolling. (Mutates page)\n"
             "  screenshot <output_path> [full_page]\n"
             "    - Takes a screenshot of the current page. (Read-only, but captures visual state)\n"
+            "  list_tabs\n"
+            "    - Lists all open tabs with index, URL, and title. (Read-only)\n"
+            "  switch_tab <index>\n"
+            "    - Sets the active tab. (Mutates page)\n"
+            "  close_tab <index>\n"
+            "    - Closes the tab at the specified index. (Mutates page)\n"
             "  help\n"
             "    - Shows this help message.\n"
             "  exit/quit\n"

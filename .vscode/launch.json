@@ -87,6 +87,17 @@
                 "PYTHONPATH": "${workspaceFolder}",
                 "MCP_EXCLUDED_BASE_CLASSES": "YamlToolBase,CommandExecutorBase"
             }
+        },
+        {
+            "name": "Python: Playwright CLI",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/playwright_cli.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+            }
         }
     ]
 } 
