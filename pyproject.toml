@@ -35,6 +35,10 @@ dependencies = [
     "starlette>=0.37.0",  # ASGI framework
     "httpx>=0.26.0",  # HTTP client
     "httpx-sse>=0.4.0",  # SSE client for httpx
+
+    # LLM clients
+    "openai>=1.14.3",  # OpenAI Python SDK
+    "azure-openai>=1.0.0b8",  # Azure OpenAI Python SDK
     
     # Webdriver tools
     "selenium==4.18.1",
