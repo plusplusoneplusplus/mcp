@@ -17,16 +17,24 @@ import azure.openai
 class LLMCompletionClient:
     """
     Async generic wrapper for LLM chat/vision completion endpoints.
-    Accepts an async callable (OpenAI or Azure OpenAI completion endpoint) and error type.
+    Accepts an async callable (OpenAI or Azure OpenAI completion endpoint), error type, and an optional default_model.
+    If model is not specified in completion/vision_completion, self.default_model is used.
     """
-    def __init__(self, completion_callable, error_type):
+    def __init__(self, completion_callable, error_type, default_model: str = None):
         self.completion_callable = completion_callable
         self.error_type = error_type
+        self.default_model = default_model
 
-    async def completion(self, model: str, messages: List[Dict[str, Any]], **kwargs) -> Dict[str, Any]:
+    async def completion(self, messages: List[Dict[str, Any]], model: str = None, **kwargs) -> Dict[str, Any]:
+        """
+        Run a chat/vision completion. If model is not provided, uses self.default_model.
+        """
+        model_to_use = model or self.default_model
+        if not model_to_use:
+            raise ValueError("No model specified and no default_model set.")
         try:
             response = await self.completion_callable(
-                model=model,
+                model=model_to_use,
                 messages=messages,
                 **kwargs
             )
@@ -34,11 +42,12 @@ class LLMCompletionClient:
         except self.error_type as e:
             raise RuntimeError(f"LLM API error: {e}")
 
-    async def vision_completion(self, model: str, text: str, images: list, **kwargs) -> Dict[str, Any]:
+    async def vision_completion(self, text: str, images: list, model: str = None, **kwargs) -> Dict[str, Any]:
         """
         Pass text and a list of images (each as a URL or a local file path).
         If the item starts with 'http://' or 'https://', it is sent as a URL.
         Otherwise, it is treated as a local file path and encoded as base64.
+        If model is not provided, uses self.default_model.
         """
         import os
         import mimetypes
@@ -63,18 +72,26 @@ class LLMCompletionClient:
                     raise ValueError(f"Image file does not exist: {img}")
                 content.append({"type": "image_url", "image_url": {"url": encode_image_to_base64(img)}})
         messages = [{"role": "user", "content": content}]
-        return await self.completion(model, messages, **kwargs)
+        return await self.completion(messages, model=model, **kwargs)
 
 class OpenAIClient(LLMCompletionClient):
-    def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1"):
+    """
+    Async OpenAI client for chat and vision completion APIs.
+    Optionally set a default_model for all completions.
+    """
+    def __init__(self, api_key: str, base_url: str = "https://api.openai.com/v1", default_model: str = None):
         self.async_client = openai.AsyncClient(api_key=api_key, base_url=base_url)
-        super().__init__(self.async_client.chat.completions.create, openai.OpenAIError)
+        super().__init__(self.async_client.chat.completions.create, openai.OpenAIError, default_model=default_model)
 
 class AzureOpenAIClient(LLMCompletionClient):
-    def __init__(self, api_key: str, endpoint: str, api_version: str = "2024-02-15-preview"):
+    """
+    Async Azure OpenAI client for chat and vision completion APIs.
+    Optionally set a default_model for all completions.
+    """
+    def __init__(self, api_key: str, endpoint: str, api_version: str = "2024-02-15-preview", default_model: str = None):
         async_client = azure.openai.AsyncAzureOpenAI(
             api_key=api_key,
             azure_endpoint=endpoint.rstrip("/"),
             api_version=api_version
         )
-        super().__init__(async_client.chat.completions.create, azure.openai.AzureOpenAIError)
+        super().__init__(async_client.chat.completions.create, azure.openai.AzureOpenAIError, default_model=default_model)
