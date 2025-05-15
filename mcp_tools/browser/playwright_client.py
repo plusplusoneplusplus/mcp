@@ -74,7 +74,9 @@ class PlaywrightBrowserClient(IBrowserClient):
         try:
             extra_headers = {"Authorization": f"Bearer {token}"} if token else None
             async with PlaywrightWrapper(
-                browser_type=self.browser, user_data_dir=self.user_data_dir, headless=headless
+                browser_type=self.browser,
+                user_data_dir=self.user_data_dir,
+                headless=headless,
             ) as wrapper:
                 await wrapper.open_page(
                     url,
@@ -88,7 +90,12 @@ class PlaywrightBrowserClient(IBrowserClient):
                 panels = await wrapper.locate_elements(selector)
                 if not panels:
                     print(f"No elements matched '{selector}'.")
-                    return {"Count": 0, "Panels": [], "URL": url, "SessionId": session_id}
+                    return {
+                        "Count": 0,
+                        "Panels": [],
+                        "URL": url,
+                        "SessionId": session_id,
+                    }
 
                 semaphore = asyncio.Semaphore(max_parallelism)
                 panel_results = [None] * len(panels)
@@ -160,11 +167,19 @@ class PlaywrightBrowserClient(IBrowserClient):
                         result = await capture_panel(idx, el)
                         panel_results[idx] = result
 
-                tasks = [asyncio.create_task(sem_task(idx, el)) for idx, el in enumerate(panels)]
+                tasks = [
+                    asyncio.create_task(sem_task(idx, el))
+                    for idx, el in enumerate(panels)
+                ]
                 await asyncio.gather(*tasks)
 
                 panels_info = [r for r in panel_results if r is not None]
-                return {"Count": len(panels_info), "Panels": panels_info, "URL": url, "SessionId": session_id}
+                return {
+                    "Count": len(panels_info),
+                    "Panels": panels_info,
+                    "URL": url,
+                    "SessionId": session_id,
+                }
         except Exception as e:
             print(f"Error in capture_panels: {e}")
             return {"Count": len(panels_info), "Panels": panels_info, "URL": url}

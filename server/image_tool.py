@@ -44,7 +44,9 @@ def get_image_dir() -> Path:
     return Path(image_dir)
 
 
-def get_session_image(session_id: str, image_name: str) -> list[ImageContent | TextContent]:
+def get_session_image(
+    session_id: str, image_name: str
+) -> list[ImageContent | TextContent]:
     """
     Return an image for a given session_id and image_name.
     Looks for the image at {IMAGE_DIR}/{session_id}/{image_name}.

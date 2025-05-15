@@ -38,7 +38,6 @@ dependencies = [
 
     # LLM clients
     "openai>=1.14.3",  # OpenAI Python SDK
-    "azure-openai>=1.0.0b8",  # Azure OpenAI Python SDK
     
     # Webdriver tools
     "selenium==4.18.1",
