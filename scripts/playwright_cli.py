@@ -2,11 +2,15 @@ import asyncio
 from utils.playwright.playwright_script_runner import PlaywrightScriptRunner
 
 
-async def main():
+import click
+
+@click.command()
+@click.option('--headless', '-H', is_flag=True, default=False, help='Run browser in headless mode (default: False)')
+async def main(headless):
     print(
         "Playwright Interactive CLI. Type 'help' for commands. Type 'exit' or 'quit' to leave."
     )
-    runner = PlaywrightScriptRunner()
+    runner = PlaywrightScriptRunner(headless=headless)
     async with runner:
         while True:
             try:
@@ -30,4 +34,11 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import sys
+    import asyncio
+    # Use click's main entrypoint for CLI parsing
+    if sys.version_info >= (3, 7):
+        asyncio.run(main())
+    else:
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())

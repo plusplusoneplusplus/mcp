@@ -35,8 +35,8 @@ class PlaywrightScriptRunner:
       - 'No effect' means the command is for control flow or timing only.
     """
 
-    def __init__(self, wrapper: Optional[PlaywrightWrapper] = None):
-        self.wrapper = wrapper or PlaywrightWrapper()
+    def __init__(self, wrapper: Optional[PlaywrightWrapper] = None, headless: bool = True):
+        self.wrapper = wrapper or PlaywrightWrapper(headless=headless)
         self.last_located = None
 
     async def __aenter__(self):
@@ -55,20 +55,13 @@ class PlaywrightScriptRunner:
 
             @click.command()
             @click.argument("url")
-            @click.option(
-                "--headless",
-                "-H",
-                is_flag=True,
-                default=None,
-                help="Force headless mode",
-            )
-            def open_cmd(url, headless):
-                return url, headless
+            def open_cmd(url):
+                return url
 
             try:
                 args = shlex.split(line[len("open ") :])
                 ctx = click.Context(open_cmd)
-                url, headless = open_cmd.make_context(
+                url = open_cmd.make_context(
                     "open", args, parent=ctx
                 ).params.values()
             except Exception as e:
@@ -207,8 +200,8 @@ class PlaywrightScriptRunner:
     def help(cls):
         return (
             "Supported commands:\n"
-            "  open <url> [--headless|-H]\n"
-            "    - Navigates the browser to the specified URL. Optionally force headless mode. (Mutates page)\n"
+            "  open <url>\n"
+            "    - Navigates the browser to the specified URL. (Mutates page)\n"
             "  wait <seconds>s\n"
             "    - Waits for the specified duration. Does not interact with the page. (No effect)\n"
             "  locate_element <selector>\n"
