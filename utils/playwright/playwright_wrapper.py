@@ -7,9 +7,51 @@ from playwright.async_api import (
     BrowserContext,
 )
 import time
+import os
+
 
 
 class PlaywrightWrapper:
+    async def evaluate_dom_tree(
+        self,
+        do_highlight_elements: bool = True,
+        focus_highlight_index: int = -1,
+        viewport_expansion: int = 0,
+        debug_mode: bool = False,
+    ) -> dict:
+        """
+        Evaluate the DOM tree by injecting and executing buildDomTree.js in the page context.
+        Args:
+            do_highlight_elements: Whether to highlight elements.
+            focus_highlight_index: Which element to focus highlight (-1 for all).
+            viewport_expansion: Viewport expansion for visibility checks.
+            debug_mode: Whether to enable debug mode for metrics.
+        Returns:
+            dict: The result from the JS evaluation (DOM tree/hash map).
+        """
+        if not self.page:
+            raise RuntimeError("Page not initialized. Call open_page first.")
+
+        # Load JS code from buildDomTree.js
+        js_path = os.path.join(os.path.dirname(__file__), "buildDomTree.js")
+        with open(js_path, "r", encoding="utf-8") as f:
+            js_code = f.read()
+
+        # Prepare the args for the JS function
+        args = {
+            "doHighlightElements": do_highlight_elements,
+            "focusHighlightIndex": focus_highlight_index,
+            "viewportExpansion": viewport_expansion,
+            "debugMode": debug_mode,
+        }
+
+        # Evaluate the JS code in the browser context
+        try:
+            result = await self.page.evaluate(js_code, args)
+        except Exception as e:
+            raise RuntimeError(f"Error evaluating DOM tree JS: {e}")
+        return result
+
     DEFAULT_WAIT_TIME = 30  # Default extra wait time (seconds) after navigation
     DEFAULT_AUTO_SCROLL_TIMEOUT = 30  # Default timeout for auto_scroll (seconds)
 

@@ -4,6 +4,7 @@ from utils.playwright.playwright_wrapper import PlaywrightWrapper
 from mcp_tools import time_util
 import click
 import shlex
+import json
 
 
 class PlaywrightScriptRunner:
@@ -52,7 +53,6 @@ class PlaywrightScriptRunner:
         Uses click for argument parsing for supported commands.
         """
         if line.startswith("open "):
-
             @click.command()
             @click.argument("url")
             def open_cmd(url):
@@ -68,6 +68,34 @@ class PlaywrightScriptRunner:
             if url is None:
                 raise ValueError("open command requires a URL")
             await self.wrapper.open_page(url, wait_time=0)
+
+        elif line.startswith("eval_dom_tree"):
+            @click.command()
+            @click.option("--highlight/--no-highlight", default=True, help="Highlight elements")
+            @click.option("--focus", default=-1, type=int, help="Focus highlight index")
+            @click.option("--viewport-expansion", default=0, type=int, help="Viewport expansion")
+            @click.option("--debug", is_flag=True, default=False, help="Enable debug mode")
+            def eval_cmd(highlight, focus, viewport_expansion, debug):
+                return highlight, focus, viewport_expansion, debug
+
+            try:
+                args = shlex.split(line[len("eval_dom_tree"):])
+                ctx = click.Context(eval_cmd)
+                params = eval_cmd.make_context("eval_dom_tree", args, parent=ctx).params
+                highlight = params["highlight"]
+                focus = params["focus"]
+                viewport_expansion = params["viewport_expansion"]
+                debug = params["debug"]
+            except Exception as e:
+                raise ValueError(f"Invalid eval_dom_tree arguments: {e}")
+
+            result = await self.wrapper.evaluate_dom_tree(
+                do_highlight_elements=highlight,
+                focus_highlight_index=focus,
+                viewport_expansion=viewport_expansion,
+                debug_mode=debug,
+            )
+            print(json.dumps(result, indent=2))
 
         elif line.startswith("wait "):
 
@@ -233,6 +261,8 @@ class PlaywrightScriptRunner:
             "    - Waits for the specified duration. Does not interact with the page. (No effect)\n"
             "  locate_element <selector>\n"
             "    - Finds elements matching the CSS selector and stores them for later use. (Read-only)\n"
+            "  eval_dom_tree [highlight] [focus] [viewport_expansion] [debug]\n"
+            "    - Evaluates the DOM tree and returns a JSON representation. (Read-only)\n"
             "  viewport <width>x<height>\n"
             "    - Sets the viewport size to the specified width and height. (Mutates page)\n"
             "  auto_scroll [timeout] [scroll_step] [scroll_delay]\n"
