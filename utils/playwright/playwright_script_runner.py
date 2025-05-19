@@ -35,8 +35,8 @@ class PlaywrightScriptRunner:
       - 'No effect' means the command is for control flow or timing only.
     """
 
-    def __init__(self, wrapper: Optional[PlaywrightWrapper] = None, headless: bool = True):
-        self.wrapper = wrapper or PlaywrightWrapper(headless=headless)
+    def __init__(self, wrapper: Optional[PlaywrightWrapper] = None, headless: bool = True, browser_type: str = "chromium"):
+        self.wrapper = wrapper or PlaywrightWrapper(headless=headless, browser_type=browser_type)
         self.last_located = None
 
     async def __aenter__(self):

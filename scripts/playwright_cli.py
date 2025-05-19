@@ -1,12 +1,15 @@
 import asyncio
 from utils.playwright.playwright_script_runner import PlaywrightScriptRunner
-
+import argparse
 
 async def main():
+    parser = argparse.ArgumentParser(description="Playwright Interactive CLI")
+    parser.add_argument('--browser-type', type=str, default='chromium', help="Browser type: chromium, firefox, webkit, chrome, edge")
+    args, unknown = parser.parse_known_args()
     print(
         "Playwright Interactive CLI. Type 'help' for commands. Type 'exit' or 'quit' to leave."
     )
-    runner = PlaywrightScriptRunner(headless=False)
+    runner = PlaywrightScriptRunner(headless=False, browser_type=args.browser_type)
     async with runner:
         while True:
             try:
