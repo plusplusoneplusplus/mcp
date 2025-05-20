@@ -52,7 +52,7 @@ class PlaywrightWrapper:
             raise RuntimeError(f"Error evaluating DOM tree JS: {e}")
         return result
 
-    DEFAULT_WAIT_TIME = 30  # Default extra wait time (seconds) after navigation
+    DEFAULT_WAIT_TIME = 5  # Default extra wait time (seconds) after navigation
     DEFAULT_AUTO_SCROLL_TIMEOUT = 30  # Default timeout for auto_scroll (seconds)
 
     def __init__(

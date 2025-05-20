@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .hidden { display: none; }
+        .offscreen { position: absolute; left: -9999px; }
+        .invisible { visibility: hidden; }
+    </style>
+</head>
+<body>
+    <div id="main">
+        <header>Header</header>
+        <nav>
+            <ul>
+                <li><a href="#home">Home</a></li>
+                <li><a href="#about">About</a></li>
+            </ul>
+        </nav>
+        <div id="content">
+            <article class="visible">Visible Content</article>
+            <article class="hidden">Hidden Content</article>
+            <article class="offscreen">Offscreen Content</article>
+            <article class="invisible">Invisible Content</article>
+        </div>
+    </div>
+</body>
+</html>
