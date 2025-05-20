@@ -13,25 +13,6 @@ class PlaywrightScriptRunner:
     """
     Runs a simple script of browser actions using PlaywrightWrapper.
 
-    Supported commands (one per line):
-
-      open <url> [--headless|-H]
-        - Navigates the browser to the specified URL. Optionally force headless mode. (Mutates page)
-      wait <seconds>s
-        - Waits for the specified duration. Does not interact with the page. (No effect)
-      locate_element <selector>
-        - Finds elements matching the CSS selector and stores them for later use. (Read-only)
-      viewport <width>x<height>
-        - Sets the viewport size to the specified width and height. (Mutates page)
-      auto_scroll [timeout] [scroll_step] [scroll_delay]
-        - Scrolls the page to the bottom, simulating user scrolling. (Mutates page)
-      screenshot <output_path> [full_page]
-        - Takes a screenshot of the current page. (Read-only, but captures visual state)
-      help
-        - Shows this help message.
-      exit/quit
-        - Exits the interactive session.
-
     Notes:
       - Commands marked as 'Mutates page' will cause the browser/page to change state.
       - 'Read-only' commands only observe or capture information, not affecting the page.
@@ -250,6 +231,26 @@ class PlaywrightScriptRunner:
             except Exception as e:
                 raise ValueError(f"Invalid close_tab argument: {e}")
 
+        elif line.startswith("extract_texts "):
+            @click.command()
+            @click.argument("selector")
+            def extract_texts_cmd(selector):
+                return selector
+
+            try:
+                args = shlex.split(line[len("extract_texts ") :])
+                ctx = click.Context(extract_texts_cmd)
+                params = extract_texts_cmd.make_context("extract_texts", args, parent=ctx).params
+                selector = params["selector"]
+            except Exception as e:
+                raise ValueError(f"Failed to parse extract_texts command: {e}")
+            if not selector:
+                raise ValueError("extract_texts command requires a selector")
+            if not hasattr(self.wrapper, "extract_texts"):
+                raise RuntimeError("extract_texts is not supported by the current PlaywrightWrapper.")
+            texts = await self.wrapper.extract_texts(selector)
+            print(json.dumps(texts, ensure_ascii=False, indent=2))
+
         else:
             raise ValueError(f"Unknown script command: {line}")
 
@@ -286,6 +287,8 @@ class PlaywrightScriptRunner:
             "    - Sets the active tab. (Mutates page)\n"
             "  close_tab <index>\n"
             "    - Closes the tab at the specified index. (Mutates page)\n"
+            "  extract_texts <selector>\n"
+            "    - Extracts text content from all elements matching the selector and prints as JSON. (Read-only, only if supported by wrapper)\n"
             "  help\n"
             "    - Shows this help message.\n"
             "  exit/quit\n"

@@ -216,6 +216,26 @@ class PlaywrightWrapper:
             raise RuntimeError("Page not initialized. Call open_page first.")
         return await self.page.locator(selector).all()
 
+    async def extract_texts(self, selector: str):
+        """
+        Extract text content from all elements matching the given selector on the current page.
+        Args:
+            selector: CSS selector string to match elements.
+        Returns:
+            List of text content strings for each matched element.
+        """
+        if not self.page:
+            raise RuntimeError("Page not initialized. Call open_page first.")
+        elements = await self.page.locator(selector).all()
+        texts = []
+        for el in elements:
+            try:
+                text = await el.inner_text()
+                texts.append(text)
+            except Exception:
+                texts.append("")
+        return texts
+
     async def take_screenshot(self, output_path: str, full_page: bool = True):
         if not self.page:
             raise RuntimeError("Page not initialized. Call open_page first.")
