@@ -5,6 +5,8 @@ from mcp_tools import time_util
 import click
 import shlex
 import json
+import tempfile
+import os
 
 
 class PlaywrightScriptRunner:
@@ -75,8 +77,9 @@ class PlaywrightScriptRunner:
             @click.option("--focus", default=-1, type=int, help="Focus highlight index")
             @click.option("--viewport-expansion", default=0, type=int, help="Viewport expansion")
             @click.option("--debug", is_flag=True, default=False, help="Enable debug mode")
-            def eval_cmd(highlight, focus, viewport_expansion, debug):
-                return highlight, focus, viewport_expansion, debug
+            @click.option("--dump-json", is_flag=True, default=False, help="Dump result JSON to a temp file")
+            def eval_cmd(highlight, focus, viewport_expansion, debug, dump_json):
+                return highlight, focus, viewport_expansion, debug, dump_json
 
             try:
                 args = shlex.split(line[len("eval_dom_tree"):])
@@ -86,6 +89,7 @@ class PlaywrightScriptRunner:
                 focus = params["focus"]
                 viewport_expansion = params["viewport_expansion"]
                 debug = params["debug"]
+                dump_json = params["dump_json"]
             except Exception as e:
                 raise ValueError(f"Invalid eval_dom_tree arguments: {e}")
 
@@ -95,7 +99,14 @@ class PlaywrightScriptRunner:
                 viewport_expansion=viewport_expansion,
                 debug_mode=debug,
             )
-            print(json.dumps(result, indent=2))
+            if dump_json:
+                fd, path = tempfile.mkstemp(suffix=".json", prefix="eval_dom_tree_")
+                os.close(fd)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(result, f, indent=2)
+                print(f"[eval_dom_tree] JSON dumped to: {path}")
+            else:
+                print(json.dumps(result, indent=2))
 
         elif line.startswith("wait "):
 

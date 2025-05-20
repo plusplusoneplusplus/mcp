@@ -16,7 +16,8 @@ async def main():
     os.makedirs(user_data_dir, exist_ok=True)
 
     print(
-        "Playwright Interactive CLI. Type 'help' for commands. Type 'exit' or 'quit' to leave."
+        "Playwright Interactive CLI. Type 'help' for commands. Type 'exit' or 'quit' to leave.\n"
+        "For 'eval_dom_tree', you can use --dump-json to save the result as JSON in a temp file."
     )
     runner = PlaywrightScriptRunner(headless=False, browser_type=args.browser_type, user_data_dir=user_data_dir)
     async with runner:
