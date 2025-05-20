@@ -192,7 +192,9 @@ class TestCommandExecutorAsync:
 
         # Check it's running
         status = await executor.get_process_status(token)
-        assert status["status"] == "running"
+        # Acceptable states for a running process
+        ACTIVE_STATES = {"running", "sleeping", "disk-sleep"}
+        assert status["status"] in ACTIVE_STATES, f"Unexpected status: {status['status']}"
 
         # Terminate it
         success = executor.terminate_by_token(token)

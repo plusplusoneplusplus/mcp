@@ -1,9 +1,7 @@
-import os
 import pytest
 import pytest_asyncio
 import json
 from pathlib import Path
-from playwright.async_api import expect, async_playwright
 from ..playwright_wrapper import PlaywrightWrapper
 
 pytestmark = pytest.mark.asyncio
