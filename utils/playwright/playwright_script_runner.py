@@ -8,11 +8,13 @@ import json
 import tempfile
 import os
 
+
 # Decorator for command descriptions
 def description(text):
     def decorator(func):
         func._description = text
         return func
+
     return decorator
 
 
@@ -26,8 +28,16 @@ class PlaywrightScriptRunner:
       - 'No effect' means the command is for control flow or timing only.
     """
 
-    def __init__(self, wrapper: Optional[PlaywrightWrapper] = None, headless: bool = True, browser_type: str = "chromium", user_data_dir: str = None):
-        self.wrapper = wrapper or PlaywrightWrapper(headless=headless, browser_type=browser_type, user_data_dir=user_data_dir)
+    def __init__(
+        self,
+        wrapper: Optional[PlaywrightWrapper] = None,
+        headless: bool = True,
+        browser_type: str = "chromium",
+        user_data_dir: str = None,
+    ):
+        self.wrapper = wrapper or PlaywrightWrapper(
+            headless=headless, browser_type=browser_type, user_data_dir=user_data_dir
+        )
         self.last_located = None
         # List of (aliases, handler) pairs as a class member
         self.command_list = [
@@ -88,27 +98,37 @@ class PlaywrightScriptRunner:
 
     # --- Command Handlers ---
     @description(
-    '''open <url>
-    - Navigates the browser to the specified URL. (Mutates page)'''
-)
+        """open <url>
+    - Navigates the browser to the specified URL. (Mutates page)"""
+    )
     async def cmd_open(self, url):
         await self.wrapper.open_page(url, wait_time=0)
         print("[OK]")
 
     @description(
-    '''eval_dom_tree [highlight] [focus] [viewport_expansion] [debug]
-    - Evaluates the DOM tree and returns a JSON representation. (Read-only)'''
-)
+        """eval_dom_tree [highlight] [focus] [viewport_expansion] [debug]
+    - Evaluates the DOM tree and returns a JSON representation. (Read-only)"""
+    )
     async def cmd_eval_dom_tree(self, *args):
         # Parse options from args (reuse click for consistency)
         @click.command()
-        @click.option("--highlight/--no-highlight", default=True, help="Highlight elements")
+        @click.option(
+            "--highlight/--no-highlight", default=True, help="Highlight elements"
+        )
         @click.option("--focus", default=-1, type=int, help="Focus highlight index")
-        @click.option("--viewport-expansion", default=0, type=int, help="Viewport expansion")
+        @click.option(
+            "--viewport-expansion", default=0, type=int, help="Viewport expansion"
+        )
         @click.option("--debug", is_flag=True, default=False, help="Enable debug mode")
-        @click.option("--dump-json", is_flag=True, default=False, help="Dump result JSON to a temp file")
+        @click.option(
+            "--dump-json",
+            is_flag=True,
+            default=False,
+            help="Dump result JSON to a temp file",
+        )
         def eval_cmd(highlight, focus, viewport_expansion, debug, dump_json):
             return highlight, focus, viewport_expansion, debug, dump_json
+
         params = eval_cmd.make_context("eval_dom_tree", list(args)).params
         result = await self.wrapper.evaluate_dom_tree(
             do_highlight_elements=params["highlight"],
@@ -126,9 +146,9 @@ class PlaywrightScriptRunner:
             print(json.dumps(result, indent=2))
 
     @description(
-    '''wait <seconds>s
-    - Waits for the specified duration. Does not interact with the page. (No effect)'''
-)
+        """wait <seconds>s
+    - Waits for the specified duration. Does not interact with the page. (No effect)"""
+    )
     async def cmd_wait(self, duration):
         if not duration.endswith("s"):
             raise ValueError("wait duration must end with 's'")
@@ -140,17 +160,17 @@ class PlaywrightScriptRunner:
         print(f"[wait] Slept for {seconds} seconds.")
 
     @description(
-    '''locate_element <selector>
-    - Finds elements matching the CSS selector and stores them for later use. (Read-only)'''
-)
+        """locate_element <selector>
+    - Finds elements matching the CSS selector and stores them for later use. (Read-only)"""
+    )
     async def cmd_locate(self, selector):
         self.last_located = await self.wrapper.locate_elements(selector)
         print(f"Located {len(self.last_located)} elements.")
 
     @description(
-    '''viewport <width>x<height>
-    - Sets the viewport size to the specified width and height. (Mutates page)'''
-)
+        """viewport <width>x<height>
+    - Sets the viewport size to the specified width and height. (Mutates page)"""
+    )
     async def cmd_viewport(self, size):
         if "x" not in size:
             raise ValueError("Viewport size must be in <width>x<height> format.")
@@ -159,39 +179,43 @@ class PlaywrightScriptRunner:
         print(f"Viewport set to {width}x{height}.")
 
     @description(
-    '''auto_scroll [timeout] [scroll_step] [scroll_delay]
-    - Scrolls the page to the bottom, simulating user scrolling. (Mutates page)'''
-)
+        """auto_scroll [timeout] [scroll_step] [scroll_delay]
+    - Scrolls the page to the bottom, simulating user scrolling. (Mutates page)"""
+    )
     async def cmd_scroll(self, timeout=None, scroll_step=None, scroll_delay=None):
         timeout = int(timeout) if timeout else self.wrapper.DEFAULT_AUTO_SCROLL_TIMEOUT
         scroll_step = int(scroll_step) if scroll_step else 80
         scroll_delay = float(scroll_delay) if scroll_delay else 0.5
         await self.wrapper.auto_scroll(timeout, scroll_step, scroll_delay)
-        print(f"Auto-scrolled for {timeout}s, step {scroll_step}, delay {scroll_delay}.")
+        print(
+            f"Auto-scrolled for {timeout}s, step {scroll_step}, delay {scroll_delay}."
+        )
 
     @description(
-    '''screenshot <output_path> [full_page]
-    - Takes a screenshot of the current page. (Read-only, but captures visual state)'''
-)
+        """screenshot <output_path> [full_page]
+    - Takes a screenshot of the current page. (Read-only, but captures visual state)"""
+    )
     async def cmd_shot(self, output_path, full_page=None):
         full_page = full_page.lower() == "true" if full_page is not None else True
         await self.wrapper.take_screenshot(output_path, full_page=full_page)
         print(f"Screenshot saved to {output_path} (full_page={full_page}).")
 
     @description(
-    '''extract_texts <selector>
-    - Extracts text content from all elements matching the selector and prints as JSON. (Read-only, only if supported by wrapper)'''
-)
+        """extract_texts <selector>
+    - Extracts text content from all elements matching the selector and prints as JSON. (Read-only, only if supported by wrapper)"""
+    )
     async def cmd_extract_texts(self, selector):
         if not hasattr(self.wrapper, "extract_texts"):
-            raise RuntimeError("extract_texts is not supported by the current PlaywrightWrapper.")
+            raise RuntimeError(
+                "extract_texts is not supported by the current PlaywrightWrapper."
+            )
         texts = await self.wrapper.extract_texts(selector)
         print(json.dumps(texts, ensure_ascii=False, indent=2))
 
     @description(
-    '''list_tabs
-    - Lists all open tabs with index, URL, and title. (Read-only)'''
-)
+        """list_tabs
+    - Lists all open tabs with index, URL, and title. (Read-only)"""
+    )
     async def cmd_list_tabs(self):
         tabs = await self.wrapper.list_tabs()
         if not tabs:
@@ -200,37 +224,39 @@ class PlaywrightScriptRunner:
             print("Open tabs:")
             for idx, url, title, is_active in tabs:
                 active_marker = " *" if is_active else ""
-                print(f"  [{idx}]{active_marker} {url or '<no url>'} | {title or '<no title>'}")
+                print(
+                    f"  [{idx}]{active_marker} {url or '<no url>'} | {title or '<no title>'}"
+                )
 
     @description(
-    '''switch_tab <index>
-    - Sets the active tab. (Mutates page)'''
-)
+        """switch_tab <index>
+    - Sets the active tab. (Mutates page)"""
+    )
     async def cmd_switch_tab(self, idx):
         idx = int(idx)
         await self.wrapper.switch_tab(idx)
         print(f"Switched to tab {idx}.")
 
     @description(
-    '''close_tab <index>
-    - Closes the tab at the specified index. (Mutates page)'''
-)
+        """close_tab <index>
+    - Closes the tab at the specified index. (Mutates page)"""
+    )
     async def cmd_close_tab(self, idx):
         idx = int(idx)
         await self.wrapper.close_tab(idx)
         print(f"Closed tab {idx}.")
 
     @description(
-    '''help
-    - Shows this help message.'''
-)
+        """help
+    - Shows this help message."""
+    )
     def cmd_help(self):
         print(self.help())
 
     @description(
-    '''exit/quit
-    - Exits the interactive session.'''
-)
+        """exit/quit
+    - Exits the interactive session."""
+    )
     def cmd_exit(self):
         print("Exiting Playwright CLI.")
         raise SystemExit(0)
@@ -248,6 +274,7 @@ class PlaywrightScriptRunner:
     def help(cls):
         # Collect all methods with a _description attribute
         import inspect
+
         lines = ["Supported commands:"]
         for name, member in inspect.getmembers(cls):
             if callable(member) and hasattr(member, "_description"):
@@ -255,7 +282,13 @@ class PlaywrightScriptRunner:
                 # Only show the first alias for the command
                 lines.append(f"  {desc}")
         lines.append("\nNotes:")
-        lines.append("  - Commands marked as 'Mutates page' will cause the browser/page to change state.")
-        lines.append("  - 'Read-only' commands only observe or capture information, not affecting the page.")
-        lines.append("  - 'No effect' means the command is for control flow or timing only.")
+        lines.append(
+            "  - Commands marked as 'Mutates page' will cause the browser/page to change state."
+        )
+        lines.append(
+            "  - 'Read-only' commands only observe or capture information, not affecting the page."
+        )
+        lines.append(
+            "  - 'No effect' means the command is for control flow or timing only."
+        )
         return "\n".join(lines)

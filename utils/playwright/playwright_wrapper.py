@@ -10,7 +10,6 @@ import time
 import os
 
 
-
 class PlaywrightWrapper:
     async def evaluate_dom_tree(
         self,
@@ -296,7 +295,7 @@ class PlaywrightWrapper:
 
     async def close(self):
         # Close all pages
-        for p in getattr(self, 'pages', []):
+        for p in getattr(self, "pages", []):
             try:
                 await p.close()
             except Exception:
@@ -320,12 +319,12 @@ class PlaywrightWrapper:
             return results
         for idx, p in enumerate(self.pages):
             try:
-                url = p.url if hasattr(p, 'url') else None
-                title = await p.title() if hasattr(p, 'title') else None
+                url = p.url if hasattr(p, "url") else None
+                title = await p.title() if hasattr(p, "title") else None
             except Exception:
                 url = None
                 title = None
-            is_active = (p == self.page)
+            is_active = p == self.page
             results.append((idx, url, title, is_active))
         return results
 
@@ -345,6 +344,6 @@ class PlaywrightWrapper:
         # If the closed tab was the active one, switch to another tab if available
         if self.page == page_to_close:
             if self.pages:
-                self.page = self.pages[min(index, len(self.pages)-1)]
+                self.page = self.pages[min(index, len(self.pages) - 1)]
             else:
                 self.page = None

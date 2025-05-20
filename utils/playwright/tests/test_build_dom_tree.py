@@ -14,12 +14,14 @@ FIXTURES_DIR = TEST_DIR / "test_fixtures"
 with open(TEST_DIR.parent / "buildDomTree.js", "r") as f:
     BUILD_DOM_TREE_JS = f.read()
 
+
 @pytest.fixture(scope="module")
 def vcr_config():
     return {
         "filter_headers": ["authorization", "cookie"],
         "ignore_localhost": True,
     }
+
 
 @pytest_asyncio.fixture(scope="function")
 async def browser():
@@ -32,12 +34,14 @@ async def browser():
     finally:
         await pw.__aexit__(None, None, None)
 
+
 async def load_test_page(browser, fixture_name):
     """Helper to load a test fixture page and evaluate the DOM tree using evaluate_dom_tree."""
     fixture_path = FIXTURES_DIR / f"{fixture_name}.html"
     url = f"file://{fixture_path.absolute()}"
     await browser.open_page(url, wait_until="networkidle")
     return await browser.evaluate_dom_tree()
+
 
 @pytest.mark.asyncio
 async def test_basic_dom_structure(browser):
@@ -70,6 +74,7 @@ async def test_basic_dom_structure(browser):
     assert container_children[1]["tagName"].upper() == "BUTTON"
     assert container_children[2]["tagName"].upper() == "A"
     assert container_children[3]["tagName"].upper() == "DIV"
+
 
 @pytest.mark.asyncio
 async def test_interactive_elements(browser):
@@ -113,6 +118,7 @@ async def test_interactive_elements(browser):
     assert custom_button_data is not None
     assert custom_button_data["attributes"].get("role") == "button"
 
+
 @pytest.mark.asyncio
 async def test_element_visibility(browser):
     """Test visibility detection of elements."""
@@ -130,12 +136,15 @@ async def test_element_visibility(browser):
             if found:
                 return found
         return None
+
     # Debug: print all node IDs, tag names, and attributes
     for nid, node in node_map.items():
         print(f"Node {nid}: tag={node.get('tagName')}, attrs={node.get('attributes')}")
+
     # Find the <div> node with four <article> children
     def is_article_node(node):
         return node.get("tagName", "").lower() == "article"
+
     content_node = None
     for node in node_map.values():
         if node.get("tagName", "").lower() == "div":
@@ -143,13 +152,16 @@ async def test_element_visibility(browser):
             if len(children) == 4 and all(is_article_node(child) for child in children):
                 content_node = node
                 break
-    assert content_node is not None, "Content <div> with four <article> children not found"
+    assert (
+        content_node is not None
+    ), "Content <div> with four <article> children not found"
     articles = [node_map[cid] for cid in content_node["children"]]
     assert len(articles) == 4
     # Debug: print full contents of article nodes
     for i, art in enumerate(articles):
         print(f"Article {i}: {art}")
     # (Visibility checks will be added after inspection)
+
 
 @pytest.mark.asyncio
 async def test_iframe_handling(browser):
@@ -159,7 +171,10 @@ async def test_iframe_handling(browser):
     # Find the iframe node by tagName and id in attributes
     iframe_node = None
     for node in node_map.values():
-        if node.get("tagName", "").upper() == "IFRAME" and node.get("attributes", {}).get("id") == "test-iframe":
+        if (
+            node.get("tagName", "").upper() == "IFRAME"
+            and node.get("attributes", {}).get("id") == "test-iframe"
+        ):
             iframe_node = node
             break
     assert iframe_node is not None, "IFRAME node with id='test-iframe' not found"
@@ -172,6 +187,7 @@ async def test_iframe_handling(browser):
     iframe_button = await frame.query_selector("#iframe-button")
     assert iframe_button is not None
 
+
 @pytest.mark.asyncio
 async def test_highlighting(browser):
     """Test element highlighting functionality."""
@@ -180,7 +196,9 @@ async def test_highlighting(browser):
     await browser.evaluate_dom_tree(do_highlight_elements=True, debug_mode=True)
     # Check if highlighting was applied
     button = await browser.page.query_selector("#test-button")
-    highlight_style = await button.evaluate("""(el) => {
+    highlight_style = await button.evaluate(
+        """(el) => {
         return window.getComputedStyle(el).getPropertyValue('outline');
-    }""")
-    assert highlight_style and highlight_style != 'none'
+    }"""
+    )
+    assert highlight_style and highlight_style != "none"
