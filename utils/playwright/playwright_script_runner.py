@@ -201,16 +201,38 @@ class PlaywrightScriptRunner:
         print(f"Screenshot saved to {output_path} (full_page={full_page}).")
 
     @description(
-        """extract_texts <selector>
-    - Extracts text content from all elements matching the selector and prints as JSON. (Read-only, only if supported by wrapper)"""
+        """extract_texts <selector> [output_format]
+    - Extracts text content from all elements matching the selector and prints as JSON or markdown. (Read-only, only if supported by wrapper)
+    - [output_format] can be 'json' (default) or 'markdown'.
+    """
     )
-    async def cmd_extract_texts(self, selector):
+    async def cmd_extract_texts(self, selector, output_format=None):
+        """
+        Extract text content from elements matching the selector.
+        Optionally output as markdown if output_format == 'markdown'.
+        """
         if not hasattr(self.wrapper, "extract_texts"):
             raise RuntimeError(
                 "extract_texts is not supported by the current PlaywrightWrapper."
             )
         texts = await self.wrapper.extract_texts(selector)
-        print(json.dumps(texts, ensure_ascii=False, indent=2))
+        if output_format and output_format.lower() == "markdown":
+            # Lazy import to avoid unnecessary dependency if not used
+            from utils.html_to_markdown.converter import html_to_markdown
+
+            # If texts is a list of HTML strings, convert each to markdown
+            if isinstance(texts, list):
+                markdowns = [html_to_markdown(t) for t in texts]
+                print("\n\n---\n\n".join(markdowns))
+            elif isinstance(texts, dict):
+                # If dict, convert each value
+                markdowns = {k: html_to_markdown(v) for k, v in texts.items()}
+                for k, md in markdowns.items():
+                    print(f"## {k}\n\n{md}\n")
+            else:
+                print(html_to_markdown(str(texts)))
+        else:
+            print(json.dumps(texts, ensure_ascii=False, indent=2))
 
     @description(
         """list_tabs
