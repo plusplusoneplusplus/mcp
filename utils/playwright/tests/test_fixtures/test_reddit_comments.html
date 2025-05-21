@@ -255,30 +255,76 @@
         }
 
         // Render the comment tree as HTML
-        function renderComments(comments, parentEl) {
-            comments.forEach(c => {
+        // Helper to render a comment as HTML string
+        function commentHTML(c) {
+            return `
+                <img class='avatar' src='${c.avatar}' alt='avatar'/>
+                <div class='meta'>
+                    <span class='author'>${c.author}</span>
+                    ${c.badges && c.badges.length ? c.badges.map(b => `<span class='badge'>${b}</span>`).join('') : ''}
+                    <span class='timestamp'>${c.timestamp}</span>
+                    ${c.edited ? `<span class='edited'>(edited)</span>` : ''}
+                </div>
+                <div class='text'>${c.text}</div>
+                <div class='actions'>
+                    <span class='vote upvoted'>▲ ${c.upvotes}</span>
+                    <span class='vote downvoted'>▼ ${c.downvotes}</span>
+                    <span style='color:#bbb;font-size:13px;'>Reply</span>
+                </div>
+            `;
+        }
+        // Custom element for shadow DOM comment
+        class ShadowComment extends HTMLElement {
+            constructor() {
+                super();
+                this.attachShadow({mode: 'open'});
+            }
+            set data(c) {
+                // Encapsulated style
+                this.shadowRoot.innerHTML = `
+                <style>
+                    :host { display:block; background:#fff; margin:12px 0 0 0; padding:14px 18px 14px 60px; border:1px solid #e4e7ea; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.03); position:relative; }
+                    .avatar { width:38px; height:38px; border-radius:50%; object-fit:cover; position:absolute; left:12px; top:16px; border:2px solid #ffb380; background:#eee; }
+                    .meta { margin-bottom:4px; font-size:13px; display:flex; align-items:center; gap:8px; }
+                    .author { font-weight:700; color:#0079d3; }
+                    .badge { background:#ffb380; color:#fff; font-size:11px; border-radius:4px; padding:2px 6px; margin-left:2px; }
+                    .timestamp { color:#888; font-size:12px; }
+                    .edited { color:#d77; font-size:11px; font-style:italic; }
+                    .actions { display:flex; align-items:center; margin-top:6px; gap:10px; }
+                    .vote { display:inline-flex; align-items:center; gap:2px; cursor:pointer; color:#bbb; font-size:14px; transition:color 0.2s; }
+                    .vote.upvoted { color:#ff4500; }
+                    .vote.downvoted { color:#7193ff; }
+                    .text { font-size:15px; line-height:1.6; margin-bottom:2px; }
+                    .text code { background:#f2f4f5; font-size:13px; border-radius:3px; padding:1px 4px; }
+                    .text img { border-radius:4px; margin:0 2px; vertical-align:middle; box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+                    .text ul { margin:2px 0 2px 18px; }
+                    .text blockquote { border-left:3px solid #ffb380; margin:4px 0; padding-left:10px; color:#555; background:#f8f8f8; }
+                    .text .emoji { font-size:18px; vertical-align:middle; }
+                </style>
+                ${commentHTML(c)}
+                `;
+            }
+        }
+        customElements.define('shadow-comment', ShadowComment);
+
+        // Render comments, using shadow root for every 2nd top-level and 1st reply
+        function renderComments(comments, parentEl, level=1) {
+            comments.forEach((c, idx) => {
                 let li = document.createElement('li');
                 li.className = 'comment';
-                li.innerHTML = `
-                    <img class='avatar' src='${c.avatar}' alt='avatar'/>
-                    <div class='meta'>
-                        <span class='author'>${c.author}</span>
-                        ${c.badges && c.badges.length ? c.badges.map(b => `<span class='badge'>${b}</span>`).join('') : ''}
-                        <span class='timestamp'>${c.timestamp}</span>
-                        ${c.edited ? `<span class='edited'>(edited)</span>` : ''}
-                    </div>
-                    <div class='text'>${c.text}</div>
-                    <div class='actions'>
-                        <span class='vote upvoted'>▲ ${c.upvotes}</span>
-                        <span class='vote downvoted'>▼ ${c.downvotes}</span>
-                        <span style='color:#bbb;font-size:13px;'>Reply</span>
-                    </div>
-                `;
+                let useShadow = (level === 1 && idx % 2 === 1) || (level === 2 && idx === 0);
+                if (useShadow) {
+                    let shadowEl = document.createElement('shadow-comment');
+                    shadowEl.data = c;
+                    li.appendChild(shadowEl);
+                } else {
+                    li.innerHTML = commentHTML(c);
+                }
                 parentEl.appendChild(li);
                 if (c.replies && c.replies.length > 0) {
                     let ul = document.createElement('ul');
                     ul.className = 'replies';
-                    renderComments(c.replies, ul);
+                    renderComments(c.replies, ul, level+1);
                     li.appendChild(ul);
                 }
             });
