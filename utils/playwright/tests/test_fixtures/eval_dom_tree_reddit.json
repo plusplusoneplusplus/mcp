@@ -1,0 +1,7021 @@
+{
+  "rootId": "816",
+  "map": {
+    "0": {
+      "type": "TEXT_NODE",
+      "text": "Reddit-style Comments (Static)",
+      "isVisible": true
+    },
+    "1": {
+      "tagName": "h1",
+      "attributes": {},
+      "xpath": "html/body/h1",
+      "children": [
+        "0"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "2": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "3": {
+      "type": "TEXT_NODE",
+      "text": "user1_1",
+      "isVisible": true
+    },
+    "4": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "3"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "5": {
+      "type": "TEXT_NODE",
+      "text": "OP",
+      "isVisible": true
+    },
+    "6": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "5"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "7": {
+      "type": "TEXT_NODE",
+      "text": "51 min ago",
+      "isVisible": true
+    },
+    "8": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[1]/span[3]",
+      "children": [
+        "7"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "9": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[1]",
+      "children": [
+        "4",
+        "6",
+        "8"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "10": {
+      "type": "TEXT_NODE",
+      "text": "AI has revolutionized how we interact with technology. From voice assistants to personalized recommendations, it's making daily tasks more efficient and enjoyable. I can't imagine going back to a world without these conveniences!",
+      "isVisible": true
+    },
+    "11": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[2]",
+      "children": [
+        "10"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "12": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 601",
+      "isVisible": true
+    },
+    "13": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "12"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 0
+    },
+    "14": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 22",
+      "isVisible": true
+    },
+    "15": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "14"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 1
+    },
+    "16": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": true
+    },
+    "17": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "16"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "18": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/div[3]",
+      "children": [
+        "13",
+        "15",
+        "17"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "19": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "20": {
+      "type": "TEXT_NODE",
+      "text": "user2_1",
+      "isVisible": true
+    },
+    "21": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "20"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "22": {
+      "type": "TEXT_NODE",
+      "text": "17 min ago",
+      "isVisible": true
+    },
+    "23": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "22"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "24": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "21",
+        "23"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "25": {
+      "type": "TEXT_NODE",
+      "text": "Absolutely agree! The convenience is unmatched, but I do worry about becoming too dependent on these systems. What happens if they fail?",
+      "isVisible": true
+    },
+    "26": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "25"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "27": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 174",
+      "isVisible": true
+    },
+    "28": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "27"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 2
+    },
+    "29": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 26",
+      "isVisible": true
+    },
+    "30": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "29"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 3
+    },
+    "31": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": true
+    },
+    "32": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "31"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "33": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "28",
+        "30",
+        "32"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "34": {
+      "tagName": "shadow-comment",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/shadow-comment",
+      "children": [
+        "19",
+        "24",
+        "26",
+        "33"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false,
+      "shadowRoot": true
+    },
+    "35": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "36": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": true
+    },
+    "37": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "36"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "38": {
+      "type": "TEXT_NODE",
+      "text": "15 min ago",
+      "isVisible": true
+    },
+    "39": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "38"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "40": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[1]",
+      "children": [
+        "37",
+        "39"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "41": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": true
+    },
+    "42": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": true
+    },
+    "43": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "42"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "44": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": true
+    },
+    "45": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "44"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "46": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[2]/ul",
+      "children": [
+        "43",
+        "45"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "47": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[2]",
+      "children": [
+        "41",
+        "46"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "48": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 865",
+      "isVisible": true
+    },
+    "49": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "48"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 4
+    },
+    "50": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 23",
+      "isVisible": true
+    },
+    "51": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "50"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 5
+    },
+    "52": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": true
+    },
+    "53": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "52"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "54": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]/div[3]",
+      "children": [
+        "49",
+        "51",
+        "53"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "55": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[1]",
+      "children": [
+        "35",
+        "40",
+        "47",
+        "54"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "56": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "57": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": true
+    },
+    "58": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "57"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "59": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": true
+    },
+    "60": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "59"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "61": {
+      "type": "TEXT_NODE",
+      "text": "30 min ago",
+      "isVisible": true
+    },
+    "62": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "61"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "63": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[1]",
+      "children": [
+        "58",
+        "60",
+        "62"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "64": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": true
+    },
+    "65": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": true
+    },
+    "66": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://github.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[2]/a",
+      "children": [
+        "65"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 6
+    },
+    "67": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[2]",
+      "children": [
+        "64",
+        "66"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "68": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 307",
+      "isVisible": true
+    },
+    "69": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "68"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 7
+    },
+    "70": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 9",
+      "isVisible": true
+    },
+    "71": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "70"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": true,
+      "isInViewport": true,
+      "highlightIndex": 8
+    },
+    "72": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": true
+    },
+    "73": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "72"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "74": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]/div[3]",
+      "children": [
+        "69",
+        "71",
+        "73"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "75": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul/li[2]",
+      "children": [
+        "56",
+        "63",
+        "67",
+        "74"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "76": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]/ul",
+      "children": [
+        "55",
+        "75"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "77": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[1]",
+      "children": [
+        "34",
+        "76"
+      ],
+      "isVisible": true,
+      "isTopElement": true,
+      "isInteractive": false
+    },
+    "78": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "79": {
+      "type": "TEXT_NODE",
+      "text": "user2_2",
+      "isVisible": false
+    },
+    "80": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "79"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "81": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "82": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "81"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "83": {
+      "type": "TEXT_NODE",
+      "text": "50 min ago",
+      "isVisible": false
+    },
+    "84": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "83"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "85": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[1]",
+      "children": [
+        "80",
+        "82",
+        "84"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "86": {
+      "type": "TEXT_NODE",
+      "text": "That's a great point. I also think about how AI can sometimes reinforce biases in recommendations. Has anyone else noticed this?",
+      "isVisible": false
+    },
+    "87": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "88": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://github.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[2]/a",
+      "children": [
+        "87"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "89": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[2]",
+      "children": [
+        "86",
+        "88"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "90": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 3",
+      "isVisible": false
+    },
+    "91": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "90"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "92": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 23",
+      "isVisible": false
+    },
+    "93": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "92"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "94": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "95": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "94"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "96": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/div[3]",
+      "children": [
+        "91",
+        "93",
+        "95"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "97": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "98": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "99": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "98"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "100": {
+      "type": "TEXT_NODE",
+      "text": "16 min ago",
+      "isVisible": false
+    },
+    "101": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "100"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "102": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[1]",
+      "children": [
+        "99",
+        "101"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "103": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "104": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "105": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "104"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "106": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "107": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "106"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "108": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[2]/ul",
+      "children": [
+        "105",
+        "107"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "109": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[2]",
+      "children": [
+        "103",
+        "108"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "110": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 592",
+      "isVisible": false
+    },
+    "111": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "110"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "112": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 1",
+      "isVisible": false
+    },
+    "113": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "112"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "114": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "115": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "114"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "116": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]/div[3]",
+      "children": [
+        "111",
+        "113",
+        "115"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "117": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[1]",
+      "children": [
+        "97",
+        "102",
+        "109",
+        "116"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "118": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "119": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "120": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "119"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "121": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "122": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "121"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "123": {
+      "type": "TEXT_NODE",
+      "text": "2 min ago",
+      "isVisible": false
+    },
+    "124": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "123"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "125": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[1]",
+      "children": [
+        "120",
+        "122",
+        "124"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "126": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "127": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "128": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://reddit.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[2]/a",
+      "children": [
+        "127"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "129": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[2]",
+      "children": [
+        "126",
+        "128"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "130": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 783",
+      "isVisible": false
+    },
+    "131": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "130"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "132": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 26",
+      "isVisible": false
+    },
+    "133": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "132"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "134": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "135": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "134"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "136": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]/div[3]",
+      "children": [
+        "131",
+        "133",
+        "135"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "137": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul/li[2]",
+      "children": [
+        "118",
+        "125",
+        "129",
+        "136"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "138": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]/ul",
+      "children": [
+        "117",
+        "137"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "139": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[2]",
+      "children": [
+        "78",
+        "85",
+        "89",
+        "96",
+        "138"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "140": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "141": {
+      "type": "TEXT_NODE",
+      "text": "user2_3",
+      "isVisible": false
+    },
+    "142": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[1]/span[1]",
+      "children": [
+        "141"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "143": {
+      "type": "TEXT_NODE",
+      "text": "GOLD",
+      "isVisible": false
+    },
+    "144": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[1]/span[2]",
+      "children": [
+        "143"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "145": {
+      "type": "TEXT_NODE",
+      "text": "19 min ago",
+      "isVisible": false
+    },
+    "146": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[1]/span[3]",
+      "children": [
+        "145"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "147": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[1]",
+      "children": [
+        "142",
+        "144",
+        "146"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "148": {
+      "type": "TEXT_NODE",
+      "text": "I love the healthcare applications too. My friend's diagnosis was sped up thanks to an AI-powered tool. It's amazing how fast things are changing.",
+      "isVisible": false
+    },
+    "149": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "150": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[2]",
+      "children": [
+        "148",
+        "149"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "151": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 487",
+      "isVisible": false
+    },
+    "152": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[3]/span[1]",
+      "children": [
+        "151"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "153": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 40",
+      "isVisible": false
+    },
+    "154": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[3]/span[2]",
+      "children": [
+        "153"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "155": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "156": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[3]/span[3]",
+      "children": [
+        "155"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "157": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/div[3]",
+      "children": [
+        "152",
+        "154",
+        "156"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "158": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "159": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "160": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "159"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "161": {
+      "type": "TEXT_NODE",
+      "text": "33 min ago",
+      "isVisible": false
+    },
+    "162": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "161"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "163": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[1]",
+      "children": [
+        "160",
+        "162"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "164": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "165": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "166": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "165"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "167": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "168": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "167"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "169": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[2]/ul",
+      "children": [
+        "166",
+        "168"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "170": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[2]",
+      "children": [
+        "164",
+        "169"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "171": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 37",
+      "isVisible": false
+    },
+    "172": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "171"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "173": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 2",
+      "isVisible": false
+    },
+    "174": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "173"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "175": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "176": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "175"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "177": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]/div[3]",
+      "children": [
+        "172",
+        "174",
+        "176"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "178": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[1]",
+      "children": [
+        "158",
+        "163",
+        "170",
+        "177"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "179": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "180": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "181": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "180"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "182": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "183": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "182"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "184": {
+      "type": "TEXT_NODE",
+      "text": "18 min ago",
+      "isVisible": false
+    },
+    "185": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "184"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "186": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[1]",
+      "children": [
+        "181",
+        "183",
+        "185"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "187": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "188": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "189": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://example.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[2]/a",
+      "children": [
+        "188"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "190": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[2]",
+      "children": [
+        "187",
+        "189"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "191": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 645",
+      "isVisible": false
+    },
+    "192": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "191"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "193": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 10",
+      "isVisible": false
+    },
+    "194": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "193"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "195": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "196": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "195"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "197": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]/div[3]",
+      "children": [
+        "192",
+        "194",
+        "196"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "198": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul/li[2]",
+      "children": [
+        "179",
+        "186",
+        "190",
+        "197"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "199": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]/ul",
+      "children": [
+        "178",
+        "198"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "200": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul/li[3]",
+      "children": [
+        "140",
+        "147",
+        "150",
+        "157",
+        "199"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "201": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]/ul",
+      "children": [
+        "77",
+        "139",
+        "200"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "202": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[1]",
+      "children": [
+        "2",
+        "9",
+        "11",
+        "18",
+        "201"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "203": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "204": {
+      "type": "TEXT_NODE",
+      "text": "user1_2",
+      "isVisible": false
+    },
+    "205": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "204"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "206": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "207": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "206"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "208": {
+      "type": "TEXT_NODE",
+      "text": "17 min ago",
+      "isVisible": false
+    },
+    "209": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "208"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "210": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "205",
+        "207",
+        "209"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "211": {
+      "type": "TEXT_NODE",
+      "text": "While AI brings many benefits, I worry about privacy and job displacement. It's essential that we balance innovation with ethical considerations and ensure everyone has a place in the new economy.",
+      "isVisible": false
+    },
+    "212": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "213": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://news.ycombinator.com",
+        "target": "_blank"
+      },
+      "xpath": "a",
+      "children": [
+        "212"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "214": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "211",
+        "213"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "215": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 507",
+      "isVisible": false
+    },
+    "216": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "215"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "217": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 10",
+      "isVisible": false
+    },
+    "218": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "217"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "219": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "220": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "219"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "221": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "216",
+        "218",
+        "220"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "222": {
+      "tagName": "shadow-comment",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/shadow-comment",
+      "children": [
+        "203",
+        "210",
+        "214",
+        "221"
+      ],
+      "isVisible": true,
+      "isTopElement": false,
+      "shadowRoot": true
+    },
+    "223": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "224": {
+      "type": "TEXT_NODE",
+      "text": "user2_1",
+      "isVisible": false
+    },
+    "225": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "224"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "226": {
+      "type": "TEXT_NODE",
+      "text": "41 min ago",
+      "isVisible": false
+    },
+    "227": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "226"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "228": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "225",
+        "227"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "229": {
+      "type": "TEXT_NODE",
+      "text": "Absolutely agree! The convenience is unmatched, but I do worry about becoming too dependent on these systems. What happens if they fail?",
+      "isVisible": false
+    },
+    "230": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "229"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "231": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 74",
+      "isVisible": false
+    },
+    "232": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "231"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "233": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 32",
+      "isVisible": false
+    },
+    "234": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "233"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "235": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "236": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "235"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "237": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "232",
+        "234",
+        "236"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "238": {
+      "tagName": "shadow-comment",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/shadow-comment",
+      "children": [
+        "223",
+        "228",
+        "230",
+        "237"
+      ],
+      "isVisible": true,
+      "isTopElement": false,
+      "shadowRoot": true
+    },
+    "239": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "240": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "241": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "240"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "242": {
+      "type": "TEXT_NODE",
+      "text": "56 min ago",
+      "isVisible": false
+    },
+    "243": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "242"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "244": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[1]",
+      "children": [
+        "241",
+        "243"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "245": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "246": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "247": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "246"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "248": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "249": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "248"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "250": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[2]/ul",
+      "children": [
+        "247",
+        "249"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "251": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[2]",
+      "children": [
+        "245",
+        "250"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "252": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 927",
+      "isVisible": false
+    },
+    "253": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "252"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "254": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 4",
+      "isVisible": false
+    },
+    "255": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "254"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "256": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "257": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "256"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "258": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]/div[3]",
+      "children": [
+        "253",
+        "255",
+        "257"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "259": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[1]",
+      "children": [
+        "239",
+        "244",
+        "251",
+        "258"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "260": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "261": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "262": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "261"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "263": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "264": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "263"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "265": {
+      "type": "TEXT_NODE",
+      "text": "1 min ago",
+      "isVisible": false
+    },
+    "266": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "265"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "267": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[1]",
+      "children": [
+        "262",
+        "264",
+        "266"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "268": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "269": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "270": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://news.ycombinator.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[2]/a",
+      "children": [
+        "269"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "271": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[2]",
+      "children": [
+        "268",
+        "270"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "272": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 137",
+      "isVisible": false
+    },
+    "273": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "272"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "274": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 5",
+      "isVisible": false
+    },
+    "275": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "274"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "276": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "277": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "276"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "278": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]/div[3]",
+      "children": [
+        "273",
+        "275",
+        "277"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "279": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul/li[2]",
+      "children": [
+        "260",
+        "267",
+        "271",
+        "278"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "280": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]/ul",
+      "children": [
+        "259",
+        "279"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "281": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[1]",
+      "children": [
+        "238",
+        "280"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "282": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "283": {
+      "type": "TEXT_NODE",
+      "text": "user2_2",
+      "isVisible": false
+    },
+    "284": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "283"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "285": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "286": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "285"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "287": {
+      "type": "TEXT_NODE",
+      "text": "5 min ago",
+      "isVisible": false
+    },
+    "288": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "287"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "289": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[1]",
+      "children": [
+        "284",
+        "286",
+        "288"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "290": {
+      "type": "TEXT_NODE",
+      "text": "That's a great point. I also think about how AI can sometimes reinforce biases in recommendations. Has anyone else noticed this?",
+      "isVisible": false
+    },
+    "291": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "292": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://imgur.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[2]/a",
+      "children": [
+        "291"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "293": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[2]",
+      "children": [
+        "290",
+        "292"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "294": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 611",
+      "isVisible": false
+    },
+    "295": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "294"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "296": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 44",
+      "isVisible": false
+    },
+    "297": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "296"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "298": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "299": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "298"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "300": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/div[3]",
+      "children": [
+        "295",
+        "297",
+        "299"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "301": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "302": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "303": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "302"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "304": {
+      "type": "TEXT_NODE",
+      "text": "42 min ago",
+      "isVisible": false
+    },
+    "305": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "304"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "306": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[1]",
+      "children": [
+        "303",
+        "305"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "307": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "308": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "309": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "308"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "310": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "311": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "310"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "312": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[2]/ul",
+      "children": [
+        "309",
+        "311"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "313": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[2]",
+      "children": [
+        "307",
+        "312"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "314": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 934",
+      "isVisible": false
+    },
+    "315": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "314"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "316": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 13",
+      "isVisible": false
+    },
+    "317": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "316"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "318": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "319": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "318"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "320": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]/div[3]",
+      "children": [
+        "315",
+        "317",
+        "319"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "321": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[1]",
+      "children": [
+        "301",
+        "306",
+        "313",
+        "320"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "322": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "323": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "324": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "323"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "325": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "326": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "325"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "327": {
+      "type": "TEXT_NODE",
+      "text": "59 min ago",
+      "isVisible": false
+    },
+    "328": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "327"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "329": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[1]",
+      "children": [
+        "324",
+        "326",
+        "328"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "330": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "331": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "332": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://imgur.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[2]/a",
+      "children": [
+        "331"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "333": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[2]",
+      "children": [
+        "330",
+        "332"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "334": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 821",
+      "isVisible": false
+    },
+    "335": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "334"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "336": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 6",
+      "isVisible": false
+    },
+    "337": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "336"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "338": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "339": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "338"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "340": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]/div[3]",
+      "children": [
+        "335",
+        "337",
+        "339"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "341": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul/li[2]",
+      "children": [
+        "322",
+        "329",
+        "333",
+        "340"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "342": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]/ul",
+      "children": [
+        "321",
+        "341"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "343": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[2]",
+      "children": [
+        "282",
+        "289",
+        "293",
+        "300",
+        "342"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "344": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "345": {
+      "type": "TEXT_NODE",
+      "text": "user2_3",
+      "isVisible": false
+    },
+    "346": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[1]/span[1]",
+      "children": [
+        "345"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "347": {
+      "type": "TEXT_NODE",
+      "text": "GOLD",
+      "isVisible": false
+    },
+    "348": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[1]/span[2]",
+      "children": [
+        "347"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "349": {
+      "type": "TEXT_NODE",
+      "text": "20 min ago",
+      "isVisible": false
+    },
+    "350": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[1]/span[3]",
+      "children": [
+        "349"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "351": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[1]",
+      "children": [
+        "346",
+        "348",
+        "350"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "352": {
+      "type": "TEXT_NODE",
+      "text": "I love the healthcare applications too. My friend's diagnosis was sped up thanks to an AI-powered tool. It's amazing how fast things are changing.",
+      "isVisible": false
+    },
+    "353": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "354": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[2]",
+      "children": [
+        "352",
+        "353"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "355": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 433",
+      "isVisible": false
+    },
+    "356": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[3]/span[1]",
+      "children": [
+        "355"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "357": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 28",
+      "isVisible": false
+    },
+    "358": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[3]/span[2]",
+      "children": [
+        "357"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "359": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "360": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[3]/span[3]",
+      "children": [
+        "359"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "361": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/div[3]",
+      "children": [
+        "356",
+        "358",
+        "360"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "362": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "363": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "364": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "363"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "365": {
+      "type": "TEXT_NODE",
+      "text": "18 min ago",
+      "isVisible": false
+    },
+    "366": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "365"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "367": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[1]",
+      "children": [
+        "364",
+        "366"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "368": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "369": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "370": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "369"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "371": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "372": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "371"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "373": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[2]/ul",
+      "children": [
+        "370",
+        "372"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "374": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[2]",
+      "children": [
+        "368",
+        "373"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "375": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 322",
+      "isVisible": false
+    },
+    "376": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "375"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "377": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 36",
+      "isVisible": false
+    },
+    "378": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "377"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "379": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "380": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "379"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "381": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]/div[3]",
+      "children": [
+        "376",
+        "378",
+        "380"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "382": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[1]",
+      "children": [
+        "362",
+        "367",
+        "374",
+        "381"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "383": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "384": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "385": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "384"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "386": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "387": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "386"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "388": {
+      "type": "TEXT_NODE",
+      "text": "53 min ago",
+      "isVisible": false
+    },
+    "389": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "388"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "390": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[1]",
+      "children": [
+        "385",
+        "387",
+        "389"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "391": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "392": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "393": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://news.ycombinator.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[2]/a",
+      "children": [
+        "392"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "394": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[2]",
+      "children": [
+        "391",
+        "393"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "395": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 695",
+      "isVisible": false
+    },
+    "396": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "395"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "397": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 49",
+      "isVisible": false
+    },
+    "398": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "397"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "399": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "400": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "399"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "401": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]/div[3]",
+      "children": [
+        "396",
+        "398",
+        "400"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "402": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul/li[2]",
+      "children": [
+        "383",
+        "390",
+        "394",
+        "401"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "403": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]/ul",
+      "children": [
+        "382",
+        "402"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "404": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul/li[3]",
+      "children": [
+        "344",
+        "351",
+        "354",
+        "361",
+        "403"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "405": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]/ul",
+      "children": [
+        "281",
+        "343",
+        "404"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "406": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[2]",
+      "children": [
+        "222",
+        "405"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "407": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "408": {
+      "type": "TEXT_NODE",
+      "text": "user1_3",
+      "isVisible": false
+    },
+    "409": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[1]/span[1]",
+      "children": [
+        "408"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "410": {
+      "type": "TEXT_NODE",
+      "text": "GOLD",
+      "isVisible": false
+    },
+    "411": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[1]/span[2]",
+      "children": [
+        "410"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "412": {
+      "type": "TEXT_NODE",
+      "text": "42 min ago",
+      "isVisible": false
+    },
+    "413": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[1]/span[3]",
+      "children": [
+        "412"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "414": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[1]",
+      "children": [
+        "409",
+        "411",
+        "413"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "415": {
+      "type": "TEXT_NODE",
+      "text": "One of the most exciting things about AI is its ability to help with healthcare. Early diagnosis, personalized treatment plans, and even robotic surgeries are becoming more common. The future looks promising!",
+      "isVisible": false
+    },
+    "416": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "417": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[2]",
+      "children": [
+        "415",
+        "416"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "418": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 295",
+      "isVisible": false
+    },
+    "419": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[3]/span[1]",
+      "children": [
+        "418"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "420": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 5",
+      "isVisible": false
+    },
+    "421": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[3]/span[2]",
+      "children": [
+        "420"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "422": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "423": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[3]/span[3]",
+      "children": [
+        "422"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "424": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/div[3]",
+      "children": [
+        "419",
+        "421",
+        "423"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "425": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "426": {
+      "type": "TEXT_NODE",
+      "text": "user2_1",
+      "isVisible": false
+    },
+    "427": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "426"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "428": {
+      "type": "TEXT_NODE",
+      "text": "6 min ago",
+      "isVisible": false
+    },
+    "429": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "428"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "430": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "427",
+        "429"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "431": {
+      "type": "TEXT_NODE",
+      "text": "Absolutely agree! The convenience is unmatched, but I do worry about becoming too dependent on these systems. What happens if they fail?",
+      "isVisible": false
+    },
+    "432": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "431"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "433": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 785",
+      "isVisible": false
+    },
+    "434": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "433"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "435": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 45",
+      "isVisible": false
+    },
+    "436": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "435"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "437": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "438": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "437"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "439": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "434",
+        "436",
+        "438"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "440": {
+      "tagName": "shadow-comment",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/shadow-comment",
+      "children": [
+        "425",
+        "430",
+        "432",
+        "439"
+      ],
+      "isVisible": true,
+      "isTopElement": false,
+      "shadowRoot": true
+    },
+    "441": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "442": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "443": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "442"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "444": {
+      "type": "TEXT_NODE",
+      "text": "58 min ago",
+      "isVisible": false
+    },
+    "445": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "444"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "446": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[1]",
+      "children": [
+        "443",
+        "445"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "447": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "448": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "449": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "448"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "450": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "451": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "450"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "452": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[2]/ul",
+      "children": [
+        "449",
+        "451"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "453": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[2]",
+      "children": [
+        "447",
+        "452"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "454": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 821",
+      "isVisible": false
+    },
+    "455": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "454"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "456": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 6",
+      "isVisible": false
+    },
+    "457": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "456"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "458": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "459": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "458"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "460": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]/div[3]",
+      "children": [
+        "455",
+        "457",
+        "459"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "461": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[1]",
+      "children": [
+        "441",
+        "446",
+        "453",
+        "460"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "462": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "463": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "464": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "463"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "465": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "466": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "465"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "467": {
+      "type": "TEXT_NODE",
+      "text": "25 min ago",
+      "isVisible": false
+    },
+    "468": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "467"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "469": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[1]",
+      "children": [
+        "464",
+        "466",
+        "468"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "470": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "471": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "472": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://github.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[2]/a",
+      "children": [
+        "471"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "473": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[2]",
+      "children": [
+        "470",
+        "472"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "474": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 699",
+      "isVisible": false
+    },
+    "475": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "474"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "476": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 11",
+      "isVisible": false
+    },
+    "477": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "476"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "478": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "479": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "478"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "480": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]/div[3]",
+      "children": [
+        "475",
+        "477",
+        "479"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "481": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul/li[2]",
+      "children": [
+        "462",
+        "469",
+        "473",
+        "480"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "482": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]/ul",
+      "children": [
+        "461",
+        "481"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "483": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[1]",
+      "children": [
+        "440",
+        "482"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "484": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "485": {
+      "type": "TEXT_NODE",
+      "text": "user2_2",
+      "isVisible": false
+    },
+    "486": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "485"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "487": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "488": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "487"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "489": {
+      "type": "TEXT_NODE",
+      "text": "38 min ago",
+      "isVisible": false
+    },
+    "490": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "489"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "491": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[1]",
+      "children": [
+        "486",
+        "488",
+        "490"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "492": {
+      "type": "TEXT_NODE",
+      "text": "That's a great point. I also think about how AI can sometimes reinforce biases in recommendations. Has anyone else noticed this?",
+      "isVisible": false
+    },
+    "493": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "494": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://github.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[2]/a",
+      "children": [
+        "493"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "495": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[2]",
+      "children": [
+        "492",
+        "494"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "496": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 335",
+      "isVisible": false
+    },
+    "497": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "496"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "498": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 10",
+      "isVisible": false
+    },
+    "499": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "498"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "500": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "501": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "500"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "502": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/div[3]",
+      "children": [
+        "497",
+        "499",
+        "501"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "503": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "504": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "505": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "504"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "506": {
+      "type": "TEXT_NODE",
+      "text": "24 min ago",
+      "isVisible": false
+    },
+    "507": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "506"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "508": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[1]",
+      "children": [
+        "505",
+        "507"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "509": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "510": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "511": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "510"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "512": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "513": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "512"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "514": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[2]/ul",
+      "children": [
+        "511",
+        "513"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "515": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[2]",
+      "children": [
+        "509",
+        "514"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "516": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 326",
+      "isVisible": false
+    },
+    "517": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "516"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "518": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 39",
+      "isVisible": false
+    },
+    "519": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "518"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "520": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "521": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "520"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "522": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]/div[3]",
+      "children": [
+        "517",
+        "519",
+        "521"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "523": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[1]",
+      "children": [
+        "503",
+        "508",
+        "515",
+        "522"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "524": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "525": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "526": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "525"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "527": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "528": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "527"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "529": {
+      "type": "TEXT_NODE",
+      "text": "44 min ago",
+      "isVisible": false
+    },
+    "530": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "529"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "531": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[1]",
+      "children": [
+        "526",
+        "528",
+        "530"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "532": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "533": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "534": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://news.ycombinator.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[2]/a",
+      "children": [
+        "533"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "535": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[2]",
+      "children": [
+        "532",
+        "534"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "536": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 369",
+      "isVisible": false
+    },
+    "537": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "536"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "538": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 0",
+      "isVisible": false
+    },
+    "539": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "538"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "540": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "541": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "540"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "542": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]/div[3]",
+      "children": [
+        "537",
+        "539",
+        "541"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "543": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul/li[2]",
+      "children": [
+        "524",
+        "531",
+        "535",
+        "542"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "544": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]/ul",
+      "children": [
+        "523",
+        "543"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "545": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[2]",
+      "children": [
+        "484",
+        "491",
+        "495",
+        "502",
+        "544"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "546": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "547": {
+      "type": "TEXT_NODE",
+      "text": "user2_3",
+      "isVisible": false
+    },
+    "548": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[1]/span[1]",
+      "children": [
+        "547"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "549": {
+      "type": "TEXT_NODE",
+      "text": "GOLD",
+      "isVisible": false
+    },
+    "550": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[1]/span[2]",
+      "children": [
+        "549"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "551": {
+      "type": "TEXT_NODE",
+      "text": "36 min ago",
+      "isVisible": false
+    },
+    "552": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[1]/span[3]",
+      "children": [
+        "551"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "553": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[1]",
+      "children": [
+        "548",
+        "550",
+        "552"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "554": {
+      "type": "TEXT_NODE",
+      "text": "I love the healthcare applications too. My friend's diagnosis was sped up thanks to an AI-powered tool. It's amazing how fast things are changing.",
+      "isVisible": false
+    },
+    "555": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "556": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[2]",
+      "children": [
+        "554",
+        "555"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "557": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 908",
+      "isVisible": false
+    },
+    "558": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[3]/span[1]",
+      "children": [
+        "557"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "559": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 10",
+      "isVisible": false
+    },
+    "560": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[3]/span[2]",
+      "children": [
+        "559"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "561": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "562": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[3]/span[3]",
+      "children": [
+        "561"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "563": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/div[3]",
+      "children": [
+        "558",
+        "560",
+        "562"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "564": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "565": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "566": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "565"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "567": {
+      "type": "TEXT_NODE",
+      "text": "42 min ago",
+      "isVisible": false
+    },
+    "568": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "567"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "569": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[1]",
+      "children": [
+        "566",
+        "568"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "570": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "571": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "572": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "571"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "573": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "574": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "573"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "575": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[2]/ul",
+      "children": [
+        "572",
+        "574"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "576": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[2]",
+      "children": [
+        "570",
+        "575"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "577": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 184",
+      "isVisible": false
+    },
+    "578": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "577"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "579": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 2",
+      "isVisible": false
+    },
+    "580": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "579"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "581": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "582": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "581"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "583": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]/div[3]",
+      "children": [
+        "578",
+        "580",
+        "582"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "584": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[1]",
+      "children": [
+        "564",
+        "569",
+        "576",
+        "583"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "585": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "586": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "587": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "586"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "588": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "589": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "588"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "590": {
+      "type": "TEXT_NODE",
+      "text": "2 min ago",
+      "isVisible": false
+    },
+    "591": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "590"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "592": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[1]",
+      "children": [
+        "587",
+        "589",
+        "591"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "593": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "594": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "595": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://example.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[2]/a",
+      "children": [
+        "594"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "596": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[2]",
+      "children": [
+        "593",
+        "595"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "597": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 275",
+      "isVisible": false
+    },
+    "598": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "597"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "599": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 16",
+      "isVisible": false
+    },
+    "600": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "599"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "601": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "602": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "601"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "603": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]/div[3]",
+      "children": [
+        "598",
+        "600",
+        "602"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "604": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul/li[2]",
+      "children": [
+        "585",
+        "592",
+        "596",
+        "603"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "605": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]/ul",
+      "children": [
+        "584",
+        "604"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "606": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul/li[3]",
+      "children": [
+        "546",
+        "553",
+        "556",
+        "563",
+        "605"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "607": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]/ul",
+      "children": [
+        "483",
+        "545",
+        "606"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "608": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[3]",
+      "children": [
+        "407",
+        "414",
+        "417",
+        "424",
+        "607"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "609": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "610": {
+      "type": "TEXT_NODE",
+      "text": "user1_4",
+      "isVisible": false
+    },
+    "611": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "610"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "612": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "613": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "612"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "614": {
+      "type": "TEXT_NODE",
+      "text": "10 min ago",
+      "isVisible": false
+    },
+    "615": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "614"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "616": {
+      "type": "TEXT_NODE",
+      "text": "(edited)",
+      "isVisible": false
+    },
+    "617": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[4]",
+      "children": [
+        "616"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "618": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "611",
+        "613",
+        "615",
+        "617"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "619": {
+      "type": "TEXT_NODE",
+      "text": "I think people overestimate AI's capabilities. Yes, it's useful, but there are still many things humans do better\u2014especially when it comes to creativity and empathy.",
+      "isVisible": false
+    },
+    "620": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "621": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://news.ycombinator.com",
+        "target": "_blank"
+      },
+      "xpath": "a",
+      "children": [
+        "620"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "622": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "619",
+        "621"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "623": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 572",
+      "isVisible": false
+    },
+    "624": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "623"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "625": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 49",
+      "isVisible": false
+    },
+    "626": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "625"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "627": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "628": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "627"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "629": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "624",
+        "626",
+        "628"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "630": {
+      "tagName": "shadow-comment",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/shadow-comment",
+      "children": [
+        "609",
+        "618",
+        "622",
+        "629"
+      ],
+      "isVisible": true,
+      "isTopElement": false,
+      "shadowRoot": true
+    },
+    "631": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "632": {
+      "type": "TEXT_NODE",
+      "text": "user2_1",
+      "isVisible": false
+    },
+    "633": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "632"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "634": {
+      "type": "TEXT_NODE",
+      "text": "24 min ago",
+      "isVisible": false
+    },
+    "635": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "634"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "636": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "633",
+        "635"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "637": {
+      "type": "TEXT_NODE",
+      "text": "Absolutely agree! The convenience is unmatched, but I do worry about becoming too dependent on these systems. What happens if they fail?",
+      "isVisible": false
+    },
+    "638": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "637"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "639": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 560",
+      "isVisible": false
+    },
+    "640": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[1]",
+      "children": [
+        "639"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "641": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 14",
+      "isVisible": false
+    },
+    "642": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[2]",
+      "children": [
+        "641"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "643": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "644": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "span[3]",
+      "children": [
+        "643"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "645": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "",
+      "children": [
+        "640",
+        "642",
+        "644"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "646": {
+      "tagName": "shadow-comment",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/shadow-comment",
+      "children": [
+        "631",
+        "636",
+        "638",
+        "645"
+      ],
+      "isVisible": true,
+      "isTopElement": false,
+      "shadowRoot": true
+    },
+    "647": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "648": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "649": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "648"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "650": {
+      "type": "TEXT_NODE",
+      "text": "24 min ago",
+      "isVisible": false
+    },
+    "651": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "650"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "652": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[1]",
+      "children": [
+        "649",
+        "651"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "653": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "654": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "655": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "654"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "656": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "657": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "656"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "658": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[2]/ul",
+      "children": [
+        "655",
+        "657"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "659": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[2]",
+      "children": [
+        "653",
+        "658"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "660": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 418",
+      "isVisible": false
+    },
+    "661": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "660"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "662": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 34",
+      "isVisible": false
+    },
+    "663": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "662"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "664": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "665": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "664"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "666": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]/div[3]",
+      "children": [
+        "661",
+        "663",
+        "665"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "667": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[1]",
+      "children": [
+        "647",
+        "652",
+        "659",
+        "666"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "668": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "669": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "670": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "669"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "671": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "672": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "671"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "673": {
+      "type": "TEXT_NODE",
+      "text": "37 min ago",
+      "isVisible": false
+    },
+    "674": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "673"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "675": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[1]",
+      "children": [
+        "670",
+        "672",
+        "674"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "676": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "677": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "678": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://news.ycombinator.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[2]/a",
+      "children": [
+        "677"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "679": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[2]",
+      "children": [
+        "676",
+        "678"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "680": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 327",
+      "isVisible": false
+    },
+    "681": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "680"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "682": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 24",
+      "isVisible": false
+    },
+    "683": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "682"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "684": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "685": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "684"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "686": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]/div[3]",
+      "children": [
+        "681",
+        "683",
+        "685"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "687": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul/li[2]",
+      "children": [
+        "668",
+        "675",
+        "679",
+        "686"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "688": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]/ul",
+      "children": [
+        "667",
+        "687"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "689": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[1]",
+      "children": [
+        "646",
+        "688"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "690": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "691": {
+      "type": "TEXT_NODE",
+      "text": "user2_2",
+      "isVisible": false
+    },
+    "692": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "691"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "693": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "694": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "693"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "695": {
+      "type": "TEXT_NODE",
+      "text": "18 min ago",
+      "isVisible": false
+    },
+    "696": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "695"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "697": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[1]",
+      "children": [
+        "692",
+        "694",
+        "696"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "698": {
+      "type": "TEXT_NODE",
+      "text": "That's a great point. I also think about how AI can sometimes reinforce biases in recommendations. Has anyone else noticed this?",
+      "isVisible": false
+    },
+    "699": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "700": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://imgur.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[2]/a",
+      "children": [
+        "699"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "701": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[2]",
+      "children": [
+        "698",
+        "700"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "702": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 235",
+      "isVisible": false
+    },
+    "703": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "702"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "704": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 16",
+      "isVisible": false
+    },
+    "705": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "704"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "706": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "707": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "706"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "708": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/div[3]",
+      "children": [
+        "703",
+        "705",
+        "707"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "709": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "710": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "711": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "710"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "712": {
+      "type": "TEXT_NODE",
+      "text": "10 min ago",
+      "isVisible": false
+    },
+    "713": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "712"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "714": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[1]",
+      "children": [
+        "711",
+        "713"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "715": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "716": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "717": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "716"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "718": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "719": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "718"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "720": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[2]/ul",
+      "children": [
+        "717",
+        "719"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "721": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[2]",
+      "children": [
+        "715",
+        "720"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "722": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 669",
+      "isVisible": false
+    },
+    "723": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "722"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "724": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 11",
+      "isVisible": false
+    },
+    "725": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "724"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "726": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "727": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "726"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "728": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]/div[3]",
+      "children": [
+        "723",
+        "725",
+        "727"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "729": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[1]",
+      "children": [
+        "709",
+        "714",
+        "721",
+        "728"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "730": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "731": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "732": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "731"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "733": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "734": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "733"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "735": {
+      "type": "TEXT_NODE",
+      "text": "3 min ago",
+      "isVisible": false
+    },
+    "736": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "735"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "737": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[1]",
+      "children": [
+        "732",
+        "734",
+        "736"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "738": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "739": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "740": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://example.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[2]/a",
+      "children": [
+        "739"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "741": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[2]",
+      "children": [
+        "738",
+        "740"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "742": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 124",
+      "isVisible": false
+    },
+    "743": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "742"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "744": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 15",
+      "isVisible": false
+    },
+    "745": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "744"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "746": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "747": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "746"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "748": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]/div[3]",
+      "children": [
+        "743",
+        "745",
+        "747"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "749": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul/li[2]",
+      "children": [
+        "730",
+        "737",
+        "741",
+        "748"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "750": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]/ul",
+      "children": [
+        "729",
+        "749"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "751": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[2]",
+      "children": [
+        "690",
+        "697",
+        "701",
+        "708",
+        "750"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "752": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "753": {
+      "type": "TEXT_NODE",
+      "text": "user2_3",
+      "isVisible": false
+    },
+    "754": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[1]/span[1]",
+      "children": [
+        "753"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "755": {
+      "type": "TEXT_NODE",
+      "text": "GOLD",
+      "isVisible": false
+    },
+    "756": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[1]/span[2]",
+      "children": [
+        "755"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "757": {
+      "type": "TEXT_NODE",
+      "text": "43 min ago",
+      "isVisible": false
+    },
+    "758": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[1]/span[3]",
+      "children": [
+        "757"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "759": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[1]",
+      "children": [
+        "754",
+        "756",
+        "758"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "760": {
+      "type": "TEXT_NODE",
+      "text": "I love the healthcare applications too. My friend's diagnosis was sped up thanks to an AI-powered tool. It's amazing how fast things are changing.",
+      "isVisible": false
+    },
+    "761": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "762": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[2]",
+      "children": [
+        "760",
+        "761"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "763": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 481",
+      "isVisible": false
+    },
+    "764": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[3]/span[1]",
+      "children": [
+        "763"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "765": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 18",
+      "isVisible": false
+    },
+    "766": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[3]/span[2]",
+      "children": [
+        "765"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "767": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "768": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[3]/span[3]",
+      "children": [
+        "767"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "769": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/div[3]",
+      "children": [
+        "764",
+        "766",
+        "768"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "770": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "771": {
+      "type": "TEXT_NODE",
+      "text": "user3_1",
+      "isVisible": false
+    },
+    "772": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[1]/span[1]",
+      "children": [
+        "771"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "773": {
+      "type": "TEXT_NODE",
+      "text": "10 min ago",
+      "isVisible": false
+    },
+    "774": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[1]/span[2]",
+      "children": [
+        "773"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "775": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[1]",
+      "children": [
+        "772",
+        "774"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "776": {
+      "type": "TEXT_NODE",
+      "text": "Redundancy is key. I always keep backups and try not to rely solely on AI. But it's hard when everything is so interconnected now!",
+      "isVisible": false
+    },
+    "777": {
+      "type": "TEXT_NODE",
+      "text": "Pro",
+      "isVisible": false
+    },
+    "778": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[2]/ul/li[1]",
+      "children": [
+        "777"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "779": {
+      "type": "TEXT_NODE",
+      "text": "Con",
+      "isVisible": false
+    },
+    "780": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[2]/ul/li[2]",
+      "children": [
+        "779"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "781": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[2]/ul",
+      "children": [
+        "778",
+        "780"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "782": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[2]",
+      "children": [
+        "776",
+        "781"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "783": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 811",
+      "isVisible": false
+    },
+    "784": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[3]/span[1]",
+      "children": [
+        "783"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "785": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 21",
+      "isVisible": false
+    },
+    "786": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[3]/span[2]",
+      "children": [
+        "785"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "787": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "788": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[3]/span[3]",
+      "children": [
+        "787"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "789": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]/div[3]",
+      "children": [
+        "784",
+        "786",
+        "788"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "790": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[1]",
+      "children": [
+        "770",
+        "775",
+        "782",
+        "789"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "791": {
+      "tagName": "img",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/img",
+      "children": [],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "792": {
+      "type": "TEXT_NODE",
+      "text": "user3_2",
+      "isVisible": false
+    },
+    "793": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[1]/span[1]",
+      "children": [
+        "792"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "794": {
+      "type": "TEXT_NODE",
+      "text": "MOD",
+      "isVisible": false
+    },
+    "795": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[1]/span[2]",
+      "children": [
+        "794"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "796": {
+      "type": "TEXT_NODE",
+      "text": "27 min ago",
+      "isVisible": false
+    },
+    "797": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[1]/span[3]",
+      "children": [
+        "796"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "798": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[1]",
+      "children": [
+        "793",
+        "795",
+        "797"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "799": {
+      "type": "TEXT_NODE",
+      "text": "Bias is a huge issue. I read a study showing that some AI models can unintentionally discriminate. Transparency is so important.",
+      "isVisible": false
+    },
+    "800": {
+      "type": "TEXT_NODE",
+      "text": "Read more",
+      "isVisible": false
+    },
+    "801": {
+      "tagName": "a",
+      "attributes": {
+        "href": "https://imgur.com",
+        "target": "_blank"
+      },
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[2]/a",
+      "children": [
+        "800"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "802": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[2]",
+      "children": [
+        "799",
+        "801"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "803": {
+      "type": "TEXT_NODE",
+      "text": "\u25b2 840",
+      "isVisible": false
+    },
+    "804": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[3]/span[1]",
+      "children": [
+        "803"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "805": {
+      "type": "TEXT_NODE",
+      "text": "\u25bc 44",
+      "isVisible": false
+    },
+    "806": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[3]/span[2]",
+      "children": [
+        "805"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "807": {
+      "type": "TEXT_NODE",
+      "text": "Reply",
+      "isVisible": false
+    },
+    "808": {
+      "tagName": "span",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[3]/span[3]",
+      "children": [
+        "807"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "809": {
+      "tagName": "div",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]/div[3]",
+      "children": [
+        "804",
+        "806",
+        "808"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "810": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul/li[2]",
+      "children": [
+        "791",
+        "798",
+        "802",
+        "809"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "811": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]/ul",
+      "children": [
+        "790",
+        "810"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "812": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul/li[3]",
+      "children": [
+        "752",
+        "759",
+        "762",
+        "769",
+        "811"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "813": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]/ul",
+      "children": [
+        "689",
+        "751",
+        "812"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "814": {
+      "tagName": "li",
+      "attributes": {},
+      "xpath": "html/body/ul/li[4]",
+      "children": [
+        "630",
+        "813"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "815": {
+      "tagName": "ul",
+      "attributes": {},
+      "xpath": "html/body/ul",
+      "children": [
+        "202",
+        "406",
+        "608",
+        "814"
+      ],
+      "isVisible": true,
+      "isTopElement": false
+    },
+    "816": {
+      "tagName": "body",
+      "attributes": {},
+      "xpath": "/body",
+      "children": [
+        "1",
+        "815"
+      ]
+    }
+  }
+}

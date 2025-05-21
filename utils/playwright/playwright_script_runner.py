@@ -128,8 +128,13 @@ class PlaywrightScriptRunner:
         print("[OK]")
 
     @description(
-        """eval_dom_tree [highlight] [focus] [viewport_expansion] [debug]
-    - Evaluates the DOM tree and returns a JSON representation. (Read-only)"""
+        """eval_dom_tree [highlight] [focus] [viewport_expansion] [debug] [--dump-json]
+    - Evaluates the DOM tree and returns a JSON representation. (Read-only)
+    - [highlight] can be 'true' or 'false' (default: true)
+    - [focus] can be an integer index or -1 (default: -1)
+    - [viewport_expansion] can be an integer (default: 0)
+    - [debug] can be 'true' or 'false' (default: false)
+    - [--dump-json] can be 'true' or 'false' (default: false)"""
     )
     async def cmd_eval_dom_tree(self, *args):
         # Parse options from args (reuse click for consistency)

@@ -43,6 +43,48 @@ async def load_test_page(browser, fixture_name):
     return await browser.evaluate_dom_tree()
 
 
+def normalize_dom_tree(tree):
+    """
+    Recursively normalize a DOM tree dict for logical comparison.
+    - Removes fields that may vary but are not semantically important (e.g., node IDs, dynamic timestamps).
+    - Sorts attributes/children where order is not significant.
+    """
+    if isinstance(tree, dict):
+        # Remove keys that are known to be non-semantic or unstable
+        ignore_keys = {"xpath", "id", "highlightIndex"}
+        return {
+            k: normalize_dom_tree(v)
+            for k, v in tree.items()
+            if k not in ignore_keys
+        }
+    elif isinstance(tree, list):
+        return [normalize_dom_tree(x) for x in tree]
+    else:
+        return tree
+
+
+@pytest.mark.asyncio
+async def test_reddit_comments_dom_tree_logical_equivalence(browser):
+    """
+    Test that the DOM tree extracted from test_reddit_comments.html is logically identical
+    to eval_dom_tree_reddit.json, ignoring non-semantic differences.
+    """
+    # Load expected JSON
+    json_path = FIXTURES_DIR / "eval_dom_tree_reddit.json"
+    with open(json_path, "r", encoding="utf-8") as f:
+        expected = json.load(f)
+    # Load actual DOM tree from the HTML fixture
+    fixture_path = FIXTURES_DIR / "test_reddit_comments.html"
+    url = f"file://{fixture_path.absolute()}"
+    await browser.open_page(url, wait_until="networkidle")
+    actual = await browser.evaluate_dom_tree()
+    # Normalize both
+    norm_actual = normalize_dom_tree(actual)
+    norm_expected = normalize_dom_tree(expected)
+    # Compare
+    assert norm_actual == norm_expected, "DOM tree does not match expected logical structure"
+
+
 @pytest.mark.asyncio
 async def test_basic_dom_structure(browser):
     """Test basic DOM structure parsing."""
