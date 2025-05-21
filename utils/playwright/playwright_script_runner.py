@@ -50,6 +50,7 @@ class PlaywrightScriptRunner:
             (["screenshot", "shot", "ss"], self.cmd_shot),
             (["extract_texts", "extract", "x"], self.cmd_extract_texts),
             (["click", "g"], self.cmd_click),
+            (["input", "i"], self.cmd_input),
             (["list_tabs", "tabs", "t"], self.cmd_list_tabs),
             (["switch_tab", "switch", "s"], self.cmd_switch_tab),
             (["close_tab", "close", "c"], self.cmd_close_tab),
@@ -99,8 +100,19 @@ class PlaywrightScriptRunner:
 
     # --- Command Handlers ---
     @description(
+        """input <selector> <value> [index]
+        - Inputs text into the field matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)
+        - Selector can be CSS or XPath (prefix with 'xpath=')."""
+    )
+    async def cmd_input(self, selector, value, index=None):
+        idx = int(index) if index is not None else 0
+        await self.wrapper.input_text(selector, value, idx)
+        print(f"[OK] Input '{value}' into {selector} (index {idx})")
+
+    @description(
         """click <selector> [index]
-        - Clicks the element matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)"""
+        - Clicks the element matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)
+        - Selector can be CSS or XPath (prefix with 'xpath=')."""
     )
     async def cmd_click(self, selector, index=None):
         idx = int(index) if index is not None else 0

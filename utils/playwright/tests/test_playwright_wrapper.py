@@ -58,6 +58,7 @@ async def test_locate_elements():
 async def test_click_element_css_and_xpath():
     # Use local fixture for deterministic test
     from pathlib import Path
+
     fixture_path = Path(__file__).parent / "test_fixtures" / "test_interactive.html"
     url = f"file://{fixture_path.absolute()}"
     async with PlaywrightWrapper(headless=True) as pw:
@@ -76,11 +77,41 @@ async def test_click_element_css_and_xpath():
         await pw.click_element("button", 0)
         # Negative test: index out of range
         import pytest
+
         with pytest.raises(IndexError):
             await pw.click_element("button", 10)
         # Negative test: selector not found
         with pytest.raises(RuntimeError):
             await pw.click_element(".notfound")
+
+
+async def test_input_text_css_and_xpath():
+    from pathlib import Path
+
+    fixture_path = Path(__file__).parent / "test_fixtures" / "test_interactive.html"
+    url = f"file://{fixture_path.absolute()}"
+    async with PlaywrightWrapper(headless=True) as pw:
+        await pw.open_page(url)
+        # Input into text field by CSS selector
+        await pw.input_text("#text-input", "hello")
+        val = await pw.page.input_value("#text-input")
+        assert val == "hello"
+        # Input into text field by XPath selector
+        await pw.input_text("xpath=//input[@id='text-input']", "world")
+        val = await pw.page.input_value("#text-input")
+        assert val == "world"
+        # Input into text field by index (should be 1st input)
+        await pw.input_text("input", "foo", 0)
+        val = await pw.page.input_value("#text-input")
+        assert val == "foo"
+        # Negative test: selector not found
+        import pytest
+
+        with pytest.raises(RuntimeError):
+            await pw.input_text(".notfound", "bar")
+        # Negative test: index out of range
+        with pytest.raises(IndexError):
+            await pw.input_text("input", "bar", 10)
 
 
 async def test_take_screenshot():

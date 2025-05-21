@@ -242,6 +242,29 @@ class PlaywrightWrapper:
             )
         await locator.nth(index).click()
 
+    async def input_text(self, selector: str, value: str, index: int = 0):
+        """
+        Fill the input or textarea matching the selector (default: first match) with the given value.
+        Args:
+            selector: Selector string (CSS or XPath, e.g., 'input#foo' or 'xpath=//input[@id="foo"]').
+            value: Text to input.
+            index: Which matched element to fill (default: 0 = first).
+        Raises:
+            RuntimeError: If page not initialized or no element found.
+            IndexError: If the index is out of range for the matched elements.
+        """
+        if not self.page:
+            raise RuntimeError("Page not initialized. Call open_page first.")
+        locator = self.page.locator(selector)
+        count = await locator.count()
+        if count == 0:
+            raise RuntimeError(f"No element found for selector: {selector}")
+        if index < 0 or index >= count:
+            raise IndexError(
+                f"Element index {index} out of range for selector: {selector}"
+            )
+        await locator.nth(index).fill(value)
+
     async def extract_texts(self, selector: str):
         """
         Extract text content from all elements matching the given selector on the current page.
