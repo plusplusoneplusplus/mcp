@@ -55,6 +55,34 @@ async def test_locate_elements():
         assert len(elements) > 0
 
 
+async def test_click_element_css_and_xpath():
+    # Use local fixture for deterministic test
+    from pathlib import Path
+    fixture_path = Path(__file__).parent / "test_fixtures" / "test_interactive.html"
+    url = f"file://{fixture_path.absolute()}"
+    async with PlaywrightWrapper(headless=True) as pw:
+        await pw.open_page(url)
+        # Click the submit button by CSS selector
+        await pw.click_element("button[type='submit']")
+        # Click the custom button by CSS selector
+        await pw.click_element("#custom-button")
+        # Click the submit button by XPath selector
+        await pw.click_element("xpath=//button[@type='submit']")
+        # Click the custom button by XPath selector
+        await pw.click_element("xpath=//div[@id='custom-button']")
+        # Click the select by index (should be 1st select on page)
+        await pw.click_element("select", 0)
+        # Click the submit button by index (should be 1st button on page)
+        await pw.click_element("button", 0)
+        # Negative test: index out of range
+        import pytest
+        with pytest.raises(IndexError):
+            await pw.click_element("button", 10)
+        # Negative test: selector not found
+        with pytest.raises(RuntimeError):
+            await pw.click_element(".notfound")
+
+
 async def test_take_screenshot():
     screenshot_path = get_temp_screenshot_path()
     try:

@@ -49,6 +49,7 @@ class PlaywrightScriptRunner:
             (["auto_scroll", "scroll", "s"], self.cmd_scroll),
             (["screenshot", "shot", "ss"], self.cmd_shot),
             (["extract_texts", "extract", "x"], self.cmd_extract_texts),
+            (["click", "g"], self.cmd_click),
             (["list_tabs", "tabs", "t"], self.cmd_list_tabs),
             (["switch_tab", "switch", "s"], self.cmd_switch_tab),
             (["close_tab", "close", "c"], self.cmd_close_tab),
@@ -98,8 +99,17 @@ class PlaywrightScriptRunner:
 
     # --- Command Handlers ---
     @description(
+        """click <selector> [index]
+        - Clicks the element matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)"""
+    )
+    async def cmd_click(self, selector, index=None):
+        idx = int(index) if index is not None else 0
+        await self.wrapper.click_element(selector, idx)
+        print(f"[OK] Clicked element {selector} (index {idx})")
+
+    @description(
         """open <url>
-    - Navigates the browser to the specified URL. (Mutates page)"""
+        - Navigates the browser to the specified URL. (Mutates page)"""
     )
     async def cmd_open(self, url):
         await self.wrapper.open_page(url, wait_time=0)

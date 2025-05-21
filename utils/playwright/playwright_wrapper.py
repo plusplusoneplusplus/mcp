@@ -215,6 +215,33 @@ class PlaywrightWrapper:
             raise RuntimeError("Page not initialized. Call open_page first.")
         return await self.page.locator(selector).all()
 
+    async def click_element(self, selector: str, index: int = 0):
+        """
+        Click the element matching the given selector (default: first match).
+        Works for links, buttons, and any clickable element.
+
+        Args:
+            selector: Selector string to match elements. Can be either:
+                - A CSS selector (e.g., 'button.submit')
+                - An XPath selector by prefixing with 'xpath=' (e.g., 'xpath=//button[@id="submit"]')
+                See Playwright docs for supported selector engines.
+            index: Which matched element to click (default: 0 = first).
+        Raises:
+            RuntimeError: If page not initialized or no element found.
+            IndexError: If the index is out of range for the matched elements.
+        """
+        if not self.page:
+            raise RuntimeError("Page not initialized. Call open_page first.")
+        locator = self.page.locator(selector)
+        count = await locator.count()
+        if count == 0:
+            raise RuntimeError(f"No element found for selector: {selector}")
+        if index < 0 or index >= count:
+            raise IndexError(
+                f"Element index {index} out of range for selector: {selector}"
+            )
+        await locator.nth(index).click()
+
     async def extract_texts(self, selector: str):
         """
         Extract text content from all elements matching the given selector on the current page.
