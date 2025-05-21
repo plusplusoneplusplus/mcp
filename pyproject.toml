@@ -66,6 +66,8 @@ dependencies = [
     "easyocr>=1.7.1",  # Fast OCR for text extraction from images
     "opencv-python>=4.8.0",  # OpenCV for image processing
     "numpy>=1.24.0",  # NumPy for numerical operations
+    "pandas>=2.2.0",  # Pandas for data analysis
+    "ipython>=8.0.0",  # IPython for interactive computing
     "pillow>=9.5.0",  # PIL for image handling
     
     # Log compression and parsing
