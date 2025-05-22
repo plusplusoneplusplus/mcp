@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MCP Knowledge Server</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .container { max-width: 600px; margin: auto; }
+        h1 { color: #333; }
+        .card { background: #f8f8f8; padding: 2em; border-radius: 10px; box-shadow: 0 2px 8px #eee; margin-bottom: 2em; }
+        label { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MCP Knowledge Server</h1>
+        <div class="card">
+            <h2>Import Knowledge Directory</h2>
+            <form id="import-form" enctype="multipart/form-data">
+              <input type="file" name="files" webkitdirectory directory multiple required />
+              <br><br>
+              <label>Collection name (optional): <input type="text" name="collection" /></label>
+              <br><br>
+              <button type="submit">Import</button>
+            </form>
+            <div id="import-status" style="margin-top:1em;"></div>
+        </div>
+        <div class="card">
+            <h2>List Documents in Collection</h2>
+            <label for="collections-dropdown">Select collection:</label>
+            <select id="collections-dropdown"></select>
+            <button id="list-docs-btn">List Documents</button>
+            <div id="docs-status" style="margin-top:1em;"></div>
+            <ul id="docs-list"></ul>
+        </div>
+        <div class="card">
+            <h2>Query Segments (Semantic Search)</h2>
+            <label for="query-collections-dropdown">Select collection:</label>
+            <select id="query-collections-dropdown"></select>
+            <br><br>
+            <label for="query-text">Query:</label>
+            <input type="text" id="query-text" size="40" placeholder="Enter your intention or question..." />
+            <br><br>
+            <label for="query-limit">Number of results:</label>
+            <input type="number" id="query-limit" min="1" max="20" value="3" style="width:4em;" />
+            <button id="run-query-btn">Search</button>
+            <div id="query-status" style="margin-top:1em;"></div>
+            <ul id="query-results"></ul>
+        </div>
+    </div>
+    <script>
+    // --- Import Knowledge AJAX ---
+    document.getElementById('import-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const statusDiv = document.getElementById('import-status');
+        statusDiv.textContent = 'Uploading and importing...';
+        const form = e.target;
+        const formData = new FormData(form);
+        try {
+            const response = await fetch('/api/import-knowledge', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            if (result.success) {
+                statusDiv.innerHTML = `<span style='color:green;'>Successfully imported ${result.imported_files} markdown files. Total segments stored: ${result.total_segments}.</span>`;
+                form.reset();
+                // Refresh collections dropdown in case new collection was added
+                await loadCollections();
+            } else {
+                statusDiv.innerHTML = `<span style='color:red;'>Error: ${result.error || 'Unknown error'}</span>`;
+            }
+        } catch (err) {
+            statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+        }
+    });
+
+    // --- Collections Dropdown and List Documents ---
+    async function loadCollections() {
+        const dropdown = document.getElementById('collections-dropdown');
+        dropdown.innerHTML = '';
+        try {
+            const resp = await fetch('/api/collections');
+            const data = await resp.json();
+            if (data.collections && data.collections.length > 0) {
+                data.collections.forEach(col => {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.textContent = col;
+                    dropdown.appendChild(opt);
+                });
+            } else {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No collections';
+                dropdown.appendChild(opt);
+            }
+        } catch (err) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Error loading collections';
+            dropdown.appendChild(opt);
+        }
+    }
+
+    document.getElementById('list-docs-btn').addEventListener('click', async function() {
+        const dropdown = document.getElementById('collections-dropdown');
+        const col = dropdown.value;
+        const docsStatus = document.getElementById('docs-status');
+        const docsList = document.getElementById('docs-list');
+        docsList.innerHTML = '';
+        if (!col) {
+            docsStatus.innerHTML = '<span style="color:red;">Please select a collection.</span>';
+            return;
+        }
+        docsStatus.textContent = 'Loading documents...';
+        try {
+            const resp = await fetch(`/api/collection-documents?collection=${encodeURIComponent(col)}`);
+            const data = await resp.json();
+            if (data.error) {
+                docsStatus.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
+            } else if (data.documents && data.documents.length > 0) {
+                docsStatus.innerHTML = `<span style='color:green;'>Found ${data.documents.length} documents.</span>`;
+                data.documents.forEach((doc, i) => {
+                    const li = document.createElement('li');
+                    li.textContent = doc.length > 100 ? doc.slice(0, 100) + '...' : doc;
+                    docsList.appendChild(li);
+                });
+            } else {
+                docsStatus.innerHTML = '<span>No documents found in this collection.</span>';
+            }
+        } catch (err) {
+            docsStatus.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+        }
+    });
+
+    // --- Query Segments (Semantic Search) ---
+    async function loadQueryCollections() {
+        const dropdown = document.getElementById('query-collections-dropdown');
+        dropdown.innerHTML = '';
+        try {
+            const resp = await fetch('/api/collections');
+            const data = await resp.json();
+            if (data.collections && data.collections.length > 0) {
+                data.collections.forEach(col => {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.textContent = col;
+                    dropdown.appendChild(opt);
+                });
+            } else {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No collections';
+                dropdown.appendChild(opt);
+            }
+        } catch (err) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Error loading collections';
+            dropdown.appendChild(opt);
+        }
+    }
+
+    document.getElementById('run-query-btn').addEventListener('click', async function() {
+        const col = document.getElementById('query-collections-dropdown').value;
+        const query = document.getElementById('query-text').value;
+        const limit = document.getElementById('query-limit').value || 3;
+        const statusDiv = document.getElementById('query-status');
+        const resultsList = document.getElementById('query-results');
+        resultsList.innerHTML = '';
+        if (!col) {
+            statusDiv.innerHTML = '<span style="color:red;">Please select a collection.</span>';
+            return;
+        }
+        if (!query) {
+            statusDiv.innerHTML = '<span style="color:red;">Please enter a query.</span>';
+            return;
+        }
+        statusDiv.textContent = 'Searching...';
+        try {
+            const resp = await fetch(`/api/query-segments?collection=${encodeURIComponent(col)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+            const data = await resp.json();
+            if (data.error) {
+                statusDiv.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
+            } else if (data.documents && data.documents.length > 0) {
+                statusDiv.innerHTML = `<span style='color:green;'>Top ${data.documents.length} results:</span>`;
+                data.documents.forEach((doc, i) => {
+                    const li = document.createElement('li');
+                    const meta = data.metadatas && data.metadatas[i] ? JSON.stringify(data.metadatas[i]) : '';
+                    const score = data.distances && data.distances[i] !== undefined ? ` (distance: ${data.distances[i].toFixed(4)})` : '';
+                    li.innerHTML = `<b>#${i+1}</b> ${doc.length > 100 ? doc.slice(0, 100) + '...' : doc} <small>${meta}${score}</small>`;
+                    resultsList.appendChild(li);
+                });
+            } else {
+                statusDiv.innerHTML = '<span>No relevant segments found.</span>';
+            }
+        } catch (err) {
+            statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+        }
+    });
+
+    // Load collections on page load for both dropdowns
+    loadCollections();
+    loadQueryCollections();
+    </script>
+</body>
+</html>

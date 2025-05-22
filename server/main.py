@@ -10,6 +10,10 @@ from typing import Dict, Any, Optional
 # Starlette and uvicorn imports
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
+from starlette.requests import Request
+from starlette.responses import HTMLResponse
+from starlette.templating import Jinja2Templates
+from server.api import api_routes
 
 import uvicorn
 
@@ -255,11 +259,19 @@ async def handle_sse(request):
         await server.run(streams[0], streams[1], options, raise_exceptions=True)
 
 
-# Create Starlette routes
+# --- Web Knowledge Import UI ---
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+# --- Main Web Page ---
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# --- Add routes ---
 routes = [
+    Route("/", endpoint=index, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
-]
+] + api_routes
 
 # Create Starlette app
 starlette_app = Starlette(routes=routes)

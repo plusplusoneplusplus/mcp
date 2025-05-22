@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Import Knowledge Directory</title>
+</head>
+<body>
+    <h2>Import Knowledge Directory</h2>
+    <form action="/import-knowledge" method="post" enctype="multipart/form-data">
+      <input type="file" name="files" webkitdirectory directory multiple required />
+      <br><br>
+      <label>Collection name (optional): <input type="text" name="collection" /></label>
+      <br><br>
+      <button type="submit">Import</button>
+    </form>
+</body>
+</html>
