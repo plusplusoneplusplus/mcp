@@ -3,51 +3,206 @@
 <head>
     <title>MCP Knowledge Server</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 2em; }
-        .container { max-width: 600px; margin: auto; }
-        h1 { color: #333; }
-        .card { background: #f8f8f8; padding: 2em; border-radius: 10px; box-shadow: 0 2px 8px #eee; margin-bottom: 2em; }
+        body { font-family: Arial, sans-serif; margin: 0; background: #fafbfc; }
+        .container { width: 100vw; margin: 0; padding: 0; }
+        h1 { color: #333; margin-left: 2em; margin-top: 1.5em; }
+        .card { background: #f8f8f8; padding: 2em; border-radius: 10px; box-shadow: 0 2px 8px #eee; margin-bottom: 2em; margin-left: 0; margin-right: 0; width: 100vw; box-sizing: border-box; }
         label { font-weight: bold; }
+        .tabs { display: flex; gap: 0.5em; margin-bottom: 1.5em; margin-left: 2em; }
+        .tab-btn {
+            background: #eee; border: none; border-radius: 6px 6px 0 0; padding: 0.7em 1.5em; font-size: 1em; cursor: pointer; color: #333;
+            transition: background 0.2s, color 0.2s;
+        }
+        .tab-btn.active {
+            background: #fff; color: #0077cc; border-bottom: 2px solid #fff; font-weight: bold;
+            box-shadow: 0 -2px 8px #eee;
+        }
+        .tab-content { display: block; width: 100vw; margin: 0; }
+
     </style>
 </head>
 <body>
     <div class="container">
         <h1>MCP Knowledge Server</h1>
-        <div class="card">
-            <h2>Import Knowledge Directory</h2>
-            <form id="import-form" enctype="multipart/form-data">
-              <input type="file" name="files" webkitdirectory directory multiple required />
-              <br><br>
-              <label>Collection name (optional): <input type="text" name="collection" /></label>
-              <br><br>
-              <button type="submit">Import</button>
-            </form>
-            <div id="import-status" style="margin-top:1em;"></div>
+        <div style="font-size:0.95em; color:#555; margin-bottom:1em;">
+            <b>Knowledge Import Path:</b> <code>{{ import_path }}</code>
         </div>
-        <div class="card">
-            <h2>List Documents in Collection</h2>
-            <label for="collections-dropdown">Select collection:</label>
-            <select id="collections-dropdown"></select>
-            <button id="list-docs-btn">List Documents</button>
-            <div id="docs-status" style="margin-top:1em;"></div>
-            <ul id="docs-list"></ul>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="import-tab">Import</button>
+            <button class="tab-btn" data-tab="list-tab">List</button>
+            <button class="tab-btn" data-tab="query-tab">Query</button>
+            <button class="tab-btn" data-tab="collections-tab">Collections</button>
         </div>
-        <div class="card">
-            <h2>Query Segments (Semantic Search)</h2>
-            <label for="query-collections-dropdown">Select collection:</label>
-            <select id="query-collections-dropdown"></select>
-            <br><br>
-            <label for="query-text">Query:</label>
-            <input type="text" id="query-text" size="40" placeholder="Enter your intention or question..." />
-            <br><br>
-            <label for="query-limit">Number of results:</label>
-            <input type="number" id="query-limit" min="1" max="20" value="3" style="width:4em;" />
-            <button id="run-query-btn">Search</button>
-            <div id="query-status" style="margin-top:1em;"></div>
-            <ul id="query-results"></ul>
+        <div class="tab-content" id="collections-tab" style="display:none;">
+            <div class="card">
+                <h2>Manage Collections</h2>
+                <div id="collections-list-area" style="margin-top:1em;"></div>
+            </div>
+        </div>
+        <div class="tab-content" id="import-tab">
+            <div class="card">
+                <h2>Import Knowledge Directory</h2>
+                <form id="import-form" enctype="multipart/form-data">
+                  <label for="import-files" style="font-weight:bold;">Select Files:</label>
+                  <div style="margin-bottom:0.5em;">
+                      <span style="font-size:0.97em;">Show extensions:</span>
+                      <label style="margin-left:1em;"><input type="checkbox" class="ext-filter" value=".md" checked> .md</label>
+                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".txt"> .txt</label>
+                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".rst"> .rst</label>
+                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".docx"> .docx</label>
+                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".pdf"> .pdf</label>
+                  </div>
+                  <input type="file" id="import-files" name="files" multiple accept=".md" style="margin-bottom:1em;" />
+                  <div id="selected-folder-path" style="font-size:0.95em; color:#666; margin:0.5em 0 0.2em 0;"></div>
+                  <div id="selected-files-list" style="margin:0.2em 0 0.5em 0;"></div>
+                  <label>Collection name (optional): <input type="text" name="collection" /></label>
+                  <br><br>
+                  <button type="submit">Import</button>
+                </form>
+                <div id="import-status" style="margin-top:1em;"></div>
+            </div>
+        </div>
+        <div class="tab-content" id="list-tab" style="display:none;">
+            <div class="card">
+                <h2>List Documents in Collection</h2>
+                <label for="collections-dropdown">Select collection:</label>
+                <select id="collections-dropdown"></select>
+                <button id="list-docs-btn">List Documents</button>
+                <div id="docs-status" style="margin-top:1em;"></div>
+                <div id="doc-viewer-area" style="margin-top:1em; display:none;">
+                  <label for="doc-selector" style="font-family:monospace;">Select document:</label>
+                  <select id="doc-selector" style="font-family:monospace;"></select>
+                  <br><br>
+                  <textarea id="doc-content-area" rows="24" style="width:100%;font-family:monospace;resize:vertical;"></textarea>
+                  <br>
+                  <label for="doc-metadata-area" style="font-family:monospace;">Metadata:</label>
+                  <textarea id="doc-metadata-area" rows="8" style="width:100%;font-family:monospace;resize:vertical;" readonly></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="tab-content" id="query-tab" style="display:none;">
+            <div class="card">
+                <h2>Query Segments (Semantic Search)</h2>
+                <label for="query-collections-dropdown">Select collection:</label>
+                <select id="query-collections-dropdown"></select>
+                <br><br>
+                <label for="query-text">Query:</label>
+                <input type="text" id="query-text" size="40" placeholder="Enter your intention or question..." />
+                <br><br>
+                <label for="query-limit">Number of results:</label>
+                <input type="number" id="query-limit" min="1" max="20" value="3" style="width:4em;" />
+                <button id="run-query-btn">Search</button>
+                <div id="query-status" style="margin-top:1em;"></div>
+                <ul id="query-results"></ul>
+            </div>
         </div>
     </div>
     <script>
+    // --- Tab Switching ---
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+            btn.classList.add('active');
+            document.getElementById(btn.dataset.tab).style.display = 'block';
+            if (btn.dataset.tab === 'collections-tab') loadCollectionsList();
+        });
+    });
+
+    // --- Manage Collections Tab ---
+    async function loadCollectionsList() {
+        const area = document.getElementById('collections-list-area');
+        area.innerHTML = 'Loading collections...';
+        try {
+            const resp = await fetch('/api/collections');
+            const data = await resp.json();
+            if (!data.collections || data.collections.length === 0) {
+                area.innerHTML = '<span>No collections found.</span>';
+                return;
+            }
+            let html = '<ul style="list-style:none;padding:0;">';
+            data.collections.forEach(col => {
+                html += `<li style='margin-bottom:0.7em;'><span style='font-family:monospace;'>${col}</span> <button class='delete-col-btn' data-col='${col}' style='color:#fff;background:#d9534f;border:none;border-radius:4px;padding:0.3em 0.8em;cursor:pointer;margin-left:1em;'>Delete</button></li>`;
+            });
+            html += '</ul>';
+            area.innerHTML = html;
+            document.querySelectorAll('.delete-col-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const col = btn.dataset.col;
+                    if (!confirm(`Are you sure you want to delete collection '${col}'? This cannot be undone.`)) return;
+                    btn.disabled = true;
+                    btn.textContent = 'Deleting...';
+                    const resp = await fetch('/api/delete-collection', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({collection: col})
+                    });
+                    const result = await resp.json();
+                    if (result.success) {
+                        btn.parentElement.remove();
+                    } else {
+                        alert('Failed to delete: ' + (result.error || 'Unknown error'));
+                        btn.disabled = false;
+                        btn.textContent = 'Delete';
+                    }
+                });
+            });
+        } catch (err) {
+            area.innerHTML = `<span style='color:red;'>Error loading collections: ${err}</span>`;
+        }
+    }
+
+
+    // --- Import Extension Filters ---
+    function updateImportAccept() {
+        const fileInput = document.getElementById('import-files');
+        const checked = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+        fileInput.setAttribute('accept', checked.join(','));
+        // Trigger change event to refresh file list
+        fileInput.dispatchEvent(new Event('change'));
+    }
+    document.querySelectorAll('.ext-filter').forEach(cb => {
+        cb.addEventListener('change', updateImportAccept);
+    });
+
+    // --- Show Selected Files (Top 10) and Folder Name ---
+    document.getElementById('import-files').addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        const listDiv = document.getElementById('selected-files-list');
+        const folderDiv = document.getElementById('selected-folder-path');
+        if (!files.length) {
+            listDiv.textContent = '';
+            folderDiv.textContent = '';
+            return;
+        }
+        const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+        const filtered = files.filter(f => exts.some(ext => f.name.endsWith(ext)));
+        const shown = filtered.slice(0, 10).map(f => f.name).join(', ');
+        listDiv.textContent = filtered.length ? `Selected (${filtered.length}): ${shown}${filtered.length > 10 ? ', ...' : ''}` : 'No matching files selected.';
+        let folder = '';
+        for (const file of files) {
+            if (file.webkitRelativePath) {
+                folder = file.webkitRelativePath.split('/')[0];
+                break;
+            }
+        }
+        if (folder) {
+            folderDiv.innerHTML = `<b>Selected folder:</b> <code>${folder}</code> <span title='Browsers do not expose the absolute path for privacy.' style='color:#888;'>(absolute path not available)</span>`;
+        } else {
+            folderDiv.innerHTML = `<span style='color:#888;'>Absolute path not available for privacy. Showing top-level folder name if possible.</span>`;
+        }
+        let html = '<b>Selected files:</b><ul style="margin:0.3em 0 0.3em 1em;">';
+        const showFiles = files.slice(0, 10);
+        for (const file of showFiles) {
+            html += `<li>${file.webkitRelativePath || file.name}</li>`;
+        }
+        html += '</ul>';
+        if (files.length > 10) {
+            html += `<span style='color:#888;'>...and ${files.length - 10} more files.</span>`;
+        }
+        listDiv.innerHTML = html;
+    });
+
     // --- Import Knowledge AJAX ---
     document.getElementById('import-form').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -64,6 +219,8 @@
             if (result.success) {
                 statusDiv.innerHTML = `<span style='color:green;'>Successfully imported ${result.imported_files} markdown files. Total segments stored: ${result.total_segments}.</span>`;
                 form.reset();
+                document.getElementById('selected-files-list').innerHTML = '';
+                document.getElementById('selected-folder-path').innerHTML = '';
                 // Refresh collections dropdown in case new collection was added
                 await loadCollections();
             } else {
@@ -106,8 +263,12 @@
         const dropdown = document.getElementById('collections-dropdown');
         const col = dropdown.value;
         const docsStatus = document.getElementById('docs-status');
-        const docsList = document.getElementById('docs-list');
-        docsList.innerHTML = '';
+        const docViewer = document.getElementById('doc-viewer-area');
+        const docSelector = document.getElementById('doc-selector');
+        const docContentArea = document.getElementById('doc-content-area');
+        docViewer.style.display = 'none';
+        docSelector.innerHTML = '';
+        docContentArea.value = '';
         if (!col) {
             docsStatus.innerHTML = '<span style="color:red;">Please select a collection.</span>';
             return;
@@ -120,16 +281,36 @@
                 docsStatus.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
             } else if (data.documents && data.documents.length > 0) {
                 docsStatus.innerHTML = `<span style='color:green;'>Found ${data.documents.length} documents.</span>`;
+                // Populate selector and textarea
+                docSelector.innerHTML = '';
                 data.documents.forEach((doc, i) => {
-                    const li = document.createElement('li');
-                    li.textContent = doc.length > 100 ? doc.slice(0, 100) + '...' : doc;
-                    docsList.appendChild(li);
+                    const id = (data.ids && data.ids[i]) ? data.ids[i] : `#${i+1}`;
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = id.length > 40 ? id.slice(0, 40) + '...' : id;
+                    docSelector.appendChild(opt);
                 });
+                docContentArea.value = data.documents[0] || '';
+                // Metadata display
+                const docMetadataArea = document.getElementById('doc-metadata-area');
+                function setMetadata(idx) {
+                    const meta = (data.metadatas && data.metadatas[idx]) ? data.metadatas[idx] : undefined;
+                    docMetadataArea.value = meta ? JSON.stringify(meta, null, 2) : '';
+                }
+                setMetadata(0);
+                docViewer.style.display = '';
+                docSelector.onchange = function() {
+                    const idx = parseInt(this.value);
+                    docContentArea.value = data.documents[idx] || '';
+                    setMetadata(idx);
+                };
             } else {
                 docsStatus.innerHTML = '<span>No documents found in this collection.</span>';
+                docViewer.style.display = 'none';
             }
         } catch (err) {
             docsStatus.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+            docViewer.style.display = 'none';
         }
     });
 

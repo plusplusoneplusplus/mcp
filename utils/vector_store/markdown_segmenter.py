@@ -378,7 +378,11 @@ class MarkdownSegmenter:
         return embedding.tolist()
 
     def segment_and_store(
-        self, markdown_content: str
+        self, markdown_content: str,
+        file_name: str = None,
+        rel_path: str = None,
+        file_size: int = None,
+        file_date: str = None
     ) -> Tuple[int, Dict[str, List[str]]]:
         """
         Segment markdown content and store it in the vector database.
@@ -407,24 +411,18 @@ class MarkdownSegmenter:
                 "position": segment["position"],
                 "heading": segment["heading"],
             }
-
-            # Add table-specific metadata
-            if segment["type"] == "table":
-                metadata["context"] = (
-                    segment["context"][:100] + "..."
-                    if len(segment["context"]) > 100
-                    else segment["context"]
-                )
-                if segment.get("is_chunk", False):
-                    metadata["is_chunk"] = True
-                    metadata["chunk_index"] = segment["chunk_index"]
-                    metadata["total_chunks"] = segment["total_chunks"]
-                    metadata["parent_id"] = segment["parent_id"]
-
+            # Add file-level metadata if present
+            if file_name is not None:
+                metadata["file_name"] = file_name
+            if rel_path is not None:
+                metadata["rel_path"] = rel_path
+            if file_size is not None:
+                metadata["file_size"] = file_size
+            if file_date is not None:
+                metadata["file_date"] = file_date
             metadatas.append(metadata)
-            documents.append(segment["content"])
+            documents.append(segment.get("content", ""))
 
-        # Store in vector database
         self.vector_store.add(
             ids=ids, embeddings=embeddings, metadatas=metadatas, documents=documents
         )

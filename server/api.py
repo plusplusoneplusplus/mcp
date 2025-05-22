@@ -36,7 +36,13 @@ async def api_import_knowledge(request: Request):
         for md_path in md_files:
             with open(md_path, "r", encoding="utf-8") as f:
                 content = f.read()
-            n, _ = segmenter.segment_and_store(content)
+            stat = os.stat(md_path)
+            file_name = os.path.basename(md_path)
+            rel_path = os.path.relpath(md_path, temp_dir)
+            file_size = stat.st_size
+            import datetime
+            file_date = datetime.datetime.fromtimestamp(stat.st_mtime).isoformat()
+            n, _ = segmenter.segment_and_store(content, file_name=file_name, rel_path=rel_path, file_size=file_size, file_date=file_date)
             total += n
         return JSONResponse({
             "success": True,
@@ -103,9 +109,23 @@ async def api_query_segments(request: Request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+async def api_delete_collection(request: Request):
+    try:
+        data = await request.json()
+        collection = data.get("collection")
+        if not collection:
+            return JSONResponse({"success": False, "error": "Missing collection name."}, status_code=400)
+        store = ChromaVectorStore(persist_directory=PERSIST_DIR)
+        # ChromaDB API: delete_collection
+        store.client.delete_collection(collection)
+        return JSONResponse({"success": True})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
 api_routes = [
     Route("/api/import-knowledge", endpoint=api_import_knowledge, methods=["POST"]),
     Route("/api/collections", endpoint=api_list_collections, methods=["GET"]),
     Route("/api/collection-documents", endpoint=api_list_documents, methods=["GET"]),
     Route("/api/query-segments", endpoint=api_query_segments, methods=["GET"]),
+    Route("/api/delete-collection", endpoint=api_delete_collection, methods=["POST"]),
 ]
