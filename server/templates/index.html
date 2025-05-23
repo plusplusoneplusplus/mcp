@@ -56,8 +56,11 @@
                   <div id="selected-folder-path" style="font-size:0.95em; color:#666; margin:0.5em 0 0.2em 0;"></div>
                   <div id="selected-files-list" style="margin:0.2em 0 0.5em 0;"></div>
                   <label>Collection name (optional): <input type="text" name="collection" /></label>
-                  <br><br>
-                  <button type="submit">Import</button>
+                  <div style="margin:0.5em 0;">
+                      <label><input type="checkbox" id="import-overwrite" name="overwrite" value="true"> Overwrite collection (delete all existing documents first)</label>
+                  </div>
+                  <button type="submit" style="margin-left:1em;">Import</button>
+                  <span id="import-status" style="margin-left:1em;"></span>
                 </form>
                 <div id="import-status" style="margin-top:1em;"></div>
             </div>

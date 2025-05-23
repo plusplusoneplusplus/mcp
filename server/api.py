@@ -11,8 +11,18 @@ async def api_import_knowledge(request: Request):
     form = await request.form()
     files = form.getlist("files")
     collection = form.get("collection") or "default"
+    overwrite = form.get("overwrite") == "true"
     if not files:
         return JSONResponse({"success": False, "error": "No files uploaded."}, status_code=400)
+
+    if overwrite:
+        # Delete the collection before importing
+        try:
+            store = ChromaVectorStore(persist_directory=PERSIST_DIR)
+            store.client.delete_collection(collection)
+        except Exception as e:
+            # If collection doesn't exist, ignore
+            pass
 
     temp_dir = tempfile.mkdtemp(prefix="import_know_")
     try:
