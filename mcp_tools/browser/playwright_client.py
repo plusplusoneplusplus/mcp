@@ -4,14 +4,11 @@ This module provides a browser client implementation using Playwright.
 """
 
 import asyncio
-import time
-from typing import Optional, Dict, Any, Union, Literal
+from typing import Optional, Any, Literal
 
 from mcp_tools.browser.interface import IBrowserClient
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
 from config import env
-from utils.ocr_extractor import extract_text_from_image
-
 
 class PlaywrightBrowserClient(IBrowserClient):
     def __init__(self, browser: Literal["chrome", "edge"], user_data_dir: str):
@@ -133,6 +130,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                         await wrapper.take_element_screenshot(el, str(image_path))
                         print(f"Saved panel_{pid}.png (attempt {attempt+1})")
                         try:
+                            from utils.ocr_extractor import extract_text_from_image
                             ocr_content = extract_text_from_image(image_path)
                         except Exception as ocr_e:
                             print(f"OCR extraction failed for {image_path}: {ocr_e}")
