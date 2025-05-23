@@ -102,7 +102,8 @@ class PlaywrightScriptRunner:
     @description(
         """input <selector> <value> [index] (aliases: input, i)
         - Inputs text into the field matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)
-        - Selector can be CSS or XPath (prefix with 'xpath=')."""
+        - Selector can be CSS or XPath (prefix with 'xpath=').
+        - Example: `.my-class 2` will select the third element with class 'my-class'."""
     )
     async def cmd_input(self, selector, value, index=None):
         idx = int(index) if index is not None else 0
@@ -112,7 +113,8 @@ class PlaywrightScriptRunner:
     @description(
         """click <selector> [index] (aliases: click, g)
         - Clicks the element matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)
-        - Selector can be CSS or XPath (prefix with 'xpath=')."""
+        - Selector can be CSS or XPath (prefix with 'xpath=').
+        - Example: `.my-class 2` will select the third element with class 'my-class'."""
     )
     async def cmd_click(self, selector, index=None):
         idx = int(index) if index is not None else 0
@@ -188,7 +190,8 @@ class PlaywrightScriptRunner:
 
     @description(
         """locate_element <selector> (aliases: locate_element, locate, l)
-        - Finds elements matching the CSS selector and stores them for later use. (Read-only)"""
+        - Finds elements matching the CSS selector and stores them for later use. (Read-only)
+        - Example: `.my-class` will match all elements with class 'my-class'. Use an index argument in other commands to select a specific one."""
     )
     async def cmd_locate(self, selector):
         self.last_located = await self.wrapper.locate_elements(selector)
