@@ -100,7 +100,7 @@ class PlaywrightScriptRunner:
 
     # --- Command Handlers ---
     @description(
-        """input <selector> <value> [index]
+        """input <selector> <value> [index] (aliases: input, i)
         - Inputs text into the field matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)
         - Selector can be CSS or XPath (prefix with 'xpath=')."""
     )
@@ -110,7 +110,7 @@ class PlaywrightScriptRunner:
         print(f"[OK] Input '{value}' into {selector} (index {idx})")
 
     @description(
-        """click <selector> [index]
+        """click <selector> [index] (aliases: click, g)
         - Clicks the element matching the selector (default: first match). Optionally specify index for multiple matches. (Mutates page)
         - Selector can be CSS or XPath (prefix with 'xpath=')."""
     )
@@ -120,7 +120,7 @@ class PlaywrightScriptRunner:
         print(f"[OK] Clicked element {selector} (index {idx})")
 
     @description(
-        """open <url>
+        """open <url> (aliases: open, o)
         - Navigates the browser to the specified URL. (Mutates page)"""
     )
     async def cmd_open(self, url):
@@ -128,13 +128,13 @@ class PlaywrightScriptRunner:
         print("[OK]")
 
     @description(
-        """eval_dom_tree [highlight] [focus] [viewport_expansion] [debug] [--dump-json]
-    - Evaluates the DOM tree and returns a JSON representation. (Read-only)
-    - [highlight] can be 'true' or 'false' (default: true)
-    - [focus] can be an integer index or -1 (default: -1)
-    - [viewport_expansion] can be an integer (default: 0)
-    - [debug] can be 'true' or 'false' (default: false)
-    - [--dump-json] can be 'true' or 'false' (default: false)"""
+        """eval_dom_tree [highlight] [focus] [viewport_expansion] [debug] [--dump-json] (aliases: eval_dom_tree, eval, e)
+        - Evaluates the DOM tree and returns a JSON representation. (Read-only)
+        - [highlight] can be 'true' or 'false' (default: true)
+        - [focus] can be an integer index or -1 (default: -1)
+        - [viewport_expansion] can be an integer (default: 0)
+        - [debug] can be 'true' or 'false' (default: false)
+        - [--dump-json] can be 'true' or 'false' (default: false)"""
     )
     async def cmd_eval_dom_tree(self, *args):
         # Parse options from args (reuse click for consistency)
@@ -173,8 +173,8 @@ class PlaywrightScriptRunner:
             print(json.dumps(result, indent=2))
 
     @description(
-        """wait <seconds>s
-    - Waits for the specified duration. Does not interact with the page. (No effect)"""
+        """wait <seconds>s (aliases: wait, w)
+        - Waits for the specified duration. Does not interact with the page. (No effect)"""
     )
     async def cmd_wait(self, duration):
         if not duration.endswith("s"):
@@ -187,16 +187,16 @@ class PlaywrightScriptRunner:
         print(f"[wait] Slept for {seconds} seconds.")
 
     @description(
-        """locate_element <selector>
-    - Finds elements matching the CSS selector and stores them for later use. (Read-only)"""
+        """locate_element <selector> (aliases: locate_element, locate, l)
+        - Finds elements matching the CSS selector and stores them for later use. (Read-only)"""
     )
     async def cmd_locate(self, selector):
         self.last_located = await self.wrapper.locate_elements(selector)
         print(f"Located {len(self.last_located)} elements.")
 
     @description(
-        """viewport <width>x<height>
-    - Sets the viewport size to the specified width and height. (Mutates page)"""
+        """viewport <width>x<height> (aliases: viewport, v)
+        - Sets the viewport size to the specified width and height. (Mutates page)"""
     )
     async def cmd_viewport(self, size):
         if "x" not in size:
@@ -206,8 +206,8 @@ class PlaywrightScriptRunner:
         print(f"Viewport set to {width}x{height}.")
 
     @description(
-        """auto_scroll [timeout] [scroll_step] [scroll_delay]
-    - Scrolls the page to the bottom, simulating user scrolling. (Mutates page)"""
+        """auto_scroll [timeout] [scroll_step] [scroll_delay] (aliases: auto_scroll, scroll, s)
+        - Scrolls the page to the bottom, simulating user scrolling. (Mutates page)"""
     )
     async def cmd_scroll(self, timeout=None, scroll_step=None, scroll_delay=None):
         timeout = int(timeout) if timeout else self.wrapper.DEFAULT_AUTO_SCROLL_TIMEOUT
@@ -219,8 +219,8 @@ class PlaywrightScriptRunner:
         )
 
     @description(
-        """screenshot <output_path> [full_page]
-    - Takes a screenshot of the current page. (Read-only, but captures visual state)"""
+        """screenshot <output_path> [full_page] (aliases: screenshot, shot, ss)
+        - Takes a screenshot of the current page. (Read-only, but captures visual state)"""
     )
     async def cmd_shot(self, output_path, full_page=None):
         full_page = full_page.lower() == "true" if full_page is not None else True
@@ -228,10 +228,10 @@ class PlaywrightScriptRunner:
         print(f"Screenshot saved to {output_path} (full_page={full_page}).")
 
     @description(
-        """extract_texts <selector> [output_format]
-    - Extracts text content from all elements matching the selector and prints as JSON or markdown. (Read-only, only if supported by wrapper)
-    - [output_format] can be 'json' (default) or 'markdown'.
-    """
+        """extract_texts <selector> [output_format] (aliases: extract_texts, extract, x)
+        - Extracts text content from all elements matching the selector and prints as JSON or markdown. (Read-only, only if supported by wrapper)
+        - [output_format] can be 'json' (default) or 'markdown'.
+        """
     )
     async def cmd_extract_texts(self, selector, output_format=None):
         """
@@ -262,8 +262,8 @@ class PlaywrightScriptRunner:
             print(json.dumps(texts, ensure_ascii=False, indent=2))
 
     @description(
-        """list_tabs
-    - Lists all open tabs with index, URL, and title. (Read-only)"""
+        """list_tabs (aliases: list_tabs, tabs, t)
+        - Lists all open tabs with index, URL, and title. (Read-only)"""
     )
     async def cmd_list_tabs(self):
         tabs = await self.wrapper.list_tabs()
@@ -278,8 +278,8 @@ class PlaywrightScriptRunner:
                 )
 
     @description(
-        """switch_tab <index>
-    - Sets the active tab. (Mutates page)"""
+        """switch_tab <index> (aliases: switch_tab, switch, s)
+        - Sets the active tab. (Mutates page)"""
     )
     async def cmd_switch_tab(self, idx):
         idx = int(idx)
@@ -287,8 +287,8 @@ class PlaywrightScriptRunner:
         print(f"Switched to tab {idx}.")
 
     @description(
-        """close_tab <index>
-    - Closes the tab at the specified index. (Mutates page)"""
+        """close_tab <index> (aliases: close_tab, close, c)
+        - Closes the tab at the specified index. (Mutates page)"""
     )
     async def cmd_close_tab(self, idx):
         idx = int(idx)
@@ -296,15 +296,15 @@ class PlaywrightScriptRunner:
         print(f"Closed tab {idx}.")
 
     @description(
-        """help
-    - Shows this help message."""
+        """help (aliases: help, h)
+        - Shows this help message."""
     )
     def cmd_help(self):
         print(self.help())
 
     @description(
-        """exit/quit
-    - Exits the interactive session."""
+        """exit/quit (aliases: exit, quit, q)
+        - Exits the interactive session."""
     )
     def cmd_exit(self):
         print("Exiting Playwright CLI.")
@@ -325,11 +325,22 @@ class PlaywrightScriptRunner:
         import inspect
 
         lines = ["Supported commands:"]
+        # Build a mapping from handler to aliases for easy lookup
+        handler_to_aliases = {}
+        if hasattr(cls, 'command_list'):
+            for aliases, handler in cls.command_list:
+                handler_to_aliases[handler] = aliases
         for name, member in inspect.getmembers(cls):
             if callable(member) and hasattr(member, "_description"):
                 desc = member._description
-                # Only show the first alias for the command
-                lines.append(f"  {desc}")
+                # Find aliases for this handler
+                aliases = handler_to_aliases.get(member)
+                if aliases:
+                    main_alias = aliases[0]
+                    alias_str = f" (aliases: {', '.join(aliases[1:])})" if len(aliases) > 1 else ""
+                    lines.append(f"  {main_alias}{alias_str}: {desc}")
+                else:
+                    lines.append(f"  {desc}")
         lines.append("\nNotes:")
         lines.append(
             "  - Commands marked as 'Mutates page' will cause the browser/page to change state."
