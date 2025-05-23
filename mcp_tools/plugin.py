@@ -213,7 +213,7 @@ class PluginRegistry:
             logger.error(f"Error discovering tools in {package_name}: {e}")
 
     def _scan_module_for_tools(self, module) -> None:
-        """Scan a module for classes that implement ToolInterface.
+        """Scan a module for classes that implement ToolInterface with comprehensive error handling.
 
         Args:
             module: The module to scan
@@ -225,29 +225,97 @@ class PluginRegistry:
             )
             return
 
-        for name, obj in inspect.getmembers(module):
-            # Check if it's a class defined in this module (not imported)
-            if (
-                inspect.isclass(obj)
-                and obj.__module__ == module.__name__
-                and issubclass(obj, ToolInterface)
-                and obj is not ToolInterface
-            ):
-
-                # Skip abstract classes
-                if inspect.isabstract(obj):
-                    logger.debug(
-                        f"Skipping abstract class {name} from {module.__name__}"
-                    )
-                    continue
-
+        module_name = getattr(module, '__name__', 'Unknown')
+        logger.debug(f"Scanning module {module_name} for tool classes")
+        
+        successful_registrations = []
+        failed_registrations = []
+        
+        try:
+            # Get all members of the module with error handling
+            try:
+                module_members = inspect.getmembers(module)
+            except Exception as e:
+                logger.error(f"Error getting members from module {module_name}: {e}")
+                return
+            
+            for name, obj in module_members:
                 try:
-                    # Use direct registry method for consistency
-                    self.register_tool(obj, source="code")
+                    # Check if it's a class defined in this module (not imported)
+                    if not (
+                        inspect.isclass(obj)
+                        and obj.__module__ == module.__name__
+                        and issubclass(obj, ToolInterface)
+                        and obj is not ToolInterface
+                    ):
+                        continue
+
+                    # Skip abstract classes
+                    if inspect.isabstract(obj):
+                        logger.debug(
+                            f"Skipping abstract class {name} from {module_name}"
+                        )
+                        continue
+
+                    # Attempt to register this individual tool with comprehensive error handling
+                    try:
+                        logger.debug(f"Attempting to register tool class {name} from {module_name}")
+                        
+                        # Validate the tool class before registration
+                        try:
+                            # Try to create a temporary instance to validate the tool
+                            temp_instance = obj()
+                            tool_name = temp_instance.name
+                            description = temp_instance.description
+                            input_schema = temp_instance.input_schema
+                            
+                            # Basic validation
+                            if not tool_name or not isinstance(tool_name, str):
+                                raise ValueError(f"Tool {name} has invalid name: {tool_name}")
+                            if not description or not isinstance(description, str):
+                                raise ValueError(f"Tool {name} has invalid description: {description}")
+                            if not isinstance(input_schema, dict):
+                                raise ValueError(f"Tool {name} has invalid input_schema: {type(input_schema)}")
+                            
+                            logger.debug(f"Tool {name} validation successful: name='{tool_name}', description='{description[:50]}...'")
+                        except Exception as validation_error:
+                            logger.warning(f"Tool {name} failed validation: {validation_error}")
+                            failed_registrations.append(f"{name}: Validation failed - {str(validation_error)}")
+                            continue
+                        
+                        # Use direct registry method for consistency
+                        result = self.register_tool(obj, source="code")
+                        if result is not None:
+                            successful_registrations.append(f"{name} (as '{tool_name}')")
+                            logger.debug(f"Successfully registered tool {name} as '{tool_name}' from {module_name}")
+                        else:
+                            logger.debug(f"Tool {name} was not registered (likely due to configuration)")
+                            failed_registrations.append(f"{name}: Not registered due to configuration")
+                    except Exception as e:
+                        logger.warning(f"Error registering tool {name} from {module_name}: {e}")
+                        failed_registrations.append(f"{name}: Registration error - {str(e)}")
                 except Exception as e:
-                    logger.warning(
-                        f"Error registering tool {name} from {module.__name__}: {e}"
-                    )
+                    logger.warning(f"Error processing class {name} from {module_name}: {e}")
+                    failed_registrations.append(f"{name}: Processing error - {str(e)}")
+            
+            # Log summary for this module
+            if successful_registrations or failed_registrations:
+                logger.info(f"Module {module_name} scan results:")
+                logger.info(f"  - Successfully registered: {len(successful_registrations)} tools")
+                if successful_registrations:
+                    for tool in successful_registrations:
+                        logger.info(f"    + {tool}")
+                
+                if failed_registrations:
+                    logger.warning(f"  - Failed registrations: {len(failed_registrations)} tools")
+                    for failure in failed_registrations:
+                        logger.warning(f"    - {failure}")
+            else:
+                logger.debug(f"No tool classes found in module {module_name}")
+                
+        except Exception as e:
+            logger.error(f"Critical error scanning module {module_name}: {e}")
+            logger.exception("Full traceback for module scanning error:")
 
     def discover_plugin_directory(self, plugin_dir: Path) -> None:
         """Discover and load plugins from a directory.
@@ -434,48 +502,111 @@ def register_tool(cls=None, *, source="code"):
 
 # Auto-discovery function
 def discover_and_register_tools():
-    """Discover and register all tools in the mcp_tools package and plugin directories."""
+    """Discover and register all tools in the mcp_tools package and plugin directories with comprehensive error handling."""
+    successful_tools = []
+    failed_tools = []
+    
+    logger.info("Starting comprehensive tool discovery and registration")
+    
     # Load YAML tools first if enabled
     if config.register_yaml_tools:
+        logger.info("Attempting to discover YAML tools...")
         try:
             # Use a dynamic import to avoid circular imports
             yaml_tools_module = importlib.import_module("mcp_tools.yaml_tools")
 
-            # Get YAML tool names before registering
-            get_yaml_names = getattr(yaml_tools_module, "get_yaml_tool_names", None)
-            if get_yaml_names:
-                yaml_tool_names = get_yaml_names()
-                registry.add_yaml_tool_names(yaml_tool_names)
+            # Get YAML tool names before registering with error handling
+            try:
+                get_yaml_names = getattr(yaml_tools_module, "get_yaml_tool_names", None)
+                if get_yaml_names:
+                    yaml_tool_names = get_yaml_names()
+                    registry.add_yaml_tool_names(yaml_tool_names)
+                    logger.info(f"Found {len(yaml_tool_names)} YAML tool names")
+                else:
+                    logger.warning("get_yaml_tool_names function not found in yaml_tools module")
+            except Exception as e:
+                logger.error(f"Error getting YAML tool names: {e}")
+                failed_tools.append(f"YAML tool names discovery: {str(e)}")
 
-            # Register YAML tools
-            yaml_tools_function = getattr(
-                yaml_tools_module, "discover_and_register_yaml_tools", None
-            )
-            if yaml_tools_function:
-                yaml_tools_function()
-            else:
-                logger.warning("YAML tools function not found")
+            # Register YAML tools with error handling
+            try:
+                yaml_tools_function = getattr(
+                    yaml_tools_module, "discover_and_register_yaml_tools", None
+                )
+                if yaml_tools_function:
+                    yaml_tool_classes = yaml_tools_function()
+                    if yaml_tool_classes:
+                        successful_tools.extend([f"YAML:{cls.__name__}" for cls in yaml_tool_classes])
+                        logger.info(f"Successfully registered {len(yaml_tool_classes)} YAML tools")
+                    else:
+                        logger.info("No YAML tools were registered")
+                else:
+                    logger.warning("discover_and_register_yaml_tools function not found")
+            except Exception as e:
+                logger.error(f"Error registering YAML tools: {e}")
+                failed_tools.append(f"YAML tools registration: {str(e)}")
+        except ImportError as e:
+            logger.error(f"Could not import YAML tools module: {e}")
+            failed_tools.append(f"YAML tools module import: {str(e)}")
         except Exception as e:
-            logger.warning(f"Error loading YAML tools: {e}")
+            logger.error(f"Unexpected error loading YAML tools: {e}")
+            failed_tools.append(f"YAML tools general error: {str(e)}")
+    else:
+        logger.info("YAML tool registration is disabled")
 
     # Then discover code-based tools if enabled
     if config.register_code_tools:
-        # Discover tools in the mcp_tools package
-        registry.discover_tools("mcp_tools")
+        logger.info("Attempting to discover code-based tools...")
+        
+        # Discover tools in the mcp_tools package with error handling
+        try:
+            registry.discover_tools("mcp_tools")
+            logger.info("Successfully completed mcp_tools package discovery")
+        except Exception as e:
+            logger.error(f"Error discovering tools in mcp_tools package: {e}")
+            failed_tools.append(f"mcp_tools package discovery: {str(e)}")
 
-        # Discover tools in plugin root directories
-        plugin_roots = config.get_plugin_roots()
-        for plugin_dir in plugin_roots:
-            registry.discover_plugin_directory(plugin_dir)
+        # Discover tools in plugin root directories with error handling
+        try:
+            plugin_roots = config.get_plugin_roots()
+            logger.info(f"Discovering tools in {len(plugin_roots)} plugin directories")
+            
+            for plugin_dir in plugin_roots:
+                try:
+                    registry.discover_plugin_directory(plugin_dir)
+                    logger.debug(f"Successfully processed plugin directory: {plugin_dir}")
+                except Exception as e:
+                    logger.error(f"Error discovering tools in plugin directory {plugin_dir}: {e}")
+                    failed_tools.append(f"Plugin directory {plugin_dir}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error getting plugin roots or processing plugin directories: {e}")
+            failed_tools.append(f"Plugin directories discovery: {str(e)}")
+    else:
+        logger.info("Code tool registration is disabled")
 
-    # For debugging - Disable this logging in production
-    tool_count = len(registry.tools)
-    tool_sources = registry.get_tool_sources()
-    yaml_count = sum(1 for source in tool_sources.values() if source == "yaml")
-    code_count = sum(1 for source in tool_sources.values() if source == "code")
+    # Collect summary information with error handling
+    try:
+        tool_count = len(registry.tools)
+        tool_sources = registry.get_tool_sources()
+        yaml_count = sum(1 for source in tool_sources.values() if source == "yaml")
+        code_count = sum(1 for source in tool_sources.values() if source == "code")
 
-    logger.debug(f"Registered {tool_count} tools: {list(registry.tools.keys())}")
-    logger.debug(f"Tool sources: {yaml_count} from YAML, {code_count} from code")
-    logger.debug(
-        f"Tool details: {[(name, source) for name, source in tool_sources.items()]}"
-    )
+        logger.info(f"Tool discovery summary:")
+        logger.info(f"  - Total tools registered: {tool_count}")
+        logger.info(f"  - YAML tools: {yaml_count}")
+        logger.info(f"  - Code tools: {code_count}")
+        logger.info(f"  - Successfully processed: {len(successful_tools)}")
+        logger.info(f"  - Failed components: {len(failed_tools)}")
+
+        if failed_tools:
+            logger.warning("Failed tool discovery components:")
+            for failed_item in failed_tools:
+                logger.warning(f"  - {failed_item}")
+
+        logger.debug(f"Registered tool names: {list(registry.tools.keys())}")
+        logger.debug(f"Tool sources breakdown: {yaml_count} from YAML, {code_count} from code")
+        logger.debug(f"Tool details: {[(name, source) for name, source in tool_sources.items()]}")
+    except Exception as e:
+        logger.error(f"Error generating tool discovery summary: {e}")
+
+    logger.info("Tool discovery and registration completed")

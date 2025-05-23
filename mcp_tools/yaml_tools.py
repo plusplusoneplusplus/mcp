@@ -555,7 +555,7 @@ def get_yaml_tool_names() -> set:
 
 
 def load_yaml_tools() -> List[Type[ToolInterface]]:
-    """Load tools from tools.yaml and register them.
+    """Load tools from tools.yaml and register them with comprehensive error handling.
 
     Returns:
         List of registered YAML tool classes
@@ -569,11 +569,19 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
         return []
 
     logger.info("Loading YAML-defined tools")
+    
+    successful_tools = []
+    failed_tools = []
 
     try:
         # Create a base instance to load YAML
-        base_tool = YamlToolBase()
-        yaml_data = base_tool._load_yaml_from_locations("tools.yaml")
+        try:
+            base_tool = YamlToolBase()
+            yaml_data = base_tool._load_yaml_from_locations("tools.yaml")
+        except Exception as e:
+            logger.error(f"Error loading tools.yaml file: {e}")
+            return []
+        
         tools_data = yaml_data.get("tools", {})
 
         if not tools_data:
@@ -585,107 +593,165 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
         # DIRECT FIX: Ensure all tools have valid inputSchema.type values
         # This is a quick fix to handle the specific error reported
         for tool_name, tool_data in tools_data.items():
-            if "inputSchema" in tool_data and isinstance(
-                tool_data["inputSchema"], dict
-            ):
-                if "type" in tool_data["inputSchema"] and not isinstance(
-                    tool_data["inputSchema"]["type"], str
+            try:
+                if "inputSchema" in tool_data and isinstance(
+                    tool_data["inputSchema"], dict
                 ):
-                    logger.warning(
-                        f"DIRECT FIX: Tool '{tool_name}' has non-string inputSchema.type: {tool_data['inputSchema']['type']} ({type(tool_data['inputSchema']['type'])})"
-                    )
-                    # Force set to string "object"
-                    tool_data["inputSchema"]["type"] = "object"
+                    if "type" in tool_data["inputSchema"] and not isinstance(
+                        tool_data["inputSchema"]["type"], str
+                    ):
+                        logger.warning(
+                            f"DIRECT FIX: Tool '{tool_name}' has non-string inputSchema.type: {tool_data['inputSchema']['type']} ({type(tool_data['inputSchema']['type'])})"
+                        )
+                        # Force set to string "object"
+                        tool_data["inputSchema"]["type"] = "object"
+            except Exception as e:
+                logger.warning(f"Error applying schema fix to tool '{tool_name}': {e}")
 
         # Debug output for all tools before processing
         for i, (name, tool_data) in enumerate(tools_data.items()):
-            logger.info(f"DEBUG Tool #{i}: {name}")
-            logger.info(f"  Description: {tool_data.get('description', 'N/A')}")
-            logger.info(f"  Tool Type: {tool_data.get('type', 'N/A')}")
-            if "inputSchema" in tool_data:
-                input_schema = tool_data["inputSchema"]
-                logger.info(f"  InputSchema: {type(input_schema)}")
+            try:
+                logger.debug(f"DEBUG Tool #{i}: {name}")
+                logger.debug(f"  Description: {tool_data.get('description', 'N/A')}")
+                logger.debug(f"  Tool Type: {tool_data.get('type', 'N/A')}")
+                if "inputSchema" in tool_data:
+                    input_schema = tool_data["inputSchema"]
+                    logger.debug(f"  InputSchema: {type(input_schema)}")
 
-                if isinstance(input_schema, dict):
-                    schema_type = input_schema.get("type")
-                    logger.info(
-                        f"  Schema.type: {schema_type} (type: {type(schema_type)})"
-                    )
-                    logger.info(f"  Properties: {input_schema.get('properties', {})}")
-                    logger.info(f"  Required: {input_schema.get('required', [])}")
+                    if isinstance(input_schema, dict):
+                        schema_type = input_schema.get("type")
+                        logger.debug(
+                            f"  Schema.type: {schema_type} (type: {type(schema_type)})"
+                        )
+                        logger.debug(f"  Properties: {input_schema.get('properties', {})}")
+                        logger.debug(f"  Required: {input_schema.get('required', [])}")
+                    else:
+                        logger.debug(f"  Schema value (invalid): {input_schema}")
                 else:
-                    logger.info(f"  Schema value (invalid): {input_schema}")
-            else:
-                logger.info("  No inputSchema found")
+                    logger.debug("  No inputSchema found")
+            except Exception as e:
+                logger.warning(f"Error logging debug info for tool '{name}': {e}")
 
         # List to hold dynamically created classes
         yaml_tool_classes = []
 
-        # Process each tool defined in the YAML
+        # Process each tool defined in the YAML with individual error handling
         for name, tool_data in tools_data.items():
             try:
+                logger.debug(f"Processing YAML tool: {name}")
+                
                 # Skip disabled tools
                 if tool_data.get("enabled", True) == False:
                     logger.info(f"Tool '{name}' is disabled in tools.yaml")
                     continue
 
-                logger.info(f"Processing YAML tool: {name}")
-
-                # Verify schema after fixing
-                if not isinstance(tool_data, dict):
-                    logger.error(f"Invalid tool data for '{name}' after schema fix")
+                # Comprehensive validation of tool data
+                validation_errors = []
+                
+                try:
+                    # Verify basic structure
+                    if not isinstance(tool_data, dict):
+                        validation_errors.append(f"Invalid tool data type: {type(tool_data)}")
+                    else:
+                        # Check required fields
+                        if "description" not in tool_data:
+                            validation_errors.append("Missing 'description' field")
+                        elif not isinstance(tool_data["description"], str):
+                            validation_errors.append(f"Invalid description type: {type(tool_data['description'])}")
+                        
+                        if "inputSchema" not in tool_data:
+                            validation_errors.append("Missing 'inputSchema' field")
+                        elif not isinstance(tool_data["inputSchema"], dict):
+                            validation_errors.append(f"Invalid inputSchema type: {type(tool_data['inputSchema'])}")
+                        else:
+                            # Validate inputSchema structure
+                            input_schema = tool_data["inputSchema"]
+                            if "type" not in input_schema:
+                                validation_errors.append("Missing 'type' in inputSchema")
+                            elif not isinstance(input_schema["type"], str):
+                                validation_errors.append(f"Invalid inputSchema.type: {type(input_schema['type'])}")
+                    
+                    if validation_errors:
+                        error_msg = f"Validation failed: {'; '.join(validation_errors)}"
+                        logger.error(f"Tool '{name}' validation errors: {error_msg}")
+                        failed_tools.append(f"{name}: {error_msg}")
+                        continue
+                        
+                except Exception as validation_error:
+                    error_msg = f"Validation exception: {str(validation_error)}"
+                    logger.error(f"Tool '{name}' validation exception: {error_msg}")
+                    failed_tools.append(f"{name}: {error_msg}")
                     continue
 
-                if "inputSchema" not in tool_data:
-                    logger.error(
-                        f"Missing inputSchema for tool '{name}' after schema fix"
-                    )
-                    continue
-
-                if not isinstance(tool_data["inputSchema"], dict):
-                    logger.error(
-                        f"Invalid inputSchema type for tool '{name}' after schema fix: {type(tool_data['inputSchema'])}"
-                    )
-                    continue
-
-                # Create a dynamic class for this tool
+                # Create a dynamic class for this tool with error handling
                 try:
                     # Ensure name is set in the tool_data
                     if "name" not in tool_data or not tool_data["name"]:
                         tool_data["name"] = name
-                        logger.warning(
-                            f"Setting missing name property for tool '{name}'"
-                        )
+                        logger.debug(f"Setting missing name property for tool '{name}'")
 
                     # Log the final tool data
-                    logger.info(f"Creating class for '{name}' with data: {tool_data}")
+                    logger.debug(f"Creating class for '{name}' with validated data")
 
+                    # Create the tool class
                     tool_class = type(
                         f"YamlTool_{name}",
                         (YamlToolBase,),
                         {"_tool_name": name, "_tool_data": tool_data},
                     )
 
+                    # Validate the created class by testing instantiation
+                    try:
+                        test_instance = tool_class()
+                        test_name = test_instance.name
+                        test_description = test_instance.description
+                        test_schema = test_instance.input_schema
+                        
+                        logger.debug(f"Tool class '{name}' instantiation test successful")
+                    except Exception as instantiation_error:
+                        error_msg = f"Class instantiation test failed: {str(instantiation_error)}"
+                        logger.error(f"Tool '{name}' instantiation error: {error_msg}")
+                        failed_tools.append(f"{name}: {error_msg}")
+                        continue
+
                     # Register the tool
-                    logger.info(f"Registering YAML tool: {name}")
+                    logger.debug(f"Registering YAML tool: {name}")
                     tool_class = register_tool(source="yaml")(tool_class)
                     yaml_tool_classes.append(tool_class)
+                    successful_tools.append(name)
+                    logger.info(f"Successfully registered YAML tool: {name}")
+                    
                 except Exception as create_error:
-                    logger.error(
-                        f"Error creating or registering class for YAML tool '{name}': {create_error}"
-                    )
+                    error_msg = f"Class creation/registration failed: {str(create_error)}"
+                    logger.error(f"Error creating or registering class for YAML tool '{name}': {error_msg}")
+                    failed_tools.append(f"{name}: {error_msg}")
+                    
             except Exception as e:
-                logger.error(f"Error processing YAML tool '{name}': {e}")
+                error_msg = f"General processing error: {str(e)}"
+                logger.error(f"Error processing YAML tool '{name}': {error_msg}")
+                failed_tools.append(f"{name}: {error_msg}")
                 import traceback
+                logger.debug(f"Full traceback for tool '{name}': {traceback.format_exc()}")
 
-                logger.error(traceback.format_exc())
+        # Log comprehensive summary
+        logger.info(f"YAML tools loading summary:")
+        logger.info(f"  - Total tools in YAML: {len(tools_data)}")
+        logger.info(f"  - Successfully loaded: {len(successful_tools)}")
+        logger.info(f"  - Failed to load: {len(failed_tools)}")
+        
+        if successful_tools:
+            logger.info(f"  - Successful tools: {', '.join(successful_tools)}")
+        
+        if failed_tools:
+            logger.warning(f"  - Failed tools:")
+            for failed_tool in failed_tools:
+                logger.warning(f"    - {failed_tool}")
 
         return yaml_tool_classes
     except Exception as e:
-        logger.error(f"Error loading YAML tools: {e}")
+        logger.error(f"Critical error loading YAML tools: {e}")
         import traceback
-
-        logger.error(traceback.format_exc())
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return []
 
 

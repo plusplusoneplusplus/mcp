@@ -228,38 +228,91 @@ class DependencyInjector:
             return None
 
     def resolve_all_dependencies(self) -> Dict[str, ToolInterface]:
-        """Resolve dependencies for all registered tools.
+        """Resolve dependencies for all registered tools with comprehensive error handling.
 
         Returns:
             Dictionary of tool instances filtered by tool source based on config
         """
-        # Discover all dependencies from constructor parameters
+        successful_tools = []
+        failed_tools = []
+        
+        logger.info("Starting dependency resolution for all registered tools")
+        
+        # Discover all dependencies from constructor parameters with error handling
         for tool_name, tool_class in registry.tools.items():
-            if tool_name not in self.tool_constructors:
-                constructor_info = self.analyze_tool_constructor(tool_class)
-                self.register_tool_constructor(tool_name, constructor_info)
+            try:
+                if tool_name not in self.tool_constructors:
+                    try:
+                        constructor_info = self.analyze_tool_constructor(tool_class)
+                        self.register_tool_constructor(tool_name, constructor_info)
+                        logger.debug(f"Analyzed constructor for tool: {tool_name}")
+                    except Exception as e:
+                        logger.warning(f"Error analyzing constructor for tool '{tool_name}': {e}")
+                        failed_tools.append(f"{tool_name}: Constructor analysis failed - {str(e)}")
+                        continue
 
-                # Infer dependencies from parameter names
-                dependencies = []
-                for param_name in constructor_info["parameters"]:
-                    # Look for registered tools that match parameter names
-                    for registered_tool in registry.tools:
-                        if registered_tool == param_name or registered_tool.endswith(
-                            "_" + param_name
-                        ):
-                            dependencies.append(registered_tool)
-                            break
+                    # Infer dependencies from parameter names with error handling
+                    try:
+                        dependencies = []
+                        for param_name in constructor_info["parameters"]:
+                            # Look for registered tools that match parameter names
+                            for registered_tool in registry.tools:
+                                if registered_tool == param_name or registered_tool.endswith(
+                                    "_" + param_name
+                                ):
+                                    dependencies.append(registered_tool)
+                                    break
 
-                # Register inferred dependencies
-                if dependencies:
-                    self.register_dependency(tool_name, dependencies)
+                        # Register inferred dependencies
+                        if dependencies:
+                            self.register_dependency(tool_name, dependencies)
+                            logger.debug(f"Registered dependencies for '{tool_name}': {dependencies}")
+                    except Exception as e:
+                        logger.warning(f"Error inferring dependencies for tool '{tool_name}': {e}")
+                        failed_tools.append(f"{tool_name}: Dependency inference failed - {str(e)}")
+            except Exception as e:
+                logger.error(f"Critical error processing tool '{tool_name}' during dependency discovery: {e}")
+                failed_tools.append(f"{tool_name}: Critical processing error - {str(e)}")
 
-        # Create instances for all tools
+        # Create instances for all tools with individual error handling
+        logger.info(f"Creating instances for {len(registry.tools)} registered tools")
         for tool_name in registry.tools:
-            self.get_tool_instance(tool_name)
+            try:
+                logger.debug(f"Attempting to create instance for tool: {tool_name}")
+                instance = self.get_tool_instance(tool_name)
+                if instance:
+                    successful_tools.append(tool_name)
+                    logger.debug(f"Successfully created instance for tool: {tool_name}")
+                else:
+                    failed_tools.append(f"{tool_name}: Instance creation returned None")
+                    logger.warning(f"Failed to create instance for tool: {tool_name} (returned None)")
+            except Exception as e:
+                logger.error(f"Error creating instance for tool '{tool_name}': {e}")
+                failed_tools.append(f"{tool_name}: Instance creation exception - {str(e)}")
 
-        # Return filtered instances based on configuration
-        return self.get_filtered_instances()
+        # Log comprehensive summary
+        logger.info(f"Dependency resolution summary:")
+        logger.info(f"  - Total tools processed: {len(registry.tools)}")
+        logger.info(f"  - Successfully created instances: {len(successful_tools)}")
+        logger.info(f"  - Failed to create instances: {len(failed_tools)}")
+        
+        if successful_tools:
+            logger.info(f"  - Successful tools: {', '.join(successful_tools)}")
+        
+        if failed_tools:
+            logger.warning(f"  - Failed tools:")
+            for failed_tool in failed_tools:
+                logger.warning(f"    - {failed_tool}")
+
+        # Return filtered instances based on configuration with error handling
+        try:
+            filtered_instances = self.get_filtered_instances()
+            logger.info(f"Returning {len(filtered_instances)} filtered tool instances")
+            return filtered_instances
+        except Exception as e:
+            logger.error(f"Error filtering instances: {e}")
+            # Return all instances as fallback
+            return self.instances.copy()
 
     def get_all_instances(self) -> Dict[str, ToolInterface]:
         """Get all tool instances without filtering.
