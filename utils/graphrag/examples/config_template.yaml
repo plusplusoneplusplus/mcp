@@ -1,0 +1,53 @@
+# GraphRAG Configuration Template
+# Copy this file and customize it for your needs
+
+# Provider Configuration
+# Set to "openai" for OpenAI or "azure_openai" for Azure OpenAI
+provider: "openai"  # or "azure_openai"
+
+# LLM Configuration
+llm:
+  # OpenAI Configuration (when provider is "openai")
+  api_key: "YOUR_OPENAI_API_KEY"  # Replace with your actual API key
+  model: "gpt-4-turbo-preview"    # or "gpt-3.5-turbo" for faster/cheaper option
+  max_tokens: 4000
+  temperature: 0.0
+  
+  # Azure OpenAI Configuration (when provider is "azure_openai")
+  # Uncomment and configure these when using Azure OpenAI:
+  # azure_endpoint: "https://your-resource.openai.azure.com/"
+  # azure_deployment: "your-gpt-deployment-name"
+  # api_version: "2024-02-15-preview"
+
+# Embedding Model Configuration  
+embeddings:
+  # OpenAI Configuration (when provider is "openai")
+  api_key: "YOUR_OPENAI_API_KEY"  # Replace with your actual API key
+  model: "text-embedding-3-small" # or "text-embedding-ada-002"
+  
+  # Azure OpenAI Configuration (when provider is "azure_openai")
+  # Uncomment and configure these when using Azure OpenAI:
+  # azure_endpoint: "https://your-resource.openai.azure.com/"
+  # azure_deployment: "your-embedding-deployment-name"
+  # api_version: "2024-02-15-preview"
+
+# Document Processing
+chunk_size: 1200      # Size of text chunks for processing
+chunk_overlap: 100    # Overlap between chunks
+
+# Data Storage
+data_dir: "./graphrag_data"  # Directory to store all GraphRAG data
+
+# Optional: Advanced Settings
+advanced:
+  # Community detection settings
+  community_level: 2
+  
+  # Indexing settings
+  batch_size: 10
+  max_cluster_size: 10
+  
+  # Search settings
+  max_data_tokens: 12000
+  map_max_tokens: 1000
+  reduce_max_tokens: 2000
