@@ -6,22 +6,21 @@ This example demonstrates how to use Microsoft's GraphRAG package to:
 2. Perform global and local queries
 3. Get structured responses with source attribution
 
-Note: You'll need to configure the settings in the config section below.
+Configuration options:
+1. YAML file: python basic_example.py config.yaml
+2. Environment variables: python basic_example.py
 """
 
 import asyncio
-import os
-import tempfile
+import sys
 from pathlib import Path
 from typing import List, Optional
 
 # GraphRAG imports
 from graphrag.config import GraphRagConfig
-from graphrag.index import create_pipeline_config
 from graphrag.index.run import run_pipeline_with_config
 from graphrag.query.context_builder.entity_extraction import EntityVectorStoreKey
 from graphrag.query.indexer_adapters import (
-    read_indexer_communities,
     read_indexer_entities,
     read_indexer_relationships,
     read_indexer_reports,
@@ -38,167 +37,63 @@ from graphrag.query.structured_search.local_search.mixed_context import (
 )
 from graphrag.query.structured_search.local_search.search import LocalSearch
 
+# Import our configuration module
+from utils.graphrag.config import load_config, GraphRAGConfig
+
 
 class BasicGraphRAG:
     """A basic GraphRAG implementation using Microsoft's GraphRAG package."""
     
-    def __init__(self, data_dir: str = "./graphrag_data"):
+    def __init__(self, config: GraphRAGConfig):
         """Initialize the GraphRAG instance.
         
         Args:
-            data_dir: Directory to store GraphRAG data and outputs
+            config: GraphRAG configuration object
         """
-        self.data_dir = Path(data_dir)
+        self.config = config
+        self.data_dir = Path(config.data_dir)
         self.data_dir.mkdir(exist_ok=True)
-        
-        # Configuration placeholders - YOU NEED TO FILL THESE IN
-        self.config = {
-            "provider": "openai",  # "openai" or "azure_openai"
-            "llm": {
-                # OpenAI Configuration
-                "api_key": "YOUR_OPENAI_API_KEY",  # Set your OpenAI API key
-                "model": "gpt-4-turbo-preview",
-                "max_tokens": 4000,
-                "temperature": 0.0,
-                # Azure OpenAI Configuration (only needed if provider is "azure_openai")
-                "azure_endpoint": "YOUR_AZURE_ENDPOINT",  # e.g., "https://your-resource.openai.azure.com/"
-                "azure_deployment": "YOUR_DEPLOYMENT_NAME",  # Your deployment name
-                "api_version": "2024-02-15-preview",  # Azure API version
-            },
-            "embeddings": {
-                # OpenAI Configuration
-                "api_key": "YOUR_OPENAI_API_KEY",  # Set your OpenAI API key
-                "model": "text-embedding-3-small",
-                # Azure OpenAI Configuration (only needed if provider is "azure_openai")
-                "azure_endpoint": "YOUR_AZURE_ENDPOINT",  # e.g., "https://your-resource.openai.azure.com/"
-                "azure_deployment": "YOUR_EMBEDDING_DEPLOYMENT_NAME",  # Your embedding deployment name
-                "api_version": "2024-02-15-preview",  # Azure API version
-            },
-            "chunk_size": 1200,
-            "chunk_overlap": 100,
-        }
-        
-        # Validate configuration
-        self._validate_config()
         
         # Initialize LLM and embedding models
         self.llm = None
         self.embedding_model = None
         self._initialize_models()
     
-    def _validate_config(self):
-        """Validate configuration based on provider."""
-        if self.config["provider"] == "azure_openai":
-            required_vars = {
-                "api_key": self.config["llm"]["api_key"],
-                "azure_endpoint": self.config["llm"]["azure_endpoint"],
-                "azure_deployment": self.config["llm"]["azure_deployment"],
-                "embedding_deployment": self.config["embeddings"]["azure_deployment"],
-            }
-            
-            missing_vars = []
-            for key, value in required_vars.items():
-                if not value or value.startswith("YOUR_"):
-                    missing_vars.append(key)
-            
-            if missing_vars:
-                print("❌ Missing Azure OpenAI configuration:")
-                for var in missing_vars:
-                    print(f"   - {var}")
-                print("\nFor Azure OpenAI, you need to set:")
-                print("   - api_key: Your Azure OpenAI API key")
-                print("   - azure_endpoint: https://your-resource.openai.azure.com/")
-                print("   - azure_deployment: Your GPT deployment name")
-                print("   - embedding_deployment: Your embedding deployment name")
-                
-            # Validate endpoint format
-            endpoint = self.config["llm"]["azure_endpoint"]
-            if endpoint and not endpoint.startswith("YOUR_"):
-                if not endpoint.startswith("https://") or not endpoint.endswith("/"):
-                    print("⚠️  Warning: Azure endpoint should start with 'https://' and end with '/'")
-                    print(f"   Current: {endpoint}")
-                    print("   Expected: https://your-resource.openai.azure.com/")
-        else:
-            # OpenAI validation
-            api_key = self.config["llm"]["api_key"]
-            if not api_key or api_key.startswith("YOUR_"):
-                print("❌ Missing OpenAI configuration:")
-                print("   - Set your OpenAI API key in the config")
-    
     def _initialize_models(self):
         """Initialize LLM and embedding models."""
         try:
-            if self.config["provider"] == "azure_openai":
+            if self.config.provider == "azure_openai":
                 # Azure OpenAI configuration
                 self.llm = ChatOpenAI(
-                    api_key=self.config["llm"]["api_key"],
-                    azure_endpoint=self.config["llm"]["azure_endpoint"],
-                    azure_deployment=self.config["llm"]["azure_deployment"],
-                    api_version=self.config["llm"]["api_version"],
-                    max_tokens=self.config["llm"]["max_tokens"],
-                    temperature=self.config["llm"]["temperature"],
+                    api_key=self.config.llm.api_key,
+                    azure_endpoint=self.config.llm.azure_endpoint,
+                    azure_deployment=self.config.llm.azure_deployment,
+                    api_version=self.config.llm.api_version,
+                    max_tokens=self.config.llm.max_tokens,
+                    temperature=self.config.llm.temperature,
                 )
                 
                 self.embedding_model = OpenAIEmbedding(
-                    api_key=self.config["embeddings"]["api_key"],
-                    azure_endpoint=self.config["embeddings"]["azure_endpoint"],
-                    azure_deployment=self.config["embeddings"]["azure_deployment"],
-                    api_version=self.config["embeddings"]["api_version"],
+                    api_key=self.config.embeddings.api_key,
+                    azure_endpoint=self.config.embeddings.azure_endpoint,
+                    azure_deployment=self.config.embeddings.azure_deployment,
+                    api_version=self.config.embeddings.api_version,
                 )
             else:
                 # Standard OpenAI configuration
                 self.llm = ChatOpenAI(
-                    api_key=self.config["llm"]["api_key"],
-                    model=self.config["llm"]["model"],
-                    max_tokens=self.config["llm"]["max_tokens"],
-                    temperature=self.config["llm"]["temperature"],
+                    api_key=self.config.llm.api_key,
+                    model=self.config.llm.model,
+                    max_tokens=self.config.llm.max_tokens,
+                    temperature=self.config.llm.temperature,
                 )
                 
                 self.embedding_model = OpenAIEmbedding(
-                    api_key=self.config["embeddings"]["api_key"],
-                    model=self.config["embeddings"]["model"],
+                    api_key=self.config.embeddings.api_key,
+                    model=self.config.embeddings.model,
                 )
         except Exception as e:
-            print(f"Warning: Could not initialize models. Please check your API keys and configuration. Error: {e}")
-    
-    def show_config(self):
-        """Display current configuration."""
-        provider = self.config["provider"]
-        print(f"📋 Current Configuration ({provider}):")
-        print("=" * 40)
-        
-        if provider == "azure_openai":
-            api_key = self.config["llm"]["api_key"]
-            endpoint = self.config["llm"]["azure_endpoint"]
-            llm_deployment = self.config["llm"]["azure_deployment"]
-            embedding_deployment = self.config["embeddings"]["azure_deployment"]
-            api_version = self.config["llm"]["api_version"]
-            
-            print(f"Provider: Azure OpenAI")
-            if api_key and not api_key.startswith("YOUR_"):
-                print(f"API Key: ✅ Set ({'*' * 20}...{api_key[-4:]})")
-            else:
-                print(f"API Key: ❌ Not set")
-            print(f"Endpoint: {endpoint}")
-            print(f"LLM Deployment: {llm_deployment}")
-            print(f"Embedding Deployment: {embedding_deployment}")
-            print(f"API Version: {api_version}")
-        else:
-            api_key = self.config["llm"]["api_key"]
-            model = self.config["llm"]["model"]
-            embedding_model = self.config["embeddings"]["model"]
-            
-            print(f"Provider: OpenAI")
-            if api_key and not api_key.startswith("YOUR_"):
-                print(f"API Key: ✅ Set ({'*' * 20}...{api_key[-4:]})")
-            else:
-                print(f"API Key: ❌ Not set")
-            print(f"Model: {model}")
-            print(f"Embedding Model: {embedding_model}")
-        
-        print(f"Data Directory: {self.data_dir}")
-        print(f"Chunk Size: {self.config['chunk_size']}")
-        print(f"Chunk Overlap: {self.config['chunk_overlap']}")
+            print(f"Warning: Could not initialize models. Please check your configuration. Error: {e}")
     
     async def index_documents(self, documents: List[str], input_dir: Optional[str] = None) -> bool:
         """Index documents to build the knowledge graph.
@@ -224,11 +119,11 @@ class BasicGraphRAG:
                             f.write(doc)
             
             # Create GraphRAG configuration
-            config = self._create_config(str(input_dir))
+            graphrag_config = self._create_graphrag_config(str(input_dir))
             
             # Run the indexing pipeline
             print("Starting document indexing...")
-            await run_pipeline_with_config(config)
+            await run_pipeline_with_config(graphrag_config)
             print("Indexing completed successfully!")
             
             return True
@@ -237,8 +132,8 @@ class BasicGraphRAG:
             print(f"Error during indexing: {e}")
             return False
     
-    def _create_config(self, input_dir: str) -> GraphRagConfig:
-        """Create GraphRAG configuration."""
+    def _create_graphrag_config(self, input_dir: str) -> GraphRagConfig:
+        """Create GraphRAG configuration for the indexing pipeline."""
         # Base configuration
         config_data = {
             "input": {
@@ -261,43 +156,43 @@ class BasicGraphRAG:
                 "base_dir": str(self.data_dir / "reporting"),
             },
             "chunks": {
-                "size": self.config["chunk_size"],
-                "overlap": self.config["chunk_overlap"],
+                "size": self.config.chunk_size,
+                "overlap": self.config.chunk_overlap,
             },
         }
         
         # Configure LLM based on provider
-        if self.config["provider"] == "azure_openai":
+        if self.config.provider == "azure_openai":
             config_data["llm"] = {
-                "api_key": self.config["llm"]["api_key"],
+                "api_key": self.config.llm.api_key,
                 "type": "azure_openai_chat",
-                "azure_endpoint": self.config["llm"]["azure_endpoint"],
-                "azure_deployment": self.config["llm"]["azure_deployment"],
-                "api_version": self.config["llm"]["api_version"],
-                "max_tokens": self.config["llm"]["max_tokens"],
-                "temperature": self.config["llm"]["temperature"],
+                "azure_endpoint": self.config.llm.azure_endpoint,
+                "azure_deployment": self.config.llm.azure_deployment,
+                "api_version": self.config.llm.api_version,
+                "max_tokens": self.config.llm.max_tokens,
+                "temperature": self.config.llm.temperature,
             }
             
             config_data["embeddings"] = {
-                "api_key": self.config["embeddings"]["api_key"],
+                "api_key": self.config.embeddings.api_key,
                 "type": "azure_openai_embedding",
-                "azure_endpoint": self.config["embeddings"]["azure_endpoint"],
-                "azure_deployment": self.config["embeddings"]["azure_deployment"],
-                "api_version": self.config["embeddings"]["api_version"],
+                "azure_endpoint": self.config.embeddings.azure_endpoint,
+                "azure_deployment": self.config.embeddings.azure_deployment,
+                "api_version": self.config.embeddings.api_version,
             }
         else:
             config_data["llm"] = {
-                "api_key": self.config["llm"]["api_key"],
+                "api_key": self.config.llm.api_key,
                 "type": "openai_chat",
-                "model": self.config["llm"]["model"],
-                "max_tokens": self.config["llm"]["max_tokens"],
-                "temperature": self.config["llm"]["temperature"],
+                "model": self.config.llm.model,
+                "max_tokens": self.config.llm.max_tokens,
+                "temperature": self.config.llm.temperature,
             }
             
             config_data["embeddings"] = {
-                "api_key": self.config["embeddings"]["api_key"],
+                "api_key": self.config.embeddings.api_key,
                 "type": "openai_embedding",
-                "model": self.config["embeddings"]["model"],
+                "model": self.config.embeddings.model,
             }
         
         return GraphRagConfig.from_dict(config_data)
@@ -404,6 +299,37 @@ async def main():
     print("🚀 Basic GraphRAG Example")
     print("=" * 50)
     
+    # Load configuration
+    try:
+        if len(sys.argv) > 1:
+            config_path = sys.argv[1]
+            print(f"📁 Loading configuration from: {config_path}")
+            config = load_config(config_path)
+        else:
+            print("🌍 Loading configuration from environment variables...")
+            config = load_config()
+        
+        print("✅ Configuration loaded successfully!")
+        
+    except Exception as e:
+        print(f"❌ Configuration error: {e}")
+        print("\n💡 Configuration options:")
+        print("1. YAML file: python basic_example.py config.yaml")
+        print("2. Environment variables: Set OPENAI_API_KEY or Azure OpenAI vars")
+        print("\n📋 Required environment variables:")
+        print("   For OpenAI:")
+        print("     export OPENAI_API_KEY='your-api-key'")
+        print("   For Azure OpenAI:")
+        print("     export GRAPHRAG_PROVIDER='azure_openai'")
+        print("     export AZURE_OPENAI_API_KEY='your-api-key'")
+        print("     export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com/'")
+        print("     export AZURE_OPENAI_LLM_DEPLOYMENT='your-gpt-deployment'")
+        print("     export AZURE_OPENAI_EMBEDDING_DEPLOYMENT='your-embedding-deployment'")
+        return
+    
+    # Show configuration
+    config.show_config()
+    
     # Sample documents to index
     sample_documents = [
         """
@@ -427,27 +353,13 @@ async def main():
     ]
     
     # Initialize GraphRAG
-    print("📊 Initializing GraphRAG...")
-    graphrag = BasicGraphRAG(data_dir="./example_graphrag_data")
-    
-    # Show current configuration
-    graphrag.show_config()
+    print("\n📊 Initializing GraphRAG...")
+    graphrag = BasicGraphRAG(config)
     
     # Check if models are properly initialized
     if graphrag.llm is None or graphrag.embedding_model is None:
-        print("\n⚠️  Warning: Models not initialized. Please set your API keys in the config.")
+        print("\n⚠️  Warning: Models not initialized. Please check your configuration.")
         print("   You can still run this example to see the structure, but queries won't work.")
-        print("\n💡 Configuration Tips:")
-        if graphrag.config["provider"] == "azure_openai":
-            print("   For Azure OpenAI:")
-            print("   1. Set provider to 'azure_openai'")
-            print("   2. Configure azure_endpoint, azure_deployment, and api_key")
-            print("   3. Set embedding deployment name")
-        else:
-            print("   For OpenAI:")
-            print("   1. Set provider to 'openai' (default)")
-            print("   2. Set your OpenAI API key")
-            print("   3. Optionally customize model names")
         return
     
     # Index documents
