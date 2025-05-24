@@ -53,9 +53,7 @@ def normalize_dom_tree(tree):
         # Remove keys that are known to be non-semantic or unstable
         ignore_keys = {"xpath", "id", "highlightIndex"}
         return {
-            k: normalize_dom_tree(v)
-            for k, v in tree.items()
-            if k not in ignore_keys
+            k: normalize_dom_tree(v) for k, v in tree.items() if k not in ignore_keys
         }
     elif isinstance(tree, list):
         return [normalize_dom_tree(x) for x in tree]
@@ -82,7 +80,9 @@ async def test_reddit_comments_dom_tree_logical_equivalence(browser):
     norm_actual = normalize_dom_tree(actual)
     norm_expected = normalize_dom_tree(expected)
     # Compare
-    assert norm_actual == norm_expected, "DOM tree does not match expected logical structure"
+    assert (
+        norm_actual == norm_expected
+    ), "DOM tree does not match expected logical structure"
 
 
 @pytest.mark.asyncio

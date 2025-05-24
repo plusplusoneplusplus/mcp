@@ -10,6 +10,7 @@ from mcp_tools.browser.interface import IBrowserClient
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
 from config import env
 
+
 class PlaywrightBrowserClient(IBrowserClient):
     def __init__(self, browser: Literal["chrome", "edge"], user_data_dir: str):
         """
@@ -131,6 +132,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                         print(f"Saved panel_{pid}.png (attempt {attempt+1})")
                         try:
                             from utils.ocr_extractor import extract_text_from_image
+
                             ocr_content = extract_text_from_image(image_path)
                         except Exception as ocr_e:
                             print(f"OCR extraction failed for {image_path}: {ocr_e}")

@@ -378,11 +378,12 @@ class MarkdownSegmenter:
         return embedding.tolist()
 
     def segment_and_store(
-        self, markdown_content: str,
+        self,
+        markdown_content: str,
         file_name: str = None,
         rel_path: str = None,
         file_size: int = None,
-        file_date: str = None
+        file_date: str = None,
     ) -> Tuple[int, Dict[str, List[str]]]:
         """
         Segment markdown content and store it in the vector database.

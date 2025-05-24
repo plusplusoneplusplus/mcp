@@ -333,7 +333,7 @@ class PlaywrightScriptRunner:
         lines = ["Supported commands:"]
         # Build a mapping from handler to aliases for easy lookup
         handler_to_aliases = {}
-        if hasattr(cls, 'command_list'):
+        if hasattr(cls, "command_list"):
             for aliases, handler in cls.command_list:
                 handler_to_aliases[handler] = aliases
         for name, member in inspect.getmembers(cls):
@@ -343,7 +343,11 @@ class PlaywrightScriptRunner:
                 aliases = handler_to_aliases.get(member)
                 if aliases:
                     main_alias = aliases[0]
-                    alias_str = f" (aliases: {', '.join(aliases[1:])})" if len(aliases) > 1 else ""
+                    alias_str = (
+                        f" (aliases: {', '.join(aliases[1:])})"
+                        if len(aliases) > 1
+                        else ""
+                    )
                     lines.append(f"  {main_alias}{alias_str}: {desc}")
                 else:
                     lines.append(f"  {desc}")

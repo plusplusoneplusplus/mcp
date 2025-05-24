@@ -5,4 +5,4 @@ This plugin provides tools for executing queries against Azure Data Explorer (Ku
 
 from .tool import KustoClient
 
-__all__ = ["KustoClient"] 
+__all__ = ["KustoClient"]

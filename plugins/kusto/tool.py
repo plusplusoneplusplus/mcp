@@ -336,4 +336,4 @@ class KustoClient(KustoClientInterface):
                 "success": False,
                 "result": f"Unknown operation: {operation}",
                 "error_type": "InvalidOperation",
-            } 
+            }

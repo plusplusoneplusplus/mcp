@@ -1,1 +1,1 @@
-"""Tests for the Azure DevOps Repository plugin.""" 
+"""Tests for the Azure DevOps Repository plugin."""

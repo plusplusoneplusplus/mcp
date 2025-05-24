@@ -569,7 +569,7 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
         return []
 
     logger.info("Loading YAML-defined tools")
-    
+
     successful_tools = []
     failed_tools = []
 
@@ -581,7 +581,7 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
         except Exception as e:
             logger.error(f"Error loading tools.yaml file: {e}")
             return []
-        
+
         tools_data = yaml_data.get("tools", {})
 
         if not tools_data:
@@ -623,7 +623,9 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
                         logger.debug(
                             f"  Schema.type: {schema_type} (type: {type(schema_type)})"
                         )
-                        logger.debug(f"  Properties: {input_schema.get('properties', {})}")
+                        logger.debug(
+                            f"  Properties: {input_schema.get('properties', {})}"
+                        )
                         logger.debug(f"  Required: {input_schema.get('required', [])}")
                     else:
                         logger.debug(f"  Schema value (invalid): {input_schema}")
@@ -639,7 +641,7 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
         for name, tool_data in tools_data.items():
             try:
                 logger.debug(f"Processing YAML tool: {name}")
-                
+
                 # Skip disabled tools
                 if tool_data.get("enabled", True) == False:
                     logger.info(f"Tool '{name}' is disabled in tools.yaml")
@@ -647,36 +649,46 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
 
                 # Comprehensive validation of tool data
                 validation_errors = []
-                
+
                 try:
                     # Verify basic structure
                     if not isinstance(tool_data, dict):
-                        validation_errors.append(f"Invalid tool data type: {type(tool_data)}")
+                        validation_errors.append(
+                            f"Invalid tool data type: {type(tool_data)}"
+                        )
                     else:
                         # Check required fields
                         if "description" not in tool_data:
                             validation_errors.append("Missing 'description' field")
                         elif not isinstance(tool_data["description"], str):
-                            validation_errors.append(f"Invalid description type: {type(tool_data['description'])}")
-                        
+                            validation_errors.append(
+                                f"Invalid description type: {type(tool_data['description'])}"
+                            )
+
                         if "inputSchema" not in tool_data:
                             validation_errors.append("Missing 'inputSchema' field")
                         elif not isinstance(tool_data["inputSchema"], dict):
-                            validation_errors.append(f"Invalid inputSchema type: {type(tool_data['inputSchema'])}")
+                            validation_errors.append(
+                                f"Invalid inputSchema type: {type(tool_data['inputSchema'])}"
+                            )
                         else:
                             # Validate inputSchema structure
                             input_schema = tool_data["inputSchema"]
                             if "type" not in input_schema:
-                                validation_errors.append("Missing 'type' in inputSchema")
+                                validation_errors.append(
+                                    "Missing 'type' in inputSchema"
+                                )
                             elif not isinstance(input_schema["type"], str):
-                                validation_errors.append(f"Invalid inputSchema.type: {type(input_schema['type'])}")
-                    
+                                validation_errors.append(
+                                    f"Invalid inputSchema.type: {type(input_schema['type'])}"
+                                )
+
                     if validation_errors:
                         error_msg = f"Validation failed: {'; '.join(validation_errors)}"
                         logger.error(f"Tool '{name}' validation errors: {error_msg}")
                         failed_tools.append(f"{name}: {error_msg}")
                         continue
-                        
+
                 except Exception as validation_error:
                     error_msg = f"Validation exception: {str(validation_error)}"
                     logger.error(f"Tool '{name}' validation exception: {error_msg}")
@@ -706,8 +718,10 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
                         test_name = test_instance.name
                         test_description = test_instance.description
                         test_schema = test_instance.input_schema
-                        
-                        logger.debug(f"Tool class '{name}' instantiation test successful")
+
+                        logger.debug(
+                            f"Tool class '{name}' instantiation test successful"
+                        )
                     except Exception as instantiation_error:
                         error_msg = f"Class instantiation test failed: {str(instantiation_error)}"
                         logger.error(f"Tool '{name}' instantiation error: {error_msg}")
@@ -720,28 +734,35 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
                     yaml_tool_classes.append(tool_class)
                     successful_tools.append(name)
                     logger.info(f"Successfully registered YAML tool: {name}")
-                    
+
                 except Exception as create_error:
-                    error_msg = f"Class creation/registration failed: {str(create_error)}"
-                    logger.error(f"Error creating or registering class for YAML tool '{name}': {error_msg}")
+                    error_msg = (
+                        f"Class creation/registration failed: {str(create_error)}"
+                    )
+                    logger.error(
+                        f"Error creating or registering class for YAML tool '{name}': {error_msg}"
+                    )
                     failed_tools.append(f"{name}: {error_msg}")
-                    
+
             except Exception as e:
                 error_msg = f"General processing error: {str(e)}"
                 logger.error(f"Error processing YAML tool '{name}': {error_msg}")
                 failed_tools.append(f"{name}: {error_msg}")
                 import traceback
-                logger.debug(f"Full traceback for tool '{name}': {traceback.format_exc()}")
+
+                logger.debug(
+                    f"Full traceback for tool '{name}': {traceback.format_exc()}"
+                )
 
         # Log comprehensive summary
         logger.info(f"YAML tools loading summary:")
         logger.info(f"  - Total tools in YAML: {len(tools_data)}")
         logger.info(f"  - Successfully loaded: {len(successful_tools)}")
         logger.info(f"  - Failed to load: {len(failed_tools)}")
-        
+
         if successful_tools:
             logger.info(f"  - Successful tools: {', '.join(successful_tools)}")
-        
+
         if failed_tools:
             logger.warning(f"  - Failed tools:")
             for failed_tool in failed_tools:
@@ -751,6 +772,7 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
     except Exception as e:
         logger.error(f"Critical error loading YAML tools: {e}")
         import traceback
+
         logger.error(f"Full traceback: {traceback.format_exc()}")
         return []
 

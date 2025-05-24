@@ -265,8 +265,12 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 # --- Main Web Page ---
 from server.api import PERSIST_DIR
 
+
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "import_path": PERSIST_DIR})
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "import_path": PERSIST_DIR}
+    )
+
 
 # --- Add routes ---
 routes = [

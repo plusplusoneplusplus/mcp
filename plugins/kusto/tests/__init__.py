@@ -1,1 +1,1 @@
-"""Tests for the Kusto plugin.""" 
+"""Tests for the Kusto plugin."""

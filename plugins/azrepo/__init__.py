@@ -6,4 +6,4 @@ including pull request management and other repository operations.
 
 from .tool import AzureRepoClient
 
-__all__ = ["AzureRepoClient"] 
+__all__ = ["AzureRepoClient"]

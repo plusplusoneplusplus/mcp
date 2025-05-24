@@ -225,12 +225,12 @@ class PluginRegistry:
             )
             return
 
-        module_name = getattr(module, '__name__', 'Unknown')
+        module_name = getattr(module, "__name__", "Unknown")
         logger.debug(f"Scanning module {module_name} for tool classes")
-        
+
         successful_registrations = []
         failed_registrations = []
-        
+
         try:
             # Get all members of the module with error handling
             try:
@@ -238,7 +238,7 @@ class PluginRegistry:
             except Exception as e:
                 logger.error(f"Error getting members from module {module_name}: {e}")
                 return
-            
+
             for name, obj in module_members:
                 try:
                     # Check if it's a class defined in this module (not imported)
@@ -259,8 +259,10 @@ class PluginRegistry:
 
                     # Attempt to register this individual tool with comprehensive error handling
                     try:
-                        logger.debug(f"Attempting to register tool class {name} from {module_name}")
-                        
+                        logger.debug(
+                            f"Attempting to register tool class {name} from {module_name}"
+                        )
+
                         # Validate the tool class before registration
                         try:
                             # Try to create a temporary instance to validate the tool
@@ -268,51 +270,81 @@ class PluginRegistry:
                             tool_name = temp_instance.name
                             description = temp_instance.description
                             input_schema = temp_instance.input_schema
-                            
+
                             # Basic validation
                             if not tool_name or not isinstance(tool_name, str):
-                                raise ValueError(f"Tool {name} has invalid name: {tool_name}")
+                                raise ValueError(
+                                    f"Tool {name} has invalid name: {tool_name}"
+                                )
                             if not description or not isinstance(description, str):
-                                raise ValueError(f"Tool {name} has invalid description: {description}")
+                                raise ValueError(
+                                    f"Tool {name} has invalid description: {description}"
+                                )
                             if not isinstance(input_schema, dict):
-                                raise ValueError(f"Tool {name} has invalid input_schema: {type(input_schema)}")
-                            
-                            logger.debug(f"Tool {name} validation successful: name='{tool_name}', description='{description[:50]}...'")
+                                raise ValueError(
+                                    f"Tool {name} has invalid input_schema: {type(input_schema)}"
+                                )
+
+                            logger.debug(
+                                f"Tool {name} validation successful: name='{tool_name}', description='{description[:50]}...'"
+                            )
                         except Exception as validation_error:
-                            logger.warning(f"Tool {name} failed validation: {validation_error}")
-                            failed_registrations.append(f"{name}: Validation failed - {str(validation_error)}")
+                            logger.warning(
+                                f"Tool {name} failed validation: {validation_error}"
+                            )
+                            failed_registrations.append(
+                                f"{name}: Validation failed - {str(validation_error)}"
+                            )
                             continue
-                        
+
                         # Use direct registry method for consistency
                         result = self.register_tool(obj, source="code")
                         if result is not None:
-                            successful_registrations.append(f"{name} (as '{tool_name}')")
-                            logger.debug(f"Successfully registered tool {name} as '{tool_name}' from {module_name}")
+                            successful_registrations.append(
+                                f"{name} (as '{tool_name}')"
+                            )
+                            logger.debug(
+                                f"Successfully registered tool {name} as '{tool_name}' from {module_name}"
+                            )
                         else:
-                            logger.debug(f"Tool {name} was not registered (likely due to configuration)")
-                            failed_registrations.append(f"{name}: Not registered due to configuration")
+                            logger.debug(
+                                f"Tool {name} was not registered (likely due to configuration)"
+                            )
+                            failed_registrations.append(
+                                f"{name}: Not registered due to configuration"
+                            )
                     except Exception as e:
-                        logger.warning(f"Error registering tool {name} from {module_name}: {e}")
-                        failed_registrations.append(f"{name}: Registration error - {str(e)}")
+                        logger.warning(
+                            f"Error registering tool {name} from {module_name}: {e}"
+                        )
+                        failed_registrations.append(
+                            f"{name}: Registration error - {str(e)}"
+                        )
                 except Exception as e:
-                    logger.warning(f"Error processing class {name} from {module_name}: {e}")
+                    logger.warning(
+                        f"Error processing class {name} from {module_name}: {e}"
+                    )
                     failed_registrations.append(f"{name}: Processing error - {str(e)}")
-            
+
             # Log summary for this module
             if successful_registrations or failed_registrations:
                 logger.info(f"Module {module_name} scan results:")
-                logger.info(f"  - Successfully registered: {len(successful_registrations)} tools")
+                logger.info(
+                    f"  - Successfully registered: {len(successful_registrations)} tools"
+                )
                 if successful_registrations:
                     for tool in successful_registrations:
                         logger.info(f"    + {tool}")
-                
+
                 if failed_registrations:
-                    logger.warning(f"  - Failed registrations: {len(failed_registrations)} tools")
+                    logger.warning(
+                        f"  - Failed registrations: {len(failed_registrations)} tools"
+                    )
                     for failure in failed_registrations:
                         logger.warning(f"    - {failure}")
             else:
                 logger.debug(f"No tool classes found in module {module_name}")
-                
+
         except Exception as e:
             logger.error(f"Critical error scanning module {module_name}: {e}")
             logger.exception("Full traceback for module scanning error:")
@@ -505,9 +537,9 @@ def discover_and_register_tools():
     """Discover and register all tools in the mcp_tools package and plugin directories with comprehensive error handling."""
     successful_tools = []
     failed_tools = []
-    
+
     logger.info("Starting comprehensive tool discovery and registration")
-    
+
     # Load YAML tools first if enabled
     if config.register_yaml_tools:
         logger.info("Attempting to discover YAML tools...")
@@ -523,7 +555,9 @@ def discover_and_register_tools():
                     registry.add_yaml_tool_names(yaml_tool_names)
                     logger.info(f"Found {len(yaml_tool_names)} YAML tool names")
                 else:
-                    logger.warning("get_yaml_tool_names function not found in yaml_tools module")
+                    logger.warning(
+                        "get_yaml_tool_names function not found in yaml_tools module"
+                    )
             except Exception as e:
                 logger.error(f"Error getting YAML tool names: {e}")
                 failed_tools.append(f"YAML tool names discovery: {str(e)}")
@@ -536,12 +570,18 @@ def discover_and_register_tools():
                 if yaml_tools_function:
                     yaml_tool_classes = yaml_tools_function()
                     if yaml_tool_classes:
-                        successful_tools.extend([f"YAML:{cls.__name__}" for cls in yaml_tool_classes])
-                        logger.info(f"Successfully registered {len(yaml_tool_classes)} YAML tools")
+                        successful_tools.extend(
+                            [f"YAML:{cls.__name__}" for cls in yaml_tool_classes]
+                        )
+                        logger.info(
+                            f"Successfully registered {len(yaml_tool_classes)} YAML tools"
+                        )
                     else:
                         logger.info("No YAML tools were registered")
                 else:
-                    logger.warning("discover_and_register_yaml_tools function not found")
+                    logger.warning(
+                        "discover_and_register_yaml_tools function not found"
+                    )
             except Exception as e:
                 logger.error(f"Error registering YAML tools: {e}")
                 failed_tools.append(f"YAML tools registration: {str(e)}")
@@ -557,7 +597,7 @@ def discover_and_register_tools():
     # Then discover code-based tools if enabled
     if config.register_code_tools:
         logger.info("Attempting to discover code-based tools...")
-        
+
         # Discover tools in the mcp_tools package with error handling
         try:
             registry.discover_tools("mcp_tools")
@@ -570,16 +610,22 @@ def discover_and_register_tools():
         try:
             plugin_roots = config.get_plugin_roots()
             logger.info(f"Discovering tools in {len(plugin_roots)} plugin directories")
-            
+
             for plugin_dir in plugin_roots:
                 try:
                     registry.discover_plugin_directory(plugin_dir)
-                    logger.debug(f"Successfully processed plugin directory: {plugin_dir}")
+                    logger.debug(
+                        f"Successfully processed plugin directory: {plugin_dir}"
+                    )
                 except Exception as e:
-                    logger.error(f"Error discovering tools in plugin directory {plugin_dir}: {e}")
+                    logger.error(
+                        f"Error discovering tools in plugin directory {plugin_dir}: {e}"
+                    )
                     failed_tools.append(f"Plugin directory {plugin_dir}: {str(e)}")
         except Exception as e:
-            logger.error(f"Error getting plugin roots or processing plugin directories: {e}")
+            logger.error(
+                f"Error getting plugin roots or processing plugin directories: {e}"
+            )
             failed_tools.append(f"Plugin directories discovery: {str(e)}")
     else:
         logger.info("Code tool registration is disabled")
@@ -604,8 +650,12 @@ def discover_and_register_tools():
                 logger.warning(f"  - {failed_item}")
 
         logger.debug(f"Registered tool names: {list(registry.tools.keys())}")
-        logger.debug(f"Tool sources breakdown: {yaml_count} from YAML, {code_count} from code")
-        logger.debug(f"Tool details: {[(name, source) for name, source in tool_sources.items()]}")
+        logger.debug(
+            f"Tool sources breakdown: {yaml_count} from YAML, {code_count} from code"
+        )
+        logger.debug(
+            f"Tool details: {[(name, source) for name, source in tool_sources.items()]}"
+        )
     except Exception as e:
         logger.error(f"Error generating tool discovery summary: {e}")
 

@@ -26,16 +26,16 @@ except ImportError:
     import os
     import sys
     import importlib.util
-    
+
     # Get the directory of this file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     types_path = os.path.join(current_dir, "types.py")
-    
+
     # Load types module directly
     spec = importlib.util.spec_from_file_location("types", types_path)
     types_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(types_module)
-    
+
     # Import the types
     PullRequestIdentity = types_module.PullRequestIdentity
     PullRequestWorkItem = types_module.PullRequestWorkItem
@@ -632,4 +632,4 @@ class AzureRepoClient(RepoClientInterface):
                 organization=arguments.get("organization"),
             )
         else:
-            return {"success": False, "error": f"Unknown operation: {operation}"} 
+            return {"success": False, "error": f"Unknown operation: {operation}"}
