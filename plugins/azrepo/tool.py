@@ -1,15 +1,53 @@
+"""Azure DevOps Repository tool implementation."""
+
 import logging
 import json
 from typing import Dict, Any, List, Optional, Union
 
-# Import interface
-from mcp_tools.interfaces import RepoClientInterface
-
-# Import the plugin decorator
+# Import the required interfaces and decorators
+from mcp_tools.interfaces import ToolInterface, RepoClientInterface
 from mcp_tools.plugin import register_tool
 
+# Import types from the plugin
+try:
+    from .types import (
+        PullRequestIdentity,
+        PullRequestWorkItem,
+        PullRequestRef,
+        PullRequest,
+        PullRequestListResponse,
+        PullRequestDetailResponse,
+        PullRequestCreateResponse,
+        PullRequestUpdateResponse,
+        PullRequestVoteEnum,
+    )
+except ImportError:
+    # Fallback for when module is loaded directly by plugin system
+    import os
+    import sys
+    import importlib.util
+    
+    # Get the directory of this file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    types_path = os.path.join(current_dir, "types.py")
+    
+    # Load types module directly
+    spec = importlib.util.spec_from_file_location("types", types_path)
+    types_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(types_module)
+    
+    # Import the types
+    PullRequestIdentity = types_module.PullRequestIdentity
+    PullRequestWorkItem = types_module.PullRequestWorkItem
+    PullRequestRef = types_module.PullRequestRef
+    PullRequest = types_module.PullRequest
+    PullRequestListResponse = types_module.PullRequestListResponse
+    PullRequestDetailResponse = types_module.PullRequestDetailResponse
+    PullRequestCreateResponse = types_module.PullRequestCreateResponse
+    PullRequestUpdateResponse = types_module.PullRequestUpdateResponse
+    PullRequestVoteEnum = types_module.PullRequestVoteEnum
 
-# Now we'll accept the CommandExecutor as a dependency rather than importing it directly
+
 @register_tool
 class AzureRepoClient(RepoClientInterface):
     """Client for interacting with Azure DevOps Repositories using Azure CLI commands.
@@ -62,6 +100,9 @@ class AzureRepoClient(RepoClientInterface):
                         "get_pull_request",
                         "create_pull_request",
                         "update_pull_request",
+                        "set_vote",
+                        "add_reviewers",
+                        "add_work_items",
                     ],
                 },
                 "pull_request_id": {
@@ -84,6 +125,11 @@ class AzureRepoClient(RepoClientInterface):
                     "description": "Name of the target branch",
                     "nullable": True,
                 },
+                "description": {
+                    "type": "string",
+                    "description": "Description for the pull request",
+                    "nullable": True,
+                },
                 "repository": {
                     "type": "string",
                     "description": "Name or ID of the repository",
@@ -97,6 +143,68 @@ class AzureRepoClient(RepoClientInterface):
                 "organization": {
                     "type": "string",
                     "description": "Azure DevOps organization URL",
+                    "nullable": True,
+                },
+                "vote": {
+                    "type": "string",
+                    "description": "Vote value (approve, approve-with-suggestions, reset, reject, wait-for-author)",
+                    "nullable": True,
+                },
+                "reviewers": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of reviewers to add (users or groups)",
+                    "nullable": True,
+                },
+                "work_items": {
+                    "type": "array",
+                    "items": {"type": ["string", "integer"]},
+                    "description": "List of work item IDs to link to the PR",
+                    "nullable": True,
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Status filter or new status for update operations",
+                    "nullable": True,
+                },
+                "creator": {
+                    "type": "string",
+                    "description": "Filter PRs by creator",
+                    "nullable": True,
+                },
+                "reviewer": {
+                    "type": "string",
+                    "description": "Filter PRs by reviewer",
+                    "nullable": True,
+                },
+                "top": {
+                    "type": "integer",
+                    "description": "Maximum number of PRs to list",
+                    "nullable": True,
+                },
+                "skip": {
+                    "type": "integer",
+                    "description": "Number of PRs to skip",
+                    "nullable": True,
+                },
+                "draft": {
+                    "type": "boolean",
+                    "description": "Whether to create the PR in draft mode",
+                    "nullable": True,
+                },
+                "auto_complete": {
+                    "type": "boolean",
+                    "description": "Set the PR to complete automatically when policies pass",
+                    "nullable": True,
+                },
+                "squash": {
+                    "type": "boolean",
+                    "description": "Squash the commits when merging",
+                    "nullable": True,
+                },
+                "delete_source_branch": {
+                    "type": "boolean",
+                    "description": "Delete the source branch after PR completion",
                     "nullable": True,
                 },
             },
@@ -469,6 +577,8 @@ class AzureRepoClient(RepoClientInterface):
                 status=arguments.get("status"),
                 source_branch=arguments.get("source_branch"),
                 target_branch=arguments.get("target_branch"),
+                top=arguments.get("top"),
+                skip=arguments.get("skip"),
             )
         elif operation == "get_pull_request":
             return await self.get_pull_request(
@@ -484,6 +594,42 @@ class AzureRepoClient(RepoClientInterface):
                 repository=arguments.get("repository"),
                 project=arguments.get("project"),
                 organization=arguments.get("organization"),
+                reviewers=arguments.get("reviewers"),
+                work_items=arguments.get("work_items"),
+                draft=arguments.get("draft", False),
+                auto_complete=arguments.get("auto_complete", False),
+                squash=arguments.get("squash", False),
+                delete_source_branch=arguments.get("delete_source_branch", False),
+            )
+        elif operation == "update_pull_request":
+            return await self.update_pull_request(
+                pull_request_id=arguments.get("pull_request_id"),
+                title=arguments.get("title"),
+                description=arguments.get("description"),
+                status=arguments.get("status"),
+                organization=arguments.get("organization"),
+                auto_complete=arguments.get("auto_complete"),
+                squash=arguments.get("squash"),
+                delete_source_branch=arguments.get("delete_source_branch"),
+                draft=arguments.get("draft"),
+            )
+        elif operation == "set_vote":
+            return await self.set_vote(
+                pull_request_id=arguments.get("pull_request_id"),
+                vote=arguments.get("vote"),
+                organization=arguments.get("organization"),
+            )
+        elif operation == "add_reviewers":
+            return await self.add_reviewers(
+                pull_request_id=arguments.get("pull_request_id"),
+                reviewers=arguments.get("reviewers", []),
+                organization=arguments.get("organization"),
+            )
+        elif operation == "add_work_items":
+            return await self.add_work_items(
+                pull_request_id=arguments.get("pull_request_id"),
+                work_items=arguments.get("work_items", []),
+                organization=arguments.get("organization"),
             )
         else:
-            return {"success": False, "error": f"Unknown operation: {operation}"}
+            return {"success": False, "error": f"Unknown operation: {operation}"} 

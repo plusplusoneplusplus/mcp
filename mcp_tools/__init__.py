@@ -11,7 +11,6 @@ from mcp_tools.interfaces import (
 
 # Import concrete implementations
 from mcp_tools.command_executor import CommandExecutor
-from mcp_tools.azrepo import AzureRepoClient
 from mcp_tools.browser import BrowserClient
 from config import env
 
@@ -43,7 +42,6 @@ __all__ = [
     "KustoClientInterface",
     # Implementations
     "CommandExecutor",
-    "AzureRepoClient",
     "BrowserClient",
     "KustoClient",
     "env",
