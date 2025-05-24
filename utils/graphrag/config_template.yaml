@@ -9,7 +9,7 @@ provider: "openai"  # or "azure_openai"
 llm:
   # OpenAI Configuration (when provider is "openai")
   api_key: "YOUR_OPENAI_API_KEY"  # Replace with your actual API key
-  model: "gpt-4-turbo-preview"    # or "gpt-3.5-turbo" for faster/cheaper option
+  model: "gpt-4.1"
   max_tokens: 4000
   temperature: 0.0
   
@@ -17,19 +17,19 @@ llm:
   # Uncomment and configure these when using Azure OpenAI:
   # azure_endpoint: "https://your-resource.openai.azure.com/"
   # azure_deployment: "your-gpt-deployment-name"
-  # api_version: "2024-02-15-preview"
+  # api_version: "2024-12-01-preview"
 
 # Embedding Model Configuration  
 embeddings:
   # OpenAI Configuration (when provider is "openai")
   api_key: "YOUR_OPENAI_API_KEY"  # Replace with your actual API key
-  model: "text-embedding-3-small" # or "text-embedding-ada-002"
+  model: "text-embedding-ada-002"
   
   # Azure OpenAI Configuration (when provider is "azure_openai")
   # Uncomment and configure these when using Azure OpenAI:
   # azure_endpoint: "https://your-resource.openai.azure.com/"
   # azure_deployment: "your-embedding-deployment-name"
-  # api_version: "2024-02-15-preview"
+  # api_version: "2024-12-01-preview"
 
 # Document Processing
 chunk_size: 1200      # Size of text chunks for processing
