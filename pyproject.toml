@@ -39,6 +39,10 @@ dependencies = [
     # LLM clients
     "openai>=1.14.3",  # OpenAI Python SDK
     
+    # graphrag
+    "graphrag>=0.3.0",  # Microsoft GraphRAG for knowledge graph construction
+    
+    
     # Webdriver tools
     "selenium==4.18.1",
     "webdriver-manager==4.0.1",
