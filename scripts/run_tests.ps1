@@ -108,7 +108,11 @@ Run-ComponentTests "utils.vector_store" "utils/vector_store/tests" $TestPattern
 Run-ComponentTests "utils.secret_scanner" "utils/secret_scanner/tests" $TestPattern
 Run-ComponentTests "utils.ocr_extractor" "utils/ocr_extractor/tests" $TestPattern
 Run-ComponentTests "utils.playwright" "utils/playwright/tests" $TestPattern
-# Add more components as needed
+
+# Run tests for plugins
+Run-ComponentTests "plugins.azrepo" "plugins/azrepo/tests" $TestPattern
+Run-ComponentTests "plugins.kusto" "plugins/kusto/tests" $TestPattern
+# Add more plugin components as needed
 
 # Run project-level tests if they exist
 if (Test-Path "tests" -PathType Container) {

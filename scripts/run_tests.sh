@@ -86,7 +86,11 @@ run_component_tests "utils.vector_store" "utils/vector_store/tests" "$TEST_PATTE
 run_component_tests "utils.secret_scanner" "utils/secret_scanner/tests" "$TEST_PATTERN"
 run_component_tests "utils.ocr_extractor" "utils/ocr_extractor/tests" "$TEST_PATTERN"
 run_component_tests "utils.playwright" "utils/playwright/tests" "$TEST_PATTERN"
-# Add more components as needed
+
+# Run tests for plugins
+run_component_tests "plugins.azrepo" "plugins/azrepo/tests" "$TEST_PATTERN"
+run_component_tests "plugins.kusto" "plugins/kusto/tests" "$TEST_PATTERN"
+# Add more plugin components as needed
 
 # Run project-level tests if they exist
 if [ -d "tests" ]; then

@@ -1,12 +1,12 @@
 """
-Tests for the KustoClient class in mcp_tools/kusto/client.py, focused on format_results.
+Tests for the KustoClient class in plugins/kusto/tool.py, focused on format_results.
 """
 
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock, PropertyMock
 from azure.kusto.data.response import KustoResponseDataSet
 
-from plugins.kusto.tool import KustoClient
+from ..tool import KustoClient
 
 
 @pytest.fixture
@@ -102,7 +102,7 @@ def test_format_results_error_handling(kusto_client):
 async def test_execute_query_with_formatting(kusto_client):
     """Test the execute_query method with formatting enabled."""
     # Setup a mock kusto client
-    with patch("mcp_tools.kusto.client.AzureKustoClient") as mock_azure_client:
+    with patch("plugins.kusto.tool.AzureKustoClient") as mock_azure_client:
         # Mock the response
         mock_response = MagicMock(spec=KustoResponseDataSet)
         mock_table = MagicMock()
@@ -137,7 +137,7 @@ async def test_execute_query_with_formatting(kusto_client):
 async def test_execute_query_without_formatting(kusto_client):
     """Test the execute_query method with formatting disabled."""
     # Setup a mock kusto client
-    with patch("mcp_tools.kusto.client.AzureKustoClient") as mock_azure_client:
+    with patch("plugins.kusto.tool.AzureKustoClient") as mock_azure_client:
         # Mock the response
         mock_response = MagicMock(spec=KustoResponseDataSet)
         mock_table = MagicMock()
@@ -188,7 +188,7 @@ async def test_execute_query_client_error(kusto_client):
 async def test_execute_query_execution_error(kusto_client):
     """Test execute_query handles query execution errors."""
     # Setup a mock kusto client
-    with patch("mcp_tools.kusto.client.AzureKustoClient") as mock_azure_client:
+    with patch("plugins.kusto.tool.AzureKustoClient") as mock_azure_client:
         # Configure the mock client instance to raise an exception
         mock_client_instance = mock_azure_client.return_value
         mock_client_instance.execute.side_effect = Exception("Test execution error")
