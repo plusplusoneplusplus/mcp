@@ -66,7 +66,7 @@ class GraphRAGConfig:
             raise ValueError("OpenAI API key is required")
         
         if not self.llm.model:
-            self.llm.model = "gpt-4-turbo-preview"
+            self.llm.model = "gpt-4.1"
         
         if not self.embeddings.model:
             self.embeddings.model = "text-embedding-3-small"
@@ -180,7 +180,7 @@ class ConfigLoader:
                 "provider": "openai",
                 "llm": {
                     "api_key": os.getenv("OPENAI_API_KEY"),
-                    "model": os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview"),
+                    "model": os.getenv("OPENAI_MODEL", "gpt-4.1"),
                     "max_tokens": int(os.getenv("OPENAI_MAX_TOKENS", "4000")),
                     "temperature": float(os.getenv("OPENAI_TEMPERATURE", "0.0")),
                 },

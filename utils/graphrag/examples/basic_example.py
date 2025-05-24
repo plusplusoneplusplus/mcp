@@ -1,243 +1,276 @@
 """
 Basic GraphRAG Example
 
-This example demonstrates how to use Microsoft's GraphRAG package to:
+This example demonstrates how to use Microsoft's GraphRAG 2.3.0 package to:
 1. Index documents and build a knowledge graph
 2. Perform global and local queries
 3. Get structured responses with source attribution
 
-Configuration options:
-1. YAML file: python basic_example.py config.yaml
-2. Environment variables: python basic_example.py
+Usage:
+    python basic_example.py config.yaml  # Use YAML config file
+    python basic_example.py              # Use environment variables
 """
 
 import asyncio
 import sys
+import os
+import yaml
 from pathlib import Path
 from typing import List, Optional
 
 # GraphRAG imports
-from graphrag.config import GraphRagConfig
-from graphrag.index.run import run_pipeline_with_config
-from graphrag.query.context_builder.entity_extraction import EntityVectorStoreKey
+from graphrag.config.load_config import load_config as load_graphrag_config
+from graphrag.index.run.run_pipeline import run_pipeline
+from graphrag.logger.rich_progress import RichProgressLogger
+from graphrag.query.factory import (
+    get_global_search_engine,
+    get_local_search_engine,
+)
 from graphrag.query.indexer_adapters import (
     read_indexer_entities,
     read_indexer_relationships,
     read_indexer_reports,
     read_indexer_text_units,
 )
-from graphrag.query.llm.oai.chat_openai import ChatOpenAI
-from graphrag.query.llm.oai.embedding import OpenAIEmbedding
-from graphrag.query.structured_search.global_search.community_context import (
-    GlobalCommunityContext,
-)
-from graphrag.query.structured_search.global_search.search import GlobalSearch
-from graphrag.query.structured_search.local_search.mixed_context import (
-    LocalSearchMixedContext,
-)
-from graphrag.query.structured_search.local_search.search import LocalSearch
 
 # Import our configuration module
 from utils.graphrag.config import load_config, GraphRAGConfig
 
 
 class BasicGraphRAG:
-    """A basic GraphRAG implementation using Microsoft's GraphRAG package."""
+    """A basic GraphRAG implementation using Microsoft's GraphRAG 2.3.0 Python API."""
     
     def __init__(self, config: GraphRAGConfig):
-        """Initialize the GraphRAG instance.
-        
-        Args:
-            config: GraphRAG configuration object
-        """
+        """Initialize the GraphRAG instance."""
         self.config = config
         self.data_dir = Path(config.data_dir)
         self.data_dir.mkdir(exist_ok=True)
         
-        # Initialize LLM and embedding models
-        self.llm = None
-        self.embedding_model = None
-        self._initialize_models()
-    
-    def _initialize_models(self):
-        """Initialize LLM and embedding models."""
-        try:
-            if self.config.provider == "azure_openai":
-                # Azure OpenAI configuration
-                self.llm = ChatOpenAI(
-                    api_key=self.config.llm.api_key,
-                    azure_endpoint=self.config.llm.azure_endpoint,
-                    azure_deployment=self.config.llm.azure_deployment,
-                    api_version=self.config.llm.api_version,
-                    max_tokens=self.config.llm.max_tokens,
-                    temperature=self.config.llm.temperature,
-                )
-                
-                self.embedding_model = OpenAIEmbedding(
-                    api_key=self.config.embeddings.api_key,
-                    azure_endpoint=self.config.embeddings.azure_endpoint,
-                    azure_deployment=self.config.embeddings.azure_deployment,
-                    api_version=self.config.embeddings.api_version,
-                )
-            else:
-                # Standard OpenAI configuration
-                self.llm = ChatOpenAI(
-                    api_key=self.config.llm.api_key,
-                    model=self.config.llm.model,
-                    max_tokens=self.config.llm.max_tokens,
-                    temperature=self.config.llm.temperature,
-                )
-                
-                self.embedding_model = OpenAIEmbedding(
-                    api_key=self.config.embeddings.api_key,
-                    model=self.config.embeddings.model,
-                )
-        except Exception as e:
-            print(f"Warning: Could not initialize models. Please check your configuration. Error: {e}")
-    
-    async def index_documents(self, documents: List[str], input_dir: Optional[str] = None) -> bool:
-        """Index documents to build the knowledge graph.
+        # GraphRAG workspace directories
+        self.input_dir = self.data_dir / "input"
+        self.output_dir = self.data_dir / "output"
+        self.cache_dir = self.data_dir / "cache"
+        self.reporting_dir = self.data_dir / "reporting"
         
-        Args:
-            documents: List of document content or file paths
-            input_dir: Directory containing input documents (if documents are file paths)
-            
-        Returns:
-            True if indexing was successful, False otherwise
-        """
+        # Create directories
+        for dir_path in [self.input_dir, self.output_dir, self.cache_dir, self.reporting_dir]:
+            dir_path.mkdir(exist_ok=True)
+    
+    async def index_documents(self, documents: List[str]) -> bool:
+        """Index documents to build the knowledge graph."""
         try:
-            # Create input directory if not provided
-            if input_dir is None:
-                input_dir = self.data_dir / "input"
-                input_dir.mkdir(exist_ok=True)
+            # Write documents to input directory
+            print("📝 Writing documents to input directory...")
+            for i, doc in enumerate(documents):
+                if isinstance(doc, str) and len(doc) < 260 and Path(doc).exists():
+                    # It's a file path, copy it
+                    import shutil
+                    print(f"  📄 Copying file: {doc}")
+                    shutil.copy2(doc, self.input_dir)
+                else:
+                    # It's content, write it to a file
+                    doc_path = self.input_dir / f"document_{i}.txt"
+                    print(f"  📄 Writing content to: {doc_path}")
+                    with open(doc_path, "w", encoding="utf-8") as f:
+                        f.write(doc.strip())
+            
+            # Create configuration files
+            print("⚙️ Creating configuration files...")
+            try:
+                self._create_config_files()
+                print("✅ Configuration files created successfully")
+            except Exception as config_error:
+                print(f"❌ Error creating config files: {config_error}")
+                import traceback
+                traceback.print_exc()
+                return False
+            
+            # Load GraphRAG configuration and run pipeline
+            print("📖 Loading GraphRAG configuration...")
+            try:
+                graphrag_config = load_graphrag_config(self.data_dir)
+                print("✅ GraphRAG configuration loaded successfully")
+            except Exception as load_error:
+                print(f"❌ Error loading GraphRAG config: {load_error}")
+                print(f"Error type: {type(load_error)}")
+                print(f"Error args: {load_error.args}")
                 
-                # Write documents to files if they're content strings
-                for i, doc in enumerate(documents):
-                    if not Path(doc).exists():  # Assume it's content, not a file path
-                        doc_path = input_dir / f"document_{i}.txt"
-                        with open(doc_path, "w", encoding="utf-8") as f:
-                            f.write(doc)
+                # Check if it's the placeholder error and provide more details
+                if "Invalid placeholder" in str(load_error):
+                    print("\n🔍 Placeholder Error Details:")
+                    settings_file = self.data_dir / "settings.yaml"
+                    if settings_file.exists():
+                        print(f"Settings file: {settings_file}")
+                        with open(settings_file, "r") as f:
+                            lines = f.readlines()
+                            for i, line in enumerate(lines, 1):
+                                print(f"{i:2d}: {line.rstrip()}")
+                                if i == 10:  # Line 10 where the error occurs
+                                    print(f"    {'':2s}  {'':24s}^ Error at column 25")
+                    
+                    print("\n🔍 Environment Variables:")
+                    for key, value in os.environ.items():
+                        if key.startswith("GRAPHRAG_"):
+                            print(f"  {key}={value}")
+                
+                import traceback
+                traceback.print_exc()
+                return False
             
-            # Create GraphRAG configuration
-            graphrag_config = self._create_graphrag_config(str(input_dir))
+            # Create logger
+            logger = RichProgressLogger("GraphRAG Indexing")
             
-            # Run the indexing pipeline
-            print("Starting document indexing...")
-            await run_pipeline_with_config(graphrag_config)
-            print("Indexing completed successfully!")
-            
-            return True
+            # Run the indexing pipeline directly
+            print("🚀 Starting document indexing...")
+            try:
+                async for result in run_pipeline(
+                    config=graphrag_config,
+                    logger=logger,
+                    is_update_run=False
+                ):
+                    pass  # Process results silently
+                
+                print("✅ Indexing completed successfully!")
+                return True
+                
+            except Exception as pipeline_run_error:
+                print(f"❌ Error running pipeline: {pipeline_run_error}")
+                import traceback
+                traceback.print_exc()
+                return False
             
         except Exception as e:
-            print(f"Error during indexing: {e}")
+            print(f"❌ Unexpected error during indexing: {e}")
+            print(f"Error type: {type(e)}")
+            print(f"Error args: {e.args}")
+            import traceback
+            traceback.print_exc()
             return False
     
-    def _create_graphrag_config(self, input_dir: str) -> GraphRagConfig:
-        """Create GraphRAG configuration for the indexing pipeline."""
-        # Base configuration
-        config_data = {
+    def _create_config_files(self):
+        """Create the configuration files that GraphRAG expects."""
+        print("  🔧 Setting environment variables...")
+        
+        # Set environment variables for GraphRAG
+        if self.config.provider == "azure_openai":
+            env_vars = {
+                "GRAPHRAG_API_KEY": self.config.llm.api_key,
+                "GRAPHRAG_LLM_API_BASE": self.config.llm.azure_endpoint,
+                "GRAPHRAG_LLM_DEPLOYMENT": self.config.llm.azure_deployment,
+                "GRAPHRAG_LLM_API_VERSION": self.config.llm.api_version,
+                "GRAPHRAG_EMBEDDING_API_KEY": self.config.embeddings.api_key,
+                "GRAPHRAG_EMBEDDING_API_BASE": self.config.embeddings.azure_endpoint,
+                "GRAPHRAG_EMBEDDING_DEPLOYMENT": self.config.embeddings.azure_deployment,
+                "GRAPHRAG_EMBEDDING_API_VERSION": self.config.embeddings.api_version,
+            }
+        else:
+            env_vars = {
+                "GRAPHRAG_API_KEY": self.config.llm.api_key,
+                "GRAPHRAG_LLM_MODEL": self.config.llm.model,
+                "GRAPHRAG_EMBEDDING_API_KEY": self.config.embeddings.api_key,
+                "GRAPHRAG_EMBEDDING_MODEL": self.config.embeddings.model,
+            }
+        
+        os.environ.update(env_vars)
+        print(f"  ✅ Set {len(env_vars)} environment variables")
+        
+        # Create .env file
+        print("  📝 Creating .env file...")
+        env_file = self.data_dir / ".env"
+        with open(env_file, "w") as f:
+            for key, value in os.environ.items():
+                if key.startswith("GRAPHRAG_"):
+                    f.write(f"{key}={value}\n")
+        print(f"  ✅ Created .env file: {env_file}")
+        
+        # Create settings.yaml file
+        print("  📝 Creating settings.yaml file...")
+        settings_file = self.data_dir / "settings.yaml"
+        
+        settings_data = {
             "input": {
                 "type": "file",
                 "file_type": "text",
-                "base_dir": input_dir,
+                "base_dir": str(self.input_dir),
                 "file_encoding": "utf-8",
-                "file_pattern": ".*\\.txt$",
+                "file_pattern": ".*\\.txt$$",
             },
-            "cache": {
-                "type": "file",
-                "base_dir": str(self.data_dir / "cache"),
-            },
-            "storage": {
-                "type": "file",
-                "base_dir": str(self.data_dir / "output"),
-            },
-            "reporting": {
-                "type": "file",
-                "base_dir": str(self.data_dir / "reporting"),
-            },
-            "chunks": {
-                "size": self.config.chunk_size,
-                "overlap": self.config.chunk_overlap,
-            },
+            "cache": {"type": "file", "base_dir": str(self.cache_dir)},
+            "storage": {"type": "file", "base_dir": str(self.output_dir)},
+            "reporting": {"type": "file", "base_dir": str(self.reporting_dir)},
+            "chunks": {"size": self.config.chunk_size, "overlap": self.config.chunk_overlap},
         }
         
-        # Configure LLM based on provider
+        # Configure models based on provider
         if self.config.provider == "azure_openai":
-            config_data["llm"] = {
-                "api_key": self.config.llm.api_key,
-                "type": "azure_openai_chat",
-                "azure_endpoint": self.config.llm.azure_endpoint,
-                "azure_deployment": self.config.llm.azure_deployment,
-                "api_version": self.config.llm.api_version,
-                "max_tokens": self.config.llm.max_tokens,
-                "temperature": self.config.llm.temperature,
-            }
-            
-            config_data["embeddings"] = {
-                "api_key": self.config.embeddings.api_key,
-                "type": "azure_openai_embedding",
-                "azure_endpoint": self.config.embeddings.azure_endpoint,
-                "azure_deployment": self.config.embeddings.azure_deployment,
-                "api_version": self.config.embeddings.api_version,
+            settings_data["models"] = {
+                "default_chat_model": {
+                    "api_key": "${GRAPHRAG_API_KEY}",
+                    "type": "azure_openai_chat",
+                    "model": "${GRAPHRAG_LLM_DEPLOYMENT}",
+                    "api_base": "${GRAPHRAG_LLM_API_BASE}",
+                    "deployment_name": "${GRAPHRAG_LLM_DEPLOYMENT}",
+                    "api_version": "${GRAPHRAG_LLM_API_VERSION}",
+                    "max_tokens": self.config.llm.max_tokens,
+                    "temperature": self.config.llm.temperature,
+                    "encoding_model": "gpt-4",
+                },
+                "default_embedding_model": {
+                    "api_key": "${GRAPHRAG_EMBEDDING_API_KEY}",
+                    "type": "azure_openai_embedding",
+                    "model": "${GRAPHRAG_EMBEDDING_DEPLOYMENT}",
+                    "api_base": "${GRAPHRAG_EMBEDDING_API_BASE}",
+                    "deployment_name": "${GRAPHRAG_EMBEDDING_DEPLOYMENT}",
+                    "api_version": "${GRAPHRAG_EMBEDDING_API_VERSION}",
+                }
             }
         else:
-            config_data["llm"] = {
-                "api_key": self.config.llm.api_key,
-                "type": "openai_chat",
-                "model": self.config.llm.model,
-                "max_tokens": self.config.llm.max_tokens,
-                "temperature": self.config.llm.temperature,
-            }
-            
-            config_data["embeddings"] = {
-                "api_key": self.config.embeddings.api_key,
-                "type": "openai_embedding",
-                "model": self.config.embeddings.model,
+            settings_data["models"] = {
+                "default_chat_model": {
+                    "api_key": "${GRAPHRAG_API_KEY}",
+                    "type": "openai_chat",
+                    "model": "${GRAPHRAG_LLM_MODEL}",
+                    "max_tokens": self.config.llm.max_tokens,
+                    "temperature": self.config.llm.temperature,
+                    "encoding_model": "gpt-4",
+                },
+                "default_embedding_model": {
+                    "api_key": "${GRAPHRAG_EMBEDDING_API_KEY}",
+                    "type": "openai_embedding",
+                    "model": "${GRAPHRAG_EMBEDDING_MODEL}",
+                }
             }
         
-        return GraphRagConfig.from_dict(config_data)
+        try:
+            with open(settings_file, "w") as f:
+                yaml.dump(settings_data, f, default_flow_style=False)
+            print(f"  ✅ Created settings.yaml file: {settings_file}")
+            
+            # Show the content for debugging
+            print("  📋 Settings.yaml content:")
+            with open(settings_file, "r") as f:
+                lines = f.readlines()
+                for i, line in enumerate(lines, 1):
+                    print(f"    {i:2d}: {line.rstrip()}")
+                    
+        except Exception as yaml_error:
+            print(f"  ❌ Error writing settings.yaml: {yaml_error}")
+            raise
     
     async def global_search(self, query: str) -> str:
-        """Perform a global search across the entire knowledge graph.
-        
-        Args:
-            query: The search query
-            
-        Returns:
-            The search response
-        """
+        """Perform a global search across the entire knowledge graph."""
         try:
-            # Load the indexed data
-            output_dir = self.data_dir / "output"
+            entities = read_indexer_entities(self.output_dir, None, 10)
+            reports = read_indexer_reports(self.output_dir, None, 10)
+            graphrag_config = load_graphrag_config(self.data_dir)
             
-            # Read the indexed data
-            entities = read_indexer_entities(output_dir, None, 10)
-            reports = read_indexer_reports(output_dir, None, 10)
-            
-            # Create context builder
-            context_builder = GlobalCommunityContext(
-                community_reports=reports,
+            search_engine = get_global_search_engine(
+                config=graphrag_config,
+                reports=reports,
                 entities=entities,
-                token_encoder=self.llm.get_token_encoder() if self.llm else None,
+                response_type="Multiple Paragraphs",
             )
             
-            # Create search engine
-            search_engine = GlobalSearch(
-                llm=self.llm,
-                context_builder=context_builder,
-                token_encoder=self.llm.get_token_encoder() if self.llm else None,
-                max_data_tokens=12000,
-                map_llm_params={
-                    "max_tokens": 1000,
-                    "temperature": 0.0,
-                },
-                reduce_llm_params={
-                    "max_tokens": 2000,
-                    "temperature": 0.0,
-                },
-            )
-            
-            # Perform the search
             result = await search_engine.asearch(query)
             return result.response
             
@@ -245,48 +278,23 @@ class BasicGraphRAG:
             return f"Error during global search: {e}"
     
     async def local_search(self, query: str) -> str:
-        """Perform a local search for specific entities and relationships.
-        
-        Args:
-            query: The search query
-            
-        Returns:
-            The search response
-        """
+        """Perform a local search for specific entities and relationships."""
         try:
-            # Load the indexed data
-            output_dir = self.data_dir / "output"
+            entities = read_indexer_entities(self.output_dir, None, 10)
+            relationships = read_indexer_relationships(self.output_dir, None, 10)
+            reports = read_indexer_reports(self.output_dir, None, 10)
+            text_units = read_indexer_text_units(self.output_dir, None, 10)
+            graphrag_config = load_graphrag_config(self.data_dir)
             
-            # Read the indexed data
-            entities = read_indexer_entities(output_dir, None, 10)
-            relationships = read_indexer_relationships(output_dir, None, 10)
-            reports = read_indexer_reports(output_dir, None, 10)
-            text_units = read_indexer_text_units(output_dir, None, 10)
-            
-            # Create context builder
-            context_builder = LocalSearchMixedContext(
-                community_reports=reports,
+            search_engine = get_local_search_engine(
+                config=graphrag_config,
+                reports=reports,
                 text_units=text_units,
                 entities=entities,
                 relationships=relationships,
-                entity_text_embeddings=None,  # You can add embeddings here
-                embedding_vectorstore_key=EntityVectorStoreKey.ID,
-                text_embedder=self.embedding_model,
-                token_encoder=self.llm.get_token_encoder() if self.llm else None,
+                response_type="Multiple Paragraphs",
             )
             
-            # Create search engine
-            search_engine = LocalSearch(
-                llm=self.llm,
-                context_builder=context_builder,
-                token_encoder=self.llm.get_token_encoder() if self.llm else None,
-                llm_params={
-                    "max_tokens": 2000,
-                    "temperature": 0.0,
-                },
-            )
-            
-            # Perform the search
             result = await search_engine.asearch(query)
             return result.response
             
@@ -296,7 +304,7 @@ class BasicGraphRAG:
 
 async def main():
     """Main example function demonstrating GraphRAG usage."""
-    print("🚀 Basic GraphRAG Example")
+    print("🚀 Basic GraphRAG Example (GraphRAG 2.3.0)")
     print("=" * 50)
     
     # Load configuration
@@ -310,6 +318,7 @@ async def main():
             config = load_config()
         
         print("✅ Configuration loaded successfully!")
+        config.show_config()
         
     except Exception as e:
         print(f"❌ Configuration error: {e}")
@@ -327,68 +336,48 @@ async def main():
         print("     export AZURE_OPENAI_EMBEDDING_DEPLOYMENT='your-embedding-deployment'")
         return
     
-    # Show configuration
-    config.show_config()
-    
-    # Sample documents to index
+    # Sample documents to index (loaded from fixture files)
+    fixtures_dir = Path(__file__).parent / "fixtures"
     sample_documents = [
-        """
-        Artificial Intelligence (AI) is transforming various industries. Machine learning, 
-        a subset of AI, enables computers to learn from data without explicit programming. 
-        Deep learning, which uses neural networks, has achieved remarkable success in 
-        image recognition and natural language processing.
-        """,
-        """
-        Climate change is one of the most pressing challenges of our time. Rising global 
-        temperatures are causing sea levels to rise, extreme weather events to become more 
-        frequent, and ecosystems to shift. Renewable energy sources like solar and wind 
-        power are crucial for reducing greenhouse gas emissions.
-        """,
-        """
-        The COVID-19 pandemic has accelerated digital transformation across organizations. 
-        Remote work has become the norm, leading to increased adoption of cloud technologies 
-        and collaboration tools. This shift has also highlighted the importance of 
-        cybersecurity and data privacy.
-        """
+        str(fixtures_dir / "artificial_intelligence.txt"),
+        str(fixtures_dir / "climate_change.txt"),
+        str(fixtures_dir / "digital_transformation.txt"),
     ]
     
-    # Initialize GraphRAG
+    # Initialize and run GraphRAG
     print("\n📊 Initializing GraphRAG...")
-    graphrag = BasicGraphRAG(config)
-    
-    # Check if models are properly initialized
-    if graphrag.llm is None or graphrag.embedding_model is None:
-        print("\n⚠️  Warning: Models not initialized. Please check your configuration.")
-        print("   You can still run this example to see the structure, but queries won't work.")
-        return
-    
-    # Index documents
-    print("\n📚 Indexing documents...")
-    success = await graphrag.index_documents(sample_documents)
-    
-    if not success:
-        print("❌ Indexing failed. Please check your configuration and try again.")
-        return
-    
-    print("✅ Documents indexed successfully!")
-    
-    # Perform global search
-    print("\n🌍 Performing global search...")
-    global_query = "What are the main themes and topics discussed in the documents?"
-    global_result = await graphrag.global_search(global_query)
-    print(f"Query: {global_query}")
-    print(f"Response: {global_result}")
-    
-    # Perform local search
-    print("\n🔍 Performing local search...")
-    local_query = "Tell me about artificial intelligence and machine learning"
-    local_result = await graphrag.local_search(local_query)
-    print(f"Query: {local_query}")
-    print(f"Response: {local_result}")
-    
-    print("\n✨ Example completed!")
+    try:
+        graphrag = BasicGraphRAG(config)
+        print("✅ GraphRAG initialized successfully!")
+        
+        # Index documents
+        print("\n📚 Indexing documents...")
+        success = await graphrag.index_documents(sample_documents)
+        
+        if not success:
+            print("❌ Indexing failed. Please check your configuration and try again.")
+            return
+        
+        print("✅ Documents indexed successfully!")
+        
+        # Perform searches
+        print("\n🌍 Performing global search...")
+        global_query = "What are the main themes and topics discussed in the documents?"
+        global_result = await graphrag.global_search(global_query)
+        print(f"Query: {global_query}")
+        print(f"Response: {global_result}")
+        
+        print("\n🔍 Performing local search...")
+        local_query = "Tell me about artificial intelligence and machine learning"
+        local_result = await graphrag.local_search(local_query)
+        print(f"Query: {local_query}")
+        print(f"Response: {local_result}")
+        
+        print("\n✨ Example completed!")
+        
+    except Exception as e:
+        print(f"❌ Failed to run GraphRAG: {e}")
 
 
 if __name__ == "__main__":
-    # Run the example
     asyncio.run(main()) 

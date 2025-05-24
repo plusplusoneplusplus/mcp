@@ -40,7 +40,7 @@ dependencies = [
     "openai>=1.14.3",  # OpenAI Python SDK
     
     # graphrag
-    "graphrag>=0.3.0",  # Microsoft GraphRAG for knowledge graph construction
+    "graphrag==2.3.0",  # Microsoft GraphRAG for knowledge graph construction
     
     
     # Webdriver tools

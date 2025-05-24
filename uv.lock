@@ -2151,7 +2151,7 @@ requires-dist = [
     { name = "detect-secrets", specifier = ">=1.4.0" },
     { name = "easyocr", specifier = ">=1.7.1" },
     { name = "flake8", marker = "extra == 'dev'" },
-    { name = "graphrag", specifier = ">=0.3.0" },
+    { name = "graphrag", specifier = "==2.3.0" },
     { name = "httpx", specifier = ">=0.26.0" },
     { name = "httpx-sse", specifier = ">=0.4.0" },
     { name = "ipython", specifier = ">=8.0.0" },
