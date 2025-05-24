@@ -1,6 +1,4 @@
-"""
-Azure Data Explorer (Kusto) client setup.
-"""
+"""Azure Data Explorer (Kusto) tool implementation."""
 
 import logging
 import json
@@ -16,10 +14,8 @@ from azure.kusto.data.exceptions import KustoServiceError
 from azure.kusto.data.response import KustoResponseDataSet
 from azure.identity import DefaultAzureCredential
 
-# Import interface
-from mcp_tools.interfaces import KustoClientInterface
-
-# Import the plugin decorator
+# Import the required interfaces and decorators
+from mcp_tools.interfaces import ToolInterface, KustoClientInterface
 from mcp_tools.plugin import register_tool
 from config import env
 
@@ -198,7 +194,6 @@ class KustoClient(KustoClientInterface):
             auth_error = f"Azure CLI authentication failed: {str(e)}"
             self.logger.error(auth_error)
 
-        # If we reached here, all authentication methods failed
         raise ValueError(
             f"All authentication methods failed ({', '.join(auth_methods_tried)}). "
             f"Last error: {auth_error}\n"
@@ -341,4 +336,4 @@ class KustoClient(KustoClientInterface):
                 "success": False,
                 "result": f"Unknown operation: {operation}",
                 "error_type": "InvalidOperation",
-            }
+            } 

@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock, PropertyMock
 from azure.kusto.data.response import KustoResponseDataSet
 
-from mcp_tools.kusto.client import KustoClient
+from plugins.kusto.tool import KustoClient
 
 
 @pytest.fixture

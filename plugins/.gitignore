@@ -14,6 +14,10 @@
 !azrepo/
 !azrepo/**
 
+# Track the kusto plugin
+!kusto/
+!kusto/**
+
 # Ignore Python bytecode files
 *.pyc
 __pycache__/

@@ -28,9 +28,6 @@ from mcp_tools.dependency import injector, DependencyInjector
 # Import YAML tools system
 from mcp_tools.yaml_tools import YamlToolBase, discover_and_register_yaml_tools
 
-# Import Kusto client
-from mcp_tools.kusto import KustoClient
-
 __version__ = "0.1.0"
 
 __all__ = [
@@ -43,7 +40,6 @@ __all__ = [
     # Implementations
     "CommandExecutor",
     "BrowserClient",
-    "KustoClient",
     "env",
     # Plugin system
     "register_tool",
