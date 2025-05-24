@@ -3,9 +3,6 @@ import datetime
 import pytest
 from mcp_tools.time.tool import get_time, TimeTool
 
-# Utility for async test
-pytestmark = pytest.mark.asyncio
-
 
 def test_get_time_now_default_utc():
     now_str = get_time()
@@ -80,12 +77,14 @@ def test_get_time_with_negative_delta_minutes():
 import asyncio
 
 
+@pytest.mark.asyncio
 async def test_time_tool_get_time_now():
     tool = TimeTool()
     result = await tool.execute_tool({"operation": "get_time"})
     assert re.match(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", result)
 
 
+@pytest.mark.asyncio
 async def test_time_tool_get_time_with_delta():
     tool = TimeTool()
     base = "2024-07-01 12:00:00"
@@ -95,6 +94,7 @@ async def test_time_tool_get_time_with_delta():
     assert result == "2024-07-01 12:05:00"
 
 
+@pytest.mark.asyncio
 async def test_time_tool_get_time_now_with_delta():
     tool = TimeTool()
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -107,6 +107,7 @@ async def test_time_tool_get_time_now_with_delta():
     assert 58 <= (dt - now).total_seconds() <= 62
 
 
+@pytest.mark.asyncio
 async def test_time_tool_get_time_invalid_delta():
     tool = TimeTool()
     res = await tool.execute_tool(
@@ -116,6 +117,7 @@ async def test_time_tool_get_time_invalid_delta():
     assert "Invalid delta string" in res["error"]
 
 
+@pytest.mark.asyncio
 async def test_time_tool_unknown_operation():
     tool = TimeTool()
     res = await tool.execute_tool({"operation": "unknown_op"})
@@ -123,6 +125,7 @@ async def test_time_tool_unknown_operation():
     assert "Unknown operation" in res["error"]
 
 
+@pytest.mark.asyncio
 async def test_time_tool_get_time_with_negative_delta():
     tool = TimeTool()
     base = "2024-07-01 12:00:00"
