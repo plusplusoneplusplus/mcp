@@ -108,3 +108,47 @@ server/.images/
 server/.vector_store/
 
 settings.yaml
+
+# Security and secrets
+.secrets.baseline
+.env.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+*.ppk
+config.json
+secrets.json
+credentials.json
+service-account*.json
+*-key.json
+*.keystore
+*.jks
+.aws/
+.azure/
+.gcp/
+.kube/config
+.docker/config.json
+
+# API keys and tokens (common patterns)
+*api*key*
+*secret*
+*token*
+*password*
+*credential*
+.netrc
+.htpasswd
+
+# Database files that might contain sensitive data
+*.db
+*.sqlite
+*.sqlite3

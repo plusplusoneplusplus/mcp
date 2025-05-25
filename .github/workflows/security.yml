@@ -1,0 +1,107 @@
+name: Security Checks
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better secret detection
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Create virtual environment and install dependencies
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip install -e .
+
+      - name: Run custom secret scanner
+        run: |
+          source .venv/bin/activate
+          find . -type f \( -name "*.py" -o -name "*.js" -o -name "*.ts" -o -name "*.json" -o -name "*.yaml" -o -name "*.yml" -o -name "*.env" -o -name "*.txt" -o -name "*.md" \) \
+            -not -path "./.venv/*" \
+            -not -path "./.git/*" \
+            -not -path "./node_modules/*" \
+            -not -path "./.pytest_cache/*" \
+            -not -path "./__pycache__/*" \
+            -not -name "*.lock" \
+            -not -name "*.log" \
+            | xargs python -m utils.secret_scanner.cli --fail-on-secrets
+
+      - name: Install detect-secrets
+        run: |
+          source .venv/bin/activate
+          uv pip install detect-secrets
+
+      - name: Run detect-secrets scan
+        run: |
+          source .venv/bin/activate
+          detect-secrets scan --all-files --baseline .secrets.baseline || true
+          if [ -f .secrets.baseline ]; then
+            detect-secrets audit .secrets.baseline --report --fail-on-unaudited
+          fi
+
+      - name: GitGuardian scan
+        uses: GitGuardian/ggshield/actions/secret@v1.30.0
+        env:
+          GITHUB_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          GITHUB_PUSH_BASE_SHA: ${{ github.event.base }}
+          GITHUB_PULL_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITGUARDIAN_API_KEY: ${{ secrets.GITGUARDIAN_API_KEY }}
+
+  dependency-check:
+    name: Dependency Vulnerability Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install safety
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip install safety
+
+      - name: Run safety check
+        run: |
+          source .venv/bin/activate
+          safety check --json --output safety-report.json || true
+          if [ -f safety-report.json ]; then
+            cat safety-report.json
+          fi
+
+      - name: Upload safety report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: safety-report
+          path: safety-report.json 
