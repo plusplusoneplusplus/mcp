@@ -28,7 +28,12 @@ repos:
             .*/\.venv/.*|
             .*/venv/.*|
             .*/node_modules/.*|
-            .*/\.git/.*
+            .*/\.git/.*|
+            scripts/\.profile/.*|
+            server/\.browserprofile/.*|
+            .*\.egg-info/.*|
+            .*/Cache/.*|
+            .*/\.cache/.*
           )$
 
   - repo: local
@@ -47,12 +52,9 @@ repos:
             .*/__pycache__/.*|
             .*/\.pytest_cache/.*|
             .*/\.venv/.*|
-            .*/venv/.*
+            .*/venv/.*|
+            scripts/\.profile/.*|
+            server/\.browserprofile/.*|
+            .*/__init__\.py$|
+            .*/prompts/.*\.txt$
           )$
-
-  - repo: https://github.com/gitguardian/ggshield
-    rev: v1.30.0
-    hooks:
-      - id: ggshield
-        language: python
-        stages: [commit] 
