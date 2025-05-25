@@ -106,3 +106,5 @@ server/.browserprofile/
 server/.extracted_charts/
 server/.images/
 server/.vector_store/
+
+settings.yaml
