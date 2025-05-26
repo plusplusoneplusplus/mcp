@@ -263,11 +263,32 @@ class PluginRegistry:
                             f"Attempting to register tool class {name} from {module_name}"
                         )
 
-                        # Validate the tool class before registration
+                        # Check exclusion before validation to avoid unnecessary instantiation
+                        # Create a temporary instance to get the tool name for exclusion check
                         try:
-                            # Try to create a temporary instance to validate the tool
                             temp_instance = obj()
                             tool_name = temp_instance.name
+                        except Exception as e:
+                            logger.warning(
+                                f"Tool {name} failed to instantiate for exclusion check: {e}"
+                            )
+                            failed_registrations.append(
+                                f"{name}: Instantiation failed - {str(e)}"
+                            )
+                            continue
+
+                        # Check if this tool should be registered based on configuration
+                        if not config.should_register_tool_class(
+                            name, tool_name, self.yaml_tool_names
+                        ):
+                            logger.debug(
+                                f"Skipping registration of {name} (tool: {tool_name}) due to configuration"
+                            )
+                            continue
+
+                        # Validate the tool class before registration
+                        try:
+                            # We already have temp_instance from above, get remaining properties
                             description = temp_instance.description
                             input_schema = temp_instance.input_schema
 
