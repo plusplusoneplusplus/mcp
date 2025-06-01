@@ -13,6 +13,7 @@ The Azure Repo Client plugin supports the following operations:
 - **Set Vote**: Vote on a pull request (approve, reject, etc.)
 - **Add Reviewers**: Add reviewers to a pull request
 - **Add Work Items**: Link work items to a pull request
+- **Get Work Item**: Retrieve detailed information about a specific work item
 
 ## Configuration
 
@@ -146,6 +147,17 @@ Add work items to a pull request.
 - `pull_request_id` (required): ID of the pull request
 - `work_items` (required): List of work item IDs to add
 - `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
+
+### get_work_item
+Get details of a specific work item.
+
+**Parameters:**
+- `work_item_id` (required): ID of the work item
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
+- `project` (optional): Name or ID of the project (uses configured default if not provided)
+- `as_of` (optional): Work item details as of a particular date and time (e.g., '2019-01-20', '2019-01-20 00:20:00')
+- `expand` (optional): The expand parameters for work item attributes (all, fields, links, none, relations)
+- `fields` (optional): Comma-separated list of requested fields (e.g., System.Id,System.AreaPath)
 
 ## Dependencies
 

@@ -23,6 +23,8 @@ try:
         PullRequestCreateResponse,
         PullRequestUpdateResponse,
         PullRequestVoteEnum,
+        WorkItem,
+        WorkItemResponse,
     )
 except ImportError:
     # Fallback for when module is loaded directly by plugin system
@@ -49,6 +51,8 @@ except ImportError:
     PullRequestCreateResponse = types_module.PullRequestCreateResponse
     PullRequestUpdateResponse = types_module.PullRequestUpdateResponse
     PullRequestVoteEnum = types_module.PullRequestVoteEnum
+    WorkItem = types_module.WorkItem
+    WorkItemResponse = types_module.WorkItemResponse
 
 
 @register_tool
@@ -116,11 +120,17 @@ class AzureRepoClient(RepoClientInterface):
                         "set_vote",
                         "add_reviewers",
                         "add_work_items",
+                        "get_work_item",
                     ],
                 },
                 "pull_request_id": {
                     "type": ["string", "integer"],
                     "description": "ID of the pull request",
+                    "nullable": True,
+                },
+                "work_item_id": {
+                    "type": ["string", "integer"],
+                    "description": "ID of the work item",
                     "nullable": True,
                 },
                 "title": {
@@ -218,6 +228,21 @@ class AzureRepoClient(RepoClientInterface):
                 "delete_source_branch": {
                     "type": "boolean",
                     "description": "Delete the source branch after PR completion",
+                    "nullable": True,
+                },
+                "as_of": {
+                    "type": "string",
+                    "description": "Work item details as of a particular date and time (e.g., '2019-01-20', '2019-01-20 00:20:00')",
+                    "nullable": True,
+                },
+                "expand": {
+                    "type": "string",
+                    "description": "The expand parameters for work item attributes (all, fields, links, none, relations)",
+                    "nullable": True,
+                },
+                "fields": {
+                    "type": "string",
+                    "description": "Comma-separated list of requested fields (e.g., System.Id,System.AreaPath)",
                     "nullable": True,
                 },
             },
@@ -633,6 +658,48 @@ class AzureRepoClient(RepoClientInterface):
 
         return await self._run_az_command(command)
 
+    async def get_work_item(
+        self,
+        work_item_id: Union[int, str],
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        as_of: Optional[str] = None,
+        expand: Optional[str] = None,
+        fields: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get details of a specific work item.
+
+        Args:
+            work_item_id: ID of the work item
+            organization: Azure DevOps organization URL (uses configured default if not provided)
+            project: Name or ID of the project (uses configured default if not provided)
+            as_of: Work item details as of a particular date and time
+            expand: The expand parameters for work item attributes (all, fields, links, none, relations)
+            fields: Comma-separated list of requested fields
+
+        Returns:
+            Dictionary with success status and work item details
+        """
+        command = f"boards work-item show --id {work_item_id}"
+
+        # Use configured defaults for core parameters
+        org = self._get_param_with_default(organization, self.default_organization)
+        proj = self._get_param_with_default(project, self.default_project)
+
+        # Add optional parameters
+        if org:
+            command += f" --org {org}"
+        if proj:
+            command += f" --project {proj}"
+        if as_of:
+            command += f" --as-of '{as_of}'"
+        if expand:
+            command += f" --expand {expand}"
+        if fields:
+            command += f" --fields {fields}"
+
+        return await self._run_az_command(command)
+
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments.
 
@@ -707,6 +774,15 @@ class AzureRepoClient(RepoClientInterface):
                 pull_request_id=arguments.get("pull_request_id"),
                 work_items=arguments.get("work_items", []),
                 organization=arguments.get("organization"),
+            )
+        elif operation == "get_work_item":
+            return await self.get_work_item(
+                work_item_id=arguments.get("work_item_id"),
+                organization=arguments.get("organization"),
+                project=arguments.get("project"),
+                as_of=arguments.get("as_of"),
+                expand=arguments.get("expand"),
+                fields=arguments.get("fields"),
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}

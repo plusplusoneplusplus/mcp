@@ -98,3 +98,35 @@ class PullRequestVoteEnum(str):
     RESET = "reset"
     REJECT = "reject"
     WAIT_FOR_AUTHOR = "wait-for-author"
+
+
+class WorkItem(BaseModel):
+    """Work item information"""
+
+    id: int
+    title: str
+    work_item_type: str
+    state: str
+    assigned_to: Optional[PullRequestIdentity] = None
+    created_by: Optional[PullRequestIdentity] = None
+    created_date: Optional[datetime] = None
+    changed_date: Optional[datetime] = None
+    area_path: Optional[str] = None
+    iteration_path: Optional[str] = None
+    description: Optional[str] = None
+    reason: Optional[str] = None
+    priority: Optional[int] = None
+    severity: Optional[str] = None
+    tags: Optional[str] = None
+    url: Optional[str] = None
+    fields: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    relations: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+
+
+class WorkItemResponse(BaseModel):
+    """Response from get work item operation"""
+
+    success: bool
+    data: Optional[WorkItem] = None
+    error: Optional[str] = None
+    raw_output: Optional[str] = None

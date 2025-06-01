@@ -67,7 +67,7 @@ class TestAzureRepoClientProperties:
         """Test the description property returns correct value."""
         assert (
             azure_repo_client.description
-            == "Interact with Azure DevOps repositories and pull requests"
+            == "Interact with Azure DevOps repositories and pull requests with automatic configuration loading"
         )
 
     def test_input_schema_property(self, azure_repo_client):
@@ -379,6 +379,73 @@ class TestVotingAndReviewers:
         assert result == mock_command_success_response
 
 
+class TestWorkItems:
+    """Test work item management methods."""
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_basic(
+        self, azure_repo_client, mock_command_success_response
+    ):
+        """Test getting a work item with basic parameters."""
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_command_success_response
+        )
+
+        result = await azure_repo_client.get_work_item(123)
+
+        expected_command = "boards work-item show --id 123"
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_command_success_response
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_with_all_options(
+        self, azure_repo_client, mock_command_success_response
+    ):
+        """Test getting a work item with all optional parameters."""
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_command_success_response
+        )
+
+        result = await azure_repo_client.get_work_item(
+            work_item_id=123,
+            organization="https://dev.azure.com/myorg",
+            project="myproject",
+            as_of="2023-01-01",
+            expand="all",
+            fields="System.Id,System.Title,System.State",
+        )
+
+        expected_command = (
+            "boards work-item show --id 123 --org https://dev.azure.com/myorg "
+            "--project myproject --as-of '2023-01-01' --expand all "
+            "--fields System.Id,System.Title,System.State"
+        )
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_command_success_response
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_with_defaults(
+        self, azure_repo_client, mock_command_success_response
+    ):
+        """Test getting a work item using configured defaults."""
+        # Set up defaults
+        azure_repo_client.default_organization = "https://dev.azure.com/defaultorg"
+        azure_repo_client.default_project = "defaultproject"
+
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_command_success_response
+        )
+
+        result = await azure_repo_client.get_work_item(456)
+
+        expected_command = (
+            "boards work-item show --id 456 --org https://dev.azure.com/defaultorg "
+            "--project defaultproject"
+        )
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_command_success_response
+
+
 class TestExecuteTool:
     """Test the execute_tool method."""
 
@@ -465,6 +532,34 @@ class TestExecuteTool:
             auto_complete=False,
             squash=False,
             delete_source_branch=False,
+        )
+        assert result == mock_command_success_response
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_get_work_item(
+        self, azure_repo_client, mock_command_success_response
+    ):
+        """Test execute_tool with get_work_item operation."""
+        azure_repo_client.get_work_item = AsyncMock(
+            return_value=mock_command_success_response
+        )
+
+        arguments = {
+            "operation": "get_work_item",
+            "work_item_id": 123,
+            "organization": "https://dev.azure.com/myorg",
+            "project": "myproject",
+            "expand": "all",
+        }
+        result = await azure_repo_client.execute_tool(arguments)
+
+        azure_repo_client.get_work_item.assert_called_once_with(
+            work_item_id=123,
+            organization="https://dev.azure.com/myorg",
+            project="myproject",
+            as_of=None,
+            expand="all",
+            fields=None,
         )
         assert result == mock_command_success_response
 
