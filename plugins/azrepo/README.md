@@ -1,6 +1,6 @@
 # Azure DevOps Repository Plugin
 
-This plugin provides tools for interacting with Azure DevOps repositories, including pull request management and other repository operations.
+This plugin provides tools for interacting with Azure DevOps repositories, including pull request management and other repository operations. It automatically loads default configuration values from environment variables while allowing parameter overrides for specific operations.
 
 ## Features
 
@@ -14,6 +14,28 @@ The Azure Repo Client plugin supports the following operations:
 - **Add Reviewers**: Add reviewers to a pull request
 - **Add Work Items**: Link work items to a pull request
 
+## Configuration
+
+The plugin automatically loads default values from environment variables with the `AZREPO_` prefix. This allows you to configure your Azure DevOps settings once and use them across all operations.
+
+### Environment Variables
+
+Add these to your `.env` file or set them as environment variables:
+
+```bash
+# Azure DevOps Configuration
+AZREPO_ORG=https://dev.azure.com/your-organization
+AZREPO_PROJECT=your-project-name
+AZREPO_REPO=your-repository-name
+AZREPO_BRANCH=main
+```
+
+### Configuration Benefits
+
+- **Convenience**: Set your Azure DevOps details once instead of passing them to every operation
+- **Flexibility**: Override defaults by providing explicit parameters when needed
+- **Consistency**: Ensures all operations use the same organization/project/repository by default
+
 ## Prerequisites
 
 - Azure CLI must be installed and configured
@@ -25,12 +47,21 @@ The Azure Repo Client plugin supports the following operations:
 The plugin is automatically registered when the MCP tools system discovers plugins. You can use it through the tool interface:
 
 ```python
-# Example usage through the tool interface
+# Example usage with configured defaults
+# (assumes AZREPO_* environment variables are set)
 arguments = {
     "operation": "list_pull_requests",
-    "repository": "my-repo",
-    "project": "my-project",
-    "status": "active"
+    "status": "active"  # Uses configured org/project/repo
+}
+
+result = await azure_repo_client.execute_tool(arguments)
+
+# Example with parameter overrides
+arguments = {
+    "operation": "create_pull_request",
+    "title": "My Feature",
+    "source_branch": "feature/my-feature",
+    "organization": "different-org"  # Override configured default
 }
 
 result = await azure_repo_client.execute_tool(arguments)
@@ -42,9 +73,9 @@ result = await azure_repo_client.execute_tool(arguments)
 List pull requests with optional filtering.
 
 **Parameters:**
-- `repository` (optional): Name or ID of the repository
-- `project` (optional): Name or ID of the project
-- `organization` (optional): Azure DevOps organization URL
+- `repository` (optional): Name or ID of the repository (uses configured default if not provided)
+- `project` (optional): Name or ID of the project (uses configured default if not provided)
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 - `creator` (optional): Filter by PR creator
 - `reviewer` (optional): Filter by reviewer
 - `status` (optional): Filter by status (abandoned, active, all, completed)
@@ -58,7 +89,7 @@ Get details of a specific pull request.
 
 **Parameters:**
 - `pull_request_id` (required): ID of the pull request
-- `organization` (optional): Azure DevOps organization URL
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 
 ### create_pull_request
 Create a new pull request.
@@ -66,11 +97,11 @@ Create a new pull request.
 **Parameters:**
 - `title` (required): Title for the pull request
 - `source_branch` (required): Name of the source branch
-- `target_branch` (optional): Name of the target branch
+- `target_branch` (optional): Name of the target branch (uses configured default if not provided)
 - `description` (optional): Description for the pull request
-- `repository` (optional): Name or ID of the repository
-- `project` (optional): Name or ID of the project
-- `organization` (optional): Azure DevOps organization URL
+- `repository` (optional): Name or ID of the repository (uses configured default if not provided)
+- `project` (optional): Name or ID of the project (uses configured default if not provided)
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 - `reviewers` (optional): List of reviewers to add
 - `work_items` (optional): List of work item IDs to link
 - `draft` (optional): Create as draft PR
@@ -86,7 +117,7 @@ Update an existing pull request.
 - `title` (optional): New title
 - `description` (optional): New description
 - `status` (optional): New status (active, abandoned, completed)
-- `organization` (optional): Azure DevOps organization URL
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 - `auto_complete` (optional): Enable/disable auto-complete
 - `squash` (optional): Enable/disable squash merge
 - `delete_source_branch` (optional): Enable/disable source branch deletion
@@ -98,7 +129,7 @@ Set your vote on a pull request.
 **Parameters:**
 - `pull_request_id` (required): ID of the pull request
 - `vote` (required): Vote value (approve, approve-with-suggestions, reset, reject, wait-for-author)
-- `organization` (optional): Azure DevOps organization URL
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 
 ### add_reviewers
 Add reviewers to a pull request.
@@ -106,7 +137,7 @@ Add reviewers to a pull request.
 **Parameters:**
 - `pull_request_id` (required): ID of the pull request
 - `reviewers` (required): List of reviewers to add
-- `organization` (optional): Azure DevOps organization URL
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 
 ### add_work_items
 Add work items to a pull request.
@@ -114,7 +145,7 @@ Add work items to a pull request.
 **Parameters:**
 - `pull_request_id` (required): ID of the pull request
 - `work_items` (required): List of work item IDs to add
-- `organization` (optional): Azure DevOps organization URL
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 
 ## Dependencies
 

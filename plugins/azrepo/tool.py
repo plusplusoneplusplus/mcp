@@ -8,6 +8,9 @@ from typing import Dict, Any, List, Optional, Union
 from mcp_tools.interfaces import ToolInterface, RepoClientInterface
 from mcp_tools.plugin import register_tool
 
+# Import configuration manager
+from config import env_manager
+
 # Import types from the plugin
 try:
     from .types import (
@@ -53,7 +56,17 @@ class AzureRepoClient(RepoClientInterface):
     """Client for interacting with Azure DevOps Repositories using Azure CLI commands.
 
     This class provides methods to manage pull requests and other repo operations
-    by executing az cli commands through the CommandExecutor.
+    by executing az cli commands through the CommandExecutor. It automatically
+    loads default configuration values from the environment while allowing
+    parameter overrides for specific operations.
+
+    Configuration:
+        The client automatically loads default values from environment variables
+        with the AZREPO_ prefix:
+        - AZREPO_ORG: Default organization URL
+        - AZREPO_PROJECT: Default project name/ID
+        - AZREPO_REPO: Default repository name/ID
+        - AZREPO_BRANCH: Default target branch
 
     Example:
         # Initialize the client with a command executor
@@ -61,14 +74,14 @@ class AzureRepoClient(RepoClientInterface):
         executor = CommandExecutor()
         az_client = AzureRepoClient(executor)
 
-        # List pull requests
+        # List pull requests (uses configured defaults)
         prs = await az_client.list_pull_requests()
 
-        # Create a pull request
+        # Create a pull request with override parameters
         pr = await az_client.create_pull_request(
             title="My PR Title",
             source_branch="feature/my-feature",
-            target_branch="main"
+            organization="different-org"  # Override default
         )
 
         # Get PR details
@@ -84,7 +97,7 @@ class AzureRepoClient(RepoClientInterface):
     @property
     def description(self) -> str:
         """Get the tool description."""
-        return "Interact with Azure DevOps repositories and pull requests"
+        return "Interact with Azure DevOps repositories and pull requests with automatic configuration loading"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -212,7 +225,7 @@ class AzureRepoClient(RepoClientInterface):
         }
 
     def __init__(self, command_executor=None):
-        """Initialize the AzureRepoClient with a command executor.
+        """Initialize the AzureRepoClient with a command executor and load configuration.
 
         Args:
             command_executor: An instance of CommandExecutor to use for running commands.
@@ -229,6 +242,48 @@ class AzureRepoClient(RepoClientInterface):
             self.executor = command_executor
 
         self.logger = logging.getLogger(__name__)
+        
+        # Load configuration defaults
+        self._load_config()
+
+    def _load_config(self):
+        """Load default configuration from environment manager."""
+        try:
+            # Ensure environment is loaded
+            env_manager.load()
+            
+            # Get Azure repo parameters
+            azrepo_params = env_manager.get_azrepo_parameters()
+            
+            # Set default values
+            self.default_organization = azrepo_params.get('org')
+            self.default_project = azrepo_params.get('project')
+            self.default_repository = azrepo_params.get('repo')
+            self.default_target_branch = azrepo_params.get('branch')
+            
+            self.logger.debug(f"Loaded Azure repo configuration: org={self.default_organization}, "
+                            f"project={self.default_project}, repo={self.default_repository}, "
+                            f"branch={self.default_target_branch}")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to load Azure repo configuration: {e}")
+            # Set defaults to None if configuration loading fails
+            self.default_organization = None
+            self.default_project = None
+            self.default_repository = None
+            self.default_target_branch = None
+
+    def _get_param_with_default(self, param_value: Optional[str], default_value: Optional[str]) -> Optional[str]:
+        """Get parameter value with fallback to default configuration.
+        
+        Args:
+            param_value: Explicitly provided parameter value
+            default_value: Default value from configuration
+            
+        Returns:
+            The parameter value to use (explicit value takes precedence)
+        """
+        return param_value if param_value is not None else default_value
 
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
@@ -284,9 +339,9 @@ class AzureRepoClient(RepoClientInterface):
         """List pull requests in the repository.
 
         Args:
-            repository: Name or ID of the repository
-            project: Name or ID of the project
-            organization: Azure DevOps organization URL
+            repository: Name or ID of the repository (uses configured default if not provided)
+            project: Name or ID of the project (uses configured default if not provided)
+            organization: Azure DevOps organization URL (uses configured default if not provided)
             creator: Limit results to PRs created by this user
             reviewer: Limit results to PRs where this user is a reviewer
             status: Limit results to PRs with this status (abandoned, active, all, completed)
@@ -300,13 +355,18 @@ class AzureRepoClient(RepoClientInterface):
         """
         command = "repos pr list"
 
+        # Use configured defaults for core parameters
+        repo = self._get_param_with_default(repository, self.default_repository)
+        proj = self._get_param_with_default(project, self.default_project)
+        org = self._get_param_with_default(organization, self.default_organization)
+
         # Add optional parameters
-        if repository:
-            command += f" --repository {repository}"
-        if project:
-            command += f" --project {project}"
-        if organization:
-            command += f" --org {organization}"
+        if repo:
+            command += f" --repository {repo}"
+        if proj:
+            command += f" --project {proj}"
+        if org:
+            command += f" --org {org}"
         if creator:
             command += f" --creator {creator}"
         if reviewer:
@@ -331,15 +391,17 @@ class AzureRepoClient(RepoClientInterface):
 
         Args:
             pull_request_id: ID of the pull request
-            organization: Azure DevOps organization URL
+            organization: Azure DevOps organization URL (uses configured default if not provided)
 
         Returns:
             Dictionary with success status and pull request details
         """
         command = f"repos pr show --id {pull_request_id}"
 
-        if organization:
-            command += f" --org {organization}"
+        # Use configured default for organization
+        org = self._get_param_with_default(organization, self.default_organization)
+        if org:
+            command += f" --org {org}"
 
         return await self._run_az_command(command)
 
@@ -364,11 +426,11 @@ class AzureRepoClient(RepoClientInterface):
         Args:
             title: Title for the pull request
             source_branch: Name of the source branch
-            target_branch: Name of the target branch (defaults to default branch if not specified)
+            target_branch: Name of the target branch (uses configured default if not specified)
             description: Description for the pull request (can include markdown)
-            repository: Name or ID of the repository
-            project: Name or ID of the project
-            organization: Azure DevOps organization URL
+            repository: Name or ID of the repository (uses configured default if not provided)
+            project: Name or ID of the project (uses configured default if not provided)
+            organization: Azure DevOps organization URL (uses configured default if not provided)
             reviewers: List of reviewers to add (users or groups)
             work_items: List of work item IDs to link to the PR
             draft: Whether to create the PR in draft mode
@@ -385,20 +447,26 @@ class AzureRepoClient(RepoClientInterface):
         command += f' --title "{title}"'
         command += f" --source-branch {source_branch}"
 
+        # Use configured defaults for core parameters
+        target_br = self._get_param_with_default(target_branch, self.default_target_branch)
+        repo = self._get_param_with_default(repository, self.default_repository)
+        proj = self._get_param_with_default(project, self.default_project)
+        org = self._get_param_with_default(organization, self.default_organization)
+
         # Add optional parameters
-        if target_branch:
-            command += f" --target-branch {target_branch}"
+        if target_br:
+            command += f" --target-branch {target_br}"
         if description:
             # Escape quotes in description and wrap each line
             desc_lines = description.replace('"', '\\"').split("\n")
             for line in desc_lines:
                 command += f' --description "{line}"'
-        if repository:
-            command += f" --repository {repository}"
-        if project:
-            command += f" --project {project}"
-        if organization:
-            command += f" --org {organization}"
+        if repo:
+            command += f" --repository {repo}"
+        if proj:
+            command += f" --project {proj}"
+        if org:
+            command += f" --org {org}"
 
         # Add reviewers if provided
         if reviewers:
@@ -441,7 +509,7 @@ class AzureRepoClient(RepoClientInterface):
             title: New title for the pull request
             description: New description for the pull request
             status: New status (active, abandoned, completed)
-            organization: Azure DevOps organization URL
+            organization: Azure DevOps organization URL (uses configured default if not provided)
             auto_complete: Set the PR to complete automatically when policies pass
             squash: Squash the commits when merging
             delete_source_branch: Delete the source branch after PR completion
@@ -451,6 +519,9 @@ class AzureRepoClient(RepoClientInterface):
             Dictionary with success status and updated pull request details
         """
         command = f"repos pr update --id {pull_request_id}"
+
+        # Use configured default for organization
+        org = self._get_param_with_default(organization, self.default_organization)
 
         # Add optional parameters
         if title:
@@ -462,8 +533,8 @@ class AzureRepoClient(RepoClientInterface):
                 command += f' --description "{line}"'
         if status:
             command += f" --status {status}"
-        if organization:
-            command += f" --org {organization}"
+        if org:
+            command += f" --org {org}"
 
         # Add flags
         if auto_complete is not None:
@@ -490,15 +561,17 @@ class AzureRepoClient(RepoClientInterface):
         Args:
             pull_request_id: ID of the pull request
             vote: Vote value (approve, approve-with-suggestions, reset, reject, wait-for-author)
-            organization: Azure DevOps organization URL
+            organization: Azure DevOps organization URL (uses configured default if not provided)
 
         Returns:
             Dictionary with success status and result details
         """
         command = f"repos pr set-vote --id {pull_request_id} --vote {vote}"
 
-        if organization:
-            command += f" --org {organization}"
+        # Use configured default for organization
+        org = self._get_param_with_default(organization, self.default_organization)
+        if org:
+            command += f" --org {org}"
 
         return await self._run_az_command(command)
 
@@ -513,7 +586,7 @@ class AzureRepoClient(RepoClientInterface):
         Args:
             pull_request_id: ID of the pull request
             reviewers: List of reviewers to add (users or groups)
-            organization: Azure DevOps organization URL
+            organization: Azure DevOps organization URL (uses configured default if not provided)
 
         Returns:
             Dictionary with success status and result details
@@ -524,8 +597,10 @@ class AzureRepoClient(RepoClientInterface):
         for reviewer in reviewers:
             command += f" --reviewers {reviewer}"
 
-        if organization:
-            command += f" --org {organization}"
+        # Use configured default for organization
+        org = self._get_param_with_default(organization, self.default_organization)
+        if org:
+            command += f" --org {org}"
 
         return await self._run_az_command(command)
 
@@ -540,7 +615,7 @@ class AzureRepoClient(RepoClientInterface):
         Args:
             pull_request_id: ID of the pull request
             work_items: List of work item IDs to add
-            organization: Azure DevOps organization URL
+            organization: Azure DevOps organization URL (uses configured default if not provided)
 
         Returns:
             Dictionary with success status and result details
@@ -551,8 +626,10 @@ class AzureRepoClient(RepoClientInterface):
         for item in work_items:
             command += f" --work-items {item}"
 
-        if organization:
-            command += f" --org {organization}"
+        # Use configured default for organization
+        org = self._get_param_with_default(organization, self.default_organization)
+        if org:
+            command += f" --org {org}"
 
         return await self._run_az_command(command)
 

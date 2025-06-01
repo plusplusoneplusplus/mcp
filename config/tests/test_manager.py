@@ -142,7 +142,7 @@ class TestEnvironmentManager(unittest.TestCase):
                     "workspace_folder": "/provider/workspace",
                     "additional_paths": {"logs": "/provider/logs"},
                 },
-                "azrepo_parameters": {"token": "provider-token"},
+                "azrepo_parameters": {"org": "provider-org"},
                 "kusto_parameters": {
                     "app_id": "provider-app-id",
                     "app_secret": "provider-app-secret",
@@ -172,7 +172,7 @@ class TestEnvironmentManager(unittest.TestCase):
             "/provider/logs",
         )
         self.assertEqual(
-            self.env_manager.azrepo_parameters.get("token"), "provider-token"
+            self.env_manager.azrepo_parameters.get("org"), "provider-org"
         )
         self.assertEqual(
             self.env_manager.kusto_parameters.get("app_id"), "provider-app-id"
