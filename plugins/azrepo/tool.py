@@ -4,6 +4,7 @@ import logging
 import json
 import getpass
 import os
+import pandas as pd
 from typing import Dict, Any, List, Optional, Union
 
 # Import the required interfaces and decorators
@@ -451,7 +452,20 @@ class AzureRepoClient(RepoClientInterface):
         if skip:
             command += f" --skip {skip}"
 
-        return await self._run_az_command(command)
+        result = await self._run_az_command(command)
+
+        # If successful, convert to DataFrame and return as CSV
+        if result.get("success", False) and "data" in result:
+            try:
+                df = self.convert_pr_to_df(result["data"])
+                csv_data = df.to_csv(index=False)
+                return {"success": True, "data": csv_data}
+            except Exception as e:
+                self.logger.warning(f"Failed to convert PRs to DataFrame: {e}")
+                # Return error if conversion fails
+                return {"success": False, "error": f"Failed to convert PRs to CSV: {str(e)}"}
+
+        return result
 
     async def get_pull_request(
         self, pull_request_id: Union[int, str], organization: Optional[str] = None
@@ -743,6 +757,24 @@ class AzureRepoClient(RepoClientInterface):
             command += f" --fields {fields}"
 
         return await self._run_az_command(command)
+
+    def convert_pr_to_df(self, prs_in_json):
+        l = []
+        for o in prs_in_json:
+            l.append({
+                'id': o['codeReviewId'],
+                'creator': o['createdBy']['uniqueName'].replace('@microsoft.com', ''),
+                'date': pd.to_datetime(o['creationDate']).strftime('%m/%d/%y %H:%M:%S'),
+                'title': o['title'],
+                'source_ref': o['sourceRefName'].replace('refs/heads/', ''),
+                'target_ref': o['targetRefName'].replace('refs/heads/', ''),
+            })
+
+        # Create DataFrame with proper columns even if empty
+        if not l:
+            return pd.DataFrame(columns=['id', 'creator', 'date', 'title', 'source_ref', 'target_ref'])
+
+        return pd.DataFrame().from_dict(l)
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments.
