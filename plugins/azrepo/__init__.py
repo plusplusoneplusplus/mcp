@@ -1,9 +1,11 @@
 """Azure DevOps Repository Plugin for MCP Tools.
 
 This plugin provides tools for interacting with Azure DevOps repositories,
-including pull request management and other repository operations.
+pull requests, and work items through dedicated specialized tools.
 """
 
 from .tool import AzureRepoClient
+from .pr_tool import AzurePullRequestTool
+from .workitem_tool import AzureWorkItemTool
 
-__all__ = ["AzureRepoClient"]
+__all__ = ["AzureRepoClient", "AzurePullRequestTool", "AzureWorkItemTool"]

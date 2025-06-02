@@ -2,73 +2,28 @@
 
 import logging
 import json
-import getpass
-import os
-import pandas as pd
-import uuid
 from typing import Dict, Any, List, Optional, Union
 
-import git
-
 # Import the required interfaces and decorators
-from mcp_tools.interfaces import ToolInterface, RepoClientInterface
+from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
 # Import configuration manager
 from config import env_manager
 
-# Import types from the plugin
-try:
-    from .types import (
-        PullRequestIdentity,
-        PullRequestWorkItem,
-        PullRequestRef,
-        PullRequest,
-        PullRequestListResponse,
-        PullRequestDetailResponse,
-        PullRequestCreateResponse,
-        PullRequestUpdateResponse,
-        PullRequestVoteEnum,
-        WorkItem,
-        WorkItemResponse,
-    )
-except ImportError:
-    # Fallback for when module is loaded directly by plugin system
-    import os
-    import sys
-    import importlib.util
-
-    # Get the directory of this file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    types_path = os.path.join(current_dir, "types.py")
-
-    # Load types module directly
-    spec = importlib.util.spec_from_file_location("types", types_path)
-    types_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(types_module)
-
-    # Import the types
-    PullRequestIdentity = types_module.PullRequestIdentity
-    PullRequestWorkItem = types_module.PullRequestWorkItem
-    PullRequestRef = types_module.PullRequestRef
-    PullRequest = types_module.PullRequest
-    PullRequestListResponse = types_module.PullRequestListResponse
-    PullRequestDetailResponse = types_module.PullRequestDetailResponse
-    PullRequestCreateResponse = types_module.PullRequestCreateResponse
-    PullRequestUpdateResponse = types_module.PullRequestUpdateResponse
-    PullRequestVoteEnum = types_module.PullRequestVoteEnum
-    WorkItem = types_module.WorkItem
-    WorkItemResponse = types_module.WorkItemResponse
-
 
 @register_tool
-class AzureRepoClient(RepoClientInterface):
+class AzureRepoClient(ToolInterface):
     """Client for interacting with Azure DevOps Repositories using Azure CLI commands.
 
-    This class provides methods to manage pull requests and other repo operations
-    by executing az cli commands through the CommandExecutor. It automatically
-    loads default configuration values from the environment while allowing
-    parameter overrides for specific operations.
+    This class provides methods for repository-level operations by executing
+    az cli commands through the CommandExecutor. It automatically loads default
+    configuration values from the environment while allowing parameter overrides
+    for specific operations.
+
+    Note: Pull request and work item functionality has been moved to dedicated tools:
+    - AzurePullRequestTool for PR operations
+    - AzureWorkItemTool for work item operations
 
     Configuration:
         The client automatically loads default values from environment variables
@@ -76,8 +31,6 @@ class AzureRepoClient(RepoClientInterface):
         - AZREPO_ORG: Default organization URL
         - AZREPO_PROJECT: Default project name/ID
         - AZREPO_REPO: Default repository name/ID
-        - AZREPO_BRANCH: Default target branch
-        - AZREPO_PR_BRANCH_PREFIX: Default prefix for auto-generated PR branch names (default: 'auto-pr/<username>/')
 
     Example:
         # Initialize the client with a command executor
@@ -85,27 +38,8 @@ class AzureRepoClient(RepoClientInterface):
         executor = CommandExecutor()
         az_client = AzureRepoClient(executor)
 
-        # List pull requests (uses configured defaults)
-        prs = await az_client.list_pull_requests()
-
-        # List current user's pull requests (creator defaults to current user)
-        my_prs = await az_client.list_pull_requests()
-
-        # List all pull requests (explicitly set creator to None)
-        all_prs = await az_client.list_pull_requests(creator=None)
-
-        # Create a pull request with override parameters
-        pr = await az_client.create_pull_request(
-            title="My PR Title",
-            source_branch="feature/my-feature",
-            organization="different-org"  # Override default
-        )
-
-        # Create a pull request with auto-generated branch and title from last commit
-        auto_pr = await az_client.create_pull_request()  # Uses current HEAD, creates branch with commit ID and configured prefix
-
-        # Get PR details
-        pr_details = await az_client.get_pull_request(123)
+        # Repository operations would go here
+        # (Currently focused on PR/WI operations which are now in separate tools)
     """
 
     # Implement ToolInterface properties
@@ -117,7 +51,7 @@ class AzureRepoClient(RepoClientInterface):
     @property
     def description(self) -> str:
         """Get the tool description."""
-        return "Interact with Azure DevOps repositories and pull requests with automatic configuration loading"
+        return "Interact with Azure DevOps repositories with automatic configuration loading"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -127,46 +61,12 @@ class AzureRepoClient(RepoClientInterface):
             "properties": {
                 "operation": {
                     "type": "string",
-                    "description": "The operation to perform (list_pull_requests, get_pull_request, create_pull_request, etc.)",
+                    "description": "The repository operation to perform",
                     "enum": [
-                        "list_pull_requests",
-                        "get_pull_request",
-                        "create_pull_request",
-                        "update_pull_request",
-                        "set_vote",
-                        "add_work_items",
-                        "get_work_item",
+                        "list_repos",
+                        "get_repo",
+                        "clone_repo",
                     ],
-                },
-                "pull_request_id": {
-                    "type": ["string", "integer"],
-                    "description": "ID of the pull request",
-                    "nullable": True,
-                },
-                "work_item_id": {
-                    "type": ["string", "integer"],
-                    "description": "ID of the work item",
-                    "nullable": True,
-                },
-                "title": {
-                    "type": "string",
-                    "description": "Title for the pull request (if None and source_branch is None, uses last commit message)",
-                    "nullable": True,
-                },
-                "source_branch": {
-                    "type": "string",
-                    "description": "Name of the source branch (if None, creates a branch from current HEAD using commit ID)",
-                    "nullable": True,
-                },
-                "target_branch": {
-                    "type": "string",
-                    "description": "Name of the target branch",
-                    "nullable": True,
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Description for the pull request (can include markdown)",
-                    "nullable": True,
                 },
                 "repository": {
                     "type": "string",
@@ -183,76 +83,14 @@ class AzureRepoClient(RepoClientInterface):
                     "description": "Azure DevOps organization URL",
                     "nullable": True,
                 },
-                "vote": {
+                "clone_url": {
                     "type": "string",
-                    "description": "Vote value (approve, approve-with-suggestions, reset, reject, wait-for-author)",
+                    "description": "URL to clone the repository",
                     "nullable": True,
                 },
-
-                "work_items": {
-                    "type": "array",
-                    "items": {"type": ["string", "integer"]},
-                    "description": "List of work item IDs to link to the PR",
-                    "nullable": True,
-                },
-                "status": {
+                "local_path": {
                     "type": "string",
-                    "description": "Status filter or new status for update operations",
-                    "nullable": True,
-                },
-                "creator": {
-                    "type": "string",
-                    "description": "Filter PRs by creator (defaults to current user if not specified, use empty string to list all PRs)",
-                    "nullable": True,
-                },
-                "reviewer": {
-                    "type": "string",
-                    "description": "Filter PRs by reviewer",
-                    "nullable": True,
-                },
-                "top": {
-                    "type": "integer",
-                    "description": "Maximum number of PRs to list",
-                    "nullable": True,
-                },
-                "skip": {
-                    "type": "integer",
-                    "description": "Number of PRs to skip",
-                    "nullable": True,
-                },
-                "draft": {
-                    "type": "boolean",
-                    "description": "Whether to create the PR in draft mode",
-                    "nullable": True,
-                },
-                "auto_complete": {
-                    "type": "boolean",
-                    "description": "Set the PR to complete automatically when policies pass",
-                    "nullable": True,
-                },
-                "squash": {
-                    "type": "boolean",
-                    "description": "Squash the commits when merging",
-                    "nullable": True,
-                },
-                "delete_source_branch": {
-                    "type": "boolean",
-                    "description": "Delete the source branch after PR completion",
-                    "nullable": True,
-                },
-                "as_of": {
-                    "type": "string",
-                    "description": "Work item details as of a particular date and time (e.g., '2019-01-20', '2019-01-20 00:20:00')",
-                    "nullable": True,
-                },
-                "expand": {
-                    "type": "string",
-                    "description": "The expand parameters for work item attributes (all, fields, links, none, relations)",
-                    "nullable": True,
-                },
-                "fields": {
-                    "type": "string",
-                    "description": "Comma-separated list of requested fields (e.g., System.Id,System.AreaPath)",
+                    "description": "Local path where to clone the repository",
                     "nullable": True,
                 },
             },
@@ -294,14 +132,9 @@ class AzureRepoClient(RepoClientInterface):
             self.default_organization = azrepo_params.get('org')
             self.default_project = azrepo_params.get('project')
             self.default_repository = azrepo_params.get('repo')
-            self.default_target_branch = azrepo_params.get('branch')
-            # Get default prefix with username
-            default_prefix = self._get_default_pr_branch_prefix()
-            self.default_pr_branch_prefix = azrepo_params.get('pr_branch_prefix', default_prefix)
 
             self.logger.debug(f"Loaded Azure repo configuration: org={self.default_organization}, "
-                            f"project={self.default_project}, repo={self.default_repository}, "
-                            f"branch={self.default_target_branch}, pr_branch_prefix={self.default_pr_branch_prefix}")
+                            f"project={self.default_project}, repo={self.default_repository}")
 
         except Exception as e:
             self.logger.warning(f"Failed to load Azure repo configuration: {e}")
@@ -309,8 +142,6 @@ class AzureRepoClient(RepoClientInterface):
             self.default_organization = None
             self.default_project = None
             self.default_repository = None
-            self.default_target_branch = None
-            self.default_pr_branch_prefix = self._get_default_pr_branch_prefix()
 
     def _get_param_with_default(self, param_value: Optional[str], default_value: Optional[str]) -> Optional[str]:
         """Get parameter value with fallback to default configuration.
@@ -323,142 +154,6 @@ class AzureRepoClient(RepoClientInterface):
             The parameter value to use (explicit value takes precedence)
         """
         return param_value if param_value is not None else default_value
-
-    def _get_current_username(self) -> Optional[str]:
-        """Get the current username in a cross-platform way.
-
-        Returns:
-            The current username, or None if unable to determine
-
-        Note:
-            This method returns None instead of raising an exception to allow
-            graceful fallback when username cannot be determined.
-        """
-        try:
-            # Try getpass.getuser() first (works on most platforms)
-            return getpass.getuser()
-        except Exception:
-            try:
-                # Fallback to environment variables
-                username = os.environ.get('USER') or os.environ.get('USERNAME')
-                if username:
-                    return username
-            except Exception:
-                pass
-
-            # Return None if unable to determine username
-            self.logger.warning("Unable to determine current username")
-            return None
-
-    def _get_default_pr_branch_prefix(self) -> str:
-        """Get the default PR branch prefix including username.
-
-        Returns:
-            Default prefix in format 'auto-pr/<username>/' or 'auto-pr' if username unavailable
-        """
-        username = self._get_current_username()
-        if username:
-            return f"auto-pr/{username}/"
-        else:
-            return "auto-pr"
-
-    def _get_last_commit_message(self) -> Optional[str]:
-        """Get the first line of the last commit message using GitPython.
-
-        Returns:
-            The first line of the last commit message, or None if unable to determine
-        """
-        try:
-            # Use GitPython to get the last commit message
-            repo = git.Repo(search_parent_directories=True)
-
-            # Get the latest commit
-            latest_commit = repo.head.commit
-
-            # Get the first line of the commit message
-            commit_message = latest_commit.message.strip()
-            if commit_message:
-                # Return only the first line (subject)
-                first_line = commit_message.split('\n')[0].strip()
-                if first_line:
-                    return first_line
-
-            self.logger.warning("Unable to get last commit message")
-            return None
-
-        except git.exc.InvalidGitRepositoryError:
-            self.logger.warning("Not in a git repository")
-            return None
-        except Exception as e:
-            self.logger.warning(f"Failed to get last commit message with GitPython: {e}")
-            return None
-
-    def _generate_branch_name_from_commit(self) -> str:
-        """Generate a branch name using the last commit ID and configurable prefix.
-
-        Returns:
-            A branch name in the format '{prefix}{commit_id}' where prefix
-            is configurable via AZREPO_PR_BRANCH_PREFIX environment variable
-            (default: 'auto-pr/<username>/') and commit_id is the first 12 characters
-            of the last commit hash
-        """
-        try:
-            # Use GitPython to get the last commit ID
-            repo = git.Repo(search_parent_directories=True)
-            latest_commit = repo.head.commit
-            commit_id = str(latest_commit.hexsha)[:12]  # Use first 12 characters of commit hash
-
-            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
-            if prefix.endswith('/'):
-                return f"{prefix}{commit_id}"
-            else:
-                return f"{prefix}/{commit_id}"
-
-        except git.exc.InvalidGitRepositoryError:
-            self.logger.warning("Not in a git repository, falling back to UUID")
-            # Fallback to UUID if not in a git repository
-            random_id = str(uuid.uuid4())[:8]
-            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
-            return f"{prefix}{random_id}"
-        except Exception as e:
-            self.logger.warning(f"Failed to get commit ID: {e}, falling back to UUID")
-            # Fallback to UUID if commit ID retrieval fails
-            random_id = str(uuid.uuid4())[:8]
-            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
-            return f"{prefix}{random_id}"
-
-    def _create_and_push_branch(self, branch_name: str) -> Dict[str, Any]:
-        """Create a new branch from current HEAD and push it to remote using GitPython.
-
-        Args:
-            branch_name: Name of the branch to create
-
-        Returns:
-            Dictionary with success status and any error information
-        """
-        try:
-            # Use GitPython to create and push the branch
-            repo = git.Repo(search_parent_directories=True)
-
-            # Create the new branch from current HEAD
-            new_branch = repo.create_head(branch_name)
-
-            # Checkout the new branch
-            new_branch.checkout()
-
-            # Push the branch to remote origin
-            origin = repo.remote('origin')
-            origin.push(new_branch, set_upstream=True)
-
-            self.logger.info(f"Successfully created and pushed branch: {branch_name}")
-            return {"success": True, "branch_name": branch_name}
-
-        except git.exc.InvalidGitRepositoryError:
-            return {"success": False, "error": "Not in a git repository"}
-        except git.exc.GitCommandError as e:
-            return {"success": False, "error": f"Git command failed: {str(e)}"}
-        except Exception as e:
-            return {"success": False, "error": f"Failed to create/push branch with GitPython: {str(e)}"}
 
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
@@ -498,52 +193,56 @@ class AzureRepoClient(RepoClientInterface):
                 "raw_output": status.get("output", ""),
             }
 
-    async def list_pull_requests(
+    async def list_repositories(
+        self,
+        project: Optional[str] = None,
+        organization: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """List repositories in the project.
+
+        Args:
+            project: Name or ID of the project (uses configured default if not provided)
+            organization: Azure DevOps organization URL (uses configured default if not provided)
+
+        Returns:
+            Dictionary with success status and list of repositories
+        """
+        command = "repos list"
+
+        # Use configured defaults for core parameters
+        proj = self._get_param_with_default(project, self.default_project)
+        org = self._get_param_with_default(organization, self.default_organization)
+
+        # Add optional parameters
+        if proj:
+            command += f" --project {proj}"
+        if org:
+            command += f" --org {org}"
+
+        return await self._run_az_command(command)
+
+    async def get_repository(
         self,
         repository: Optional[str] = None,
         project: Optional[str] = None,
         organization: Optional[str] = None,
-        creator: Optional[str] = "default",
-        reviewer: Optional[str] = None,
-        status: Optional[str] = None,
-        source_branch: Optional[str] = None,
-        target_branch: Optional[str] = None,
-        top: Optional[int] = None,
-        skip: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """List pull requests in the repository.
+        """Get details of a specific repository.
 
         Args:
             repository: Name or ID of the repository (uses configured default if not provided)
             project: Name or ID of the project (uses configured default if not provided)
             organization: Azure DevOps organization URL (uses configured default if not provided)
-            creator: Limit results to PRs created by this user.
-                    - If "default" (default value), uses current user
-                    - If None or empty string, lists all PRs regardless of creator
-                    - If a username, filters by that specific user
-            reviewer: Limit results to PRs where this user is a reviewer
-            status: Limit results to PRs with this status (abandoned, active, all, completed)
-            source_branch: Limit results to PRs that originate from this branch
-            target_branch: Limit results to PRs that target this branch
-            top: Maximum number of PRs to list
-            skip: Number of PRs to skip
 
         Returns:
-            Dictionary with success status and list of pull requests
+            Dictionary with success status and repository details
         """
-        command = "repos pr list"
+        command = "repos show"
 
         # Use configured defaults for core parameters
         repo = self._get_param_with_default(repository, self.default_repository)
         proj = self._get_param_with_default(project, self.default_project)
         org = self._get_param_with_default(organization, self.default_organization)
-
-        # Handle creator parameter with default behavior
-        if creator == "default":
-            # Use current user as default
-            creator = self._get_current_username()
-            if creator:
-                self.logger.debug(f"Using current user as creator filter: {creator}")
 
         # Add optional parameters
         if repo:
@@ -552,338 +251,62 @@ class AzureRepoClient(RepoClientInterface):
             command += f" --project {proj}"
         if org:
             command += f" --org {org}"
-        if creator:
-            command += f" --creator {creator}"
-        if reviewer:
-            command += f" --reviewer {reviewer}"
-        if status:
-            command += f" --status {status}"
-        if source_branch:
-            command += f" --source-branch {source_branch}"
-        if target_branch:
-            command += f" --target-branch {target_branch}"
-        if top:
-            command += f" --top {top}"
-        if skip:
-            command += f" --skip {skip}"
-
-        result = await self._run_az_command(command)
-
-        # If successful, convert to DataFrame and return as CSV
-        if result.get("success", False) and "data" in result:
-            try:
-                df = self.convert_pr_to_df(result["data"])
-                csv_data = df.to_csv(index=False)
-                return {"success": True, "data": csv_data}
-            except Exception as e:
-                self.logger.warning(f"Failed to convert PRs to DataFrame: {e}")
-                # Return error if conversion fails
-                return {"success": False, "error": f"Failed to convert PRs to CSV: {str(e)}"}
-
-        return result
-
-    async def get_pull_request(
-        self, pull_request_id: Union[int, str], organization: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Get details of a specific pull request.
-
-        Args:
-            pull_request_id: ID of the pull request
-            organization: Azure DevOps organization URL (uses configured default if not provided)
-
-        Returns:
-            Dictionary with success status and pull request details
-        """
-        command = f"repos pr show --id {pull_request_id}"
-
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-        if org:
-            command += f" --org {org}"
 
         return await self._run_az_command(command)
 
-    async def create_pull_request(
+    async def clone_repository(
         self,
-        title: Optional[str] = None,
-        source_branch: Optional[str] = None,
-        target_branch: Optional[str] = None,
-        description: Optional[str] = None,
+        clone_url: Optional[str] = None,
+        local_path: Optional[str] = None,
         repository: Optional[str] = None,
         project: Optional[str] = None,
         organization: Optional[str] = None,
-        reviewers: Optional[List[str]] = None,
-        work_items: Optional[List[Union[int, str]]] = None,
-        draft: bool = False,
-        auto_complete: bool = False,
-        squash: bool = False,
-        delete_source_branch: bool = False,
     ) -> Dict[str, Any]:
-        """Create a new pull request.
+        """Clone a repository to a local path.
 
         Args:
-            title: Title for the pull request (if None and source_branch is None, uses last commit message)
-            source_branch: Name of the source branch (if None, creates a branch from current HEAD using commit ID)
-            target_branch: Name of the target branch (uses configured default if not specified)
-            description: Description for the pull request (can include markdown)
+            clone_url: URL to clone the repository (if not provided, will be constructed from other params)
+            local_path: Local path where to clone the repository
             repository: Name or ID of the repository (uses configured default if not provided)
             project: Name or ID of the project (uses configured default if not provided)
             organization: Azure DevOps organization URL (uses configured default if not provided)
-            reviewers: List of reviewers to add (users or groups)
-            work_items: List of work item IDs to link to the PR
-            draft: Whether to create the PR in draft mode
-            auto_complete: Set the PR to complete automatically when policies pass
-            squash: Squash the commits when merging
-            delete_source_branch: Delete the source branch after PR completion
 
         Returns:
-            Dictionary with success status and created pull request details
+            Dictionary with success status and clone details
         """
-        # Handle None source_branch case
-        if source_branch is None:
-            # Generate branch name from commit ID and create/push it
-            commit_branch = self._generate_branch_name_from_commit()
-            self.logger.info(f"Creating branch from commit: {commit_branch}")
+        if clone_url:
+            # Use provided clone URL directly
+            command = f"git clone {clone_url}"
+            if local_path:
+                command += f" {local_path}"
+        else:
+            # Construct clone URL from Azure DevOps parameters
+            repo = self._get_param_with_default(repository, self.default_repository)
+            proj = self._get_param_with_default(project, self.default_project)
+            org = self._get_param_with_default(organization, self.default_organization)
 
-            branch_result = self._create_and_push_branch(commit_branch)
-            if not branch_result.get("success", False):
-                return branch_result
+            if not all([repo, proj, org]):
+                return {
+                    "success": False,
+                    "error": "Repository, project, and organization must be specified for Azure DevOps clone"
+                }
 
-            source_branch = commit_branch
+            # Construct Azure DevOps clone URL
+            clone_url = f"{org}/{proj}/_git/{repo}"
+            command = f"git clone {clone_url}"
+            if local_path:
+                command += f" {local_path}"
 
-            # If title is also None, get it from last commit message
-            if title is None:
-                commit_title = self._get_last_commit_message()
-                if commit_title:
-                    title = commit_title
-                    self.logger.info(f"Using commit message as title: {title}")
-                else:
-                    title = f"Auto PR from {source_branch}"
-                    self.logger.warning(f"Could not get commit message, using default title: {title}")
+        # Execute git clone command directly (not through az cli)
+        result = await self.executor.execute_async(command)
+        token = result.get("token")
 
-        # Ensure we have a title
-        if title is None:
-            return {"success": False, "error": "Title is required when source_branch is provided"}
+        status = await self.executor.query_process(token, wait=True)
 
-        command = "repos pr create"
-
-        # Required parameters
-        command += f' --title "{title}"'
-        command += f" --source-branch {source_branch}"
-
-        # Use configured defaults for core parameters
-        target_br = self._get_param_with_default(target_branch, self.default_target_branch)
-        repo = self._get_param_with_default(repository, self.default_repository)
-        proj = self._get_param_with_default(project, self.default_project)
-        org = self._get_param_with_default(organization, self.default_organization)
-
-        # Add optional parameters
-        if target_br:
-            command += f" --target-branch {target_br}"
-        if description:
-            # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split("\n")
-            for line in desc_lines:
-                command += f' --description "{line}"'
-        if repo:
-            command += f" --repository {repo}"
-        if proj:
-            command += f" --project {proj}"
-        if org:
-            command += f" --org {org}"
-
-        # Add reviewers if provided
-        if reviewers:
-            for reviewer in reviewers:
-                command += f" --reviewers {reviewer}"
-
-        # Add work items if provided
-        if work_items:
-            for item in work_items:
-                command += f" --work-items {item}"
-
-        # Add flags
-        if draft:
-            command += " --draft"
-        if auto_complete:
-            command += " --auto-complete"
-        if squash:
-            command += " --squash"
-        if delete_source_branch:
-            command += " --delete-source-branch"
-
-        return await self._run_az_command(command)
-
-    async def update_pull_request(
-        self,
-        pull_request_id: Union[int, str],
-        title: Optional[str] = None,
-        description: Optional[str] = None,
-        status: Optional[str] = None,
-        organization: Optional[str] = None,
-        auto_complete: Optional[bool] = None,
-        squash: Optional[bool] = None,
-        delete_source_branch: Optional[bool] = None,
-        draft: Optional[bool] = None,
-    ) -> Dict[str, Any]:
-        """Update an existing pull request.
-
-        Args:
-            pull_request_id: ID of the pull request to update
-            title: New title for the pull request
-            description: New description for the pull request
-            status: New status (active, abandoned, completed)
-            organization: Azure DevOps organization URL (uses configured default if not provided)
-            auto_complete: Set the PR to complete automatically when policies pass
-            squash: Squash the commits when merging
-            delete_source_branch: Delete the source branch after PR completion
-            draft: Whether the PR should be in draft mode
-
-        Returns:
-            Dictionary with success status and updated pull request details
-        """
-        command = f"repos pr update --id {pull_request_id}"
-
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-
-        # Add optional parameters
-        if title:
-            command += f' --title "{title}"'
-        if description:
-            # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split("\n")
-            for line in desc_lines:
-                command += f' --description "{line}"'
-        if status:
-            command += f" --status {status}"
-        if org:
-            command += f" --org {org}"
-
-        # Add flags
-        if auto_complete is not None:
-            command += f" --auto-complete {'true' if auto_complete else 'false'}"
-        if squash is not None:
-            command += f" --squash {'true' if squash else 'false'}"
-        if delete_source_branch is not None:
-            command += (
-                f" --delete-source-branch {'true' if delete_source_branch else 'false'}"
-            )
-        if draft is not None:
-            command += f" --draft {'true' if draft else 'false'}"
-
-        return await self._run_az_command(command)
-
-    async def set_vote(
-        self,
-        pull_request_id: Union[int, str],
-        vote: str,
-        organization: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Set your vote on a pull request.
-
-        Args:
-            pull_request_id: ID of the pull request
-            vote: Vote value (approve, approve-with-suggestions, reset, reject, wait-for-author)
-            organization: Azure DevOps organization URL (uses configured default if not provided)
-
-        Returns:
-            Dictionary with success status and result details
-        """
-        command = f"repos pr set-vote --id {pull_request_id} --vote {vote}"
-
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-        if org:
-            command += f" --org {org}"
-
-        return await self._run_az_command(command)
-
-
-
-    async def add_work_items(
-        self,
-        pull_request_id: Union[int, str],
-        work_items: List[Union[int, str]],
-        organization: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Add work items to a pull request.
-
-        Args:
-            pull_request_id: ID of the pull request
-            work_items: List of work item IDs to add
-            organization: Azure DevOps organization URL (uses configured default if not provided)
-
-        Returns:
-            Dictionary with success status and result details
-        """
-        command = f"repos pr work-item add --id {pull_request_id}"
-
-        # Add work items
-        for item in work_items:
-            command += f" --work-items {item}"
-
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-        if org:
-            command += f" --org {org}"
-
-        return await self._run_az_command(command)
-
-    async def get_work_item(
-        self,
-        work_item_id: Union[int, str],
-        organization: Optional[str] = None,
-        as_of: Optional[str] = None,
-        expand: Optional[str] = None,
-        fields: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Get details of a specific work item.
-
-        Args:
-            work_item_id: ID of the work item
-            organization: Azure DevOps organization URL (uses configured default if not provided)
-            as_of: Work item details as of a particular date and time
-            expand: The expand parameters for work item attributes (all, fields, links, none, relations)
-            fields: Comma-separated list of requested fields
-
-        Returns:
-            Dictionary with success status and work item details
-        """
-        command = f"boards work-item show --id {work_item_id}"
-
-        # Use configured defaults for core parameters
-        org = self._get_param_with_default(organization, self.default_organization)
-
-        # Add optional parameters
-        if org:
-            command += f" --org {org}"
-        if as_of:
-            command += f" --as-of '{as_of}'"
-        if expand:
-            command += f" --expand {expand}"
-        if fields:
-            command += f" --fields {fields}"
-
-        return await self._run_az_command(command)
-
-    def convert_pr_to_df(self, prs_in_json):
-        l = []
-        for o in prs_in_json:
-            l.append({
-                'id': o['pullRequestId'],
-                'creator': o['createdBy']['uniqueName'],
-                'date': pd.to_datetime(o['creationDate']).strftime('%m/%d/%y %H:%M:%S'),
-                'title': o['title'],
-                'source_ref': o['sourceRefName'].replace('refs/heads/', ''),
-                'target_ref': o['targetRefName'].replace('refs/heads/', ''),
-            })
-
-        # Create DataFrame with proper columns even if empty
-        if not l:
-            return pd.DataFrame(columns=['id', 'creator', 'date', 'title', 'source_ref', 'target_ref'])
-
-        return pd.DataFrame().from_dict(l)
+        if status.get("success", False):
+            return {"success": True, "message": f"Repository cloned successfully to {local_path or 'current directory'}"}
+        else:
+            return {"success": False, "error": status.get("error", "Clone failed")}
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments.
@@ -896,72 +319,24 @@ class AzureRepoClient(RepoClientInterface):
         """
         operation = arguments.get("operation", "")
 
-        if operation == "list_pull_requests":
-            return await self.list_pull_requests(
+        if operation == "list_repos":
+            return await self.list_repositories(
+                project=arguments.get("project"),
+                organization=arguments.get("organization"),
+            )
+        elif operation == "get_repo":
+            return await self.get_repository(
                 repository=arguments.get("repository"),
                 project=arguments.get("project"),
                 organization=arguments.get("organization"),
-                creator=arguments.get("creator", "default"),  # Use "default" if not specified
-                reviewer=arguments.get("reviewer"),
-                status=arguments.get("status"),
-                source_branch=arguments.get("source_branch"),
-                target_branch=arguments.get("target_branch"),
-                top=arguments.get("top"),
-                skip=arguments.get("skip"),
             )
-        elif operation == "get_pull_request":
-            return await self.get_pull_request(
-                pull_request_id=arguments.get("pull_request_id"),
-                organization=arguments.get("organization"),
-            )
-        elif operation == "create_pull_request":
-            return await self.create_pull_request(
-                title=arguments.get("title"),
-                source_branch=arguments.get("source_branch"),
-                target_branch=arguments.get("target_branch"),
-                description=arguments.get("description"),
+        elif operation == "clone_repo":
+            return await self.clone_repository(
+                clone_url=arguments.get("clone_url"),
+                local_path=arguments.get("local_path"),
                 repository=arguments.get("repository"),
                 project=arguments.get("project"),
                 organization=arguments.get("organization"),
-                reviewers=arguments.get("reviewers"),
-                work_items=arguments.get("work_items"),
-                draft=arguments.get("draft", False),
-                auto_complete=arguments.get("auto_complete", False),
-                squash=arguments.get("squash", False),
-                delete_source_branch=arguments.get("delete_source_branch", False),
-            )
-        elif operation == "update_pull_request":
-            return await self.update_pull_request(
-                pull_request_id=arguments.get("pull_request_id"),
-                title=arguments.get("title"),
-                description=arguments.get("description"),
-                status=arguments.get("status"),
-                organization=arguments.get("organization"),
-                auto_complete=arguments.get("auto_complete"),
-                squash=arguments.get("squash"),
-                delete_source_branch=arguments.get("delete_source_branch"),
-                draft=arguments.get("draft"),
-            )
-        elif operation == "set_vote":
-            return await self.set_vote(
-                pull_request_id=arguments.get("pull_request_id"),
-                vote=arguments.get("vote"),
-                organization=arguments.get("organization"),
-            )
-
-        elif operation == "add_work_items":
-            return await self.add_work_items(
-                pull_request_id=arguments.get("pull_request_id"),
-                work_items=arguments.get("work_items", []),
-                organization=arguments.get("organization"),
-            )
-        elif operation == "get_work_item":
-            return await self.get_work_item(
-                work_item_id=arguments.get("work_item_id"),
-                organization=arguments.get("organization"),
-                as_of=arguments.get("as_of"),
-                expand=arguments.get("expand"),
-                fields=arguments.get("fields"),
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}

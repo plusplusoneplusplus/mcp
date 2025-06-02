@@ -6,6 +6,8 @@ import pytest
 from unittest.mock import MagicMock
 
 from ..tool import AzureRepoClient
+from ..pr_tool import AzurePullRequestTool
+from ..workitem_tool import AzureWorkItemTool
 
 
 @pytest.fixture
@@ -14,6 +16,22 @@ def azure_repo_client():
     # Mock the command executor to avoid registry dependency
     mock_executor = MagicMock()
     return AzureRepoClient(command_executor=mock_executor)
+
+
+@pytest.fixture
+def azure_pr_tool():
+    """Create an AzurePullRequestTool instance for testing."""
+    # Mock the command executor to avoid registry dependency
+    mock_executor = MagicMock()
+    return AzurePullRequestTool(command_executor=mock_executor)
+
+
+@pytest.fixture
+def azure_workitem_tool():
+    """Create an AzureWorkItemTool instance for testing."""
+    # Mock the command executor to avoid registry dependency
+    mock_executor = MagicMock()
+    return AzureWorkItemTool(command_executor=mock_executor)
 
 
 @pytest.fixture
@@ -108,3 +126,67 @@ def mock_git_repo():
     mock_commit.message = "Fix authentication bug\n\nDetailed description here"
     mock_repo.head.commit = mock_commit
     return mock_repo
+
+
+@pytest.fixture
+def mock_repo_list_response():
+    """Create a mock repository list response."""
+    return {
+        "success": True,
+        "data": [
+            {
+                "id": "repo1-id",
+                "name": "test-repo-1",
+                "url": "https://dev.azure.com/org/project/_git/test-repo-1",
+                "defaultBranch": "refs/heads/main",
+                "size": 1024000
+            },
+            {
+                "id": "repo2-id",
+                "name": "test-repo-2",
+                "url": "https://dev.azure.com/org/project/_git/test-repo-2",
+                "defaultBranch": "refs/heads/master",
+                "size": 2048000
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def mock_repo_details_response():
+    """Create a mock repository details response."""
+    return {
+        "success": True,
+        "data": {
+            "id": "repo1-id",
+            "name": "test-repo-1",
+            "url": "https://dev.azure.com/org/project/_git/test-repo-1",
+            "defaultBranch": "refs/heads/main",
+            "size": 1024000,
+            "project": {
+                "id": "project-id",
+                "name": "test-project"
+            }
+        }
+    }
+
+
+@pytest.fixture
+def mock_workitem_response():
+    """Create a mock work item response."""
+    return {
+        "success": True,
+        "data": {
+            "id": 12345,
+            "fields": {
+                "System.Id": 12345,
+                "System.Title": "Test Work Item",
+                "System.State": "Active",
+                "System.WorkItemType": "Bug",
+                "System.AssignedTo": {
+                    "displayName": "John Doe",
+                    "uniqueName": "john.doe@company.com"
+                }
+            }
+        }
+    }
