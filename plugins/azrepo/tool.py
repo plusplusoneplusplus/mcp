@@ -720,7 +720,6 @@ class AzureRepoClient(RepoClientInterface):
         self,
         work_item_id: Union[int, str],
         organization: Optional[str] = None,
-        project: Optional[str] = None,
         as_of: Optional[str] = None,
         expand: Optional[str] = None,
         fields: Optional[str] = None,
@@ -730,7 +729,6 @@ class AzureRepoClient(RepoClientInterface):
         Args:
             work_item_id: ID of the work item
             organization: Azure DevOps organization URL (uses configured default if not provided)
-            project: Name or ID of the project (uses configured default if not provided)
             as_of: Work item details as of a particular date and time
             expand: The expand parameters for work item attributes (all, fields, links, none, relations)
             fields: Comma-separated list of requested fields
@@ -742,13 +740,10 @@ class AzureRepoClient(RepoClientInterface):
 
         # Use configured defaults for core parameters
         org = self._get_param_with_default(organization, self.default_organization)
-        proj = self._get_param_with_default(project, self.default_project)
 
         # Add optional parameters
         if org:
             command += f" --org {org}"
-        if proj:
-            command += f" --project {proj}"
         if as_of:
             command += f" --as-of '{as_of}'"
         if expand:
@@ -855,7 +850,6 @@ class AzureRepoClient(RepoClientInterface):
             return await self.get_work_item(
                 work_item_id=arguments.get("work_item_id"),
                 organization=arguments.get("organization"),
-                project=arguments.get("project"),
                 as_of=arguments.get("as_of"),
                 expand=arguments.get("expand"),
                 fields=arguments.get("fields"),

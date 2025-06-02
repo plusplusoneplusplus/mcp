@@ -656,7 +656,6 @@ class TestWorkItems:
         result = await azure_repo_client.get_work_item(
             work_item_id=123,
             organization="https://dev.azure.com/myorg",
-            project="myproject",
             as_of="2023-01-01",
             expand="all",
             fields="System.Id,System.Title,System.State",
@@ -664,7 +663,7 @@ class TestWorkItems:
 
         expected_command = (
             "boards work-item show --id 123 --org https://dev.azure.com/myorg "
-            "--project myproject --as-of '2023-01-01' --expand all "
+            "--as-of '2023-01-01' --expand all "
             "--fields System.Id,System.Title,System.State"
         )
         azure_repo_client._run_az_command.assert_called_once_with(expected_command)
@@ -677,7 +676,6 @@ class TestWorkItems:
         """Test getting a work item using configured defaults."""
         # Set up defaults
         azure_repo_client.default_organization = "https://dev.azure.com/defaultorg"
-        azure_repo_client.default_project = "defaultproject"
 
         azure_repo_client._run_az_command = AsyncMock(
             return_value=mock_command_success_response
@@ -686,8 +684,7 @@ class TestWorkItems:
         result = await azure_repo_client.get_work_item(456)
 
         expected_command = (
-            "boards work-item show --id 456 --org https://dev.azure.com/defaultorg "
-            "--project defaultproject"
+            "boards work-item show --id 456 --org https://dev.azure.com/defaultorg"
         )
         azure_repo_client._run_az_command.assert_called_once_with(expected_command)
         assert result == mock_command_success_response
@@ -859,7 +856,6 @@ class TestExecuteTool:
             "operation": "get_work_item",
             "work_item_id": 123,
             "organization": "https://dev.azure.com/myorg",
-            "project": "myproject",
             "expand": "all",
         }
         result = await azure_repo_client.execute_tool(arguments)
@@ -867,7 +863,6 @@ class TestExecuteTool:
         azure_repo_client.get_work_item.assert_called_once_with(
             work_item_id=123,
             organization="https://dev.azure.com/myorg",
-            project="myproject",
             as_of=None,
             expand="all",
             fields=None,
