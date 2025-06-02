@@ -90,9 +90,69 @@ class TestAzureRepoClientProperties:
             "set_vote",
             "add_reviewers",
             "add_work_items",
+            "get_work_item",
         ]
         for op in expected_operations:
             assert op in operations
+
+    def test_creator_parameter_description(self, azure_repo_client):
+        """Test that creator parameter has the correct description."""
+        schema = azure_repo_client.input_schema
+        creator_desc = schema["properties"]["creator"]["description"]
+        assert "defaults to current user" in creator_desc
+        assert "use empty string to list all PRs" in creator_desc
+
+
+class TestCurrentUsernameDetection:
+    """Test the current username detection functionality."""
+
+    @patch('getpass.getuser')
+    def test_get_current_username_success(self, mock_getuser, azure_repo_client):
+        """Test successful username detection using getpass.getuser()."""
+        mock_getuser.return_value = "testuser"
+
+        username = azure_repo_client._get_current_username()
+
+        assert username == "testuser"
+        mock_getuser.assert_called_once()
+
+    @patch('getpass.getuser')
+    @patch('os.environ')
+    def test_get_current_username_fallback_user(self, mock_environ, mock_getuser, azure_repo_client):
+        """Test username detection fallback to USER environment variable."""
+        mock_getuser.side_effect = Exception("getuser failed")
+        mock_environ.get.side_effect = lambda key: "envuser" if key == "USER" else None
+
+        username = azure_repo_client._get_current_username()
+
+        assert username == "envuser"
+        mock_getuser.assert_called_once()
+        mock_environ.get.assert_called()
+
+    @patch('getpass.getuser')
+    @patch('os.environ')
+    def test_get_current_username_fallback_username(self, mock_environ, mock_getuser, azure_repo_client):
+        """Test username detection fallback to USERNAME environment variable."""
+        mock_getuser.side_effect = Exception("getuser failed")
+        mock_environ.get.side_effect = lambda key: "winuser" if key == "USERNAME" else None
+
+        username = azure_repo_client._get_current_username()
+
+        assert username == "winuser"
+        mock_getuser.assert_called_once()
+        mock_environ.get.assert_called()
+
+    @patch('getpass.getuser')
+    @patch('os.environ')
+    def test_get_current_username_failure(self, mock_environ, mock_getuser, azure_repo_client):
+        """Test username detection failure returns None."""
+        mock_getuser.side_effect = Exception("getuser failed")
+        mock_environ.get.return_value = None
+
+        username = azure_repo_client._get_current_username()
+
+        assert username is None
+        mock_getuser.assert_called_once()
 
 
 class TestAzureRepoClientCommands:
@@ -192,6 +252,118 @@ class TestListPullRequests:
         expected_command = "repos pr list --repository test-repo --project test-project --creator test-user --status active --top 10"
         azure_repo_client._run_az_command.assert_called_once_with(expected_command)
         assert result == mock_pr_list_response
+
+
+class TestListPullRequestsCreatorBehavior:
+    """Test the creator parameter behavior in list_pull_requests method."""
+
+    @pytest.mark.asyncio
+    @patch.object(AzureRepoClient, '_get_current_username')
+    async def test_list_pull_requests_default_creator(
+        self, mock_get_username, azure_repo_client, mock_pr_list_response
+    ):
+        """Test that default creator parameter uses current user."""
+        mock_get_username.return_value = "currentuser"
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        # Call with default creator parameter
+        result = await azure_repo_client.list_pull_requests()
+
+        expected_command = "repos pr list --creator currentuser"
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_pr_list_response
+        mock_get_username.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch.object(AzureRepoClient, '_get_current_username')
+    async def test_list_pull_requests_default_creator_no_username(
+        self, mock_get_username, azure_repo_client, mock_pr_list_response
+    ):
+        """Test default creator behavior when username cannot be detected."""
+        mock_get_username.return_value = None
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        # Call with default creator parameter
+        result = await azure_repo_client.list_pull_requests()
+
+        # Should not include creator filter if username detection fails
+        expected_command = "repos pr list"
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_pr_list_response
+        mock_get_username.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_list_pull_requests_explicit_none_creator(
+        self, azure_repo_client, mock_pr_list_response
+    ):
+        """Test that explicit None creator lists all PRs."""
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        result = await azure_repo_client.list_pull_requests(creator=None)
+
+        # Should not include creator filter
+        expected_command = "repos pr list"
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_pr_list_response
+
+    @pytest.mark.asyncio
+    async def test_list_pull_requests_explicit_empty_creator(
+        self, azure_repo_client, mock_pr_list_response
+    ):
+        """Test that explicit empty string creator lists all PRs."""
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        result = await azure_repo_client.list_pull_requests(creator="")
+
+        # Should not include creator filter
+        expected_command = "repos pr list"
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_pr_list_response
+
+    @pytest.mark.asyncio
+    async def test_list_pull_requests_explicit_username_creator(
+        self, azure_repo_client, mock_pr_list_response
+    ):
+        """Test that explicit username creator filters by that user."""
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        result = await azure_repo_client.list_pull_requests(creator="specificuser")
+
+        expected_command = "repos pr list --creator specificuser"
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_pr_list_response
+
+    @pytest.mark.asyncio
+    @patch.object(AzureRepoClient, '_get_current_username')
+    async def test_list_pull_requests_default_with_other_params(
+        self, mock_get_username, azure_repo_client, mock_pr_list_response
+    ):
+        """Test default creator behavior with other parameters."""
+        mock_get_username.return_value = "currentuser"
+        azure_repo_client._run_az_command = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        result = await azure_repo_client.list_pull_requests(
+            repository="test-repo",
+            status="active",
+            top=5
+        )
+
+        expected_command = "repos pr list --repository test-repo --creator currentuser --status active --top 5"
+        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
+        assert result == mock_pr_list_response
+        mock_get_username.assert_called_once()
 
 
 class TestGetPullRequest:
@@ -450,10 +622,12 @@ class TestExecuteTool:
     """Test the execute_tool method."""
 
     @pytest.mark.asyncio
-    async def test_execute_tool_list_pull_requests(
-        self, azure_repo_client, mock_pr_list_response
+    @patch.object(AzureRepoClient, '_get_current_username')
+    async def test_execute_tool_list_pull_requests_default_creator(
+        self, mock_get_username, azure_repo_client, mock_pr_list_response
     ):
-        """Test execute_tool with list_pull_requests operation."""
+        """Test execute_tool with list_pull_requests operation using default creator."""
+        mock_get_username.return_value = "currentuser"
         azure_repo_client.list_pull_requests = AsyncMock(
             return_value=mock_pr_list_response
         )
@@ -469,7 +643,69 @@ class TestExecuteTool:
             repository="test-repo",
             project=None,
             organization=None,
-            creator=None,
+            creator="default",  # Should use "default" when not specified
+            reviewer=None,
+            status="active",
+            source_branch=None,
+            target_branch=None,
+            top=None,
+            skip=None,
+        )
+        assert result == mock_pr_list_response
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_list_pull_requests_explicit_creator(
+        self, azure_repo_client, mock_pr_list_response
+    ):
+        """Test execute_tool with list_pull_requests operation and explicit creator."""
+        azure_repo_client.list_pull_requests = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        arguments = {
+            "operation": "list_pull_requests",
+            "repository": "test-repo",
+            "creator": "specificuser",
+            "status": "active",
+        }
+        result = await azure_repo_client.execute_tool(arguments)
+
+        azure_repo_client.list_pull_requests.assert_called_once_with(
+            repository="test-repo",
+            project=None,
+            organization=None,
+            creator="specificuser",  # Should use the explicitly provided creator
+            reviewer=None,
+            status="active",
+            source_branch=None,
+            target_branch=None,
+            top=None,
+            skip=None,
+        )
+        assert result == mock_pr_list_response
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_list_pull_requests_none_creator(
+        self, azure_repo_client, mock_pr_list_response
+    ):
+        """Test execute_tool with list_pull_requests operation and None creator."""
+        azure_repo_client.list_pull_requests = AsyncMock(
+            return_value=mock_pr_list_response
+        )
+
+        arguments = {
+            "operation": "list_pull_requests",
+            "repository": "test-repo",
+            "creator": None,
+            "status": "active",
+        }
+        result = await azure_repo_client.execute_tool(arguments)
+
+        azure_repo_client.list_pull_requests.assert_called_once_with(
+            repository="test-repo",
+            project=None,
+            organization=None,
+            creator=None,  # Should use None when explicitly provided
             reviewer=None,
             status="active",
             source_branch=None,
@@ -600,3 +836,92 @@ class TestInitialization:
 
         with pytest.raises(ValueError, match="Command executor not found in registry"):
             AzureRepoClient()
+
+
+class TestCreatorIntegration:
+    """Integration tests for creator functionality."""
+
+    @pytest.mark.asyncio
+    @patch.object(AzureRepoClient, '_get_current_username')
+    async def test_end_to_end_default_creator_workflow(
+        self, mock_get_username, azure_repo_client
+    ):
+        """Test end-to-end workflow with default creator behavior."""
+        mock_get_username.return_value = "testuser"
+
+        # Mock the command execution
+        azure_repo_client.executor.execute_async = AsyncMock(
+            return_value={"token": "test_token"}
+        )
+        azure_repo_client.executor.query_process = AsyncMock(
+            return_value={
+                "success": True,
+                "output": json.dumps([
+                    {
+                        "pullRequestId": 123,
+                        "title": "My PR",
+                        "createdBy": {"displayName": "testuser"},
+                        "status": "active"
+                    }
+                ])
+            }
+        )
+
+        # Test via execute_tool interface
+        result = await azure_repo_client.execute_tool({
+            "operation": "list_pull_requests",
+            "status": "active"
+        })
+
+        assert result["success"] is True
+        assert len(result["data"]) == 1
+        assert result["data"][0]["title"] == "My PR"
+
+        # Verify the command included the current user as creator
+        azure_repo_client.executor.execute_async.assert_called_once()
+        command_call = azure_repo_client.executor.execute_async.call_args[0][0]
+        assert "--creator testuser" in command_call
+        assert "--status active" in command_call
+
+    @pytest.mark.asyncio
+    async def test_end_to_end_explicit_none_creator_workflow(self, azure_repo_client):
+        """Test end-to-end workflow with explicit None creator."""
+        # Mock the command execution
+        azure_repo_client.executor.execute_async = AsyncMock(
+            return_value={"token": "test_token"}
+        )
+        azure_repo_client.executor.query_process = AsyncMock(
+            return_value={
+                "success": True,
+                "output": json.dumps([
+                    {
+                        "pullRequestId": 123,
+                        "title": "Someone's PR",
+                        "createdBy": {"displayName": "otheruser"},
+                        "status": "active"
+                    },
+                    {
+                        "pullRequestId": 124,
+                        "title": "My PR",
+                        "createdBy": {"displayName": "testuser"},
+                        "status": "active"
+                    }
+                ])
+            }
+        )
+
+        # Test via execute_tool interface with explicit None creator
+        result = await azure_repo_client.execute_tool({
+            "operation": "list_pull_requests",
+            "creator": None,
+            "status": "active"
+        })
+
+        assert result["success"] is True
+        assert len(result["data"]) == 2  # Should get all PRs
+
+        # Verify the command did NOT include a creator filter
+        azure_repo_client.executor.execute_async.assert_called_once()
+        command_call = azure_repo_client.executor.execute_async.call_args[0][0]
+        assert "--creator" not in command_call
+        assert "--status active" in command_call

@@ -2,6 +2,8 @@
 
 import logging
 import json
+import getpass
+import os
 from typing import Dict, Any, List, Optional, Union
 
 # Import the required interfaces and decorators
@@ -81,6 +83,12 @@ class AzureRepoClient(RepoClientInterface):
         # List pull requests (uses configured defaults)
         prs = await az_client.list_pull_requests()
 
+        # List current user's pull requests (creator defaults to current user)
+        my_prs = await az_client.list_pull_requests()
+
+        # List all pull requests (explicitly set creator to None)
+        all_prs = await az_client.list_pull_requests(creator=None)
+
         # Create a pull request with override parameters
         pr = await az_client.create_pull_request(
             title="My PR Title",
@@ -150,7 +158,7 @@ class AzureRepoClient(RepoClientInterface):
                 },
                 "description": {
                     "type": "string",
-                    "description": "Description for the pull request",
+                    "description": "Description for the pull request (can include markdown)",
                     "nullable": True,
                 },
                 "repository": {
@@ -192,7 +200,7 @@ class AzureRepoClient(RepoClientInterface):
                 },
                 "creator": {
                     "type": "string",
-                    "description": "Filter PRs by creator",
+                    "description": "Filter PRs by creator (defaults to current user if not specified, use empty string to list all PRs)",
                     "nullable": True,
                 },
                 "reviewer": {
@@ -310,6 +318,32 @@ class AzureRepoClient(RepoClientInterface):
         """
         return param_value if param_value is not None else default_value
 
+    def _get_current_username(self) -> Optional[str]:
+        """Get the current username in a cross-platform way.
+
+        Returns:
+            The current username, or None if unable to determine
+
+        Note:
+            This method returns None instead of raising an exception to allow
+            graceful fallback when username cannot be determined.
+        """
+        try:
+            # Try getpass.getuser() first (works on most platforms)
+            return getpass.getuser()
+        except Exception:
+            try:
+                # Fallback to environment variables
+                username = os.environ.get('USER') or os.environ.get('USERNAME')
+                if username:
+                    return username
+            except Exception:
+                pass
+
+            # Return None if unable to determine username
+            self.logger.warning("Unable to determine current username")
+            return None
+
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
     ) -> Dict[str, Any]:
@@ -353,7 +387,7 @@ class AzureRepoClient(RepoClientInterface):
         repository: Optional[str] = None,
         project: Optional[str] = None,
         organization: Optional[str] = None,
-        creator: Optional[str] = None,
+        creator: Optional[str] = "default",
         reviewer: Optional[str] = None,
         status: Optional[str] = None,
         source_branch: Optional[str] = None,
@@ -367,7 +401,10 @@ class AzureRepoClient(RepoClientInterface):
             repository: Name or ID of the repository (uses configured default if not provided)
             project: Name or ID of the project (uses configured default if not provided)
             organization: Azure DevOps organization URL (uses configured default if not provided)
-            creator: Limit results to PRs created by this user
+            creator: Limit results to PRs created by this user.
+                    - If "default" (default value), uses current user
+                    - If None or empty string, lists all PRs regardless of creator
+                    - If a username, filters by that specific user
             reviewer: Limit results to PRs where this user is a reviewer
             status: Limit results to PRs with this status (abandoned, active, all, completed)
             source_branch: Limit results to PRs that originate from this branch
@@ -384,6 +421,13 @@ class AzureRepoClient(RepoClientInterface):
         repo = self._get_param_with_default(repository, self.default_repository)
         proj = self._get_param_with_default(project, self.default_project)
         org = self._get_param_with_default(organization, self.default_organization)
+
+        # Handle creator parameter with default behavior
+        if creator == "default":
+            # Use current user as default
+            creator = self._get_current_username()
+            if creator:
+                self.logger.debug(f"Using current user as creator filter: {creator}")
 
         # Add optional parameters
         if repo:
@@ -716,7 +760,7 @@ class AzureRepoClient(RepoClientInterface):
                 repository=arguments.get("repository"),
                 project=arguments.get("project"),
                 organization=arguments.get("organization"),
-                creator=arguments.get("creator"),
+                creator=arguments.get("creator", "default"),  # Use "default" if not specified
                 reviewer=arguments.get("reviewer"),
                 status=arguments.get("status"),
                 source_branch=arguments.get("source_branch"),
