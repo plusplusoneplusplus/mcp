@@ -296,13 +296,187 @@ def test_valid_tool_sources():
     }, f"""
     =====================================================================
     ATTENTION: Tool source types have changed!
-    
+
     Expected source types: code, yaml
     Actual source types: {', '.join(sorted(unique_sources))}
-    
+
     If you are adding a new tool source type:
     1. Update this test to include the new source type in the assertion
     2. Add tests for the new source type's behavior
     3. Update the plugin_config.is_source_enabled method to handle the new source
     =====================================================================
     """
+
+
+def test_discover_plugin_directory_with_multiple_tool_files(clean_registry, tmp_path):
+    """Test that discover_plugin_directory can find all files ending with tool.py."""
+    # Create a temporary plugin directory structure
+    plugin_dir = tmp_path / "test_plugin"
+    plugin_dir.mkdir()
+
+    # Create __init__.py to make it a valid Python package
+    (plugin_dir / "__init__.py").write_text("")
+
+    # Create multiple tool files
+    repo_tool_content = '''
+from mcp_tools.interfaces import ToolInterface
+from mcp_tools.plugin import register_tool
+
+@register_tool
+class TestRepoTool(ToolInterface):
+    @property
+    def name(self) -> str:
+        return "test_repo_tool"
+
+    @property
+    def description(self) -> str:
+        return "Test repository tool"
+
+    @property
+    def input_schema(self) -> dict:
+        return {"type": "object", "properties": {}}
+
+    async def execute_tool(self, arguments: dict) -> any:
+        return {"success": True, "tool": "repo"}
+'''
+
+    pr_tool_content = '''
+from mcp_tools.interfaces import ToolInterface
+from mcp_tools.plugin import register_tool
+
+@register_tool
+class TestPRTool(ToolInterface):
+    @property
+    def name(self) -> str:
+        return "test_pr_tool"
+
+    @property
+    def description(self) -> str:
+        return "Test PR tool"
+
+    @property
+    def input_schema(self) -> dict:
+        return {"type": "object", "properties": {}}
+
+    async def execute_tool(self, arguments: dict) -> any:
+        return {"success": True, "tool": "pr"}
+'''
+
+    workitem_tool_content = '''
+from mcp_tools.interfaces import ToolInterface
+from mcp_tools.plugin import register_tool
+
+@register_tool
+class TestWorkItemTool(ToolInterface):
+    @property
+    def name(self) -> str:
+        return "test_workitem_tool"
+
+    @property
+    def description(self) -> str:
+        return "Test work item tool"
+
+    @property
+    def input_schema(self) -> dict:
+        return {"type": "object", "properties": {}}
+
+    async def execute_tool(self, arguments: dict) -> any:
+        return {"success": True, "tool": "workitem"}
+'''
+
+    # Write the tool files
+    (plugin_dir / "repo_tool.py").write_text(repo_tool_content)
+    (plugin_dir / "pr_tool.py").write_text(pr_tool_content)
+    (plugin_dir / "workitem_tool.py").write_text(workitem_tool_content)
+
+    # Also create a non-tool file to ensure it's ignored
+    (plugin_dir / "helper.py").write_text("# This is not a tool file")
+
+    # Discover plugins in the directory
+    clean_registry.discover_plugin_directory(tmp_path)
+
+    # Verify that all three tools were discovered
+    assert "test_repo_tool" in clean_registry.tools
+    assert "test_pr_tool" in clean_registry.tools
+    assert "test_workitem_tool" in clean_registry.tools
+
+    # Verify the tool classes are correct
+    assert clean_registry.tools["test_repo_tool"].__name__ == "TestRepoTool"
+    assert clean_registry.tools["test_pr_tool"].__name__ == "TestPRTool"
+    assert clean_registry.tools["test_workitem_tool"].__name__ == "TestWorkItemTool"
+
+    # Verify all tools are marked as code-based
+    tool_sources = clean_registry.get_tool_sources()
+    assert tool_sources["test_repo_tool"] == "code"
+    assert tool_sources["test_pr_tool"] == "code"
+    assert tool_sources["test_workitem_tool"] == "code"
+
+
+def test_discover_plugin_directory_ignores_non_tool_files(clean_registry, tmp_path):
+    """Test that discover_plugin_directory ignores files that don't end with tool.py."""
+    # Create a temporary plugin directory structure
+    plugin_dir = tmp_path / "test_plugin"
+    plugin_dir.mkdir()
+
+    # Create __init__.py to make it a valid Python package
+    (plugin_dir / "__init__.py").write_text("")
+
+    # Create a valid tool file
+    tool_content = '''
+from mcp_tools.interfaces import ToolInterface
+from mcp_tools.plugin import register_tool
+
+@register_tool
+class ValidTool(ToolInterface):
+    @property
+    def name(self) -> str:
+        return "valid_tool"
+
+    @property
+    def description(self) -> str:
+        return "A valid tool"
+
+    @property
+    def input_schema(self) -> dict:
+        return {"type": "object", "properties": {}}
+
+    async def execute_tool(self, arguments: dict) -> any:
+        return {"success": True}
+'''
+
+    # Create files that should be ignored
+    invalid_content = '''
+from mcp_tools.interfaces import ToolInterface
+
+class InvalidTool(ToolInterface):
+    @property
+    def name(self) -> str:
+        return "invalid_tool"
+
+    @property
+    def description(self) -> str:
+        return "This should be ignored"
+
+    @property
+    def input_schema(self) -> dict:
+        return {"type": "object", "properties": {}}
+
+    async def execute_tool(self, arguments: dict) -> any:
+        return {"success": True}
+'''
+
+    # Write files
+    (plugin_dir / "valid_tool.py").write_text(tool_content)  # Should be discovered
+    (plugin_dir / "helper.py").write_text(invalid_content)   # Should be ignored
+    (plugin_dir / "utils.py").write_text(invalid_content)    # Should be ignored
+    (plugin_dir / "config.py").write_text(invalid_content)   # Should be ignored
+
+    # Discover plugins in the directory
+    clean_registry.discover_plugin_directory(tmp_path)
+
+    # Verify only the valid tool was discovered
+    assert "valid_tool" in clean_registry.tools
+    assert "invalid_tool" not in clean_registry.tools
+
+    # Verify we only have one tool registered
+    assert len(clean_registry.tools) == 1

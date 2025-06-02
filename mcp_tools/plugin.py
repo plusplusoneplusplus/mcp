@@ -409,30 +409,34 @@ class PluginRegistry:
                     # Add to discovered paths to avoid reprocessing
                     self.discovered_paths.add(plugin_name)
 
-                    # Look for tool.py file
-                    tool_file = item / "tool.py"
-                    if tool_file.exists():
-                        try:
-                            # Import the module directly using importlib
-                            spec = importlib.util.spec_from_file_location(
-                                f"{plugin_name}.tool", str(tool_file)
-                            )
-                            if spec and spec.loader:
-                                module = importlib.util.module_from_spec(spec)
-                                sys.modules[spec.name] = module
-                                spec.loader.exec_module(module)
+                    # Look for all files ending with tool.py
+                    tool_files = list(item.glob("*tool.py"))
+                    if tool_files:
+                        for tool_file in tool_files:
+                            try:
+                                # Extract module name from filename (e.g., "repo_tool.py" -> "repo_tool")
+                                module_name = tool_file.stem
 
-                                # Scan for tools in the module
-                                self._scan_module_for_tools(module)
-                                logger.info(
-                                    f"Successfully loaded plugin tool module: {plugin_name}.tool"
+                                # Import the module directly using importlib
+                                spec = importlib.util.spec_from_file_location(
+                                    f"{plugin_name}.{module_name}", str(tool_file)
                                 )
-                            else:
-                                logger.error(f"Failed to create spec for {tool_file}")
-                        except Exception as e:
-                            logger.error(
-                                f"Error importing tool module from {tool_file}: {e}"
-                            )
+                                if spec and spec.loader:
+                                    module = importlib.util.module_from_spec(spec)
+                                    sys.modules[spec.name] = module
+                                    spec.loader.exec_module(module)
+
+                                    # Scan for tools in the module
+                                    self._scan_module_for_tools(module)
+                                    logger.info(
+                                        f"Successfully loaded plugin tool module: {plugin_name}.{module_name}"
+                                    )
+                                else:
+                                    logger.error(f"Failed to create spec for {tool_file}")
+                            except Exception as e:
+                                logger.error(
+                                    f"Error importing tool module from {tool_file}: {e}"
+                                )
                 except Exception as e:
                     logger.error(f"Error loading plugin {item.name}: {e}")
 
