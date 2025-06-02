@@ -133,7 +133,6 @@ class TestAzureRepoClientProperties:
             "create_pull_request",
             "update_pull_request",
             "set_vote",
-            "add_reviewers",
             "add_work_items",
             "get_work_item",
         ]
@@ -591,22 +590,7 @@ class TestVotingAndReviewers:
         azure_repo_client._run_az_command.assert_called_once_with(expected_command)
         assert result == mock_command_success_response
 
-    @pytest.mark.asyncio
-    async def test_add_reviewers(
-        self, azure_repo_client, mock_command_success_response
-    ):
-        """Test adding reviewers to a pull request."""
-        azure_repo_client._run_az_command = AsyncMock(
-            return_value=mock_command_success_response
-        )
 
-        result = await azure_repo_client.add_reviewers(123, ["user1", "user2"])
-
-        expected_command = (
-            "repos pr reviewer add --id 123 --reviewers user1 --reviewers user2"
-        )
-        azure_repo_client._run_az_command.assert_called_once_with(expected_command)
-        assert result == mock_command_success_response
 
     @pytest.mark.asyncio
     async def test_add_work_items(

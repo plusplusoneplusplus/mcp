@@ -127,7 +127,6 @@ class AzureRepoClient(RepoClientInterface):
                         "create_pull_request",
                         "update_pull_request",
                         "set_vote",
-                        "add_reviewers",
                         "add_work_items",
                         "get_work_item",
                     ],
@@ -182,12 +181,7 @@ class AzureRepoClient(RepoClientInterface):
                     "description": "Vote value (approve, approve-with-suggestions, reset, reject, wait-for-author)",
                     "nullable": True,
                 },
-                "reviewers": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "List of reviewers to add (users or groups)",
-                    "nullable": True,
-                },
+
                 "work_items": {
                     "type": "array",
                     "items": {"type": ["string", "integer"]},
@@ -658,34 +652,7 @@ class AzureRepoClient(RepoClientInterface):
 
         return await self._run_az_command(command)
 
-    async def add_reviewers(
-        self,
-        pull_request_id: Union[int, str],
-        reviewers: List[str],
-        organization: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Add reviewers to a pull request.
 
-        Args:
-            pull_request_id: ID of the pull request
-            reviewers: List of reviewers to add (users or groups)
-            organization: Azure DevOps organization URL (uses configured default if not provided)
-
-        Returns:
-            Dictionary with success status and result details
-        """
-        command = f"repos pr reviewer add --id {pull_request_id}"
-
-        # Add reviewers
-        for reviewer in reviewers:
-            command += f" --reviewers {reviewer}"
-
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-        if org:
-            command += f" --org {org}"
-
-        return await self._run_az_command(command)
 
     async def add_work_items(
         self,
@@ -834,12 +801,7 @@ class AzureRepoClient(RepoClientInterface):
                 vote=arguments.get("vote"),
                 organization=arguments.get("organization"),
             )
-        elif operation == "add_reviewers":
-            return await self.add_reviewers(
-                pull_request_id=arguments.get("pull_request_id"),
-                reviewers=arguments.get("reviewers", []),
-                organization=arguments.get("organization"),
-            )
+
         elif operation == "add_work_items":
             return await self.add_work_items(
                 pull_request_id=arguments.get("pull_request_id"),
