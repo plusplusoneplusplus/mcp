@@ -267,7 +267,7 @@ class AzureRepoClient(RepoClientInterface):
             self.executor = command_executor
 
         self.logger = logging.getLogger(__name__)
-        
+
         # Load configuration defaults
         self._load_config()
 
@@ -276,20 +276,20 @@ class AzureRepoClient(RepoClientInterface):
         try:
             # Ensure environment is loaded
             env_manager.load()
-            
+
             # Get Azure repo parameters
             azrepo_params = env_manager.get_azrepo_parameters()
-            
+
             # Set default values
             self.default_organization = azrepo_params.get('org')
             self.default_project = azrepo_params.get('project')
             self.default_repository = azrepo_params.get('repo')
             self.default_target_branch = azrepo_params.get('branch')
-            
+
             self.logger.debug(f"Loaded Azure repo configuration: org={self.default_organization}, "
                             f"project={self.default_project}, repo={self.default_repository}, "
                             f"branch={self.default_target_branch}")
-            
+
         except Exception as e:
             self.logger.warning(f"Failed to load Azure repo configuration: {e}")
             # Set defaults to None if configuration loading fails
@@ -300,11 +300,11 @@ class AzureRepoClient(RepoClientInterface):
 
     def _get_param_with_default(self, param_value: Optional[str], default_value: Optional[str]) -> Optional[str]:
         """Get parameter value with fallback to default configuration.
-        
+
         Args:
             param_value: Explicitly provided parameter value
             default_value: Default value from configuration
-            
+
         Returns:
             The parameter value to use (explicit value takes precedence)
         """
@@ -391,7 +391,7 @@ class AzureRepoClient(RepoClientInterface):
         if proj:
             command += f" --project {proj}"
         if org:
-            command += f" --org {org}"
+            command += f" --organization {org}"
         if creator:
             command += f" --creator {creator}"
         if reviewer:
