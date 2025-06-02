@@ -95,8 +95,7 @@ class TestWorkItems:
 
         # Test with date only
         result = await azure_workitem_tool.get_work_item(
-            work_item_id=123,
-            as_of="2023-01-01"
+            work_item_id=123, as_of="2023-01-01"
         )
 
         expected_command = "boards work-item show --id 123 --as-of '2023-01-01'"
@@ -105,11 +104,12 @@ class TestWorkItems:
         # Test with date and time
         azure_workitem_tool._run_az_command.reset_mock()
         result = await azure_workitem_tool.get_work_item(
-            work_item_id=123,
-            as_of="2023-01-01 12:30:00"
+            work_item_id=123, as_of="2023-01-01 12:30:00"
         )
 
-        expected_command = "boards work-item show --id 123 --as-of '2023-01-01 12:30:00'"
+        expected_command = (
+            "boards work-item show --id 123 --as-of '2023-01-01 12:30:00'"
+        )
         azure_workitem_tool._run_az_command.assert_called_with(expected_command)
 
     @pytest.mark.asyncio
@@ -126,11 +126,12 @@ class TestWorkItems:
         for expand_option in expand_options:
             azure_workitem_tool._run_az_command.reset_mock()
             result = await azure_workitem_tool.get_work_item(
-                work_item_id=123,
-                expand=expand_option
+                work_item_id=123, expand=expand_option
             )
 
-            expected_command = f"boards work-item show --id 123 --expand {expand_option}"
+            expected_command = (
+                f"boards work-item show --id 123 --expand {expand_option}"
+            )
             azure_workitem_tool._run_az_command.assert_called_with(expected_command)
             assert result == mock_command_success_response
 
@@ -145,7 +146,7 @@ class TestWorkItems:
 
         result = await azure_workitem_tool.get_work_item(
             work_item_id=123,
-            fields="System.Id,System.Title,System.State,System.AssignedTo,System.AreaPath"
+            fields="System.Id,System.Title,System.State,System.AssignedTo,System.AreaPath",
         )
 
         expected_command = (
@@ -158,10 +159,7 @@ class TestWorkItems:
     @pytest.mark.asyncio
     async def test_get_work_item_error_handling(self, azure_workitem_tool):
         """Test work item retrieval error handling."""
-        error_response = {
-            "success": False,
-            "error": "Work item not found"
-        }
+        error_response = {"success": False, "error": "Work item not found"}
         azure_workitem_tool._run_az_command = AsyncMock(return_value=error_response)
 
         result = await azure_workitem_tool.get_work_item(999)

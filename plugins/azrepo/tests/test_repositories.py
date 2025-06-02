@@ -33,11 +33,12 @@ class TestListRepositories:
         )
 
         result = await azure_repo_client.list_repositories(
-            project="test-project",
-            organization="https://dev.azure.com/myorg"
+            project="test-project", organization="https://dev.azure.com/myorg"
         )
 
-        expected_command = "repos list --project test-project --org https://dev.azure.com/myorg"
+        expected_command = (
+            "repos list --project test-project --org https://dev.azure.com/myorg"
+        )
         azure_repo_client._run_az_command.assert_called_once_with(expected_command)
         assert result == mock_repo_list_response
 
@@ -91,7 +92,7 @@ class TestGetRepository:
         result = await azure_repo_client.get_repository(
             repository="test-repo",
             project="test-project",
-            organization="https://dev.azure.com/myorg"
+            organization="https://dev.azure.com/myorg",
         )
 
         expected_command = "repos show --repository test-repo --project test-project --org https://dev.azure.com/myorg"
@@ -133,8 +134,7 @@ class TestCloneRepository:
         azure_repo_client.executor.query_process = AsyncMock(return_value=mock_status)
 
         result = await azure_repo_client.clone_repository(
-            clone_url="https://github.com/user/repo.git",
-            local_path="/path/to/local"
+            clone_url="https://github.com/user/repo.git", local_path="/path/to/local"
         )
 
         azure_repo_client.executor.execute_async.assert_called_once_with(
@@ -156,11 +156,13 @@ class TestCloneRepository:
             repository="test-repo",
             project="test-project",
             organization="https://dev.azure.com/myorg",
-            local_path="/path/to/local"
+            local_path="/path/to/local",
         )
 
         expected_command = "git clone https://dev.azure.com/myorg/test-project/_git/test-repo /path/to/local"
-        azure_repo_client.executor.execute_async.assert_called_once_with(expected_command)
+        azure_repo_client.executor.execute_async.assert_called_once_with(
+            expected_command
+        )
         assert result["success"] is True
 
     @pytest.mark.asyncio
@@ -172,7 +174,9 @@ class TestCloneRepository:
         )
 
         assert result["success"] is False
-        assert "Repository, project, and organization must be specified" in result["error"]
+        assert (
+            "Repository, project, and organization must be specified" in result["error"]
+        )
 
     @pytest.mark.asyncio
     async def test_clone_repository_with_defaults(self, azure_repo_client):
@@ -191,7 +195,9 @@ class TestCloneRepository:
         result = await azure_repo_client.clone_repository(local_path="/path/to/local")
 
         expected_command = "git clone https://dev.azure.com/defaultorg/default-project/_git/default-repo /path/to/local"
-        azure_repo_client.executor.execute_async.assert_called_once_with(expected_command)
+        azure_repo_client.executor.execute_async.assert_called_once_with(
+            expected_command
+        )
         assert result["success"] is True
 
     @pytest.mark.asyncio

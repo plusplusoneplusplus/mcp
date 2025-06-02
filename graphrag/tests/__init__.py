@@ -1,1 +1,1 @@
-"""Test suite for GraphRAG utility.""" 
+"""Test suite for GraphRAG utility."""

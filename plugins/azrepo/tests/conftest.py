@@ -63,9 +63,9 @@ def mock_pr_list_response():
                 "status": "active",
                 "createdBy": {
                     "displayName": "John Doe",
-                    "uniqueName": "john.doe@abc.com"
+                    "uniqueName": "john.doe@abc.com",
                 },
-                "creationDate": "2024-01-15T10:30:00.000Z"
+                "creationDate": "2024-01-15T10:30:00.000Z",
             },
             {
                 "pullRequestId": 124,
@@ -75,9 +75,9 @@ def mock_pr_list_response():
                 "status": "completed",
                 "createdBy": {
                     "displayName": "Jane Smith",
-                    "uniqueName": "jane.smith@abc.com"
+                    "uniqueName": "jane.smith@abc.com",
                 },
-                "creationDate": "2024-01-14T15:45:00.000Z"
+                "creationDate": "2024-01-14T15:45:00.000Z",
             },
         ],
     }
@@ -97,9 +97,9 @@ def mock_pr_list_response_with_csv_fields():
                 "status": "active",
                 "createdBy": {
                     "displayName": "John Doe",
-                    "uniqueName": "john.doe@abc.com"
+                    "uniqueName": "john.doe@abc.com",
                 },
-                "creationDate": "2024-01-15T10:30:00.000Z"
+                "creationDate": "2024-01-15T10:30:00.000Z",
             },
             {
                 "pullRequestId": 124,
@@ -109,9 +109,9 @@ def mock_pr_list_response_with_csv_fields():
                 "status": "completed",
                 "createdBy": {
                     "displayName": "Jane Smith",
-                    "uniqueName": "jane.smith@abc.com"
+                    "uniqueName": "jane.smith@abc.com",
                 },
-                "creationDate": "2024-01-14T15:45:00.000Z"
+                "creationDate": "2024-01-14T15:45:00.000Z",
             },
         ],
     }
@@ -139,16 +139,16 @@ def mock_repo_list_response():
                 "name": "test-repo-1",
                 "url": "https://dev.azure.com/org/project/_git/test-repo-1",
                 "defaultBranch": "refs/heads/main",
-                "size": 1024000
+                "size": 1024000,
             },
             {
                 "id": "repo2-id",
                 "name": "test-repo-2",
                 "url": "https://dev.azure.com/org/project/_git/test-repo-2",
                 "defaultBranch": "refs/heads/master",
-                "size": 2048000
-            }
-        ]
+                "size": 2048000,
+            },
+        ],
     }
 
 
@@ -163,11 +163,8 @@ def mock_repo_details_response():
             "url": "https://dev.azure.com/org/project/_git/test-repo-1",
             "defaultBranch": "refs/heads/main",
             "size": 1024000,
-            "project": {
-                "id": "project-id",
-                "name": "test-project"
-            }
-        }
+            "project": {"id": "project-id", "name": "test-project"},
+        },
     }
 
 
@@ -185,8 +182,8 @@ def mock_workitem_response():
                 "System.WorkItemType": "Bug",
                 "System.AssignedTo": {
                     "displayName": "John Doe",
-                    "uniqueName": "john.doe@company.com"
-                }
-            }
-        }
+                    "uniqueName": "john.doe@company.com",
+                },
+            },
+        },
     }

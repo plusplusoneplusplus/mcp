@@ -12,13 +12,9 @@ class TestListPullRequests:
     """Test the list_pull_requests method."""
 
     @pytest.mark.asyncio
-    async def test_list_pull_requests_basic(
-        self, azure_pr_tool, mock_pr_list_response
-    ):
+    async def test_list_pull_requests_basic(self, azure_pr_tool, mock_pr_list_response):
         """Test basic pull request listing."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         result = await azure_pr_tool.list_pull_requests()
 
@@ -38,9 +34,7 @@ class TestListPullRequests:
         self, azure_pr_tool, mock_pr_list_response
     ):
         """Test pull request listing with filters."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         result = await azure_pr_tool.list_pull_requests(
             repository="test-repo",
@@ -63,15 +57,13 @@ class TestListPullRequestsCreatorBehavior:
     """Test the creator parameter behavior in list_pull_requests method."""
 
     @pytest.mark.asyncio
-    @patch.object(AzurePullRequestTool, '_get_current_username')
+    @patch.object(AzurePullRequestTool, "_get_current_username")
     async def test_list_pull_requests_default_creator(
         self, mock_get_username, azure_pr_tool, mock_pr_list_response
     ):
         """Test that default creator parameter uses current user."""
         mock_get_username.return_value = "currentuser"
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         # Call with default creator parameter
         result = await azure_pr_tool.list_pull_requests()
@@ -85,15 +77,13 @@ class TestListPullRequestsCreatorBehavior:
         mock_get_username.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch.object(AzurePullRequestTool, '_get_current_username')
+    @patch.object(AzurePullRequestTool, "_get_current_username")
     async def test_list_pull_requests_default_creator_no_username(
         self, mock_get_username, azure_pr_tool, mock_pr_list_response
     ):
         """Test default creator behavior when username cannot be detected."""
         mock_get_username.return_value = None
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         # Call with default creator parameter
         result = await azure_pr_tool.list_pull_requests()
@@ -112,9 +102,7 @@ class TestListPullRequestsCreatorBehavior:
         self, azure_pr_tool, mock_pr_list_response
     ):
         """Test that explicit None creator lists all PRs."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         result = await azure_pr_tool.list_pull_requests(creator=None)
 
@@ -131,9 +119,7 @@ class TestListPullRequestsCreatorBehavior:
         self, azure_pr_tool, mock_pr_list_response
     ):
         """Test that explicit empty string creator lists all PRs."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         result = await azure_pr_tool.list_pull_requests(creator="")
 
@@ -150,9 +136,7 @@ class TestListPullRequestsCreatorBehavior:
         self, azure_pr_tool, mock_pr_list_response
     ):
         """Test that explicit username creator filters by that user."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         result = await azure_pr_tool.list_pull_requests(creator="specificuser")
 
@@ -164,20 +148,16 @@ class TestListPullRequestsCreatorBehavior:
         assert isinstance(result["data"], str)
 
     @pytest.mark.asyncio
-    @patch.object(AzurePullRequestTool, '_get_current_username')
+    @patch.object(AzurePullRequestTool, "_get_current_username")
     async def test_list_pull_requests_default_with_other_params(
         self, mock_get_username, azure_pr_tool, mock_pr_list_response
     ):
         """Test default creator behavior with other parameters."""
         mock_get_username.return_value = "currentuser"
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_pr_list_response
-        )
+        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
 
         result = await azure_pr_tool.list_pull_requests(
-            repository="test-repo",
-            status="active",
-            top=5
+            repository="test-repo", status="active", top=5
         )
 
         expected_command = "repos pr list --repository test-repo --creator currentuser --status active --top 5"
@@ -203,9 +183,7 @@ class TestGetPullRequest:
 
         result = await azure_pr_tool.get_pull_request(123)
 
-        azure_pr_tool._run_az_command.assert_called_once_with(
-            "repos pr show --id 123"
-        )
+        azure_pr_tool._run_az_command.assert_called_once_with("repos pr show --id 123")
         assert result == mock_command_success_response
 
     @pytest.mark.asyncio
@@ -340,9 +318,7 @@ class TestVotingAndReviewers:
         assert result == mock_command_success_response
 
     @pytest.mark.asyncio
-    async def test_add_work_items(
-        self, azure_pr_tool, mock_command_success_response
-    ):
+    async def test_add_work_items(self, azure_pr_tool, mock_command_success_response):
         """Test adding work items to a pull request."""
         azure_pr_tool._run_az_command = AsyncMock(
             return_value=mock_command_success_response

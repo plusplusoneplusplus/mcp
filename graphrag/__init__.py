@@ -14,10 +14,10 @@ from utils.graphrag.config import (
 
 __all__ = [
     "GraphRAGConfig",
-    "LLMConfig", 
+    "LLMConfig",
     "EmbeddingConfig",
     "ConfigLoader",
     "load_config",
 ]
 
-__version__ = "0.1.0" 
+__version__ = "0.1.0"

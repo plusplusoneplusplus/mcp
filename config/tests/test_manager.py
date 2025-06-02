@@ -171,9 +171,7 @@ class TestEnvironmentManager(unittest.TestCase):
             self.env_manager.repository_info.additional_paths.get("logs"),
             "/provider/logs",
         )
-        self.assertEqual(
-            self.env_manager.azrepo_parameters.get("org"), "provider-org"
-        )
+        self.assertEqual(self.env_manager.azrepo_parameters.get("org"), "provider-org")
         self.assertEqual(
             self.env_manager.kusto_parameters.get("app_id"), "provider-app-id"
         )

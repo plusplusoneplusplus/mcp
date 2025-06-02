@@ -149,8 +149,8 @@ class TestExecuteTool:
 
         azure_repo_client.get_repository.assert_called_once_with(
             repository=None,  # Will use default in the method
-            project=None,     # Will use default in the method
-            organization=None, # Will use default in the method
+            project=None,  # Will use default in the method
+            organization=None,  # Will use default in the method
         )
         assert result == mock_command_success_response
 
@@ -168,15 +168,14 @@ class TestRepositoryIntegration:
         azure_repo_client.executor.query_process = AsyncMock(
             return_value={
                 "success": True,
-                "output": '{"value": [{"id": "repo1", "name": "Repository 1"}, {"id": "repo2", "name": "Repository 2"}]}'
+                "output": '{"value": [{"id": "repo1", "name": "Repository 1"}, {"id": "repo2", "name": "Repository 2"}]}',
             }
         )
 
         # Test via execute_tool interface
-        result = await azure_repo_client.execute_tool({
-            "operation": "list_repos",
-            "project": "test-project"
-        })
+        result = await azure_repo_client.execute_tool(
+            {"operation": "list_repos", "project": "test-project"}
+        )
 
         assert result["success"] is True
         assert "data" in result
@@ -191,16 +190,18 @@ class TestRepositoryIntegration:
         azure_repo_client.executor.query_process = AsyncMock(
             return_value={
                 "success": True,
-                "output": '{"id": "repo1", "name": "Repository 1", "defaultBranch": "refs/heads/main"}'
+                "output": '{"id": "repo1", "name": "Repository 1", "defaultBranch": "refs/heads/main"}',
             }
         )
 
         # Test via execute_tool interface
-        result = await azure_repo_client.execute_tool({
-            "operation": "get_repo",
-            "repository": "test-repo",
-            "project": "test-project"
-        })
+        result = await azure_repo_client.execute_tool(
+            {
+                "operation": "get_repo",
+                "repository": "test-repo",
+                "project": "test-project",
+            }
+        )
 
         assert result["success"] is True
         assert "data" in result

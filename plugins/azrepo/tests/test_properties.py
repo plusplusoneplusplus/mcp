@@ -56,6 +56,7 @@ class TestInitialization:
     def test_init_with_executor(self):
         """Test initialization with provided executor."""
         from unittest.mock import MagicMock
+
         mock_executor = MagicMock()
         client = AzureRepoClient(command_executor=mock_executor)
         assert client.executor == mock_executor
@@ -64,6 +65,7 @@ class TestInitialization:
     def test_init_without_executor_success(self, mock_registry):
         """Test initialization without executor (registry lookup success)."""
         from unittest.mock import MagicMock
+
         mock_executor = MagicMock()
         mock_registry.get_tool_instance.return_value = mock_executor
 
@@ -86,26 +88,28 @@ class TestConfigurationLoading:
     def test_load_config_success(self, mock_env_manager):
         """Test successful configuration loading."""
         from unittest.mock import MagicMock
+
         mock_executor = MagicMock()
 
         # Mock environment manager
         mock_env_manager.load.return_value = None
         mock_env_manager.get_azrepo_parameters.return_value = {
-            'org': 'https://dev.azure.com/testorg',
-            'project': 'test-project',
-            'repo': 'test-repo'
+            "org": "https://dev.azure.com/testorg",
+            "project": "test-project",
+            "repo": "test-repo",
         }
 
         client = AzureRepoClient(command_executor=mock_executor)
 
-        assert client.default_organization == 'https://dev.azure.com/testorg'
-        assert client.default_project == 'test-project'
-        assert client.default_repository == 'test-repo'
+        assert client.default_organization == "https://dev.azure.com/testorg"
+        assert client.default_project == "test-project"
+        assert client.default_repository == "test-repo"
 
     @patch("plugins.azrepo.repo_tool.env_manager")
     def test_load_config_failure(self, mock_env_manager):
         """Test configuration loading failure."""
         from unittest.mock import MagicMock
+
         mock_executor = MagicMock()
 
         # Mock environment manager to raise exception

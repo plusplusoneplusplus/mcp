@@ -129,12 +129,14 @@ class AzureRepoClient(ToolInterface):
             azrepo_params = env_manager.get_azrepo_parameters()
 
             # Set default values
-            self.default_organization = azrepo_params.get('org')
-            self.default_project = azrepo_params.get('project')
-            self.default_repository = azrepo_params.get('repo')
+            self.default_organization = azrepo_params.get("org")
+            self.default_project = azrepo_params.get("project")
+            self.default_repository = azrepo_params.get("repo")
 
-            self.logger.debug(f"Loaded Azure repo configuration: org={self.default_organization}, "
-                            f"project={self.default_project}, repo={self.default_repository}")
+            self.logger.debug(
+                f"Loaded Azure repo configuration: org={self.default_organization}, "
+                f"project={self.default_project}, repo={self.default_repository}"
+            )
 
         except Exception as e:
             self.logger.warning(f"Failed to load Azure repo configuration: {e}")
@@ -143,7 +145,9 @@ class AzureRepoClient(ToolInterface):
             self.default_project = None
             self.default_repository = None
 
-    def _get_param_with_default(self, param_value: Optional[str], default_value: Optional[str]) -> Optional[str]:
+    def _get_param_with_default(
+        self, param_value: Optional[str], default_value: Optional[str]
+    ) -> Optional[str]:
         """Get parameter value with fallback to default configuration.
 
         Args:
@@ -288,7 +292,7 @@ class AzureRepoClient(ToolInterface):
             if not all([repo, proj, org]):
                 return {
                     "success": False,
-                    "error": "Repository, project, and organization must be specified for Azure DevOps clone"
+                    "error": "Repository, project, and organization must be specified for Azure DevOps clone",
                 }
 
             # Construct Azure DevOps clone URL
@@ -304,7 +308,10 @@ class AzureRepoClient(ToolInterface):
         status = await self.executor.query_process(token, wait=True)
 
         if status.get("success", False):
-            return {"success": True, "message": f"Repository cloned successfully to {local_path or 'current directory'}"}
+            return {
+                "success": True,
+                "message": f"Repository cloned successfully to {local_path or 'current directory'}",
+            }
         else:
             return {"success": False, "error": status.get("error", "Clone failed")}
 

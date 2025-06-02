@@ -260,17 +260,21 @@ class AzurePullRequestTool(ToolInterface):
             azrepo_params = env_manager.get_azrepo_parameters()
 
             # Set default values
-            self.default_organization = azrepo_params.get('org')
-            self.default_project = azrepo_params.get('project')
-            self.default_repository = azrepo_params.get('repo')
-            self.default_target_branch = azrepo_params.get('branch')
+            self.default_organization = azrepo_params.get("org")
+            self.default_project = azrepo_params.get("project")
+            self.default_repository = azrepo_params.get("repo")
+            self.default_target_branch = azrepo_params.get("branch")
             # Get default prefix with username
             default_prefix = self._get_default_pr_branch_prefix()
-            self.default_pr_branch_prefix = azrepo_params.get('pr_branch_prefix', default_prefix)
+            self.default_pr_branch_prefix = azrepo_params.get(
+                "pr_branch_prefix", default_prefix
+            )
 
-            self.logger.debug(f"Loaded Azure repo configuration: org={self.default_organization}, "
-                            f"project={self.default_project}, repo={self.default_repository}, "
-                            f"branch={self.default_target_branch}, pr_branch_prefix={self.default_pr_branch_prefix}")
+            self.logger.debug(
+                f"Loaded Azure repo configuration: org={self.default_organization}, "
+                f"project={self.default_project}, repo={self.default_repository}, "
+                f"branch={self.default_target_branch}, pr_branch_prefix={self.default_pr_branch_prefix}"
+            )
 
         except Exception as e:
             self.logger.warning(f"Failed to load Azure repo configuration: {e}")
@@ -281,7 +285,9 @@ class AzurePullRequestTool(ToolInterface):
             self.default_target_branch = None
             self.default_pr_branch_prefix = self._get_default_pr_branch_prefix()
 
-    def _get_param_with_default(self, param_value: Optional[str], default_value: Optional[str]) -> Optional[str]:
+    def _get_param_with_default(
+        self, param_value: Optional[str], default_value: Optional[str]
+    ) -> Optional[str]:
         """Get parameter value with fallback to default configuration.
 
         Args:
@@ -305,7 +311,7 @@ class AzurePullRequestTool(ToolInterface):
         except Exception:
             try:
                 # Fallback to environment variables
-                username = os.environ.get('USER') or os.environ.get('USERNAME')
+                username = os.environ.get("USER") or os.environ.get("USERNAME")
                 if username:
                     return username
             except Exception:
@@ -344,7 +350,7 @@ class AzurePullRequestTool(ToolInterface):
             commit_message = latest_commit.message.strip()
             if commit_message:
                 # Return only the first line (subject)
-                first_line = commit_message.split('\n')[0].strip()
+                first_line = commit_message.split("\n")[0].strip()
                 if first_line:
                     return first_line
 
@@ -355,7 +361,9 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.warning("Not in a git repository")
             return None
         except Exception as e:
-            self.logger.warning(f"Failed to get last commit message with GitPython: {e}")
+            self.logger.warning(
+                f"Failed to get last commit message with GitPython: {e}"
+            )
             return None
 
     def _generate_branch_name_from_commit(self) -> str:
@@ -370,10 +378,14 @@ class AzurePullRequestTool(ToolInterface):
             # Use GitPython to get the last commit ID
             repo = git.Repo(search_parent_directories=True)
             latest_commit = repo.head.commit
-            commit_id = str(latest_commit.hexsha)[:12]  # Use first 12 characters of commit hash
+            commit_id = str(latest_commit.hexsha)[
+                :12
+            ]  # Use first 12 characters of commit hash
 
-            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
-            if prefix.endswith('/'):
+            prefix = (
+                self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            )
+            if prefix.endswith("/"):
                 return f"{prefix}{commit_id}"
             else:
                 return f"{prefix}/{commit_id}"
@@ -382,13 +394,17 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.warning("Not in a git repository, falling back to UUID")
             # Fallback to UUID if not in a git repository
             random_id = str(uuid.uuid4())[:8]
-            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            prefix = (
+                self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            )
             return f"{prefix}{random_id}"
         except Exception as e:
             self.logger.warning(f"Failed to get commit ID: {e}, falling back to UUID")
             # Fallback to UUID if commit ID retrieval fails
             random_id = str(uuid.uuid4())[:8]
-            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            prefix = (
+                self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            )
             return f"{prefix}{random_id}"
 
     def _create_and_push_branch(self, branch_name: str) -> Dict[str, Any]:
@@ -411,7 +427,7 @@ class AzurePullRequestTool(ToolInterface):
             new_branch.checkout()
 
             # Push the branch to remote origin
-            origin = repo.remote('origin')
+            origin = repo.remote("origin")
             origin.push(new_branch, set_upstream=True)
 
             self.logger.info(f"Successfully created and pushed branch: {branch_name}")
@@ -422,7 +438,10 @@ class AzurePullRequestTool(ToolInterface):
         except git.exc.GitCommandError as e:
             return {"success": False, "error": f"Git command failed: {str(e)}"}
         except Exception as e:
-            return {"success": False, "error": f"Failed to create/push branch with GitPython: {str(e)}"}
+            return {
+                "success": False,
+                "error": f"Failed to create/push branch with GitPython: {str(e)}",
+            }
 
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
@@ -466,18 +485,24 @@ class AzurePullRequestTool(ToolInterface):
         """Convert pull request JSON data to a pandas DataFrame."""
         l = []
         for o in prs_in_json:
-            l.append({
-                'id': o['pullRequestId'],
-                'creator': o['createdBy']['uniqueName'],
-                'date': pd.to_datetime(o['creationDate']).strftime('%m/%d/%y %H:%M:%S'),
-                'title': o['title'],
-                'source_ref': o['sourceRefName'].replace('refs/heads/', ''),
-                'target_ref': o['targetRefName'].replace('refs/heads/', ''),
-            })
+            l.append(
+                {
+                    "id": o["pullRequestId"],
+                    "creator": o["createdBy"]["uniqueName"],
+                    "date": pd.to_datetime(o["creationDate"]).strftime(
+                        "%m/%d/%y %H:%M:%S"
+                    ),
+                    "title": o["title"],
+                    "source_ref": o["sourceRefName"].replace("refs/heads/", ""),
+                    "target_ref": o["targetRefName"].replace("refs/heads/", ""),
+                }
+            )
 
         # Create DataFrame with proper columns even if empty
         if not l:
-            return pd.DataFrame(columns=['id', 'creator', 'date', 'title', 'source_ref', 'target_ref'])
+            return pd.DataFrame(
+                columns=["id", "creator", "date", "title", "source_ref", "target_ref"]
+            )
 
         return pd.DataFrame().from_dict(l)
 
@@ -542,7 +567,10 @@ class AzurePullRequestTool(ToolInterface):
             except Exception as e:
                 self.logger.warning(f"Failed to convert PRs to DataFrame: {e}")
                 # Return error if conversion fails
-                return {"success": False, "error": f"Failed to convert PRs to CSV: {str(e)}"}
+                return {
+                    "success": False,
+                    "error": f"Failed to convert PRs to CSV: {str(e)}",
+                }
 
         return result
 
@@ -596,11 +624,16 @@ class AzurePullRequestTool(ToolInterface):
                     self.logger.info(f"Using commit message as title: {title}")
                 else:
                     title = f"Auto PR from {source_branch}"
-                    self.logger.warning(f"Could not get commit message, using default title: {title}")
+                    self.logger.warning(
+                        f"Could not get commit message, using default title: {title}"
+                    )
 
         # Ensure we have a title
         if title is None:
-            return {"success": False, "error": "Title is required when source_branch is provided"}
+            return {
+                "success": False,
+                "error": "Title is required when source_branch is provided",
+            }
 
         command = "repos pr create"
 
@@ -609,7 +642,9 @@ class AzurePullRequestTool(ToolInterface):
         command += f" --source-branch {source_branch}"
 
         # Use configured defaults for core parameters
-        target_br = self._get_param_with_default(target_branch, self.default_target_branch)
+        target_br = self._get_param_with_default(
+            target_branch, self.default_target_branch
+        )
         repo = self._get_param_with_default(repository, self.default_repository)
         proj = self._get_param_with_default(project, self.default_project)
         org = self._get_param_with_default(organization, self.default_organization)

@@ -1,1 +1,1 @@
-"""GraphRAG usage examples and demonstrations.""" 
+"""GraphRAG usage examples and demonstrations."""

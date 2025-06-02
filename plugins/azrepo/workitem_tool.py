@@ -151,11 +151,13 @@ class AzureWorkItemTool(ToolInterface):
             azrepo_params = env_manager.get_azrepo_parameters()
 
             # Set default values
-            self.default_organization = azrepo_params.get('org')
-            self.default_project = azrepo_params.get('project')
+            self.default_organization = azrepo_params.get("org")
+            self.default_project = azrepo_params.get("project")
 
-            self.logger.debug(f"Loaded Azure work item configuration: org={self.default_organization}, "
-                            f"project={self.default_project}")
+            self.logger.debug(
+                f"Loaded Azure work item configuration: org={self.default_organization}, "
+                f"project={self.default_project}"
+            )
 
         except Exception as e:
             self.logger.warning(f"Failed to load Azure work item configuration: {e}")
@@ -163,7 +165,9 @@ class AzureWorkItemTool(ToolInterface):
             self.default_organization = None
             self.default_project = None
 
-    def _get_param_with_default(self, param_value: Optional[str], default_value: Optional[str]) -> Optional[str]:
+    def _get_param_with_default(
+        self, param_value: Optional[str], default_value: Optional[str]
+    ) -> Optional[str]:
         """Get parameter value with fallback to default configuration.
 
         Args:
