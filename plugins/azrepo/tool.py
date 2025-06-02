@@ -391,7 +391,7 @@ class AzureRepoClient(RepoClientInterface):
         if proj:
             command += f" --project {proj}"
         if org:
-            command += f" --organization {org}"
+            command += f" --org {org}"
         if creator:
             command += f" --creator {creator}"
         if reviewer:
