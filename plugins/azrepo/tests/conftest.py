@@ -5,7 +5,7 @@ Shared fixtures for Azure Repo Client tests.
 import pytest
 from unittest.mock import MagicMock
 
-from ..tool import AzureRepoClient
+from ..repo_tool import AzureRepoClient
 from ..pr_tool import AzurePullRequestTool
 from ..workitem_tool import AzureWorkItemTool
 

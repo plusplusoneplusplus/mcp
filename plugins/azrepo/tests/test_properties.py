@@ -5,7 +5,7 @@ Tests for AzureRepoClient properties and interface compliance.
 import pytest
 from unittest.mock import patch
 
-from ..tool import AzureRepoClient
+from ..repo_tool import AzureRepoClient
 
 
 class TestAzureRepoClientProperties:
@@ -82,7 +82,7 @@ class TestInitialization:
 class TestConfigurationLoading:
     """Test configuration loading behavior."""
 
-    @patch("plugins.azrepo.tool.env_manager")
+    @patch("plugins.azrepo.repo_tool.env_manager")
     def test_load_config_success(self, mock_env_manager):
         """Test successful configuration loading."""
         from unittest.mock import MagicMock
@@ -102,7 +102,7 @@ class TestConfigurationLoading:
         assert client.default_project == 'test-project'
         assert client.default_repository == 'test-repo'
 
-    @patch("plugins.azrepo.tool.env_manager")
+    @patch("plugins.azrepo.repo_tool.env_manager")
     def test_load_config_failure(self, mock_env_manager):
         """Test configuration loading failure."""
         from unittest.mock import MagicMock

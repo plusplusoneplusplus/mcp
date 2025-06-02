@@ -5,7 +5,7 @@ Tests for the execute_tool method and integration functionality for repository o
 import pytest
 from unittest.mock import AsyncMock
 
-from ..tool import AzureRepoClient
+from ..repo_tool import AzureRepoClient
 
 
 class TestExecuteTool:
