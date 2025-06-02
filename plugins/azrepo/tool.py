@@ -762,8 +762,8 @@ class AzureRepoClient(RepoClientInterface):
         l = []
         for o in prs_in_json:
             l.append({
-                'id': o['codeReviewId'],
-                'creator': o['createdBy']['uniqueName'].replace('@microsoft.com', ''),
+                'id': o['pullRequestId'],
+                'creator': o['createdBy']['uniqueName'],
                 'date': pd.to_datetime(o['creationDate']).strftime('%m/%d/%y %H:%M:%S'),
                 'title': o['title'],
                 'source_ref': o['sourceRefName'].replace('refs/heads/', ''),

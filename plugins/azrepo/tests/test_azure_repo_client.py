@@ -40,7 +40,6 @@ def mock_pr_list_response():
         "success": True,
         "data": [
             {
-                "codeReviewId": 123,
                 "pullRequestId": 123,
                 "title": "Test PR 1",
                 "sourceRefName": "refs/heads/feature/test1",
@@ -48,12 +47,11 @@ def mock_pr_list_response():
                 "status": "active",
                 "createdBy": {
                     "displayName": "John Doe",
-                    "uniqueName": "john.doe@microsoft.com"
+                    "uniqueName": "john.doe@abc.com"
                 },
                 "creationDate": "2024-01-15T10:30:00.000Z"
             },
             {
-                "codeReviewId": 124,
                 "pullRequestId": 124,
                 "title": "Test PR 2",
                 "sourceRefName": "refs/heads/feature/test2",
@@ -61,7 +59,7 @@ def mock_pr_list_response():
                 "status": "completed",
                 "createdBy": {
                     "displayName": "Jane Smith",
-                    "uniqueName": "jane.smith@microsoft.com"
+                    "uniqueName": "jane.smith@abc.com"
                 },
                 "creationDate": "2024-01-14T15:45:00.000Z"
             },
@@ -76,7 +74,6 @@ def mock_pr_list_response_with_csv_fields():
         "success": True,
         "data": [
             {
-                "codeReviewId": 123,
                 "pullRequestId": 123,
                 "title": "Test PR 1",
                 "sourceRefName": "refs/heads/feature/test1",
@@ -84,12 +81,11 @@ def mock_pr_list_response_with_csv_fields():
                 "status": "active",
                 "createdBy": {
                     "displayName": "John Doe",
-                    "uniqueName": "john.doe@microsoft.com"
+                    "uniqueName": "john.doe@abc.com"
                 },
                 "creationDate": "2024-01-15T10:30:00.000Z"
             },
             {
-                "codeReviewId": 124,
                 "pullRequestId": 124,
                 "title": "Test PR 2",
                 "sourceRefName": "refs/heads/feature/test2",
@@ -97,7 +93,7 @@ def mock_pr_list_response_with_csv_fields():
                 "status": "completed",
                 "createdBy": {
                     "displayName": "Jane Smith",
-                    "uniqueName": "jane.smith@microsoft.com"
+                    "uniqueName": "jane.smith@abc.com"
                 },
                 "creationDate": "2024-01-14T15:45:00.000Z"
             },
@@ -937,10 +933,9 @@ class TestCreatorIntegration:
                 "success": True,
                 "output": json.dumps([
                     {
-                        "codeReviewId": 123,
                         "pullRequestId": 123,
                         "title": "My PR",
-                        "createdBy": {"displayName": "testuser", "uniqueName": "testuser@microsoft.com"},
+                        "createdBy": {"displayName": "testuser", "uniqueName": "testuser@abc.com"},
                         "status": "active",
                         "sourceRefName": "refs/heads/feature/test",
                         "targetRefName": "refs/heads/main",
@@ -978,20 +973,18 @@ class TestCreatorIntegration:
                 "success": True,
                 "output": json.dumps([
                     {
-                        "codeReviewId": 123,
                         "pullRequestId": 123,
                         "title": "Someone's PR",
-                        "createdBy": {"displayName": "otheruser", "uniqueName": "otheruser@microsoft.com"},
+                        "createdBy": {"displayName": "otheruser", "uniqueName": "otheruser@abc.com"},
                         "status": "active",
                         "sourceRefName": "refs/heads/feature/other",
                         "targetRefName": "refs/heads/main",
                         "creationDate": "2024-01-15T10:30:00.000Z"
                     },
                     {
-                        "codeReviewId": 124,
                         "pullRequestId": 124,
                         "title": "My PR",
-                        "createdBy": {"displayName": "testuser", "uniqueName": "testuser@microsoft.com"},
+                        "createdBy": {"displayName": "testuser", "uniqueName": "testuser@abc.com"},
                         "status": "active",
                         "sourceRefName": "refs/heads/feature/test",
                         "targetRefName": "refs/heads/main",
@@ -1026,24 +1019,24 @@ class TestConvertPrToDf:
         """Test basic PR to DataFrame conversion."""
         prs_data = [
             {
-                "codeReviewId": 123,
+                "pullRequestId": 123,
                 "title": "Test PR 1",
                 "sourceRefName": "refs/heads/feature/test1",
                 "targetRefName": "refs/heads/main",
                 "createdBy": {
                     "displayName": "John Doe",
-                    "uniqueName": "john.doe@microsoft.com"
+                    "uniqueName": "john.doe@abc.com"
                 },
                 "creationDate": "2024-01-15T10:30:00.000Z"
             },
             {
-                "codeReviewId": 124,
+                "pullRequestId": 124,
                 "title": "Test PR 2",
                 "sourceRefName": "refs/heads/feature/test2",
                 "targetRefName": "refs/heads/main",
                 "createdBy": {
                     "displayName": "Jane Smith",
-                    "uniqueName": "jane.smith@microsoft.com"
+                    "uniqueName": "jane.smith@abc.com"
                 },
                 "creationDate": "2024-01-14T15:45:00.000Z"
             }
@@ -1058,14 +1051,14 @@ class TestConvertPrToDf:
 
         # Check first row data
         assert df.iloc[0]['id'] == 123
-        assert df.iloc[0]['creator'] == 'john.doe'
+        assert df.iloc[0]['creator'] == 'john.doe@abc.com'
         assert df.iloc[0]['title'] == 'Test PR 1'
         assert df.iloc[0]['source_ref'] == 'feature/test1'
         assert df.iloc[0]['target_ref'] == 'main'
 
         # Check second row data
         assert df.iloc[1]['id'] == 124
-        assert df.iloc[1]['creator'] == 'jane.smith'
+        assert df.iloc[1]['creator'] == 'jane.smith@abc.com'
         assert df.iloc[1]['title'] == 'Test PR 2'
         assert df.iloc[1]['source_ref'] == 'feature/test2'
         assert df.iloc[1]['target_ref'] == 'main'
@@ -1082,12 +1075,12 @@ class TestConvertPrToDf:
         """Test that refs/heads/ prefix is properly removed from branch names."""
         prs_data = [
             {
-                "codeReviewId": 123,
+                "pullRequestId": 123,
                 "title": "Test PR",
                 "sourceRefName": "refs/heads/feature/complex-branch-name",
                 "targetRefName": "refs/heads/develop",
                 "createdBy": {
-                    "uniqueName": "test.user@microsoft.com"
+                    "uniqueName": "test.user@abc.com"
                 },
                 "creationDate": "2024-01-15T10:30:00.000Z"
             }
@@ -1098,16 +1091,16 @@ class TestConvertPrToDf:
         assert df.iloc[0]['source_ref'] == 'feature/complex-branch-name'
         assert df.iloc[0]['target_ref'] == 'develop'
 
-    def test_convert_pr_to_df_removes_microsoft_domain(self, azure_repo_client):
-        """Test that @microsoft.com domain is removed from creator names."""
+    def test_convert_pr_to_df_preserves_full_email(self, azure_repo_client):
+        """Test that full email addresses are preserved in creator names."""
         prs_data = [
             {
-                "codeReviewId": 123,
+                "pullRequestId": 123,
                 "title": "Test PR",
                 "sourceRefName": "refs/heads/feature/test",
                 "targetRefName": "refs/heads/main",
                 "createdBy": {
-                    "uniqueName": "test.user@microsoft.com"
+                    "uniqueName": "test.user@abc.com"
                 },
                 "creationDate": "2024-01-15T10:30:00.000Z"
             }
@@ -1115,18 +1108,18 @@ class TestConvertPrToDf:
 
         df = azure_repo_client.convert_pr_to_df(prs_data)
 
-        assert df.iloc[0]['creator'] == 'test.user'
+        assert df.iloc[0]['creator'] == 'test.user@abc.com'
 
     def test_convert_pr_to_df_date_formatting(self, azure_repo_client):
         """Test that dates are properly formatted."""
         prs_data = [
             {
-                "codeReviewId": 123,
+                "pullRequestId": 123,
                 "title": "Test PR",
                 "sourceRefName": "refs/heads/feature/test",
                 "targetRefName": "refs/heads/main",
                 "createdBy": {
-                    "uniqueName": "test.user@microsoft.com"
+                    "uniqueName": "test.user@abc.com"
                 },
                 "creationDate": "2024-01-15T10:30:45.123Z"
             }
@@ -1175,7 +1168,7 @@ class TestListPullRequestsWithCsv:
         # Check first data row
         first_row = lines[1].split(',')
         assert first_row[0] == '123'  # id
-        assert first_row[1] == 'john.doe'  # creator
+        assert first_row[1] == 'john.doe@abc.com'  # creator
         assert 'Test PR 1' in first_row[3]  # title
         assert first_row[4] == 'feature/test1'  # source_ref
         assert first_row[5] == 'main'  # target_ref
@@ -1191,7 +1184,7 @@ class TestListPullRequestsWithCsv:
                     # Missing required fields for conversion
                     "pullRequestId": 123,
                     "title": "Test PR"
-                    # Missing codeReviewId, createdBy, etc.
+                    # Missing pullRequestId, createdBy, etc.
                 }
             ]
         }
@@ -1308,22 +1301,22 @@ class TestCsvIntegration:
                 "success": True,
                 "output": json.dumps([
                     {
-                        "codeReviewId": 123,
+                        "pullRequestId": 123,
                         "title": "Fix authentication bug",
                         "sourceRefName": "refs/heads/feature/auth-fix",
                         "targetRefName": "refs/heads/main",
                         "createdBy": {
-                            "uniqueName": "john.doe@microsoft.com"
+                            "uniqueName": "john.doe@abc.com"
                         },
                         "creationDate": "2024-01-15T10:30:00.000Z"
                     },
                     {
-                        "codeReviewId": 124,
+                        "pullRequestId": 124,
                         "title": "Add new feature",
                         "sourceRefName": "refs/heads/feature/new-feature",
                         "targetRefName": "refs/heads/develop",
                         "createdBy": {
-                            "uniqueName": "jane.smith@microsoft.com"
+                            "uniqueName": "jane.smith@abc.com"
                         },
                         "creationDate": "2024-01-14T15:45:00.000Z"
                     }
@@ -1350,13 +1343,13 @@ class TestCsvIntegration:
 
         # Verify data content (basic checks)
         assert "123" in lines[1]
-        assert "john.doe" in lines[1]
+        assert "john.doe@abc.com" in lines[1]
         assert "Fix authentication bug" in lines[1]
         assert "feature/auth-fix" in lines[1]
         assert "main" in lines[1]
 
         assert "124" in lines[2]
-        assert "jane.smith" in lines[2]
+        assert "jane.smith@abc.com" in lines[2]
         assert "Add new feature" in lines[2]
         assert "feature/new-feature" in lines[2]
         assert "develop" in lines[2]
@@ -1372,12 +1365,12 @@ class TestCsvIntegration:
                 "success": True,
                 "output": json.dumps([
                     {
-                        "codeReviewId": 123,
+                        "pullRequestId": 123,
                         "title": "Fix bug with \"quotes\" and, commas",
                         "sourceRefName": "refs/heads/feature/bug-fix",
                         "targetRefName": "refs/heads/main",
                         "createdBy": {
-                            "uniqueName": "test.user@microsoft.com"
+                            "uniqueName": "test.user@abc.com"
                         },
                         "creationDate": "2024-01-15T10:30:00.000Z"
                     }
