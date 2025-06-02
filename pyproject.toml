@@ -82,6 +82,9 @@ dependencies = [
 
     # pre-commit
     "pre-commit>=4.2.0",
+
+    # Git operations
+    "GitPython>=3.1.40",  # Python Git library
 ]
 
 [project.optional-dependencies]

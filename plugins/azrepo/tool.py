@@ -5,7 +5,10 @@ import json
 import getpass
 import os
 import pandas as pd
+import uuid
 from typing import Dict, Any, List, Optional, Union
+
+import git
 
 # Import the required interfaces and decorators
 from mcp_tools.interfaces import ToolInterface, RepoClientInterface
@@ -74,6 +77,7 @@ class AzureRepoClient(RepoClientInterface):
         - AZREPO_PROJECT: Default project name/ID
         - AZREPO_REPO: Default repository name/ID
         - AZREPO_BRANCH: Default target branch
+        - AZREPO_PR_BRANCH_PREFIX: Default prefix for auto-generated PR branch names (default: 'auto-pr/<username>/')
 
     Example:
         # Initialize the client with a command executor
@@ -96,6 +100,9 @@ class AzureRepoClient(RepoClientInterface):
             source_branch="feature/my-feature",
             organization="different-org"  # Override default
         )
+
+        # Create a pull request with auto-generated branch and title from last commit
+        auto_pr = await az_client.create_pull_request()  # Uses current HEAD, creates branch with commit ID and configured prefix
 
         # Get PR details
         pr_details = await az_client.get_pull_request(123)
@@ -143,12 +150,12 @@ class AzureRepoClient(RepoClientInterface):
                 },
                 "title": {
                     "type": "string",
-                    "description": "Title for the pull request",
+                    "description": "Title for the pull request (if None and source_branch is None, uses last commit message)",
                     "nullable": True,
                 },
                 "source_branch": {
                     "type": "string",
-                    "description": "Name of the source branch",
+                    "description": "Name of the source branch (if None, creates a branch from current HEAD using commit ID)",
                     "nullable": True,
                 },
                 "target_branch": {
@@ -288,10 +295,13 @@ class AzureRepoClient(RepoClientInterface):
             self.default_project = azrepo_params.get('project')
             self.default_repository = azrepo_params.get('repo')
             self.default_target_branch = azrepo_params.get('branch')
+            # Get default prefix with username
+            default_prefix = self._get_default_pr_branch_prefix()
+            self.default_pr_branch_prefix = azrepo_params.get('pr_branch_prefix', default_prefix)
 
             self.logger.debug(f"Loaded Azure repo configuration: org={self.default_organization}, "
                             f"project={self.default_project}, repo={self.default_repository}, "
-                            f"branch={self.default_target_branch}")
+                            f"branch={self.default_target_branch}, pr_branch_prefix={self.default_pr_branch_prefix}")
 
         except Exception as e:
             self.logger.warning(f"Failed to load Azure repo configuration: {e}")
@@ -300,6 +310,7 @@ class AzureRepoClient(RepoClientInterface):
             self.default_project = None
             self.default_repository = None
             self.default_target_branch = None
+            self.default_pr_branch_prefix = self._get_default_pr_branch_prefix()
 
     def _get_param_with_default(self, param_value: Optional[str], default_value: Optional[str]) -> Optional[str]:
         """Get parameter value with fallback to default configuration.
@@ -338,6 +349,116 @@ class AzureRepoClient(RepoClientInterface):
             # Return None if unable to determine username
             self.logger.warning("Unable to determine current username")
             return None
+
+    def _get_default_pr_branch_prefix(self) -> str:
+        """Get the default PR branch prefix including username.
+
+        Returns:
+            Default prefix in format 'auto-pr/<username>/' or 'auto-pr' if username unavailable
+        """
+        username = self._get_current_username()
+        if username:
+            return f"auto-pr/{username}/"
+        else:
+            return "auto-pr"
+
+    def _get_last_commit_message(self) -> Optional[str]:
+        """Get the first line of the last commit message using GitPython.
+
+        Returns:
+            The first line of the last commit message, or None if unable to determine
+        """
+        try:
+            # Use GitPython to get the last commit message
+            repo = git.Repo(search_parent_directories=True)
+
+            # Get the latest commit
+            latest_commit = repo.head.commit
+
+            # Get the first line of the commit message
+            commit_message = latest_commit.message.strip()
+            if commit_message:
+                # Return only the first line (subject)
+                first_line = commit_message.split('\n')[0].strip()
+                if first_line:
+                    return first_line
+
+            self.logger.warning("Unable to get last commit message")
+            return None
+
+        except git.exc.InvalidGitRepositoryError:
+            self.logger.warning("Not in a git repository")
+            return None
+        except Exception as e:
+            self.logger.warning(f"Failed to get last commit message with GitPython: {e}")
+            return None
+
+    def _generate_branch_name_from_commit(self) -> str:
+        """Generate a branch name using the last commit ID and configurable prefix.
+
+        Returns:
+            A branch name in the format '{prefix}{commit_id}' where prefix
+            is configurable via AZREPO_PR_BRANCH_PREFIX environment variable
+            (default: 'auto-pr/<username>/') and commit_id is the first 12 characters
+            of the last commit hash
+        """
+        try:
+            # Use GitPython to get the last commit ID
+            repo = git.Repo(search_parent_directories=True)
+            latest_commit = repo.head.commit
+            commit_id = str(latest_commit.hexsha)[:12]  # Use first 12 characters of commit hash
+
+            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            if prefix.endswith('/'):
+                return f"{prefix}{commit_id}"
+            else:
+                return f"{prefix}/{commit_id}"
+
+        except git.exc.InvalidGitRepositoryError:
+            self.logger.warning("Not in a git repository, falling back to UUID")
+            # Fallback to UUID if not in a git repository
+            random_id = str(uuid.uuid4())[:8]
+            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            return f"{prefix}{random_id}"
+        except Exception as e:
+            self.logger.warning(f"Failed to get commit ID: {e}, falling back to UUID")
+            # Fallback to UUID if commit ID retrieval fails
+            random_id = str(uuid.uuid4())[:8]
+            prefix = self.default_pr_branch_prefix or self._get_default_pr_branch_prefix()
+            return f"{prefix}{random_id}"
+
+    def _create_and_push_branch(self, branch_name: str) -> Dict[str, Any]:
+        """Create a new branch from current HEAD and push it to remote using GitPython.
+
+        Args:
+            branch_name: Name of the branch to create
+
+        Returns:
+            Dictionary with success status and any error information
+        """
+        try:
+            # Use GitPython to create and push the branch
+            repo = git.Repo(search_parent_directories=True)
+
+            # Create the new branch from current HEAD
+            new_branch = repo.create_head(branch_name)
+
+            # Checkout the new branch
+            new_branch.checkout()
+
+            # Push the branch to remote origin
+            origin = repo.remote('origin')
+            origin.push(new_branch, set_upstream=True)
+
+            self.logger.info(f"Successfully created and pushed branch: {branch_name}")
+            return {"success": True, "branch_name": branch_name}
+
+        except git.exc.InvalidGitRepositoryError:
+            return {"success": False, "error": "Not in a git repository"}
+        except git.exc.GitCommandError as e:
+            return {"success": False, "error": f"Git command failed: {str(e)}"}
+        except Exception as e:
+            return {"success": False, "error": f"Failed to create/push branch with GitPython: {str(e)}"}
 
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
@@ -484,8 +605,8 @@ class AzureRepoClient(RepoClientInterface):
 
     async def create_pull_request(
         self,
-        title: str,
-        source_branch: str,
+        title: Optional[str] = None,
+        source_branch: Optional[str] = None,
         target_branch: Optional[str] = None,
         description: Optional[str] = None,
         repository: Optional[str] = None,
@@ -501,8 +622,8 @@ class AzureRepoClient(RepoClientInterface):
         """Create a new pull request.
 
         Args:
-            title: Title for the pull request
-            source_branch: Name of the source branch
+            title: Title for the pull request (if None and source_branch is None, uses last commit message)
+            source_branch: Name of the source branch (if None, creates a branch from current HEAD using commit ID)
             target_branch: Name of the target branch (uses configured default if not specified)
             description: Description for the pull request (can include markdown)
             repository: Name or ID of the repository (uses configured default if not provided)
@@ -518,6 +639,32 @@ class AzureRepoClient(RepoClientInterface):
         Returns:
             Dictionary with success status and created pull request details
         """
+        # Handle None source_branch case
+        if source_branch is None:
+            # Generate branch name from commit ID and create/push it
+            commit_branch = self._generate_branch_name_from_commit()
+            self.logger.info(f"Creating branch from commit: {commit_branch}")
+
+            branch_result = self._create_and_push_branch(commit_branch)
+            if not branch_result.get("success", False):
+                return branch_result
+
+            source_branch = commit_branch
+
+            # If title is also None, get it from last commit message
+            if title is None:
+                commit_title = self._get_last_commit_message()
+                if commit_title:
+                    title = commit_title
+                    self.logger.info(f"Using commit message as title: {title}")
+                else:
+                    title = f"Auto PR from {source_branch}"
+                    self.logger.warning(f"Could not get commit message, using default title: {title}")
+
+        # Ensure we have a title
+        if title is None:
+            return {"success": False, "error": "Title is required when source_branch is provided"}
+
         command = "repos pr create"
 
         # Required parameters
