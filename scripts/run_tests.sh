@@ -25,10 +25,10 @@ run_component_tests() {
     component=$1
     test_path=$2
     test_pattern=$3
-    
+
     if [ -d "$test_path" ]; then
         echo -e "${BLUE}Running tests for ${component}...${NC}"
-        
+
         # Run the tests and capture both exit code and output
         # Use uv instead of python directly
         if [ -n "$test_pattern" ]; then
@@ -37,10 +37,10 @@ run_component_tests() {
             output=$(uv run python -m pytest "$test_path" 2>&1)
         fi
         exit_code=$?
-        
+
         # Print the output
         echo "$output"
-        
+
         # Parse output to get test statistics
         if [[ "$output" == *"no tests ran"* ]]; then
             echo -e "${YELLOW}\u26a0 No tests ran for ${component}${NC}"
@@ -91,6 +91,7 @@ run_component_tests "utils.playwright" "utils/playwright/tests" "$TEST_PATTERN"
 run_component_tests "plugins.azrepo" "plugins/azrepo/tests" "$TEST_PATTERN"
 run_component_tests "plugins.kusto" "plugins/kusto/tests" "$TEST_PATTERN"
 run_component_tests "plugins.git_tool" "plugins/git_tool/tests" "$TEST_PATTERN"
+run_component_tests "plugins.knowledge_indexer" "plugins/knowledge_indexer/tests" "$TEST_PATTERN"
 # Add more plugin components as needed
 
 # Run project-level tests if they exist
@@ -117,4 +118,4 @@ if [ $failures -gt 0 ]; then
     exit 1
 fi
 
-exit 0 
+exit 0

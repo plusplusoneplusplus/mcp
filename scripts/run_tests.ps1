@@ -14,7 +14,7 @@ function Write-ColorMessage {
         [string]$Message,
         [string]$Color = "White"
     )
-    
+
     $originalColor = $host.UI.RawUI.ForegroundColor
     $host.UI.RawUI.ForegroundColor = $Color
     Write-Host $Message
@@ -36,10 +36,10 @@ function Run-ComponentTests {
         [string]$TestPath,
         [string]$TestPattern = ""
     )
-    
+
     if (Test-Path $TestPath -PathType Container) {
         Write-ColorMessage "Running tests for $Component..." "Blue"
-        
+
         # Run the tests and capture output
         try {
             # Use uv instead of python directly
@@ -49,10 +49,10 @@ function Run-ComponentTests {
                 $output = & uv run python -m pytest "$TestPath" 2>&1 | Out-String
             }
             $exitCode = $LASTEXITCODE
-            
+
             # Print the output
             Write-Host $output
-            
+
             # Parse output to get test statistics
             if ($output -match "no tests ran") {
                 Write-ColorMessage "! No tests ran for $Component" "Yellow"
@@ -113,6 +113,7 @@ Run-ComponentTests "utils.playwright" "utils/playwright/tests" $TestPattern
 Run-ComponentTests "plugins.azrepo" "plugins/azrepo/tests" $TestPattern
 Run-ComponentTests "plugins.kusto" "plugins/kusto/tests" $TestPattern
 Run-ComponentTests "plugins.git_tool" "plugins/git_tool/tests" $TestPattern
+Run-ComponentTests "plugins.knowledge_indexer" "plugins/knowledge_indexer/tests" $TestPattern
 # Add more plugin components as needed
 
 # Run project-level tests if they exist
@@ -141,4 +142,4 @@ if ($failures -gt 0) {
     exit 1
 }
 
-exit 0 
+exit 0
