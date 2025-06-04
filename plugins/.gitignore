@@ -18,6 +18,10 @@
 !kusto/
 !kusto/**
 
+# Track the git_tool plugin
+!git_tool/
+!git_tool/**
+
 # Ignore Python bytecode files
 *.pyc
 __pycache__/
