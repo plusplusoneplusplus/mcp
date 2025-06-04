@@ -9,7 +9,7 @@ import asyncio
 import git
 from git.exc import InvalidGitRepositoryError, GitCommandError
 
-from plugins.git.git_tool import GitTool, GitOperationType
+from plugins.git_tool.git_tool import GitTool, GitOperationType
 
 
 @pytest.fixture
@@ -358,4 +358,99 @@ class TestGitTool:
         result = await git_tool.execute_tool({"operation": "git_status"})
         
         assert "error" in result
-        assert "Missing required parameter: repo_path" in result["error"] 
+        assert "Missing required parameter: repo_path" in result["error"]
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_pull_rebase_success(self, mock_repo_class, git_tool, mock_repo):
+        """Test git pull rebase operation."""
+        mock_repo_class.return_value = mock_repo
+        mock_branch = Mock()
+        mock_branch.name = "main"
+        mock_repo.active_branch = mock_branch
+        mock_repo.git.pull.return_value = ""
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_pull_rebase",
+            "repo_path": "/test"
+        })
+        
+        assert result["success"]
+        assert "Successfully pulled and rebased 'main' from 'origin/main'" in result["result"]
+        mock_repo.git.pull.assert_called_once_with("--rebase", "origin", "main")
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_pull_rebase_with_custom_remote(self, mock_repo_class, git_tool, mock_repo):
+        """Test git pull rebase with custom remote."""
+        mock_repo_class.return_value = mock_repo
+        mock_branch = Mock()
+        mock_branch.name = "feature"
+        mock_repo.active_branch = mock_branch
+        mock_repo.git.pull.return_value = ""
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_pull_rebase",
+            "repo_path": "/test",
+            "remote": "upstream"
+        })
+        
+        assert result["success"]
+        assert "Successfully pulled and rebased 'feature' from 'upstream/feature'" in result["result"]
+        mock_repo.git.pull.assert_called_once_with("--rebase", "upstream", "feature")
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_pull_rebase_conflict(self, mock_repo_class, git_tool, mock_repo):
+        """Test git pull rebase with conflicts."""
+        mock_repo_class.return_value = mock_repo
+        mock_branch = Mock()
+        mock_branch.name = "main"
+        mock_repo.active_branch = mock_branch
+        mock_repo.git.pull.side_effect = GitCommandError("git pull", 1, "conflict detected")
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_pull_rebase",
+            "repo_path": "/test"
+        })
+        
+        assert result["success"]
+        assert "Pull rebase failed due to conflicts" in result["result"]
+        assert "git rebase --continue" in result["result"]
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_pull_rebase_no_remote(self, mock_repo_class, git_tool, mock_repo):
+        """Test git pull rebase with non-existent remote."""
+        mock_repo_class.return_value = mock_repo
+        mock_branch = Mock()
+        mock_branch.name = "main"
+        mock_repo.active_branch = mock_branch
+        mock_repo.git.pull.side_effect = GitCommandError("git pull", 1, "no such remote 'nonexistent'")
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_pull_rebase",
+            "repo_path": "/test",
+            "remote": "nonexistent"
+        })
+        
+        assert result["success"]
+        assert "Remote 'nonexistent' does not exist" in result["result"]
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_pull_rebase_no_tracking(self, mock_repo_class, git_tool, mock_repo):
+        """Test git pull rebase with no tracking information."""
+        mock_repo_class.return_value = mock_repo
+        mock_branch = Mock()
+        mock_branch.name = "main"
+        mock_repo.active_branch = mock_branch
+        mock_repo.git.pull.side_effect = GitCommandError("git pull", 1, "no tracking information for the current branch")
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_pull_rebase",
+            "repo_path": "/test"
+        })
+        
+        assert result["success"]
+        assert "No tracking information for current branch" in result["result"] 

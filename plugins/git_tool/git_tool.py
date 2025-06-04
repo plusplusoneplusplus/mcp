@@ -30,6 +30,7 @@ class GitOperationType(str, Enum):
     CHECKOUT = "git_checkout"
     SHOW = "git_show"
     INIT = "git_init"
+    PULL_REBASE = "git_pull_rebase"
 
 
 @register_tool
@@ -49,7 +50,7 @@ class GitTool(ToolInterface):
     @property
     def description(self) -> str:
         """Return the tool description."""
-        return "Git repository operations including status, diff, commit, branch management, and more"
+        return "Git repository operations including status, diff, commit, branch management, pull rebase, and more"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -95,6 +96,10 @@ class GitTool(ToolInterface):
                     "type": "integer",
                     "description": "Maximum number of commits to show (for log operation)",
                     "default": 10,
+                },
+                "remote": {
+                    "type": "string",
+                    "description": "Remote name for pull rebase operation (defaults to 'origin')",
                 },
             },
             "required": ["operation", "repo_path"],
@@ -211,6 +216,11 @@ class GitTool(ToolInterface):
                     result = self._git_show(repo, revision)
                     return {"success": True, "result": result}
                 
+                case GitOperationType.PULL_REBASE:
+                    remote = parameters.get("remote", "origin")
+                    result = self._git_pull_rebase(repo, remote)
+                    return {"success": True, "result": result}
+                
                 case _:
                     return {"error": f"Unknown Git operation: {operation}"}
         
@@ -310,4 +320,29 @@ class GitTool(ToolInterface):
             repo = git.Repo.init(path=repo_path, mkdir=True)
             return f"Initialized empty Git repository in {repo.git_dir}"
         except Exception as e:
-            return f"Error initializing repository: {str(e)}" 
+            return f"Error initializing repository: {str(e)}"
+
+    def _git_pull_rebase(self, repo: git.Repo, remote: str = "origin") -> str:
+        """Pull changes from remote with rebase (no merge allowed)."""
+        try:
+            # Get the current branch name
+            current_branch = repo.active_branch.name
+            
+            # Perform git pull --rebase
+            # This will fetch from remote and rebase current branch on top of remote branch
+            repo.git.pull("--rebase", remote, current_branch)
+            
+            return f"Successfully pulled and rebased '{current_branch}' from '{remote}/{current_branch}'"
+            
+        except git.GitCommandError as e:
+            # Handle common rebase conflicts or issues
+            if "conflict" in str(e).lower():
+                return f"Pull rebase failed due to conflicts. Please resolve conflicts manually and run 'git rebase --continue' or 'git rebase --abort'"
+            elif "no such remote" in str(e).lower():
+                return f"Remote '{remote}' does not exist. Please check the remote name."
+            elif "no tracking information" in str(e).lower():
+                return f"No tracking information for current branch. Please set up tracking or specify the remote branch explicitly."
+            else:
+                return f"Pull rebase failed: {str(e)}"
+        except Exception as e:
+            return f"Error during pull rebase: {str(e)}" 
