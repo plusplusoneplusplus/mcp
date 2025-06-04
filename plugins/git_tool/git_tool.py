@@ -2,7 +2,8 @@
 
 This module provides a comprehensive Git tool that implements various Git operations
 through the Model Context Protocol, including repository status, diff viewing,
-committing changes, branch management, and more.
+adding files, branch management, and more. Commit operations are handled by the
+dedicated GitCommitTool.
 """
 
 import logging
@@ -22,7 +23,6 @@ class GitOperationType(str, Enum):
     DIFF_UNSTAGED = "git_diff_unstaged"
     DIFF_STAGED = "git_diff_staged"
     DIFF = "git_diff"
-    COMMIT = "git_commit"
     ADD = "git_add"
     RESET = "git_reset"
     LOG = "git_log"
@@ -30,7 +30,6 @@ class GitOperationType(str, Enum):
     CHECKOUT = "git_checkout"
     SHOW = "git_show"
     INIT = "git_init"
-    PULL_REBASE = "git_pull_rebase"
     QUERY_COMMITS = "git_query_commits"
 
 
@@ -51,7 +50,7 @@ class GitTool(ToolInterface):
     @property
     def description(self) -> str:
         """Return the tool description."""
-        return "Git repository operations including status, diff, commit, branch management, pull rebase, commit querying, and more"
+        return "Git repository operations including status, diff, add, branch management, commit querying, and more"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -68,10 +67,7 @@ class GitTool(ToolInterface):
                     "type": "string",
                     "description": "Path to the Git repository",
                 },
-                "message": {
-                    "type": "string",
-                    "description": "Commit message (for commit operation)",
-                },
+
                 "files": {
                     "type": "array",
                     "items": {"type": "string"},
@@ -98,10 +94,7 @@ class GitTool(ToolInterface):
                     "description": "Maximum number of commits to show (for log operation)",
                     "default": 10,
                 },
-                "remote": {
-                    "type": "string",
-                    "description": "Remote name for pull rebase operation (defaults to 'origin')",
-                },
+
                 "since_date": {
                     "type": "string",
                     "description": "Start date for commit query (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
@@ -142,11 +135,6 @@ class GitTool(ToolInterface):
                     target = parameters.get("target")
                     if not target:
                         return {"error": "Missing required parameter: target"}
-                
-                case GitOperationType.COMMIT:
-                    message = parameters.get("message")
-                    if not message:
-                        return {"error": "Missing required parameter: message"}
                 
                 case GitOperationType.ADD:
                     files = parameters.get("files")
@@ -194,11 +182,6 @@ class GitTool(ToolInterface):
                     result = self._git_diff(repo, target)
                     return {"success": True, "result": f"Diff with {target}:\n{result}"}
                 
-                case GitOperationType.COMMIT:
-                    message = parameters.get("message")  # Already validated above
-                    result = self._git_commit(repo, message)
-                    return {"success": True, "result": result}
-                
                 case GitOperationType.ADD:
                     files = parameters.get("files")  # Already validated above
                     result = self._git_add(repo, files)
@@ -227,11 +210,6 @@ class GitTool(ToolInterface):
                 case GitOperationType.SHOW:
                     revision = parameters.get("revision")  # Already validated above
                     result = self._git_show(repo, revision)
-                    return {"success": True, "result": result}
-                
-                case GitOperationType.PULL_REBASE:
-                    remote = parameters.get("remote", "origin")
-                    result = self._git_pull_rebase(repo, remote)
                     return {"success": True, "result": result}
                 
                 case GitOperationType.QUERY_COMMITS:
@@ -269,10 +247,7 @@ class GitTool(ToolInterface):
         """Get diff with target branch or commit."""
         return repo.git.diff(target)
 
-    def _git_commit(self, repo: git.Repo, message: str) -> str:
-        """Commit changes."""
-        commit = repo.index.commit(message)
-        return f"Changes committed successfully with hash {commit.hexsha}"
+
 
     def _git_add(self, repo: git.Repo, files: List[str]) -> str:
         """Add files to staging area."""
@@ -343,30 +318,7 @@ class GitTool(ToolInterface):
         except Exception as e:
             return f"Error initializing repository: {str(e)}"
 
-    def _git_pull_rebase(self, repo: git.Repo, remote: str = "origin") -> str:
-        """Pull changes from remote with rebase (no merge allowed)."""
-        try:
-            # Get the current branch name
-            current_branch = repo.active_branch.name
-            
-            # Perform git pull --rebase
-            # This will fetch from remote and rebase current branch on top of remote branch
-            repo.git.pull("--rebase", remote, current_branch)
-            
-            return f"Successfully pulled and rebased '{current_branch}' from '{remote}/{current_branch}'"
-            
-        except git.GitCommandError as e:
-            # Handle common rebase conflicts or issues
-            if "conflict" in str(e).lower():
-                return f"Pull rebase failed due to conflicts. Please resolve conflicts manually and run 'git rebase --continue' or 'git rebase --abort'"
-            elif "no such remote" in str(e).lower():
-                return f"Remote '{remote}' does not exist. Please check the remote name."
-            elif "no tracking information" in str(e).lower():
-                return f"No tracking information for current branch. Please set up tracking or specify the remote branch explicitly."
-            else:
-                return f"Pull rebase failed: {str(e)}"
-        except Exception as e:
-            return f"Error during pull rebase: {str(e)}"
+
 
     def _git_query_commits(self, repo: git.Repo, since_date: Optional[str] = None, 
                           until_date: Optional[str] = None, author: Optional[str] = None, 
