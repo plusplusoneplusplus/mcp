@@ -51,13 +51,13 @@ def sample_files_data(sample_markdown_content):
         {
             "filename": "test1.md",
             "content": sample_markdown_content,
-            "encoding": "utf-8"
+            "encoding": "utf-8",
         },
         {
             "filename": "test2.md",
             "content": base64.b64encode(sample_markdown_content.encode()).decode(),
-            "encoding": "base64"
-        }
+            "encoding": "base64",
+        },
     ]
 
 
@@ -94,7 +94,7 @@ class TestKnowledgeIndexerTool:
             {
                 "filename": "test.txt",
                 "content": "This is a text file",
-                "encoding": "utf-8"
+                "encoding": "utf-8",
             }
         ]
 
@@ -104,10 +104,15 @@ class TestKnowledgeIndexerTool:
         assert "No markdown files found" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
-    @patch('plugins.knowledge_indexer.tool.MarkdownSegmenter')
-    async def test_execute_tool_success(self, mock_segmenter_class, mock_store_class,
-                                       sample_files_data, temp_vector_store):
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
+    @patch("plugins.knowledge_indexer.tool.MarkdownSegmenter")
+    async def test_execute_tool_success(
+        self,
+        mock_segmenter_class,
+        mock_store_class,
+        sample_files_data,
+        temp_vector_store,
+    ):
         """Test successful tool execution."""
         # Setup mocks
         mock_store = Mock()
@@ -121,11 +126,13 @@ class TestKnowledgeIndexerTool:
         tool = KnowledgeIndexerTool()
         tool.persist_dir = temp_vector_store
 
-        result = await tool.execute_tool({
-            "files": sample_files_data,
-            "collection": "test_collection",
-            "overwrite": False
-        })
+        result = await tool.execute_tool(
+            {
+                "files": sample_files_data,
+                "collection": "test_collection",
+                "overwrite": False,
+            }
+        )
 
         assert result["success"] is True
         assert result["collection"] == "test_collection"
@@ -134,24 +141,30 @@ class TestKnowledgeIndexerTool:
         assert len(result["processed_files"]) == 2
 
     @pytest.mark.asyncio
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
-    async def test_execute_tool_with_overwrite(self, mock_store_class, sample_files_data):
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
+    async def test_execute_tool_with_overwrite(
+        self, mock_store_class, sample_files_data
+    ):
         """Test tool execution with overwrite option."""
         mock_store = Mock()
         mock_store_class.return_value = mock_store
 
         tool = KnowledgeIndexerTool()
 
-        with patch('plugins.knowledge_indexer.tool.MarkdownSegmenter') as mock_segmenter_class:
+        with patch(
+            "plugins.knowledge_indexer.tool.MarkdownSegmenter"
+        ) as mock_segmenter_class:
             mock_segmenter = Mock()
             mock_segmenter_class.return_value = mock_segmenter
             mock_segmenter.segment_and_store.return_value = (3, {})
 
-            result = await tool.execute_tool({
-                "files": sample_files_data,
-                "collection": "test_collection",
-                "overwrite": True
-            })
+            result = await tool.execute_tool(
+                {
+                    "files": sample_files_data,
+                    "collection": "test_collection",
+                    "overwrite": True,
+                }
+            )
 
         # Verify that delete_collection was called
         mock_store.client.delete_collection.assert_called_once_with("test_collection")
@@ -161,20 +174,27 @@ class TestKnowledgeIndexerTool:
         """Test tool exception handling."""
         tool = KnowledgeIndexerTool()
 
-        with patch('plugins.knowledge_indexer.tool.ChromaVectorStore', side_effect=Exception("Test error")):
-            result = await tool.execute_tool({
-                "files": sample_files_data,
-                "collection": "test_collection"
-            })
+        with patch(
+            "plugins.knowledge_indexer.tool.ChromaVectorStore",
+            side_effect=Exception("Test error"),
+        ):
+            result = await tool.execute_tool(
+                {"files": sample_files_data, "collection": "test_collection"}
+            )
 
         assert result["success"] is False
         assert "Knowledge indexing failed" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
-    @patch('plugins.knowledge_indexer.tool.MarkdownSegmenter')
-    async def test_execute_tool_custom_persist_directory(self, mock_segmenter_class, mock_store_class,
-                                                        sample_files_data, temp_vector_store):
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
+    @patch("plugins.knowledge_indexer.tool.MarkdownSegmenter")
+    async def test_execute_tool_custom_persist_directory(
+        self,
+        mock_segmenter_class,
+        mock_store_class,
+        sample_files_data,
+        temp_vector_store,
+    ):
         """Test tool execution with custom persist directory."""
         # Setup mocks
         mock_store = Mock()
@@ -187,16 +207,17 @@ class TestKnowledgeIndexerTool:
         tool = KnowledgeIndexerTool()
         custom_persist_dir = "/custom/persist/path"
 
-        result = await tool.execute_tool({
-            "files": sample_files_data,
-            "collection": "test_collection",
-            "persist_directory": custom_persist_dir
-        })
+        result = await tool.execute_tool(
+            {
+                "files": sample_files_data,
+                "collection": "test_collection",
+                "persist_directory": custom_persist_dir,
+            }
+        )
 
         # Verify that ChromaVectorStore was called with custom persist directory
         mock_store_class.assert_called_with(
-            collection_name="test_collection",
-            persist_directory=custom_persist_dir
+            collection_name="test_collection", persist_directory=custom_persist_dir
         )
 
         assert result["success"] is True
@@ -227,8 +248,8 @@ class TestKnowledgeQueryTool:
         assert "Query text is required" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('sentence_transformers.SentenceTransformer')
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
+    @patch("sentence_transformers.SentenceTransformer")
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
     async def test_execute_tool_success(self, mock_store_class, mock_transformer_class):
         """Test successful query execution."""
         # Setup mocks
@@ -242,18 +263,16 @@ class TestKnowledgeQueryTool:
             "ids": [["id1", "id2"]],
             "documents": [["doc1", "doc2"]],
             "metadatas": [["meta1", "meta2"]],
-            "distances": [[0.1, 0.2]]
+            "distances": [[0.1, 0.2]],
         }
         mock_store.collection = mock_collection
         mock_store_class.return_value = mock_store
 
         tool = KnowledgeQueryTool()
 
-        result = await tool.execute_tool({
-            "query": "test query",
-            "collection": "test_collection",
-            "limit": 5
-        })
+        result = await tool.execute_tool(
+            {"query": "test query", "collection": "test_collection", "limit": 5}
+        )
 
         assert result["success"] is True
         assert result["query"] == "test query"
@@ -266,11 +285,13 @@ class TestKnowledgeQueryTool:
         """Test query tool exception handling."""
         tool = KnowledgeQueryTool()
 
-        with patch('sentence_transformers.SentenceTransformer', side_effect=Exception("Test error")):
-            result = await tool.execute_tool({
-                "query": "test query",
-                "collection": "test_collection"
-            })
+        with patch(
+            "sentence_transformers.SentenceTransformer",
+            side_effect=Exception("Test error"),
+        ):
+            result = await tool.execute_tool(
+                {"query": "test query", "collection": "test_collection"}
+            )
 
         assert result["success"] is False
         assert "Knowledge query failed" in result["error"]
@@ -290,7 +311,7 @@ class TestKnowledgeCollectionManagerTool:
         assert "persist_directory" in tool.input_schema["properties"]
 
     @pytest.mark.asyncio
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
     async def test_list_collections(self, mock_store_class):
         """Test listing collections."""
         mock_store = Mock()
@@ -306,7 +327,7 @@ class TestKnowledgeCollectionManagerTool:
         assert result["collections"] == ["collection1", "collection2"]
 
     @pytest.mark.asyncio
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
     async def test_delete_collection_success(self, mock_store_class):
         """Test successful collection deletion."""
         mock_store = Mock()
@@ -314,10 +335,9 @@ class TestKnowledgeCollectionManagerTool:
 
         tool = KnowledgeCollectionManagerTool()
 
-        result = await tool.execute_tool({
-            "action": "delete",
-            "collection": "test_collection"
-        })
+        result = await tool.execute_tool(
+            {"action": "delete", "collection": "test_collection"}
+        )
 
         assert result["success"] is True
         assert result["action"] == "delete"
@@ -336,7 +356,7 @@ class TestKnowledgeCollectionManagerTool:
         assert "Collection name is required" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
     async def test_collection_info(self, mock_store_class):
         """Test getting collection info."""
         # Setup mocks for collection info
@@ -345,7 +365,7 @@ class TestKnowledgeCollectionManagerTool:
             "ids": [["id1", "id2", "id3"]],
             "documents": [["doc1", "doc2", "doc3"]],
             "metadatas": [["meta1", "meta2", "meta3"]],
-            "distances": [[0.1, 0.2, 0.3]]
+            "distances": [[0.1, 0.2, 0.3]],
         }
 
         mock_store = Mock()
@@ -354,10 +374,9 @@ class TestKnowledgeCollectionManagerTool:
 
         tool = KnowledgeCollectionManagerTool()
 
-        result = await tool.execute_tool({
-            "action": "info",
-            "collection": "test_collection"
-        })
+        result = await tool.execute_tool(
+            {"action": "info", "collection": "test_collection"}
+        )
 
         assert result["success"] is True
         assert result["action"] == "info"
@@ -390,7 +409,10 @@ class TestKnowledgeCollectionManagerTool:
         """Test collection manager exception handling."""
         tool = KnowledgeCollectionManagerTool()
 
-        with patch('plugins.knowledge_indexer.tool.ChromaVectorStore', side_effect=Exception("Test error")):
+        with patch(
+            "plugins.knowledge_indexer.tool.ChromaVectorStore",
+            side_effect=Exception("Test error"),
+        ):
             result = await tool.execute_tool({"action": "list"})
 
         assert result["success"] is False
@@ -401,12 +423,16 @@ class TestToolIntegration:
     """Integration tests for knowledge tools."""
 
     @pytest.mark.asyncio
-    @patch('plugins.knowledge_indexer.tool.ChromaVectorStore')
-    @patch('plugins.knowledge_indexer.tool.MarkdownSegmenter')
-    @patch('sentence_transformers.SentenceTransformer')
-    async def test_index_and_query_workflow(self, mock_transformer_class,
-                                           mock_segmenter_class, mock_store_class,
-                                           sample_files_data):
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
+    @patch("plugins.knowledge_indexer.tool.MarkdownSegmenter")
+    @patch("sentence_transformers.SentenceTransformer")
+    async def test_index_and_query_workflow(
+        self,
+        mock_transformer_class,
+        mock_segmenter_class,
+        mock_store_class,
+        sample_files_data,
+    ):
         """Test the complete workflow of indexing and querying."""
         # Setup mocks for indexing
         mock_store = Mock()
@@ -426,25 +452,23 @@ class TestToolIntegration:
             "ids": [["id1"]],
             "documents": [["Found document"]],
             "metadatas": [["metadata"]],
-            "distances": [[0.1]]
+            "distances": [[0.1]],
         }
         mock_store.collection = mock_collection
 
         # Test indexing
         indexer = KnowledgeIndexerTool()
-        index_result = await indexer.execute_tool({
-            "files": sample_files_data,
-            "collection": "test_workflow"
-        })
+        index_result = await indexer.execute_tool(
+            {"files": sample_files_data, "collection": "test_workflow"}
+        )
 
         assert index_result["success"] is True
 
         # Test querying
         query_tool = KnowledgeQueryTool()
-        query_result = await query_tool.execute_tool({
-            "query": "test query",
-            "collection": "test_workflow"
-        })
+        query_result = await query_tool.execute_tool(
+            {"query": "test query", "collection": "test_workflow"}
+        )
 
         assert query_result["success"] is True
         assert query_result["results"]["documents"] == ["Found document"]
@@ -456,15 +480,15 @@ class TestToolIntegration:
         tools = [
             KnowledgeIndexerTool(),
             KnowledgeQueryTool(),
-            KnowledgeCollectionManagerTool()
+            KnowledgeCollectionManagerTool(),
         ]
 
         for tool in tools:
             assert isinstance(tool, ToolInterface)
-            assert hasattr(tool, 'name')
-            assert hasattr(tool, 'description')
-            assert hasattr(tool, 'input_schema')
-            assert hasattr(tool, 'execute_tool')
+            assert hasattr(tool, "name")
+            assert hasattr(tool, "description")
+            assert hasattr(tool, "input_schema")
+            assert hasattr(tool, "execute_tool")
 
             # Test that properties return expected types
             assert isinstance(tool.name, str)

@@ -1,1 +1,1 @@
-"""Tests for the Git plugin.""" 
+"""Tests for the Git plugin."""

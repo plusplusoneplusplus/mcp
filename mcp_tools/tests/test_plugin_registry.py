@@ -318,7 +318,7 @@ def test_discover_plugin_directory_with_multiple_tool_files(clean_registry, tmp_
     (plugin_dir / "__init__.py").write_text("")
 
     # Create multiple tool files
-    repo_tool_content = '''
+    repo_tool_content = """
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
@@ -338,9 +338,9 @@ class TestRepoTool(ToolInterface):
 
     async def execute_tool(self, arguments: dict) -> any:
         return {"success": True, "tool": "repo"}
-'''
+"""
 
-    pr_tool_content = '''
+    pr_tool_content = """
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
@@ -360,9 +360,9 @@ class TestPRTool(ToolInterface):
 
     async def execute_tool(self, arguments: dict) -> any:
         return {"success": True, "tool": "pr"}
-'''
+"""
 
-    workitem_tool_content = '''
+    workitem_tool_content = """
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
@@ -382,7 +382,7 @@ class TestWorkItemTool(ToolInterface):
 
     async def execute_tool(self, arguments: dict) -> any:
         return {"success": True, "tool": "workitem"}
-'''
+"""
 
     # Write the tool files
     (plugin_dir / "repo_tool.py").write_text(repo_tool_content)
@@ -422,7 +422,7 @@ def test_discover_plugin_directory_ignores_non_tool_files(clean_registry, tmp_pa
     (plugin_dir / "__init__.py").write_text("")
 
     # Create a valid tool file
-    tool_content = '''
+    tool_content = """
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
@@ -442,10 +442,10 @@ class ValidTool(ToolInterface):
 
     async def execute_tool(self, arguments: dict) -> any:
         return {"success": True}
-'''
+"""
 
     # Create files that should be ignored
-    invalid_content = '''
+    invalid_content = """
 from mcp_tools.interfaces import ToolInterface
 
 class InvalidTool(ToolInterface):
@@ -463,13 +463,13 @@ class InvalidTool(ToolInterface):
 
     async def execute_tool(self, arguments: dict) -> any:
         return {"success": True}
-'''
+"""
 
     # Write files
     (plugin_dir / "valid_tool.py").write_text(tool_content)  # Should be discovered
-    (plugin_dir / "helper.py").write_text(invalid_content)   # Should be ignored
-    (plugin_dir / "utils.py").write_text(invalid_content)    # Should be ignored
-    (plugin_dir / "config.py").write_text(invalid_content)   # Should be ignored
+    (plugin_dir / "helper.py").write_text(invalid_content)  # Should be ignored
+    (plugin_dir / "utils.py").write_text(invalid_content)  # Should be ignored
+    (plugin_dir / "config.py").write_text(invalid_content)  # Should be ignored
 
     # Discover plugins in the directory
     clean_registry.discover_plugin_directory(tmp_path)

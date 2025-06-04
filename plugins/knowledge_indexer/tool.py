@@ -42,29 +42,36 @@ class KnowledgeIndexerTool(ToolInterface):
                         "type": "object",
                         "properties": {
                             "filename": {"type": "string"},
-                            "content": {"type": "string", "description": "Base64 encoded file content or raw text content"},
-                            "encoding": {"type": "string", "enum": ["base64", "utf-8"], "default": "utf-8"}
+                            "content": {
+                                "type": "string",
+                                "description": "Base64 encoded file content or raw text content",
+                            },
+                            "encoding": {
+                                "type": "string",
+                                "enum": ["base64", "utf-8"],
+                                "default": "utf-8",
+                            },
                         },
-                        "required": ["filename", "content"]
+                        "required": ["filename", "content"],
                     },
-                    "description": "List of files to index"
+                    "description": "List of files to index",
                 },
                 "collection": {
                     "type": "string",
                     "default": "default",
-                    "description": "Name of the collection to store the knowledge in"
+                    "description": "Name of the collection to store the knowledge in",
                 },
                 "overwrite": {
                     "type": "boolean",
                     "default": False,
-                    "description": "Whether to overwrite existing collection"
+                    "description": "Whether to overwrite existing collection",
                 },
                 "persist_directory": {
                     "type": "string",
-                    "description": "Optional custom path for vector store persistence. If not provided, uses default server directory"
-                }
+                    "description": "Optional custom path for vector store persistence. If not provided, uses default server directory",
+                },
             },
-            "required": ["files"]
+            "required": ["files"],
         }
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -76,10 +83,7 @@ class KnowledgeIndexerTool(ToolInterface):
             persist_directory = arguments.get("persist_directory", self.persist_dir)
 
             if not files:
-                return {
-                    "success": False,
-                    "error": "No files provided for indexing"
-                }
+                return {"success": False, "error": "No files provided for indexing"}
 
             # Handle overwrite - delete collection if requested
             if overwrite:
@@ -92,7 +96,7 @@ class KnowledgeIndexerTool(ToolInterface):
 
             # Create temporary directory for processing
             temp_dir = tempfile.mkdtemp(prefix="knowledge_index_")
-            
+
             try:
                 # Process uploaded files
                 filepaths = []
@@ -100,58 +104,60 @@ class KnowledgeIndexerTool(ToolInterface):
                     filename = file_data.get("filename")
                     content = file_data.get("content")
                     encoding = file_data.get("encoding", "utf-8")
-                    
+
                     if not filename or not content:
                         continue
-                    
+
                     # Create file path in temp directory
                     dest_path = os.path.join(temp_dir, filename)
                     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                    
+
                     # Write content to file
                     if encoding == "base64":
                         import base64
+
                         decoded_content = base64.b64decode(content)
                         with open(dest_path, "wb") as f:
                             f.write(decoded_content)
                     else:
                         with open(dest_path, "w", encoding="utf-8") as f:
                             f.write(content)
-                    
+
                     filepaths.append(dest_path)
 
                 # Filter for markdown files
                 md_files = [f for f in filepaths if f.lower().endswith(".md")]
-                
+
                 if not md_files:
                     return {
                         "success": False,
-                        "error": "No markdown files found in the provided files"
+                        "error": "No markdown files found in the provided files",
                     }
 
                 # Initialize vector store and segmenter
                 vector_store = ChromaVectorStore(
-                    collection_name=collection, 
-                    persist_directory=persist_directory
+                    collection_name=collection, persist_directory=persist_directory
                 )
                 segmenter = MarkdownSegmenter(vector_store)
 
                 # Process each markdown file
                 total_segments = 0
                 processed_files = []
-                
+
                 for md_path in md_files:
                     try:
                         with open(md_path, "r", encoding="utf-8") as f:
                             content = f.read()
-                        
+
                         # Get file metadata
                         stat = os.stat(md_path)
                         file_name = os.path.basename(md_path)
                         rel_path = os.path.relpath(md_path, temp_dir)
                         file_size = stat.st_size
-                        file_date = datetime.datetime.fromtimestamp(stat.st_mtime).isoformat()
-                        
+                        file_date = datetime.datetime.fromtimestamp(
+                            stat.st_mtime
+                        ).isoformat()
+
                         # Segment and store
                         n_segments, _ = segmenter.segment_and_store(
                             content,
@@ -160,27 +166,30 @@ class KnowledgeIndexerTool(ToolInterface):
                             file_size=file_size,
                             file_date=file_date,
                         )
-                        
+
                         total_segments += n_segments
-                        processed_files.append({
-                            "filename": file_name,
-                            "segments": n_segments,
-                            "size": file_size
-                        })
-                        
+                        processed_files.append(
+                            {
+                                "filename": file_name,
+                                "segments": n_segments,
+                                "size": file_size,
+                            }
+                        )
+
                     except Exception as e:
                         # Log error but continue with other files
-                        processed_files.append({
-                            "filename": os.path.basename(md_path),
-                            "error": str(e)
-                        })
+                        processed_files.append(
+                            {"filename": os.path.basename(md_path), "error": str(e)}
+                        )
 
                 return {
                     "success": True,
                     "collection": collection,
-                    "imported_files": len([f for f in processed_files if "error" not in f]),
+                    "imported_files": len(
+                        [f for f in processed_files if "error" not in f]
+                    ),
                     "total_segments": total_segments,
-                    "processed_files": processed_files
+                    "processed_files": processed_files,
                 }
 
             finally:
@@ -188,10 +197,7 @@ class KnowledgeIndexerTool(ToolInterface):
                 shutil.rmtree(temp_dir, ignore_errors=True)
 
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Knowledge indexing failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Knowledge indexing failed: {str(e)}"}
 
 
 @register_tool
@@ -216,28 +222,25 @@ class KnowledgeQueryTool(ToolInterface):
         return {
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query text"
-                },
+                "query": {"type": "string", "description": "The search query text"},
                 "collection": {
                     "type": "string",
                     "default": "default",
-                    "description": "Name of the collection to search in"
+                    "description": "Name of the collection to search in",
                 },
                 "limit": {
                     "type": "integer",
                     "default": 5,
                     "minimum": 1,
                     "maximum": 50,
-                    "description": "Maximum number of results to return"
+                    "description": "Maximum number of results to return",
                 },
                 "persist_directory": {
                     "type": "string",
-                    "description": "Optional custom path for vector store persistence. If not provided, uses default server directory"
-                }
+                    "description": "Optional custom path for vector store persistence. If not provided, uses default server directory",
+                },
             },
-            "required": ["query"]
+            "required": ["query"],
         }
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -249,25 +252,21 @@ class KnowledgeQueryTool(ToolInterface):
             persist_directory = arguments.get("persist_directory", self.persist_dir)
 
             if not query_text:
-                return {
-                    "success": False,
-                    "error": "Query text is required"
-                }
+                return {"success": False, "error": "Query text is required"}
 
             # Initialize embedder and vector store
             from sentence_transformers import SentenceTransformer
+
             embedder = SentenceTransformer("all-MiniLM-L6-v2")
             query_vec = embedder.encode([query_text]).tolist()
 
             store = ChromaVectorStore(
-                collection_name=collection, 
-                persist_directory=persist_directory
+                collection_name=collection, persist_directory=persist_directory
             )
 
             # Perform the query
             results = store.collection.query(
-                query_embeddings=query_vec, 
-                n_results=limit
+                query_embeddings=query_vec, n_results=limit
             )
 
             return {
@@ -279,14 +278,11 @@ class KnowledgeQueryTool(ToolInterface):
                     "documents": results.get("documents", [[]])[0],
                     "metadatas": results.get("metadatas", [[]])[0],
                     "distances": results.get("distances", [[]])[0],
-                }
+                },
             }
 
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Knowledge query failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Knowledge query failed: {str(e)}"}
 
 
 @register_tool
@@ -314,18 +310,18 @@ class KnowledgeCollectionManagerTool(ToolInterface):
                 "action": {
                     "type": "string",
                     "enum": ["list", "delete", "info"],
-                    "description": "Action to perform on collections"
+                    "description": "Action to perform on collections",
                 },
                 "collection": {
                     "type": "string",
-                    "description": "Name of the collection (required for delete and info actions)"
+                    "description": "Name of the collection (required for delete and info actions)",
                 },
                 "persist_directory": {
                     "type": "string",
-                    "description": "Optional custom path for vector store persistence. If not provided, uses default server directory"
-                }
+                    "description": "Optional custom path for vector store persistence. If not provided, uses default server directory",
+                },
             },
-            "required": ["action"]
+            "required": ["action"],
         }
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -339,78 +335,71 @@ class KnowledgeCollectionManagerTool(ToolInterface):
 
             if action == "list":
                 collections = store.list_collections()
-                return {
-                    "success": True,
-                    "action": "list",
-                    "collections": collections
-                }
+                return {"success": True, "action": "list", "collections": collections}
 
             elif action == "delete":
                 if not collection:
                     return {
                         "success": False,
-                        "error": "Collection name is required for delete action"
+                        "error": "Collection name is required for delete action",
                     }
-                
+
                 try:
                     store.client.delete_collection(collection)
                     return {
                         "success": True,
                         "action": "delete",
                         "collection": collection,
-                        "message": f"Collection '{collection}' deleted successfully"
+                        "message": f"Collection '{collection}' deleted successfully",
                     }
                 except Exception as e:
                     return {
                         "success": False,
-                        "error": f"Failed to delete collection '{collection}': {str(e)}"
+                        "error": f"Failed to delete collection '{collection}': {str(e)}",
                     }
 
             elif action == "info":
                 if not collection:
                     return {
                         "success": False,
-                        "error": "Collection name is required for info action"
+                        "error": "Collection name is required for info action",
                     }
-                
+
                 try:
                     # Get collection info by querying with dummy vector
                     collection_store = ChromaVectorStore(
-                        collection_name=collection, 
-                        persist_directory=persist_directory
+                        collection_name=collection, persist_directory=persist_directory
                     )
-                    
+
                     # Use a zero-vector to get all documents (hack for ChromaDB)
                     dummy_vec = [[0.0] * 384]
                     results = collection_store.collection.query(
-                        query_embeddings=dummy_vec, 
-                        n_results=1000
+                        query_embeddings=dummy_vec, n_results=1000
                     )
-                    
+
                     document_count = len(results.get("ids", [[]])[0])
-                    
+
                     return {
                         "success": True,
                         "action": "info",
                         "collection": collection,
                         "document_count": document_count,
-                        "sample_documents": results.get("documents", [[]])[0][:5]  # First 5 docs as sample
+                        "sample_documents": results.get("documents", [[]])[0][
+                            :5
+                        ],  # First 5 docs as sample
                     }
-                    
+
                 except Exception as e:
                     return {
                         "success": False,
-                        "error": f"Failed to get info for collection '{collection}': {str(e)}"
+                        "error": f"Failed to get info for collection '{collection}': {str(e)}",
                     }
 
             else:
-                return {
-                    "success": False,
-                    "error": f"Unknown action: {action}"
-                }
+                return {"success": False, "error": f"Unknown action: {action}"}
 
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Collection management failed: {str(e)}"
-            } 
+                "error": f"Collection management failed: {str(e)}",
+            }

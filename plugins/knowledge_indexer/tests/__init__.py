@@ -1,1 +1,1 @@
-"""Tests for the knowledge indexer plugin.""" 
+"""Tests for the knowledge indexer plugin."""

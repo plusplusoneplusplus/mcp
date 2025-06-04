@@ -19,6 +19,7 @@ from mcp_tools.plugin import register_tool
 
 class GitOperationType(str, Enum):
     """Enumeration of supported Git operations."""
+
     STATUS = "git_status"
     DIFF_UNSTAGED = "git_diff_unstaged"
     DIFF_STAGED = "git_diff_staged"
@@ -67,7 +68,6 @@ class GitTool(ToolInterface):
                     "type": "string",
                     "description": "Path to the Git repository",
                 },
-
                 "files": {
                     "type": "array",
                     "items": {"type": "string"},
@@ -94,7 +94,6 @@ class GitTool(ToolInterface):
                     "description": "Maximum number of commits to show (for log operation)",
                     "default": 10,
                 },
-
                 "since_date": {
                     "type": "string",
                     "description": "Start date for commit query (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
@@ -119,116 +118,132 @@ class GitTool(ToolInterface):
 
         return await self.execute_function(operation, arguments)
 
-    async def execute_function(self, function_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_function(
+        self, function_name: str, parameters: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Execute a Git function."""
         try:
             operation = GitOperationType(function_name)
-            
+
             # Validate repo_path for all operations
             repo_path = parameters.get("repo_path")
             if not repo_path:
                 return {"error": "Missing required parameter: repo_path"}
-            
+
             # Validate operation-specific parameters BEFORE accessing the repository
             match operation:
                 case GitOperationType.DIFF:
                     target = parameters.get("target")
                     if not target:
                         return {"error": "Missing required parameter: target"}
-                
+
                 case GitOperationType.ADD:
                     files = parameters.get("files")
                     if not files:
                         return {"error": "Missing required parameter: files"}
-                
+
                 case GitOperationType.CREATE_BRANCH:
                     branch_name = parameters.get("branch_name")
                     if not branch_name:
                         return {"error": "Missing required parameter: branch_name"}
-                
+
                 case GitOperationType.CHECKOUT:
                     branch_name = parameters.get("branch_name")
                     if not branch_name:
                         return {"error": "Missing required parameter: branch_name"}
-                
+
                 case GitOperationType.SHOW:
                     revision = parameters.get("revision")
                     if not revision:
                         return {"error": "Missing required parameter: revision"}
-            
+
             # Handle git init separately since it doesn't require an existing repo
             if operation == GitOperationType.INIT:
                 result = self._git_init(repo_path)
                 return {"success": True, "result": result}
-            
+
             # For all other operations, validate the repository exists
             repo = git.Repo(repo_path)
-            
+
             match operation:
                 case GitOperationType.STATUS:
                     result = self._git_status(repo)
                     return {"success": True, "result": f"Repository status:\n{result}"}
-                
+
                 case GitOperationType.DIFF_UNSTAGED:
                     result = self._git_diff_unstaged(repo)
                     return {"success": True, "result": f"Unstaged changes:\n{result}"}
-                
+
                 case GitOperationType.DIFF_STAGED:
                     result = self._git_diff_staged(repo)
                     return {"success": True, "result": f"Staged changes:\n{result}"}
-                
+
                 case GitOperationType.DIFF:
                     target = parameters.get("target")  # Already validated above
                     result = self._git_diff(repo, target)
                     return {"success": True, "result": f"Diff with {target}:\n{result}"}
-                
+
                 case GitOperationType.ADD:
                     files = parameters.get("files")  # Already validated above
                     result = self._git_add(repo, files)
                     return {"success": True, "result": result}
-                
+
                 case GitOperationType.RESET:
                     result = self._git_reset(repo)
                     return {"success": True, "result": result}
-                
+
                 case GitOperationType.LOG:
                     max_count = parameters.get("max_count", 10)
                     result = self._git_log(repo, max_count)
                     return {"success": True, "result": f"Commit history:\n{result}"}
-                
+
                 case GitOperationType.CREATE_BRANCH:
-                    branch_name = parameters.get("branch_name")  # Already validated above
+                    branch_name = parameters.get(
+                        "branch_name"
+                    )  # Already validated above
                     base_branch = parameters.get("base_branch")
                     result = self._git_create_branch(repo, branch_name, base_branch)
                     return {"success": True, "result": result}
-                
+
                 case GitOperationType.CHECKOUT:
-                    branch_name = parameters.get("branch_name")  # Already validated above
+                    branch_name = parameters.get(
+                        "branch_name"
+                    )  # Already validated above
                     result = self._git_checkout(repo, branch_name)
                     return {"success": True, "result": result}
-                
+
                 case GitOperationType.SHOW:
                     revision = parameters.get("revision")  # Already validated above
                     result = self._git_show(repo, revision)
                     return {"success": True, "result": result}
-                
+
                 case GitOperationType.QUERY_COMMITS:
                     since_date = parameters.get("since_date")
                     until_date = parameters.get("until_date")
                     author = parameters.get("author")
                     max_count = parameters.get("max_count", 100)
-                    result = self._git_query_commits(repo, since_date, until_date, author, max_count)
-                    return {"success": True, "result": f"Commit query results:\n{result}"}
-                
+                    result = self._git_query_commits(
+                        repo, since_date, until_date, author, max_count
+                    )
+                    return {
+                        "success": True,
+                        "result": f"Commit query results:\n{result}",
+                    }
+
                 case _:
                     return {"error": f"Unknown Git operation: {operation}"}
-        
+
         except git.InvalidGitRepositoryError:
-            return {"success": False, "error": f"Invalid Git repository: {parameters.get('repo_path', 'unknown')}"}
+            return {
+                "success": False,
+                "error": f"Invalid Git repository: {parameters.get('repo_path', 'unknown')}",
+            }
         except git.GitCommandError as e:
             return {"success": False, "error": f"Git command failed: {str(e)}"}
         except Exception as e:
-            self.logger.error(f"Error executing Git operation {function_name}: {str(e)}")
+            self.logger.error(
+                f"Error executing Git operation {function_name}: {str(e)}"
+            )
             return {"success": False, "error": f"Git operation failed: {str(e)}"}
 
     def _git_status(self, repo: git.Repo) -> str:
@@ -246,8 +261,6 @@ class GitTool(ToolInterface):
     def _git_diff(self, repo: git.Repo, target: str) -> str:
         """Get diff with target branch or commit."""
         return repo.git.diff(target)
-
-
 
     def _git_add(self, repo: git.Repo, files: List[str]) -> str:
         """Add files to staging area."""
@@ -272,7 +285,9 @@ class GitTool(ToolInterface):
             )
         return "\n".join(log_entries)
 
-    def _git_create_branch(self, repo: git.Repo, branch_name: str, base_branch: Optional[str] = None) -> str:
+    def _git_create_branch(
+        self, repo: git.Repo, branch_name: str, base_branch: Optional[str] = None
+    ) -> str:
         """Create a new branch."""
         if base_branch:
             base = repo.refs[base_branch]
@@ -296,18 +311,18 @@ class GitTool(ToolInterface):
             f"Date: {commit.authored_datetime}\n"
             f"Message: {commit.message}\n"
         ]
-        
+
         if commit.parents:
             parent = commit.parents[0]
             diff = parent.diff(commit, create_patch=True)
         else:
             diff = commit.diff(git.NULL_TREE, create_patch=True)
-        
+
         for d in diff:
             output.append(f"\n--- {d.a_path}\n+++ {d.b_path}\n")
             if d.diff:
-                output.append(d.diff.decode('utf-8'))
-        
+                output.append(d.diff.decode("utf-8"))
+
         return "".join(output)
 
     def _git_init(self, repo_path: str) -> str:
@@ -318,40 +333,45 @@ class GitTool(ToolInterface):
         except Exception as e:
             return f"Error initializing repository: {str(e)}"
 
-
-
-    def _git_query_commits(self, repo: git.Repo, since_date: Optional[str] = None, 
-                          until_date: Optional[str] = None, author: Optional[str] = None, 
-                          max_count: int = 100) -> str:
+    def _git_query_commits(
+        self,
+        repo: git.Repo,
+        since_date: Optional[str] = None,
+        until_date: Optional[str] = None,
+        author: Optional[str] = None,
+        max_count: int = 100,
+    ) -> str:
         """Query commits based on optional time range, author, and max count."""
         try:
             # Build the git log command arguments
             log_args = []
-            
+
             # Add date range filters if provided
             if since_date:
                 log_args.extend(["--since", since_date])
             if until_date:
                 log_args.extend(["--until", until_date])
-            
+
             # Add author filter if provided
             if author:
                 log_args.extend(["--author", author])
-            
+
             # Add max count
             log_args.extend(["-n", str(max_count)])
-            
+
             # Get commits using iter_commits with the filters
-            commits = list(repo.iter_commits(
-                max_count=max_count,
-                since=since_date,
-                until=until_date,
-                author=author
-            ))
-            
+            commits = list(
+                repo.iter_commits(
+                    max_count=max_count,
+                    since=since_date,
+                    until=until_date,
+                    author=author,
+                )
+            )
+
             if not commits:
                 return "No commits found matching the specified criteria."
-            
+
             # Format the commit information
             log_entries = []
             for commit in commits:
@@ -362,7 +382,7 @@ class GitTool(ToolInterface):
                     f"Message: {commit.message.strip()}\n"
                     f"{'=' * 50}"
                 )
-            
+
             summary = f"Found {len(commits)} commit(s)"
             if since_date or until_date:
                 date_range = []
@@ -374,8 +394,8 @@ class GitTool(ToolInterface):
             if author:
                 summary += f" by author '{author}'"
             summary += f" (max {max_count} results)\n\n"
-            
+
             return summary + "\n".join(log_entries)
-            
+
         except Exception as e:
-            return f"Error querying commits: {str(e)}" 
+            return f"Error querying commits: {str(e)}"

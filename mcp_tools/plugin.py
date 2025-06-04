@@ -432,7 +432,9 @@ class PluginRegistry:
                                         f"Successfully loaded plugin tool module: {plugin_name}.{module_name}"
                                     )
                                 else:
-                                    logger.error(f"Failed to create spec for {tool_file}")
+                                    logger.error(
+                                        f"Failed to create spec for {tool_file}"
+                                    )
                             except Exception as e:
                                 logger.error(
                                     f"Error importing tool module from {tool_file}: {e}"

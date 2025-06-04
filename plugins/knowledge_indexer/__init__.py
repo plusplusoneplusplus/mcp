@@ -12,6 +12,6 @@ from plugins.knowledge_indexer.tool import (
 
 __all__ = [
     "KnowledgeIndexerTool",
-    "KnowledgeQueryTool", 
+    "KnowledgeQueryTool",
     "KnowledgeCollectionManagerTool",
-] 
+]

@@ -10,4 +10,6 @@ sys.path.insert(0, str(project_root))
 
 # Set up environment variables for testing
 os.environ.setdefault("MCP_REGISTER_CODE_TOOLS", "true")
-os.environ.setdefault("MCP_REGISTER_YAML_TOOLS", "false")  # Disable YAML tools for simpler testing 
+os.environ.setdefault(
+    "MCP_REGISTER_YAML_TOOLS", "false"
+)  # Disable YAML tools for simpler testing

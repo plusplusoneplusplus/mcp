@@ -53,7 +53,7 @@ async def api_import_knowledge(request: Request):
         files = form.getlist("files")
         collection = form.get("collection") or "default"
         overwrite = form.get("overwrite") == "true"
-        
+
         if not files:
             return JSONResponse(
                 {"success": False, "error": "No files uploaded."}, status_code=400
@@ -62,26 +62,24 @@ async def api_import_knowledge(request: Request):
         # Convert uploaded files to the format expected by the tool
         file_data = []
         for upload in files:
-            filename = getattr(upload, "filename", None) or getattr(upload, "name", None)
+            filename = getattr(upload, "filename", None) or getattr(
+                upload, "name", None
+            )
             if not filename:
                 continue
-            
+
             content = await upload.read()
             # Convert binary content to base64 for the tool
-            content_b64 = base64.b64encode(content).decode('utf-8')
-            
-            file_data.append({
-                "filename": filename,
-                "content": content_b64,
-                "encoding": "base64"
-            })
+            content_b64 = base64.b64encode(content).decode("utf-8")
+
+            file_data.append(
+                {"filename": filename, "content": content_b64, "encoding": "base64"}
+            )
 
         # Execute the knowledge indexer tool
-        result = await get_knowledge_indexer().execute_tool({
-            "files": file_data,
-            "collection": collection,
-            "overwrite": overwrite
-        })
+        result = await get_knowledge_indexer().execute_tool(
+            {"files": file_data, "collection": collection, "overwrite": overwrite}
+        )
 
         # Return the result with appropriate status code
         status_code = 200 if result.get("success") else 500
@@ -99,12 +97,14 @@ async def api_list_collections(request: Request):
     try:
         # Execute the knowledge collections tool
         result = await get_knowledge_collections().execute_tool({"action": "list"})
-        
+
         if result.get("success"):
             return JSONResponse({"collections": result.get("collections", [])})
         else:
-            return JSONResponse({"error": result.get("error", "Unknown error")}, status_code=500)
-            
+            return JSONResponse(
+                {"error": result.get("error", "Unknown error")}, status_code=500
+            )
+
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -114,25 +114,30 @@ async def api_list_documents(request: Request):
     try:
         collection = request.query_params.get("collection")
         if not collection:
-            return JSONResponse({"error": "Missing collection parameter."}, status_code=400)
-        
+            return JSONResponse(
+                {"error": "Missing collection parameter."}, status_code=400
+            )
+
         # Execute the knowledge collections tool
-        result = await get_knowledge_collections().execute_tool({
-            "action": "info",
-            "collection": collection
-        })
-        
+        result = await get_knowledge_collections().execute_tool(
+            {"action": "info", "collection": collection}
+        )
+
         if result.get("success"):
             # Convert the tool result to match the original API format
-            return JSONResponse({
-                "ids": [],  # Tool doesn't return IDs in the same format
-                "documents": result.get("sample_documents", []),
-                "metadatas": [],  # Tool doesn't return metadata in the same format
-                "document_count": result.get("document_count", 0)
-            })
+            return JSONResponse(
+                {
+                    "ids": [],  # Tool doesn't return IDs in the same format
+                    "documents": result.get("sample_documents", []),
+                    "metadatas": [],  # Tool doesn't return metadata in the same format
+                    "document_count": result.get("document_count", 0),
+                }
+            )
         else:
-            return JSONResponse({"error": result.get("error", "Unknown error")}, status_code=500)
-            
+            return JSONResponse(
+                {"error": result.get("error", "Unknown error")}, status_code=500
+            )
+
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -146,31 +151,33 @@ async def api_query_segments(request: Request):
             limit = int(request.query_params.get("limit", 3))
         except Exception:
             limit = 3
-            
+
         if not collection or not query_text:
             return JSONResponse(
                 {"error": "Missing collection or query parameter."}, status_code=400
             )
-        
+
         # Execute the knowledge query tool
-        result = await get_knowledge_query().execute_tool({
-            "query": query_text,
-            "collection": collection,
-            "limit": limit
-        })
-        
+        result = await get_knowledge_query().execute_tool(
+            {"query": query_text, "collection": collection, "limit": limit}
+        )
+
         if result.get("success"):
             # Return the results in the expected format
             results_data = result.get("results", {})
-            return JSONResponse({
-                "ids": results_data.get("ids", []),
-                "documents": results_data.get("documents", []),
-                "metadatas": results_data.get("metadatas", []),
-                "distances": results_data.get("distances", []),
-            })
+            return JSONResponse(
+                {
+                    "ids": results_data.get("ids", []),
+                    "documents": results_data.get("documents", []),
+                    "metadatas": results_data.get("metadatas", []),
+                    "distances": results_data.get("distances", []),
+                }
+            )
         else:
-            return JSONResponse({"error": result.get("error", "Unknown error")}, status_code=500)
-            
+            return JSONResponse(
+                {"error": result.get("error", "Unknown error")}, status_code=500
+            )
+
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -184,17 +191,16 @@ async def api_delete_collection(request: Request):
             return JSONResponse(
                 {"success": False, "error": "Missing collection name."}, status_code=400
             )
-        
+
         # Execute the knowledge collections tool
-        result = await get_knowledge_collections().execute_tool({
-            "action": "delete",
-            "collection": collection
-        })
-        
+        result = await get_knowledge_collections().execute_tool(
+            {"action": "delete", "collection": collection}
+        )
+
         # Return the result as-is since it already has the expected format
         status_code = 200 if result.get("success") else 500
         return JSONResponse(result, status_code=status_code)
-        
+
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
