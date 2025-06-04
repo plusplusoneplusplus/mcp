@@ -453,4 +453,323 @@ class TestGitTool:
         })
         
         assert result["success"]
-        assert "No tracking information for current branch" in result["result"] 
+        assert "No tracking information for current branch" in result["result"]
+
+    # Tests for git_query_commits functionality
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_basic(self, mock_repo_class, git_tool, mock_repo):
+        """Test basic git query commits operation."""
+        mock_repo_class.return_value = mock_repo
+        
+        # Create mock commits
+        mock_commit1 = Mock()
+        mock_commit1.hexsha = "abc123def456"
+        mock_commit1.author.name = "John Doe"
+        mock_commit1.author.email = "john@example.com"
+        mock_commit1.authored_datetime.strftime.return_value = "2023-12-01 10:30:00"
+        mock_commit1.message = "Add new feature\n"
+        
+        mock_commit2 = Mock()
+        mock_commit2.hexsha = "def456ghi789"
+        mock_commit2.author.name = "Jane Smith"
+        mock_commit2.author.email = "jane@example.com"
+        mock_commit2.authored_datetime.strftime.return_value = "2023-11-30 15:45:00"
+        mock_commit2.message = "Fix bug in authentication\n"
+        
+        mock_repo.iter_commits.return_value = [mock_commit1, mock_commit2]
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test"
+        })
+        
+        assert result["success"]
+        assert "Found 2 commit(s)" in result["result"]
+        assert "abc123de" in result["result"]  # Short hash
+        assert "John Doe <john@example.com>" in result["result"]
+        assert "Add new feature" in result["result"]
+        assert "def456gh" in result["result"]  # Short hash
+        assert "Jane Smith <jane@example.com>" in result["result"]
+        assert "Fix bug in authentication" in result["result"]
+        
+        # Verify iter_commits was called with default parameters
+        mock_repo.iter_commits.assert_called_once_with(
+            max_count=100,
+            since=None,
+            until=None,
+            author=None
+        )
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_with_date_range(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits with date range filtering."""
+        mock_repo_class.return_value = mock_repo
+        
+        mock_commit = Mock()
+        mock_commit.hexsha = "abc123def456"
+        mock_commit.author.name = "John Doe"
+        mock_commit.author.email = "john@example.com"
+        mock_commit.authored_datetime.strftime.return_value = "2023-12-01 10:30:00"
+        mock_commit.message = "Recent commit\n"
+        
+        mock_repo.iter_commits.return_value = [mock_commit]
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test",
+            "since_date": "2023-12-01",
+            "until_date": "2023-12-31"
+        })
+        
+        assert result["success"]
+        assert "Found 1 commit(s) since 2023-12-01 until 2023-12-31" in result["result"]
+        assert "Recent commit" in result["result"]
+        
+        mock_repo.iter_commits.assert_called_once_with(
+            max_count=100,
+            since="2023-12-01",
+            until="2023-12-31",
+            author=None
+        )
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_with_author_filter(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits with author filtering."""
+        mock_repo_class.return_value = mock_repo
+        
+        mock_commit = Mock()
+        mock_commit.hexsha = "abc123def456"
+        mock_commit.author.name = "John Doe"
+        mock_commit.author.email = "john@example.com"
+        mock_commit.authored_datetime.strftime.return_value = "2023-12-01 10:30:00"
+        mock_commit.message = "John's commit\n"
+        
+        mock_repo.iter_commits.return_value = [mock_commit]
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test",
+            "author": "John Doe"
+        })
+        
+        assert result["success"]
+        assert "Found 1 commit(s) by author 'John Doe'" in result["result"]
+        assert "John's commit" in result["result"]
+        
+        mock_repo.iter_commits.assert_called_once_with(
+            max_count=100,
+            since=None,
+            until=None,
+            author="John Doe"
+        )
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_with_max_count(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits with custom max count."""
+        mock_repo_class.return_value = mock_repo
+        
+        # Create 3 mock commits but limit to 2
+        mock_commits = []
+        for i in range(2):  # Only return 2 commits due to max_count=2
+            mock_commit = Mock()
+            mock_commit.hexsha = f"commit{i}hash"
+            mock_commit.author.name = f"Author {i}"
+            mock_commit.author.email = f"author{i}@example.com"
+            mock_commit.authored_datetime.strftime.return_value = f"2023-12-0{i+1} 10:30:00"
+            mock_commit.message = f"Commit {i}\n"
+            mock_commits.append(mock_commit)
+        
+        mock_repo.iter_commits.return_value = mock_commits
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test",
+            "max_count": 2
+        })
+        
+        assert result["success"]
+        assert "Found 2 commit(s) (max 2 results)" in result["result"]
+        assert "Commit 0" in result["result"]
+        assert "Commit 1" in result["result"]
+        
+        mock_repo.iter_commits.assert_called_once_with(
+            max_count=2,
+            since=None,
+            until=None,
+            author=None
+        )
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_all_filters(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits with all filters applied."""
+        mock_repo_class.return_value = mock_repo
+        
+        mock_commit = Mock()
+        mock_commit.hexsha = "abc123def456"
+        mock_commit.author.name = "John Doe"
+        mock_commit.author.email = "john@example.com"
+        mock_commit.authored_datetime.strftime.return_value = "2023-12-01 10:30:00"
+        mock_commit.message = "Filtered commit\n"
+        
+        mock_repo.iter_commits.return_value = [mock_commit]
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test",
+            "since_date": "2023-12-01",
+            "until_date": "2023-12-31",
+            "author": "John Doe",
+            "max_count": 50
+        })
+        
+        assert result["success"]
+        assert "Found 1 commit(s) since 2023-12-01 until 2023-12-31 by author 'John Doe' (max 50 results)" in result["result"]
+        assert "Filtered commit" in result["result"]
+        
+        mock_repo.iter_commits.assert_called_once_with(
+            max_count=50,
+            since="2023-12-01",
+            until="2023-12-31",
+            author="John Doe"
+        )
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_no_results(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits when no commits match criteria."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.iter_commits.return_value = []
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test",
+            "author": "NonExistentAuthor"
+        })
+        
+        assert result["success"]
+        assert "No commits found matching the specified criteria" in result["result"]
+        
+        mock_repo.iter_commits.assert_called_once_with(
+            max_count=100,
+            since=None,
+            until=None,
+            author="NonExistentAuthor"
+        )
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_only_since_date(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits with only since_date filter."""
+        mock_repo_class.return_value = mock_repo
+        
+        mock_commit = Mock()
+        mock_commit.hexsha = "abc123def456"
+        mock_commit.author.name = "John Doe"
+        mock_commit.author.email = "john@example.com"
+        mock_commit.authored_datetime.strftime.return_value = "2023-12-01 10:30:00"
+        mock_commit.message = "Recent commit\n"
+        
+        mock_repo.iter_commits.return_value = [mock_commit]
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test",
+            "since_date": "2023-12-01"
+        })
+        
+        assert result["success"]
+        assert "Found 1 commit(s) since 2023-12-01" in result["result"]
+        assert "Recent commit" in result["result"]
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_only_until_date(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits with only until_date filter."""
+        mock_repo_class.return_value = mock_repo
+        
+        mock_commit = Mock()
+        mock_commit.hexsha = "abc123def456"
+        mock_commit.author.name = "John Doe"
+        mock_commit.author.email = "john@example.com"
+        mock_commit.authored_datetime.strftime.return_value = "2023-11-30 10:30:00"
+        mock_commit.message = "Old commit\n"
+        
+        mock_repo.iter_commits.return_value = [mock_commit]
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test",
+            "until_date": "2023-11-30"
+        })
+        
+        assert result["success"]
+        assert "Found 1 commit(s) until 2023-11-30" in result["result"]
+        assert "Old commit" in result["result"]
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_git_error(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits with git command error."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.iter_commits.side_effect = GitCommandError("git log", 1, "fatal: bad revision")
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test"
+        })
+        
+        assert result["success"]
+        assert "Error querying commits" in result["result"]
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_invalid_repo(self, mock_repo_class, git_tool):
+        """Test git query commits with invalid repository."""
+        mock_repo_class.side_effect = InvalidGitRepositoryError("Not a git repo")
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/invalid"
+        })
+        
+        assert not result["success"]
+        assert "Invalid Git repository" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_query_commits_missing_repo_path(self, git_tool):
+        """Test git query commits without repo_path."""
+        result = await git_tool.execute_tool({"operation": "git_query_commits"})
+        
+        assert "error" in result
+        assert "Missing required parameter: repo_path" in result["error"]
+
+    @pytest.mark.asyncio
+    @patch('git.Repo')
+    async def test_query_commits_message_formatting(self, mock_repo_class, git_tool, mock_repo):
+        """Test git query commits message formatting with multiline commit messages."""
+        mock_repo_class.return_value = mock_repo
+        
+        mock_commit = Mock()
+        mock_commit.hexsha = "abc123def456"
+        mock_commit.author.name = "John Doe"
+        mock_commit.author.email = "john@example.com"
+        mock_commit.authored_datetime.strftime.return_value = "2023-12-01 10:30:00"
+        mock_commit.message = "Add new feature\n\nThis commit adds a new feature\nwith multiple lines of description\n\n"
+        
+        mock_repo.iter_commits.return_value = [mock_commit]
+        
+        result = await git_tool.execute_tool({
+            "operation": "git_query_commits",
+            "repo_path": "/test"
+        })
+        
+        assert result["success"]
+        # Check that the message is properly stripped
+        assert "Add new feature\n\nThis commit adds a new feature\nwith multiple lines of description" in result["result"]
+        # Ensure the formatting separators are present
+        assert "=" * 50 in result["result"] 

@@ -31,6 +31,7 @@ class GitOperationType(str, Enum):
     SHOW = "git_show"
     INIT = "git_init"
     PULL_REBASE = "git_pull_rebase"
+    QUERY_COMMITS = "git_query_commits"
 
 
 @register_tool
@@ -50,7 +51,7 @@ class GitTool(ToolInterface):
     @property
     def description(self) -> str:
         """Return the tool description."""
-        return "Git repository operations including status, diff, commit, branch management, pull rebase, and more"
+        return "Git repository operations including status, diff, commit, branch management, pull rebase, commit querying, and more"
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -100,6 +101,18 @@ class GitTool(ToolInterface):
                 "remote": {
                     "type": "string",
                     "description": "Remote name for pull rebase operation (defaults to 'origin')",
+                },
+                "since_date": {
+                    "type": "string",
+                    "description": "Start date for commit query (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
+                },
+                "until_date": {
+                    "type": "string",
+                    "description": "End date for commit query (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)",
+                },
+                "author": {
+                    "type": "string",
+                    "description": "Filter commits by author name or email",
                 },
             },
             "required": ["operation", "repo_path"],
@@ -220,6 +233,14 @@ class GitTool(ToolInterface):
                     remote = parameters.get("remote", "origin")
                     result = self._git_pull_rebase(repo, remote)
                     return {"success": True, "result": result}
+                
+                case GitOperationType.QUERY_COMMITS:
+                    since_date = parameters.get("since_date")
+                    until_date = parameters.get("until_date")
+                    author = parameters.get("author")
+                    max_count = parameters.get("max_count", 100)
+                    result = self._git_query_commits(repo, since_date, until_date, author, max_count)
+                    return {"success": True, "result": f"Commit query results:\n{result}"}
                 
                 case _:
                     return {"error": f"Unknown Git operation: {operation}"}
@@ -345,4 +366,64 @@ class GitTool(ToolInterface):
             else:
                 return f"Pull rebase failed: {str(e)}"
         except Exception as e:
-            return f"Error during pull rebase: {str(e)}" 
+            return f"Error during pull rebase: {str(e)}"
+
+    def _git_query_commits(self, repo: git.Repo, since_date: Optional[str] = None, 
+                          until_date: Optional[str] = None, author: Optional[str] = None, 
+                          max_count: int = 100) -> str:
+        """Query commits based on optional time range, author, and max count."""
+        try:
+            # Build the git log command arguments
+            log_args = []
+            
+            # Add date range filters if provided
+            if since_date:
+                log_args.extend(["--since", since_date])
+            if until_date:
+                log_args.extend(["--until", until_date])
+            
+            # Add author filter if provided
+            if author:
+                log_args.extend(["--author", author])
+            
+            # Add max count
+            log_args.extend(["-n", str(max_count)])
+            
+            # Get commits using iter_commits with the filters
+            commits = list(repo.iter_commits(
+                max_count=max_count,
+                since=since_date,
+                until=until_date,
+                author=author
+            ))
+            
+            if not commits:
+                return "No commits found matching the specified criteria."
+            
+            # Format the commit information
+            log_entries = []
+            for commit in commits:
+                log_entries.append(
+                    f"Commit: {commit.hexsha[:8]}\n"
+                    f"Author: {commit.author.name} <{commit.author.email}>\n"
+                    f"Date: {commit.authored_datetime.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"Message: {commit.message.strip()}\n"
+                    f"{'=' * 50}"
+                )
+            
+            summary = f"Found {len(commits)} commit(s)"
+            if since_date or until_date:
+                date_range = []
+                if since_date:
+                    date_range.append(f"since {since_date}")
+                if until_date:
+                    date_range.append(f"until {until_date}")
+                summary += f" {' '.join(date_range)}"
+            if author:
+                summary += f" by author '{author}'"
+            summary += f" (max {max_count} results)\n\n"
+            
+            return summary + "\n".join(log_entries)
+            
+        except Exception as e:
+            return f"Error querying commits: {str(e)}" 
