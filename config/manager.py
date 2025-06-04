@@ -19,6 +19,7 @@ class EnvironmentManager:
         "tool_history_path",
         "browser_profile_path",
         "image_dir",
+        "vector_store_path",
     ]
 
     # Default settings with their types
@@ -36,6 +37,8 @@ class EnvironmentManager:
         "client_type": ("playwright", str),
         # Image serving
         "image_dir": (".images", str),
+        # Vector store settings
+        "vector_store_path": (".vector_store", str),
     }
 
     # Create mapping dynamically - each setting can be set via its uppercase env var
@@ -422,6 +425,10 @@ class EnvironmentManager:
     def get_tool_history_path(self) -> str:
         """Get the path for storing tool invoke history"""
         return self.get_setting("tool_history_path", ".history")
+
+    def get_vector_store_path(self) -> str:
+        """Get the vector store persistence path"""
+        return self.get_setting("vector_store_path", ".vector_store")
 
 
 # Create singleton instance

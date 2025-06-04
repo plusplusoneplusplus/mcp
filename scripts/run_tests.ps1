@@ -112,6 +112,7 @@ Run-ComponentTests "utils.playwright" "utils/playwright/tests" $TestPattern
 # Run tests for plugins
 Run-ComponentTests "plugins.azrepo" "plugins/azrepo/tests" $TestPattern
 Run-ComponentTests "plugins.kusto" "plugins/kusto/tests" $TestPattern
+Run-ComponentTests "plugins.git_tool" "plugins/git_tool/tests" $TestPattern
 # Add more plugin components as needed
 
 # Run project-level tests if they exist

@@ -22,6 +22,10 @@
 !git_tool/
 !git_tool/**
 
+# Track the knowledge_indexer plugin
+!knowledge_indexer/
+!knowledge_indexer/**
+
 # Ignore Python bytecode files
 *.pyc
 __pycache__/

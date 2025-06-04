@@ -1,154 +1,182 @@
 import os
 import tempfile
 import shutil
+import base64
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 from utils.vector_store.markdown_segmenter import MarkdownSegmenter
 from utils.vector_store.vector_store import ChromaVectorStore
 
+# Import the knowledge tools directly
+from plugins.knowledge_indexer.tool import (
+    KnowledgeIndexerTool,
+    KnowledgeQueryTool,
+    KnowledgeCollectionManagerTool,
+)
+from config import env
+
+# Global tool instances (lazy initialized)
+_knowledge_indexer = None
+_knowledge_query = None
+_knowledge_collections = None
+
+
+def get_knowledge_indexer():
+    """Get or create the knowledge indexer tool instance."""
+    global _knowledge_indexer
+    if _knowledge_indexer is None:
+        _knowledge_indexer = KnowledgeIndexerTool()
+    return _knowledge_indexer
+
+
+def get_knowledge_query():
+    """Get or create the knowledge query tool instance."""
+    global _knowledge_query
+    if _knowledge_query is None:
+        _knowledge_query = KnowledgeQueryTool()
+    return _knowledge_query
+
+
+def get_knowledge_collections():
+    """Get or create the knowledge collections tool instance."""
+    global _knowledge_collections
+    if _knowledge_collections is None:
+        _knowledge_collections = KnowledgeCollectionManagerTool()
+    return _knowledge_collections
+
 
 async def api_import_knowledge(request: Request):
-    form = await request.form()
-    files = form.getlist("files")
-    collection = form.get("collection") or "default"
-    overwrite = form.get("overwrite") == "true"
-    if not files:
-        return JSONResponse(
-            {"success": False, "error": "No files uploaded."}, status_code=400
-        )
-
-    if overwrite:
-        # Delete the collection before importing
-        try:
-            store = ChromaVectorStore(persist_directory=PERSIST_DIR)
-            store.client.delete_collection(collection)
-        except Exception as e:
-            # If collection doesn't exist, ignore
-            pass
-
-    temp_dir = tempfile.mkdtemp(prefix="import_know_")
+    """API endpoint that delegates to the knowledge_indexer tool."""
     try:
-        filepaths = []
-        for upload in files:
-            rel_path = getattr(upload, "filename", None) or getattr(
-                upload, "name", None
-            )
-            if not rel_path:
-                continue
-            dest_path = os.path.join(temp_dir, rel_path)
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            with open(dest_path, "wb") as f:
-                content = await upload.read()
-                f.write(content)
-            filepaths.append(dest_path)
-        md_files = [f for f in filepaths if f.lower().endswith(".md")]
-        if not md_files:
+        form = await request.form()
+        files = form.getlist("files")
+        collection = form.get("collection") or "default"
+        overwrite = form.get("overwrite") == "true"
+        
+        if not files:
             return JSONResponse(
-                {"success": False, "error": "No markdown files found in upload."},
-                status_code=400,
+                {"success": False, "error": "No files uploaded."}, status_code=400
             )
-        vector_store = ChromaVectorStore(
-            collection_name=collection, persist_directory=PERSIST_DIR
-        )
-        segmenter = MarkdownSegmenter(vector_store)
-        total = 0
-        for md_path in md_files:
-            with open(md_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            stat = os.stat(md_path)
-            file_name = os.path.basename(md_path)
-            rel_path = os.path.relpath(md_path, temp_dir)
-            file_size = stat.st_size
-            import datetime
 
-            file_date = datetime.datetime.fromtimestamp(stat.st_mtime).isoformat()
-            n, _ = segmenter.segment_and_store(
-                content,
-                file_name=file_name,
-                rel_path=rel_path,
-                file_size=file_size,
-                file_date=file_date,
-            )
-            total += n
-        return JSONResponse(
-            {"success": True, "imported_files": len(md_files), "total_segments": total}
-        )
+        # Convert uploaded files to the format expected by the tool
+        file_data = []
+        for upload in files:
+            filename = getattr(upload, "filename", None) or getattr(upload, "name", None)
+            if not filename:
+                continue
+            
+            content = await upload.read()
+            # Convert binary content to base64 for the tool
+            content_b64 = base64.b64encode(content).decode('utf-8')
+            
+            file_data.append({
+                "filename": filename,
+                "content": content_b64,
+                "encoding": "base64"
+            })
+
+        # Execute the knowledge indexer tool
+        result = await get_knowledge_indexer().execute_tool({
+            "files": file_data,
+            "collection": collection,
+            "overwrite": overwrite
+        })
+
+        # Return the result with appropriate status code
+        status_code = 200 if result.get("success") else 500
+        return JSONResponse(result, status_code=status_code)
+
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 from starlette.responses import JSONResponse
 
-PERSIST_DIR = os.path.join(os.path.dirname(__file__), ".vector_store")
-
 
 async def api_list_collections(request: Request):
-    store = ChromaVectorStore(persist_directory=PERSIST_DIR)
-    collections = store.list_collections()
-    return JSONResponse({"collections": collections})
-
-
-async def api_list_documents(request: Request):
-    collection = request.query_params.get("collection")
-    if not collection:
-        return JSONResponse({"error": "Missing collection parameter."}, status_code=400)
-    store = ChromaVectorStore(collection_name=collection, persist_directory=PERSIST_DIR)
-    # ChromaDB does not have a direct 'list all' method, so we use a hack: query all with a dummy vector
-    # We'll use a zero-vector of the correct dimension (assume 384 for MiniLM)
+    """API endpoint that delegates to the knowledge_collections tool."""
     try:
-        dummy_vec = [[0.0] * 384]
-        results = store.collection.query(query_embeddings=dummy_vec, n_results=1000)
-        # Return ids, documents, metadatas
-        return JSONResponse(
-            {
-                "ids": results.get("ids", [[]])[0],
-                "documents": results.get("documents", [[]])[0],
-                "metadatas": results.get("metadatas", [[]])[0],
-            }
-        )
+        # Execute the knowledge collections tool
+        result = await get_knowledge_collections().execute_tool({"action": "list"})
+        
+        if result.get("success"):
+            return JSONResponse({"collections": result.get("collections", [])})
+        else:
+            return JSONResponse({"error": result.get("error", "Unknown error")}, status_code=500)
+            
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-from sentence_transformers import SentenceTransformer
-import numpy as np
+async def api_list_documents(request: Request):
+    """API endpoint that delegates to the knowledge_collections tool."""
+    try:
+        collection = request.query_params.get("collection")
+        if not collection:
+            return JSONResponse({"error": "Missing collection parameter."}, status_code=400)
+        
+        # Execute the knowledge collections tool
+        result = await get_knowledge_collections().execute_tool({
+            "action": "info",
+            "collection": collection
+        })
+        
+        if result.get("success"):
+            # Convert the tool result to match the original API format
+            return JSONResponse({
+                "ids": [],  # Tool doesn't return IDs in the same format
+                "documents": result.get("sample_documents", []),
+                "metadatas": [],  # Tool doesn't return metadata in the same format
+                "document_count": result.get("document_count", 0)
+            })
+        else:
+            return JSONResponse({"error": result.get("error", "Unknown error")}, status_code=500)
+            
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 async def api_query_segments(request: Request):
-    collection = request.query_params.get("collection")
-    query_text = request.query_params.get("query")
+    """API endpoint that delegates to the knowledge_query tool."""
     try:
-        limit = int(request.query_params.get("limit", 3))
-    except Exception:
-        limit = 3
-    if not collection or not query_text:
-        return JSONResponse(
-            {"error": "Missing collection or query parameter."}, status_code=400
-        )
-    try:
-        embedder = SentenceTransformer("all-MiniLM-L6-v2")
-        query_vec = embedder.encode([query_text]).tolist()
-        store = ChromaVectorStore(
-            collection_name=collection, persist_directory=PERSIST_DIR
-        )
-        results = store.collection.query(query_embeddings=query_vec, n_results=limit)
-        # Chroma returns lists of lists for ids, docs, etc.
-        return JSONResponse(
-            {
-                "ids": results.get("ids", [[]])[0],
-                "documents": results.get("documents", [[]])[0],
-                "metadatas": results.get("metadatas", [[]])[0],
-                "distances": results.get("distances", [[]])[0],
-            }
-        )
+        collection = request.query_params.get("collection")
+        query_text = request.query_params.get("query")
+        try:
+            limit = int(request.query_params.get("limit", 3))
+        except Exception:
+            limit = 3
+            
+        if not collection or not query_text:
+            return JSONResponse(
+                {"error": "Missing collection or query parameter."}, status_code=400
+            )
+        
+        # Execute the knowledge query tool
+        result = await get_knowledge_query().execute_tool({
+            "query": query_text,
+            "collection": collection,
+            "limit": limit
+        })
+        
+        if result.get("success"):
+            # Return the results in the expected format
+            results_data = result.get("results", {})
+            return JSONResponse({
+                "ids": results_data.get("ids", []),
+                "documents": results_data.get("documents", []),
+                "metadatas": results_data.get("metadatas", []),
+                "distances": results_data.get("distances", []),
+            })
+        else:
+            return JSONResponse({"error": result.get("error", "Unknown error")}, status_code=500)
+            
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
 async def api_delete_collection(request: Request):
+    """API endpoint that delegates to the knowledge_collections tool."""
     try:
         data = await request.json()
         collection = data.get("collection")
@@ -156,10 +184,17 @@ async def api_delete_collection(request: Request):
             return JSONResponse(
                 {"success": False, "error": "Missing collection name."}, status_code=400
             )
-        store = ChromaVectorStore(persist_directory=PERSIST_DIR)
-        # ChromaDB API: delete_collection
-        store.client.delete_collection(collection)
-        return JSONResponse({"success": True})
+        
+        # Execute the knowledge collections tool
+        result = await get_knowledge_collections().execute_tool({
+            "action": "delete",
+            "collection": collection
+        })
+        
+        # Return the result as-is since it already has the expected format
+        status_code = 200 if result.get("success") else 500
+        return JSONResponse(result, status_code=status_code)
+        
     except Exception as e:
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
