@@ -16,6 +16,9 @@ from plugins.knowledge_indexer.tool import (
 )
 from config import env
 
+# Vector store path constant for backward compatibility
+PERSIST_DIR = env.get_vector_store_path()
+
 # Global tool instances (lazy initialized)
 _knowledge_indexer = None
 _knowledge_query = None
