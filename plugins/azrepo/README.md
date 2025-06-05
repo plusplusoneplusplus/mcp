@@ -14,6 +14,7 @@ The Azure Repo Client plugin supports the following operations:
 - **Add Reviewers**: Add reviewers to a pull request
 - **Add Work Items**: Link work items to a pull request
 - **Get Work Item**: Retrieve detailed information about a specific work item
+- **Create Work Item**: Create a new work item with title, description, and optional area/iteration paths
 
 ## Configuration
 
@@ -29,6 +30,9 @@ AZREPO_ORG=https://dev.azure.com/your-organization
 AZREPO_PROJECT=your-project-name
 AZREPO_REPO=your-repository-name
 AZREPO_BRANCH=main
+# Work item defaults
+AZREPO_AREA_PATH=your-area-path
+AZREPO_ITERATION=your-iteration-path
 ```
 
 ### Configuration Benefits
@@ -159,6 +163,18 @@ Get details of a specific work item.
 - `expand` (optional): The expand parameters for work item attributes (all, fields, links, none, relations)
 - `fields` (optional): Comma-separated list of requested fields (e.g., System.Id,System.AreaPath)
 
+### create_work_item
+Create a new work item.
+
+**Parameters:**
+- `title` (required): Title of the work item
+- `description` (optional): Description of the work item
+- `work_item_type` (optional): Type of work item (Bug, Task, User Story, etc.) - defaults to "Task"
+- `area_path` (optional): Area path for the work item (uses configured default if not provided)
+- `iteration_path` (optional): Iteration path for the work item (uses configured default if not provided)
+- `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
+- `project` (optional): Name or ID of the project (uses configured default if not provided)
+
 ## Dependencies
 
 This plugin depends on:
@@ -175,4 +191,4 @@ The plugin includes comprehensive error handling for:
 - Missing dependencies
 - Invalid parameters
 
-All operations return a dictionary with a `success` field indicating the operation status, and an `error` field containing error details when applicable. 
+All operations return a dictionary with a `success` field indicating the operation status, and an `error` field containing error details when applicable.

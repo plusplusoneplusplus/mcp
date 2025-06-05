@@ -16,6 +16,7 @@ try:
     from .types import (
         WorkItem,
         WorkItemResponse,
+        WorkItemCreateResponse,
     )
 except ImportError:
     # Fallback for when module is loaded directly by plugin system
@@ -29,12 +30,16 @@ except ImportError:
 
     # Load types module directly
     spec = importlib.util.spec_from_file_location("types", types_path)
-    types_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(types_module)
+    if spec is not None and spec.loader is not None:
+        types_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(types_module)
 
-    # Import the types
-    WorkItem = types_module.WorkItem
-    WorkItemResponse = types_module.WorkItemResponse
+        # Import the types
+        WorkItem = types_module.WorkItem
+        WorkItemResponse = types_module.WorkItemResponse
+        WorkItemCreateResponse = types_module.WorkItemCreateResponse
+    else:
+        raise ImportError("Could not load types module")
 
 
 @register_tool
@@ -42,15 +47,18 @@ class AzureWorkItemTool(ToolInterface):
     """Dedicated tool for managing Azure DevOps Work Items.
 
     This tool provides work item management capabilities including
-    retrieving work item details and managing work item properties.
-    It automatically loads default configuration values from the environment
-    while allowing parameter overrides for specific operations.
+    retrieving work item details, creating new work items, and managing
+    work item properties. It automatically loads default configuration
+    values from the environment while allowing parameter overrides for
+    specific operations.
 
     Configuration:
         The tool automatically loads default values from environment variables
         with the AZREPO_ prefix:
         - AZREPO_ORG: Default organization URL
         - AZREPO_PROJECT: Default project name/ID
+        - AZREPO_AREA_PATH: Default area path for new work items
+        - AZREPO_ITERATION: Default iteration path for new work items
 
     Example:
         # Get work item details
@@ -59,11 +67,11 @@ class AzureWorkItemTool(ToolInterface):
             "work_item_id": 12345
         })
 
-        # Get work item with specific fields
+        # Create a new work item
         work_item = await workitem_tool.execute_tool({
-            "operation": "get",
-            "work_item_id": 12345,
-            "fields": "System.Id,System.Title,System.State"
+            "operation": "create",
+            "title": "New feature request",
+            "description": "Detailed description of the feature"
         })
     """
 
@@ -89,15 +97,46 @@ class AzureWorkItemTool(ToolInterface):
                     "description": "The work item operation to perform",
                     "enum": [
                         "get",
+                        "create",
                     ],
                 },
                 "work_item_id": {
                     "type": ["string", "integer"],
-                    "description": "ID of the work item",
+                    "description": "ID of the work item (required for get operation)",
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Title of the work item (required for create operation)",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Description of the work item (optional for create operation)",
+                    "nullable": True,
+                },
+                "work_item_type": {
+                    "type": "string",
+                    "description": "Type of work item (Bug, Task, User Story, etc.)",
+                    "default": "Task",
+                    "nullable": True,
+                },
+                "area_path": {
+                    "type": "string",
+                    "description": "Area path for the work item (uses configured default if not provided)",
+                    "nullable": True,
+                },
+                "iteration_path": {
+                    "type": "string",
+                    "description": "Iteration path for the work item (uses configured default if not provided)",
+                    "nullable": True,
                 },
                 "organization": {
                     "type": "string",
                     "description": "Azure DevOps organization URL",
+                    "nullable": True,
+                },
+                "project": {
+                    "type": "string",
+                    "description": "Azure DevOps project name/ID",
                     "nullable": True,
                 },
                 "as_of": {
@@ -116,7 +155,7 @@ class AzureWorkItemTool(ToolInterface):
                     "nullable": True,
                 },
             },
-            "required": ["operation", "work_item_id"],
+            "required": ["operation"],
         }
 
     def __init__(self, command_executor=None):
@@ -138,6 +177,12 @@ class AzureWorkItemTool(ToolInterface):
 
         self.logger = logging.getLogger(__name__)
 
+        # Initialize default values
+        self.default_organization: Optional[str] = None
+        self.default_project: Optional[str] = None
+        self.default_area_path: Optional[str] = None
+        self.default_iteration_path: Optional[str] = None
+
         # Load configuration defaults
         self._load_config()
 
@@ -153,10 +198,13 @@ class AzureWorkItemTool(ToolInterface):
             # Set default values
             self.default_organization = azrepo_params.get("org")
             self.default_project = azrepo_params.get("project")
+            self.default_area_path = azrepo_params.get("area_path")
+            self.default_iteration_path = azrepo_params.get("iteration")
 
             self.logger.debug(
                 f"Loaded Azure work item configuration: org={self.default_organization}, "
-                f"project={self.default_project}"
+                f"project={self.default_project}, area_path={self.default_area_path}, "
+                f"iteration={self.default_iteration_path}"
             )
 
         except Exception as e:
@@ -164,6 +212,8 @@ class AzureWorkItemTool(ToolInterface):
             # Set defaults to None if configuration loading fails
             self.default_organization = None
             self.default_project = None
+            self.default_area_path = None
+            self.default_iteration_path = None
 
     def _get_param_with_default(
         self, param_value: Optional[str], default_value: Optional[str]
@@ -221,6 +271,7 @@ class AzureWorkItemTool(ToolInterface):
         self,
         work_item_id: Union[int, str],
         organization: Optional[str] = None,
+        project: Optional[str] = None,
         as_of: Optional[str] = None,
         expand: Optional[str] = None,
         fields: Optional[str] = None,
@@ -230,6 +281,7 @@ class AzureWorkItemTool(ToolInterface):
         Args:
             work_item_id: ID of the work item
             organization: Azure DevOps organization URL (uses configured default if not provided)
+            project: Azure DevOps project name/ID (uses configured default if not provided)
             as_of: Work item details as of a particular date and time
             expand: The expand parameters for work item attributes (all, fields, links, none, relations)
             fields: Comma-separated list of requested fields
@@ -241,10 +293,13 @@ class AzureWorkItemTool(ToolInterface):
 
         # Use configured defaults for core parameters
         org = self._get_param_with_default(organization, self.default_organization)
+        proj = self._get_param_with_default(project, self.default_project)
 
         # Add optional parameters
         if org:
             command += f" --org {org}"
+        if proj:
+            command += f" --project {proj}"
         if as_of:
             command += f" --as-of '{as_of}'"
         if expand:
@@ -254,17 +309,82 @@ class AzureWorkItemTool(ToolInterface):
 
         return await self._run_az_command(command)
 
+    async def create_work_item(
+        self,
+        title: str,
+        description: Optional[str] = None,
+        work_item_type: str = "Task",
+        area_path: Optional[str] = None,
+        iteration_path: Optional[str] = None,
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a new work item.
+
+        Args:
+            title: Title of the work item
+            description: Description of the work item
+            work_item_type: Type of work item (Bug, Task, User Story, etc.)
+            area_path: Area path for the work item (uses configured default if not provided)
+            iteration_path: Iteration path for the work item (uses configured default if not provided)
+            organization: Azure DevOps organization URL (uses configured default if not provided)
+            project: Azure DevOps project name/ID (uses configured default if not provided)
+
+        Returns:
+            Dictionary with success status and created work item details
+        """
+        command = f"boards work-item create --type '{work_item_type}' --title '{title}'"
+
+        # Use configured defaults for core parameters
+        org = self._get_param_with_default(organization, self.default_organization)
+        proj = self._get_param_with_default(project, self.default_project)
+        area = self._get_param_with_default(area_path, self.default_area_path)
+        iteration = self._get_param_with_default(iteration_path, self.default_iteration_path)
+
+        # Add optional parameters
+        if org:
+            command += f" --org {org}"
+        if proj:
+            command += f" --project {proj}"
+        if description:
+            command += f" --description '{description}'"
+        if area:
+            command += f" --area '{area}'"
+        if iteration:
+            command += f" --iteration '{iteration}'"
+
+        return await self._run_az_command(command)
+
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments."""
         operation = arguments.get("operation", "")
 
         if operation == "get":
+            work_item_id = arguments.get("work_item_id")
+            if work_item_id is None:
+                return {"success": False, "error": "work_item_id is required for get operation"}
+
             return await self.get_work_item(
-                work_item_id=arguments.get("work_item_id"),
+                work_item_id=work_item_id,
                 organization=arguments.get("organization"),
+                project=arguments.get("project"),
                 as_of=arguments.get("as_of"),
                 expand=arguments.get("expand"),
                 fields=arguments.get("fields"),
+            )
+        elif operation == "create":
+            title = arguments.get("title")
+            if not title:
+                return {"success": False, "error": "title is required for create operation"}
+
+            return await self.create_work_item(
+                title=title,
+                description=arguments.get("description"),
+                work_item_type=arguments.get("work_item_type", "Task"),
+                area_path=arguments.get("area_path"),
+                iteration_path=arguments.get("iteration_path"),
+                organization=arguments.get("organization"),
+                project=arguments.get("project"),
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}
