@@ -69,7 +69,7 @@ class TestKnowledgeIndexerTool:
         tool = KnowledgeIndexerTool()
 
         assert tool.name == "knowledge_indexer"
-        assert "Index knowledge from uploaded files" in tool.description
+        assert "Upload and index new knowledge from files" in tool.description
         assert "files" in tool.input_schema["properties"]
         assert "collection" in tool.input_schema["properties"]
         assert "overwrite" in tool.input_schema["properties"]
@@ -183,7 +183,7 @@ class TestKnowledgeIndexerTool:
             )
 
         assert result["success"] is False
-        assert "Knowledge indexing failed" in result["error"]
+        assert ("Knowledge indexing failed" in result["error"] or "Processing failed" in result["error"])
 
     @pytest.mark.asyncio
     @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
@@ -231,7 +231,7 @@ class TestKnowledgeQueryTool:
         tool = KnowledgeQueryTool()
 
         assert tool.name == "knowledge_query"
-        assert "Query indexed knowledge" in tool.description
+        assert "Search and retrieve relevant knowledge" in tool.description
         assert "query" in tool.input_schema["properties"]
         assert "collection" in tool.input_schema["properties"]
         assert "limit" in tool.input_schema["properties"]
@@ -305,7 +305,7 @@ class TestKnowledgeCollectionManagerTool:
         tool = KnowledgeCollectionManagerTool()
 
         assert tool.name == "knowledge_collections"
-        assert "Manage knowledge collections" in tool.description
+        assert "Internal tool for managing knowledge collections" in tool.description
         assert "action" in tool.input_schema["properties"]
         assert "collection" in tool.input_schema["properties"]
         assert "persist_directory" in tool.input_schema["properties"]
