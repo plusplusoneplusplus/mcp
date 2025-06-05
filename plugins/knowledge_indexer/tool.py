@@ -16,7 +16,7 @@ from config import env
 
 @register_tool
 class KnowledgeIndexerTool(ToolInterface):
-    """Tool for indexing knowledge from uploaded files into a vector store."""
+    """Tool for users to upload and index new knowledge from files into a vector store."""
 
     def __init__(self):
         super().__init__()
@@ -29,7 +29,7 @@ class KnowledgeIndexerTool(ToolInterface):
 
     @property
     def description(self) -> str:
-        return "Index knowledge from uploaded files into a vector store for semantic search and retrieval"
+        return "Upload and index new knowledge from files (markdown format) into a vector store. This tool is intended for users to add new documents and knowledge bases that can later be searched and retrieved. Supports multiple file uploads and organizes content into searchable collections."
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -202,7 +202,7 @@ class KnowledgeIndexerTool(ToolInterface):
 
 @register_tool
 class KnowledgeQueryTool(ToolInterface):
-    """Tool for querying indexed knowledge from the vector store."""
+    """Tool for language models to query and retrieve indexed knowledge from the vector store."""
 
     def __init__(self):
         super().__init__()
@@ -215,7 +215,7 @@ class KnowledgeQueryTool(ToolInterface):
 
     @property
     def description(self) -> str:
-        return "Query indexed knowledge using semantic search"
+        return "Search and retrieve relevant knowledge from indexed documents using semantic search. This tool is designed for language models to automatically find and access contextual information from the knowledge base to enhance responses and provide more informed answers."
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -232,7 +232,7 @@ class KnowledgeQueryTool(ToolInterface):
                     "type": "integer",
                     "default": 5,
                     "minimum": 1,
-                    "maximum": 50,
+                    "maximum": 20,
                     "description": "Maximum number of results to return",
                 },
                 "persist_directory": {
@@ -287,7 +287,7 @@ class KnowledgeQueryTool(ToolInterface):
 
 @register_tool
 class KnowledgeCollectionManagerTool(ToolInterface):
-    """Tool for managing knowledge collections."""
+    """Internal administrative tool for managing knowledge collections - not for general use."""
 
     def __init__(self):
         super().__init__()
@@ -300,7 +300,7 @@ class KnowledgeCollectionManagerTool(ToolInterface):
 
     @property
     def description(self) -> str:
-        return "Manage knowledge collections (list, delete, get info)"
+        return "Internal tool for managing knowledge collections (list, delete, get info). This tool is primarily for system administration and debugging purposes and should not be used in normal workflows. Use knowledge_indexer for adding content and knowledge_query for retrieving information."
 
     @property
     def input_schema(self) -> Dict[str, Any]:
