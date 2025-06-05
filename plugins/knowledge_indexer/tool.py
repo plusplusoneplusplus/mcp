@@ -192,6 +192,9 @@ class KnowledgeIndexerTool(ToolInterface):
                     "processed_files": processed_files,
                 }
 
+            except Exception as inner_e:
+                # Handle any exceptions that occur during processing
+                return {"success": False, "error": f"Processing failed: {str(inner_e)}"}
             finally:
                 # Clean up temporary directory
                 shutil.rmtree(temp_dir, ignore_errors=True)
