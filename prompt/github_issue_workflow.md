@@ -1,0 +1,179 @@
+# AI Prompt: GitHub Issue Resolution Workflow
+
+## Task Overview
+
+Your primary task is to read a GitHub issue, understand the requirements, implement the necessary changes, create a pull request, and manage the git workflow properly. This is a complete end-to-end workflow for issue resolution.
+
+## Workflow Steps
+
+### 1. Issue Analysis Phase
+
+**Read and Understand the Issue:**
+- Carefully read the GitHub issue description, comments, and any attached files
+- Identify the problem statement, requirements, and acceptance criteria
+- Note any specific implementation details, constraints, or preferences mentioned
+- Check for related issues, PRs, or discussions that might provide context
+- Identify the scope of changes needed (files, components, features affected)
+
+**Ask Clarifying Questions (if needed):**
+- If the issue is unclear or missing critical information, ask specific questions
+- Confirm your understanding of the requirements before proceeding
+- Verify any assumptions about the implementation approach
+
+### 2. Planning Phase
+
+**Create Implementation Plan:**
+- Break down the work into logical steps
+- Identify which files need to be modified or created
+- Consider the impact on existing functionality
+- Plan for testing requirements (unit tests, integration tests, etc.)
+- Identify any dependencies or prerequisites
+
+**Branch Management:**
+- Create a new feature branch with a descriptive name (e.g., `fix/issue-123-description` or `feature/issue-456-new-feature`)
+- Ensure you're working from the latest main/master branch
+
+### 3. Implementation Phase
+
+**Code Changes:**
+- Implement the required changes following the project's coding standards
+- Write clean, well-documented code with appropriate comments
+- Follow existing patterns and conventions in the codebase
+- Ensure backward compatibility unless breaking changes are explicitly required
+
+**Testing:**
+- Add or update unit tests for new functionality
+- Run existing tests to ensure no regressions
+- Add integration tests if applicable
+- Test edge cases and error scenarios
+
+**Documentation:**
+- Update relevant documentation (README, API docs, etc.)
+- Add inline code comments for complex logic
+- Update changelog if the project maintains one
+
+### 4. Quality Assurance Phase
+
+**Code Review Preparation:**
+- Review your own changes thoroughly
+- Check for code quality, performance implications, and security considerations
+- Ensure all tests pass
+- Verify that the implementation fully addresses the issue requirements
+
+**Commit Management:**
+- Make atomic, logical commits with clear commit messages
+- Follow the project's commit message conventions
+- Squash or organize commits if needed for a clean history
+
+### 5. Pull Request Phase
+
+**Create Pull Request:**
+- Write a clear, descriptive PR title that references the issue
+- Include a comprehensive PR description that:
+  - References the original issue (e.g., "Fixes #123" or "Closes #456")
+  - Summarizes the changes made
+  - Explains the approach taken
+  - Lists any breaking changes or migration steps
+  - Includes testing instructions for reviewers
+
+**PR Best Practices:**
+- Add appropriate labels and assignees
+- Request reviews from relevant team members
+- Include screenshots or demos for UI changes
+- Link to any related issues or PRs
+
+### 6. Post-Submission Phase
+
+**Monitor and Respond:**
+- Respond promptly to review comments and feedback
+- Make requested changes in additional commits or amend existing ones
+- Re-request reviews after addressing feedback
+- Ensure CI/CD checks pass
+
+**Merge and Cleanup:**
+- Once approved, merge the PR using the project's preferred merge strategy
+- Delete the feature branch after successful merge
+- **Switch back to main branch** and pull latest changes
+- Verify the issue is properly closed and linked to the PR
+
+## Git Commands Reference
+
+```bash
+# Start workflow - ensure you're on main and up to date
+git checkout main
+git pull origin main
+
+# Create and switch to feature branch
+git checkout -b fix/issue-123-description
+
+# After making changes and commits
+git push origin fix/issue-123-description
+
+# After PR is merged, cleanup
+git checkout main
+git pull origin main
+git branch -d fix/issue-123-description
+git push origin --delete fix/issue-123-description  # if needed
+```
+
+## Output Format
+
+When working through this workflow, provide updates at each major step:
+
+### Issue Analysis Summary
+```markdown
+## Issue Analysis
+- **Issue Number:** #123
+- **Problem:** [Brief description]
+- **Requirements:** [Key requirements identified]
+- **Scope:** [Files/components affected]
+- **Approach:** [Planned implementation approach]
+```
+
+### Implementation Progress
+```markdown
+## Implementation Progress
+- **Branch Created:** `fix/issue-123-description`
+- **Files Modified:** [List of files changed]
+- **Key Changes:** [Summary of main changes]
+- **Tests Added/Updated:** [Testing changes]
+```
+
+### Pull Request Summary
+```markdown
+## Pull Request Created
+- **PR Title:** [Title]
+- **PR Number:** #456
+- **Description:** [Brief summary of PR description]
+- **Status:** [Draft/Ready for Review/Approved/Merged]
+```
+
+### Completion Confirmation
+```markdown
+## Workflow Complete
+- **PR Status:** Merged
+- **Issue Status:** Closed
+- **Branch Cleanup:** Complete
+- **Current Branch:** main (up to date)
+```
+
+## Best Practices
+
+1. **Communication:** Keep stakeholders informed of progress and any blockers
+2. **Documentation:** Document decisions and trade-offs made during implementation
+3. **Testing:** Prioritize thorough testing to prevent regressions
+4. **Code Quality:** Maintain high code quality standards throughout
+5. **Git Hygiene:** Keep commit history clean and meaningful
+6. **Branch Management:** Always return to main branch after completion
+7. **Issue Tracking:** Ensure proper linking between issues, commits, and PRs
+
+## Error Handling
+
+If you encounter issues during any phase:
+- Document the problem clearly
+- Seek help or clarification when needed
+- Consider alternative approaches if the original plan isn't working
+- Update stakeholders on any delays or changes in scope
+- Don't hesitate to ask for code review or pair programming assistance
+
+Remember: The goal is not just to close the issue, but to deliver a high-quality solution that improves the codebase and provides value to users.
