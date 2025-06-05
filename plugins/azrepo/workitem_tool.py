@@ -281,7 +281,7 @@ class AzureWorkItemTool(ToolInterface):
         Args:
             work_item_id: ID of the work item
             organization: Azure DevOps organization URL (uses configured default if not provided)
-            project: Azure DevOps project name/ID (uses configured default if not provided)
+            project: Azure DevOps project name/ID (accepted for compatibility but not used - work item IDs are globally unique within an organization)
             as_of: Work item details as of a particular date and time
             expand: The expand parameters for work item attributes (all, fields, links, none, relations)
             fields: Comma-separated list of requested fields
@@ -293,13 +293,11 @@ class AzureWorkItemTool(ToolInterface):
 
         # Use configured defaults for core parameters
         org = self._get_param_with_default(organization, self.default_organization)
-        proj = self._get_param_with_default(project, self.default_project)
+        # Note: project parameter is not used for work item retrieval as work item IDs are globally unique within an organization
 
         # Add optional parameters
         if org:
             command += f" --org {org}"
-        if proj:
-            command += f" --project {proj}"
         if as_of:
             command += f" --as-of '{as_of}'"
         if expand:
