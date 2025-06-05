@@ -32,6 +32,7 @@ class GitOperationType(str, Enum):
     SHOW = "git_show"
     INIT = "git_init"
     QUERY_COMMITS = "git_query_commits"
+    CHERRY_PICK = "git_cherry_pick"
 
 
 @register_tool
@@ -106,6 +107,24 @@ class GitTool(ToolInterface):
                     "type": "string",
                     "description": "Filter commits by author name or email",
                 },
+                "commit_hash": {
+                    "type": "string",
+                    "description": "Commit hash to cherry-pick",
+                },
+                "no_commit": {
+                    "type": "boolean",
+                    "description": "Apply changes without creating a commit (--no-commit flag)",
+                    "default": False,
+                },
+                "mainline": {
+                    "type": "integer",
+                    "description": "Parent number for merge commits (1-based index)",
+                },
+                "strategy": {
+                    "type": "string",
+                    "description": "Merge strategy to use",
+                    "enum": ["resolve", "recursive", "octopus", "ours", "subtree"],
+                },
             },
             "required": ["operation", "repo_path"],
         }
@@ -156,6 +175,11 @@ class GitTool(ToolInterface):
                     revision = parameters.get("revision")
                     if not revision:
                         return {"error": "Missing required parameter: revision"}
+
+                case GitOperationType.CHERRY_PICK:
+                    commit_hash = parameters.get("commit_hash")
+                    if not commit_hash:
+                        return {"error": "Missing required parameter: commit_hash"}
 
             # Handle git init separately since it doesn't require an existing repo
             if operation == GitOperationType.INIT:
@@ -229,6 +253,15 @@ class GitTool(ToolInterface):
                         "success": True,
                         "result": f"Commit query results:\n{result}",
                     }
+
+                case GitOperationType.CHERRY_PICK:
+                    commit_hash = parameters.get("commit_hash")  # Already validated above
+                    assert commit_hash is not None  # Type assertion for linter
+                    no_commit = parameters.get("no_commit", False)
+                    mainline = parameters.get("mainline")
+                    strategy = parameters.get("strategy")
+                    result = self._git_cherry_pick(repo, commit_hash, no_commit, mainline, strategy)
+                    return {"success": True, "result": result}
 
                 case _:
                     return {"error": f"Unknown Git operation: {operation}"}
@@ -399,3 +432,34 @@ class GitTool(ToolInterface):
 
         except Exception as e:
             return f"Error querying commits: {str(e)}"
+
+    def _git_cherry_pick(
+        self,
+        repo: git.Repo,
+        commit_hash: str,
+        no_commit: bool,
+        mainline: Optional[int],
+        strategy: Optional[str],
+    ) -> str:
+        """Cherry-pick a commit."""
+        try:
+            # Build the git cherry-pick command arguments
+            cherry_pick_args = [commit_hash]
+            if no_commit:
+                cherry_pick_args.append("--no-commit")
+            if mainline:
+                cherry_pick_args.extend(["--mainline", str(mainline)])
+            if strategy:
+                cherry_pick_args.extend(["--strategy", strategy])
+
+            # Cherry-pick the commit
+            repo.git.cherry_pick(*cherry_pick_args)
+            return "Commit cherry-picked successfully"
+
+        except git.GitCommandError as e:
+            return f"Git command failed: {str(e)}"
+        except Exception as e:
+            self.logger.error(
+                f"Error cherry-picking commit: {commit_hash}: {str(e)}"
+            )
+            return "Error cherry-picking commit"

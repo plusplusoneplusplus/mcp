@@ -684,3 +684,211 @@ class TestGitTool:
         )
         # Ensure the formatting separators are present
         assert "=" * 50 in result["result"]
+
+    # Cherry-pick tests
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_basic_success(self, mock_repo_class, git_tool, mock_repo):
+        """Test basic cherry-pick operation."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.return_value = None
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "abc123def456",
+            }
+        )
+
+        assert result["success"]
+        assert "Commit cherry-picked successfully" in result["result"]
+        mock_repo.git.cherry_pick.assert_called_once_with("abc123def456")
+
+    @pytest.mark.asyncio
+    async def test_cherry_pick_missing_commit_hash(self, git_tool):
+        """Test cherry-pick without commit_hash parameter."""
+        result = await git_tool.execute_tool(
+            {"operation": "git_cherry_pick", "repo_path": "/test"}
+        )
+
+        assert "error" in result
+        assert "Missing required parameter: commit_hash" in result["error"]
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_with_no_commit(self, mock_repo_class, git_tool, mock_repo):
+        """Test cherry-pick with --no-commit flag."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.return_value = None
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "abc123def456",
+                "no_commit": True,
+            }
+        )
+
+        assert result["success"]
+        assert "Commit cherry-picked successfully" in result["result"]
+        mock_repo.git.cherry_pick.assert_called_once_with("abc123def456", "--no-commit")
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_with_mainline(self, mock_repo_class, git_tool, mock_repo):
+        """Test cherry-pick with mainline for merge commits."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.return_value = None
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "merge123abc",
+                "mainline": 1,
+            }
+        )
+
+        assert result["success"]
+        assert "Commit cherry-picked successfully" in result["result"]
+        mock_repo.git.cherry_pick.assert_called_once_with(
+            "merge123abc", "--mainline", "1"
+        )
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_with_strategy(self, mock_repo_class, git_tool, mock_repo):
+        """Test cherry-pick with merge strategy."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.return_value = None
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "abc123def456",
+                "strategy": "recursive",
+            }
+        )
+
+        assert result["success"]
+        assert "Commit cherry-picked successfully" in result["result"]
+        mock_repo.git.cherry_pick.assert_called_once_with(
+            "abc123def456", "--strategy", "recursive"
+        )
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_with_all_options(self, mock_repo_class, git_tool, mock_repo):
+        """Test cherry-pick with all options combined."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.return_value = None
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "merge123abc",
+                "no_commit": True,
+                "mainline": 2,
+                "strategy": "ours",
+            }
+        )
+
+        assert result["success"]
+        assert "Commit cherry-picked successfully" in result["result"]
+        mock_repo.git.cherry_pick.assert_called_once_with(
+            "merge123abc", "--no-commit", "--mainline", "2", "--strategy", "ours"
+        )
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_git_command_error(self, mock_repo_class, git_tool, mock_repo):
+        """Test cherry-pick with Git command error (e.g., conflicts)."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.side_effect = GitCommandError(
+            "cherry-pick", "Conflict in file.txt"
+        )
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "abc123def456",
+            }
+        )
+
+        assert result["success"]
+        assert "Git command failed" in result["result"]
+        assert "Conflict in file.txt" in result["result"]
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_invalid_commit_hash(self, mock_repo_class, git_tool, mock_repo):
+        """Test cherry-pick with invalid commit hash."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.side_effect = GitCommandError(
+            "cherry-pick", "bad revision 'invalid123'"
+        )
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "invalid123",
+            }
+        )
+
+        assert result["success"]
+        assert "Git command failed" in result["result"]
+        assert "bad revision" in result["result"]
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_invalid_repo(self, mock_repo_class, git_tool):
+        """Test cherry-pick with invalid repository."""
+        mock_repo_class.side_effect = InvalidGitRepositoryError("Not a git repo")
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/invalid",
+                "commit_hash": "abc123def456",
+            }
+        )
+
+        assert not result["success"]
+        assert "Invalid Git repository" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_cherry_pick_missing_repo_path(self, git_tool):
+        """Test cherry-pick without repo_path parameter."""
+        result = await git_tool.execute_tool(
+            {"operation": "git_cherry_pick", "commit_hash": "abc123def456"}
+        )
+
+        assert "error" in result
+        assert "Missing required parameter: repo_path" in result["error"]
+
+    @pytest.mark.asyncio
+    @patch("git.Repo")
+    async def test_cherry_pick_no_commit_false(self, mock_repo_class, git_tool, mock_repo):
+        """Test cherry-pick with no_commit explicitly set to False."""
+        mock_repo_class.return_value = mock_repo
+        mock_repo.git.cherry_pick.return_value = None
+
+        result = await git_tool.execute_tool(
+            {
+                "operation": "git_cherry_pick",
+                "repo_path": "/test",
+                "commit_hash": "abc123def456",
+                "no_commit": False,
+            }
+        )
+
+        assert result["success"]
+        assert "Commit cherry-picked successfully" in result["result"]
+        # Should not include --no-commit flag when False
+        mock_repo.git.cherry_pick.assert_called_once_with("abc123def456")
