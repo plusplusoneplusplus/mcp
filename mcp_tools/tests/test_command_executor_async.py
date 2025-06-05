@@ -427,11 +427,24 @@ class TestCommandExecutorAsync:
 
             # Verify it completed
             assert result["status"] == "completed"
-            assert result["output"].strip() != "", "Branch name should not be empty"
-            # Branch name should be a valid git branch name (no spaces or special chars except - _ /)
-            assert all(
-                c.isalnum() or c in "-_/" for c in result["output"].strip()
-            ), "Invalid branch name characters"
+
+            # Check if we're in detached HEAD state (common in CI environments)
+            branch_name = result["output"].strip()
+            if branch_name == "":
+                # In detached HEAD state, verify we can still get commit info
+                response = await executor.execute_async("git rev-parse HEAD")
+                token = response["token"]
+                commit_result = await executor.wait_for_process(token, timeout=5.0)
+
+                assert commit_result["status"] == "completed"
+                commit_hash = commit_result["output"].strip()
+                assert len(commit_hash) == 40, "Should get a valid commit hash"
+                assert all(c in "0123456789abcdef" for c in commit_hash), "Invalid commit hash characters"
+            else:
+                # On a named branch, verify branch name is valid
+                assert all(
+                    c.isalnum() or c in "-_/" for c in branch_name
+                ), "Invalid branch name characters"
         finally:
             # Restore original directory
             os.chdir(original_dir)
