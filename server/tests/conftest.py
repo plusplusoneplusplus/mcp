@@ -6,6 +6,50 @@ This module provides reusable fixtures for:
 - MCP client session setup
 - Port allocation for parallel testing
 - Proper cleanup and timeout handling
+
+## MCP Client Testing Patterns
+
+### Pattern 1: Using create_mcp_client context manager (Recommended)
+This is the most flexible and reliable pattern for MCP client testing:
+
+```python
+@pytest.mark.asyncio
+async def test_something(self, mcp_client_info):
+    from .conftest import create_mcp_client
+
+    server_url = mcp_client_info['url']
+    worker_id = mcp_client_info['worker_id']
+
+    async with create_mcp_client(server_url, worker_id) as session:
+        # Use the session for testing
+        tools_response = await session.list_tools()
+        assert tools_response is not None
+```
+
+### Pattern 2: Using mcp_client_info fixture
+For tests that need connection information but want to manage the client lifecycle themselves:
+
+```python
+@pytest.mark.asyncio
+async def test_something(self, mcp_client_info):
+    server_url = mcp_client_info['url']
+    worker_id = mcp_client_info['worker_id']
+    port = mcp_client_info['port']
+
+    # Custom client setup logic here
+```
+
+### Available Fixtures:
+- `mcp_server`: Running MCP server process
+- `mcp_client_info`: Connection information (url, worker_id, port)
+- `server_url`: HTTP server URL
+- `sse_url`: SSE endpoint URL
+- `server_port`: Allocated port number
+- `server_process_info`: Process information
+
+### Note on mcp_client fixture:
+The `mcp_client` fixture mentioned in some error messages is intentionally not provided
+due to async context manager lifecycle issues with pytest-asyncio. Use the patterns above instead.
 """
 
 import asyncio
@@ -292,16 +336,6 @@ def sse_url(mcp_server: subprocess.Popen) -> str:
 
 
 # Utility fixtures for specific test scenarios
-@pytest_asyncio.fixture
-async def initialized_mcp_session(mcp_client_info: dict):
-    """
-    Provide an initialized MCP session for backward compatibility.
-    """
-    server_url = mcp_client_info['url']
-    worker_id = mcp_client_info['worker_id']
-
-    async with create_mcp_client(server_url, worker_id) as session:
-        yield session
 
 
 @pytest.fixture
