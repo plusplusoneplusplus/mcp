@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: false
 ---
 ## Role
@@ -48,9 +48,14 @@ When a user requests to create a GitHub issue, follow these guidelines to create
 Create issues with the following structure:
 
 **Title**: Clear, concise, and descriptive (50-72 characters)
+- Use square brackets `[]` at the beginning to categorize the type of work
+- Examples: `[Feature]`, `[Bug]`, `[Chore]`, `[Tooling]`, `[Docs]`, `[Enhancement]`, `[API]`, `[Security]`, `[Performance]`, `[UI/UX]`, `[Database]`, `[Testing]`, `[DevOps]`, `[Research]`, etc.
 - Use action verbs (Add, Fix, Update, Remove, etc.)
 - Include the component/area affected
 - Be specific but not overly technical
+- Example: `[Feature] Add user authentication with OAuth2 support`
+- Example: `[Chore] Refactor database connection pooling logic`
+- Example: `[Tooling] Set up automated dependency vulnerability scanning`
 
 **Description**: Include these sections:
 - **Problem/Motivation**: Why is this needed?
