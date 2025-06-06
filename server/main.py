@@ -327,8 +327,7 @@ def setup():
     # Initialize environment using the new module
     env.load()
     logger.info(
-        f"Initialized environment: Git root={env.get_git_root()}, "
-        + f"Workspace folder={env.get_workspace_folder()}"
+        f"Initialized environment: Git root={env.get_git_root()}"
     )
 
     # Log tool history settings

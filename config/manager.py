@@ -14,7 +14,6 @@ class EnvironmentManager:
     # List of all settings that are paths
     PATH_SETTINGS = [
         "git_root",
-        "workspace_folder",
         "private_tool_root",
         "tool_history_path",
         "browser_profile_path",
@@ -26,7 +25,6 @@ class EnvironmentManager:
     DEFAULT_SETTINGS = {
         # Repository info settings
         "git_root": (None, str),
-        "workspace_folder": (None, str),
         "project_name": (None, str),
         "private_tool_root": (None, str),
         # Tool history settings
@@ -85,7 +83,6 @@ class EnvironmentManager:
         """Sync settings to repository info object"""
         repo_fields = [
             "git_root",
-            "workspace_folder",
             "project_name",
             "private_tool_root",
         ]
@@ -97,7 +94,6 @@ class EnvironmentManager:
         """Sync repository info to settings dictionary"""
         repo_fields = [
             "git_root",
-            "workspace_folder",
             "project_name",
             "private_tool_root",
         ]
@@ -136,10 +132,6 @@ class EnvironmentManager:
     def _load_from_env_file(self):
         """Find and load variables from a .env file"""
         env_file_paths = []
-
-        # Check workspace folder
-        if self.repository_info.workspace_folder:
-            env_file_paths.append(Path(self.repository_info.workspace_folder) / ".env")
 
         if self.repository_info.git_root:
             env_file_paths.append(Path(self.repository_info.git_root) / ".env")
@@ -307,7 +299,6 @@ class EnvironmentManager:
                 repo_info = additional_data.get("repository", {})
                 for field in [
                     "git_root",
-                    "workspace_folder",
                     "project_name",
                     "private_tool_root",
                 ]:
@@ -373,7 +364,6 @@ class EnvironmentManager:
         # If it's a repo setting, sync from repo first
         if name in [
             "git_root",
-            "workspace_folder",
             "project_name",
             "private_tool_root",
         ]:
@@ -386,9 +376,7 @@ class EnvironmentManager:
         """Get git root directory"""
         return self.get_setting("git_root")
 
-    def get_workspace_folder(self) -> Optional[str]:
-        """Get workspace folder"""
-        return self.get_setting("workspace_folder")
+
 
     def get_project_name(self) -> Optional[str]:
         """Get project name"""

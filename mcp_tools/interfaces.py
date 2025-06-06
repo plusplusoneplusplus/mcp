@@ -298,12 +298,3 @@ class EnvironmentManagerInterface(ToolInterface):
             Path to the git root or None if not available
         """
         pass
-
-    @abstractmethod
-    def get_workspace_folder(self) -> Optional[str]:
-        """Get workspace folder.
-
-        Returns:
-            Path to the workspace folder or None if not available
-        """
-        pass

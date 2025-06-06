@@ -8,7 +8,7 @@ The MCP project is organized into several components:
 
 - **mcp_core/**: Core types and adapters
   - **mcp_core/tests/**: Tests for core types and functionality
-  
+
 - **mcp_tools/**: Utility tools and implementations
   - **mcp_tools/command_executor/**: Command execution utilities
   - **mcp_tools/tests/**: Tests for utility tools
@@ -52,9 +52,8 @@ The MCP project uses a centralized environment configuration system based on `.e
    ```bash
    # Repository Information
    GIT_ROOT=/path/to/git/repo
-   WORKSPACE_FOLDER=/path/to/workspace
    PROJECT_NAME=mcp_project
-   
+
    # Azure Repo Configuration
    AZREPO_ORG=your-organization
    AZREPO_PROJECT=your-project
@@ -62,7 +61,6 @@ The MCP project uses a centralized environment configuration system based on `.e
    ```
 
 3. The system will automatically load the `.env` file from:
-   - Workspace folder
    - Git root directory
    - Current working directory
    - User's home directory
@@ -78,13 +76,12 @@ env_manager.load()
 
 # Access environment settings
 git_root = env_manager.get_git_root()
-workspace = env_manager.get_workspace_folder()
 azrepo_params = env_manager.get_azrepo_parameters()
 ```
 
 See `config/README.md` for more details on environment configuration.
 
-## Configuration 
+## Configuration
 
 The MCP server uses a flexible configuration system that supports both default and user-specific settings. Configuration files are stored in YAML format.
 

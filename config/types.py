@@ -6,7 +6,6 @@ class RepositoryInfo(BaseModel):
     """Model representing repository information"""
 
     git_root: Optional[str] = None
-    workspace_folder: Optional[str] = None
     project_name: Optional[str] = None
     additional_paths: Dict[str, str] = Field(default_factory=dict)
     private_tool_root: Optional[str] = None  # Path for private tool root

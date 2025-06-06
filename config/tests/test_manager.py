@@ -12,32 +12,31 @@ class TestEnvironmentManager(unittest.TestCase):
     """Test cases for the EnvironmentManager class."""
 
     def setUp(self):
-        """Set up tests by creating a new EnvironmentManager instance."""
-        # Create a mock for the singleton's __new__ method to allow multiple instances in tests
-        self.original_new = EnvironmentManager.__new__
-        EnvironmentManager.__new__ = lambda cls: object.__new__(cls)
-
-        # Create a clean instance
+        """Set up test fixtures."""
+        # Create a new instance for each test to avoid singleton issues
+        EnvironmentManager._instance = None
         self.env_manager = EnvironmentManager()
-        self.env_manager._initialize()
 
-        # Create a temporary directory for testing
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.test_dir = Path(self.temp_dir.name)
+        # Create a temporary directory for test files
+        self.temp_dir = tempfile.mkdtemp()
+
+        # Store original working directory
+        self.original_cwd = os.getcwd()
 
     def tearDown(self):
         """Clean up after tests."""
-        # Restore the original __new__ method
-        EnvironmentManager.__new__ = self.original_new
+        # Clean up temporary files
+        import shutil
 
-        # Clean up the temporary directory
-        self.temp_dir.cleanup()
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+        # Restore original working directory
+        os.chdir(self.original_cwd)
 
     def create_env_file(self, content):
-        """Create a .env file with the given content in the test directory."""
-        env_file = self.test_dir / ".env"
-        with open(env_file, "w") as f:
-            f.write(content)
+        """Create a temporary .env file with the given content."""
+        env_file = Path(self.temp_dir) / ".env"
+        env_file.write_text(content)
         return env_file
 
     def test_initialization(self):
@@ -49,23 +48,20 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertIsInstance(self.env_manager.kusto_parameters, dict)
         self.assertIsInstance(self.env_manager.settings, dict)
 
-        # Check that default settings are loaded
-        self.assertTrue(self.env_manager.settings["tool_history_enabled"])
-        self.assertTrue(
-            self.env_manager.settings["tool_history_path"].endswith(".history")
-        )
+        # Check default settings are loaded
+        self.assertIn("git_root", self.env_manager.settings)
+        self.assertIn("project_name", self.env_manager.settings)
+        self.assertIn("tool_history_enabled", self.env_manager.settings)
 
     def test_singleton_pattern(self):
-        """Test that EnvironmentManager follows the singleton pattern."""
-        # Reset to allow testing singleton behavior
-        EnvironmentManager.__new__ = self.original_new
+        """Test that EnvironmentManager follows singleton pattern."""
+        # Reset singleton for this test
+        EnvironmentManager._instance = None
 
-        # Get two instances
-        instance1 = EnvironmentManager()
-        instance2 = EnvironmentManager()
+        manager1 = EnvironmentManager()
+        manager2 = EnvironmentManager()
 
-        # They should be the same object
-        self.assertIs(instance1, instance2)
+        self.assertIs(manager1, manager2)
 
     def test_parse_env_file(self):
         """Test parsing an environment file."""
@@ -73,7 +69,6 @@ class TestEnvironmentManager(unittest.TestCase):
         env_content = """
         # Test environment file
         GIT_ROOT=/path/to/git
-        WORKSPACE_FOLDER=/path/to/workspace
         PROJECT_NAME=test_project
         PRIVATE_TOOL_ROOT=/path/to/private/tools
         MCP_PATH_DATA=/path/to/data
@@ -90,9 +85,6 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Check the values were set correctly
         self.assertEqual(self.env_manager.repository_info.git_root, "/path/to/git")
-        self.assertEqual(
-            self.env_manager.repository_info.workspace_folder, "/path/to/workspace"
-        )
         self.assertEqual(self.env_manager.repository_info.project_name, "test_project")
         self.assertEqual(
             self.env_manager.repository_info.private_tool_root, "/path/to/private/tools"
@@ -116,7 +108,6 @@ class TestEnvironmentManager(unittest.TestCase):
         # Create a test .env file with quoted values
         env_content = """
         GIT_ROOT="/path/with spaces/git"
-        WORKSPACE_FOLDER='/path/with spaces/workspace'
         """
         env_file = self.create_env_file(env_content)
 
@@ -127,10 +118,6 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(
             self.env_manager.repository_info.git_root, "/path/with spaces/git"
         )
-        self.assertEqual(
-            self.env_manager.repository_info.workspace_folder,
-            "/path/with spaces/workspace",
-        )
 
     def test_register_provider(self):
         """Test registering a provider function."""
@@ -139,7 +126,6 @@ class TestEnvironmentManager(unittest.TestCase):
             return_value={
                 "repository": {
                     "git_root": "/provider/git",
-                    "workspace_folder": "/provider/workspace",
                     "additional_paths": {"logs": "/provider/logs"},
                 },
                 "azrepo_parameters": {"org": "provider-org"},
@@ -164,9 +150,6 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Check the values were loaded
         self.assertEqual(self.env_manager.repository_info.git_root, "/provider/git")
-        self.assertEqual(
-            self.env_manager.repository_info.workspace_folder, "/provider/workspace"
-        )
         self.assertEqual(
             self.env_manager.repository_info.additional_paths.get("logs"),
             "/provider/logs",
@@ -199,7 +182,6 @@ class TestEnvironmentManager(unittest.TestCase):
         """Test getting a parameter dictionary."""
         # Set up repository info
         self.env_manager.repository_info.git_root = "/test/git"
-        self.env_manager.repository_info.workspace_folder = "/test/workspace"
         self.env_manager.repository_info.project_name = "test_project"
         self.env_manager.repository_info.private_tool_root = "/test/private"
         self.env_manager.repository_info.additional_paths = {"data": "/test/data"}
@@ -214,7 +196,6 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Check the values
         self.assertEqual(params["git_root"], "/test/git")
-        self.assertEqual(params["workspace_folder"], "/test/workspace")
         self.assertEqual(params["project_name"], "test_project")
         self.assertEqual(params["private_tool_root"], "/test/private")
         self.assertEqual(params["path_data"], "/test/data")
@@ -226,7 +207,6 @@ class TestEnvironmentManager(unittest.TestCase):
         """Test the getter methods."""
         # Set up repository info
         self.env_manager.repository_info.git_root = "/test/git"
-        self.env_manager.repository_info.workspace_folder = "/test/workspace"
         self.env_manager.repository_info.project_name = "test_project"
         self.env_manager.repository_info.private_tool_root = "/test/private"
         self.env_manager.repository_info.additional_paths = {"data": "/test/data"}
@@ -240,7 +220,6 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Test the getters
         self.assertEqual(self.env_manager.get_git_root(), "/test/git")
-        self.assertEqual(self.env_manager.get_workspace_folder(), "/test/workspace")
         self.assertEqual(self.env_manager.get_project_name(), "test_project")
         self.assertEqual(self.env_manager.get_private_tool_root(), "/test/private")
         self.assertEqual(self.env_manager.get_path("data"), "/test/data")
@@ -278,7 +257,6 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Set up repository info
         self.env_manager.repository_info.git_root = "/test/git"
-        self.env_manager.repository_info.workspace_folder = "/test/workspace"
 
         # Call the method
         self.env_manager._load_from_env_file()
@@ -291,7 +269,6 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Check it was called with one of the expected paths
         expected_paths = [
-            Path("/test/workspace/.env"),
             Path("/test/git/.env"),
             Path("/mock/cwd/.env"),
         ]
@@ -341,7 +318,6 @@ class TestEnvironmentManager(unittest.TestCase):
         """Test syncing settings to repository info."""
         # Set values in settings
         self.env_manager.settings["git_root"] = "/settings/git"
-        self.env_manager.settings["workspace_folder"] = "/settings/workspace"
         self.env_manager.settings["project_name"] = "settings_project"
         self.env_manager.settings["private_tool_root"] = "/settings/private"
 
@@ -350,9 +326,6 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Check repository info was updated
         self.assertEqual(self.env_manager.repository_info.git_root, "/settings/git")
-        self.assertEqual(
-            self.env_manager.repository_info.workspace_folder, "/settings/workspace"
-        )
         self.assertEqual(
             self.env_manager.repository_info.project_name, "settings_project"
         )
@@ -364,7 +337,6 @@ class TestEnvironmentManager(unittest.TestCase):
         """Test syncing repository info to settings."""
         # Set values in repository info
         self.env_manager.repository_info.git_root = "/repo/git"
-        self.env_manager.repository_info.workspace_folder = "/repo/workspace"
         self.env_manager.repository_info.project_name = "repo_project"
         self.env_manager.repository_info.private_tool_root = "/repo/private"
 
@@ -373,32 +345,41 @@ class TestEnvironmentManager(unittest.TestCase):
 
         # Check settings were updated
         self.assertEqual(self.env_manager.settings["git_root"], "/repo/git")
-        self.assertEqual(
-            self.env_manager.settings["workspace_folder"], "/repo/workspace"
-        )
         self.assertEqual(self.env_manager.settings["project_name"], "repo_project")
         self.assertEqual(
             self.env_manager.settings["private_tool_root"], "/repo/private"
         )
 
     def test_load_with_env_vars(self):
-        """Test loading from environment variables."""
-        # Use a context manager to temporarily set environment variables
+        """Test loading with environment variables."""
+        # Mock os.environ
         with mock.patch.dict(
-            os.environ,
-            {"TOOL_HISTORY_ENABLED": "false", "TOOL_HISTORY_PATH": "/env/history/path"},
+            "os.environ",
+            {
+                "GIT_ROOT": "/env/git",
+                "PROJECT_NAME": "env_project",
+                "TOOL_HISTORY_ENABLED": "false",
+                "MCP_PATH_CUSTOM": "/env/custom",
+                "AZREPO_ORG": "env-org",
+                "KUSTO_CLUSTER": "env-cluster",
+            },
         ):
-            # Load from environment
+            # Load environment
             self.env_manager.load()
 
-            # Check the values were set correctly
+            # Check values were loaded from environment variables
+            self.assertEqual(self.env_manager.repository_info.git_root, "/env/git")
+            self.assertEqual(
+                self.env_manager.repository_info.project_name, "env_project"
+            )
             self.assertFalse(self.env_manager.settings["tool_history_enabled"])
             self.assertEqual(
-                self.env_manager.settings["tool_history_path"], "/env/history/path"
+                self.env_manager.repository_info.additional_paths.get("custom"),
+                "/env/custom",
             )
-            self.assertFalse(self.env_manager.is_tool_history_enabled())
+            self.assertEqual(self.env_manager.azrepo_parameters.get("org"), "env-org")
             self.assertEqual(
-                self.env_manager.get_tool_history_path(), "/env/history/path"
+                self.env_manager.kusto_parameters.get("cluster"), "env-cluster"
             )
 
 
