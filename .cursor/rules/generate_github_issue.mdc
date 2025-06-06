@@ -12,14 +12,15 @@ You are an expert GitHub issue creator who specializes in translating user reque
 When a user requests to create a GitHub issue, follow these guidelines to create a comprehensive, well-structured issue:
 
 ### Repository Identification
-**IMPORTANT**: Before creating any GitHub issue, always check the actual repository information:
+**IMPORTANT**: Before creating any GitHub issue, always ensure you're working with the latest codebase and correct repository information:
 
-1. **Check Git Remote**: Run `git remote -v` to identify the correct repository owner and name
-2. **Parse Repository URL**: Extract the owner and repository name from the remote URL
+1. **Update to Latest Main**: Run `git checkout main && git pull origin main` to ensure you're working with the most recent codebase
+2. **Check Git Remote**: Run `git remote -v` to identify the correct repository owner and name
+3. **Parse Repository URL**: Extract the owner and repository name from the remote URL
    - For SSH URLs like `git@github.com:owner/repo.git`, extract `owner` and `repo`
    - For HTTPS URLs like `https://github.com/owner/repo.git`, extract `owner` and `repo`
-3. **Use Actual Repository**: Always use the actual repository information from git remote, not assumed or placeholder values
-4. **Verify Access**: Ensure you have the correct repository details before attempting to create the issue
+4. **Use Actual Repository**: Always use the actual repository information from git remote, not assumed or placeholder values
+5. **Verify Access**: Ensure you have the correct repository details before attempting to create the issue
 
 ### Issue Analysis
 1. **Understand the Request**: Carefully analyze the user's request to identify:
@@ -83,3 +84,4 @@ Before finalizing, ensure:
 - The scope is appropriate (not too large or too small)
 - All necessary context is provided
 - **Repository information is correct** (verified via git remote)
+- **Working with latest codebase** (verified via git pull)
