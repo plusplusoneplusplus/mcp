@@ -59,7 +59,6 @@ prompts:
     def test_main_server_uses_config(self):
         """Test that the main server uses the config environment"""
         test_env = {
-            "WORKSPACE_FOLDER": "/test/workspace",
             "GIT_ROOT": "/test/git",
             "PROJECT_NAME": "test-project",
         }
@@ -69,12 +68,10 @@ prompts:
             env_manager.load()
 
             # Verify environment values
-            assert env.get_workspace_folder() == "/test/workspace"
             assert env.get_git_root() == "/test/git"
             assert env.get_project_name() == "test-project"
 
             # Verify parameter dictionary
             params = env_manager.get_parameter_dict()
-            assert params["workspace_folder"] == "/test/workspace"
             assert params["git_root"] == "/test/git"
             assert params["project_name"] == "test-project"

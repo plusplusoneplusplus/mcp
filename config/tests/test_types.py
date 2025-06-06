@@ -9,7 +9,6 @@ class TestRepositoryInfo(unittest.TestCase):
         """Test that RepositoryInfo initializes with correct defaults."""
         repo_info = RepositoryInfo()
         self.assertIsNone(repo_info.git_root)
-        self.assertIsNone(repo_info.workspace_folder)
         self.assertIsNone(repo_info.project_name)
         self.assertIsNone(repo_info.private_tool_root)
         self.assertEqual(repo_info.additional_paths, {})
@@ -18,14 +17,12 @@ class TestRepositoryInfo(unittest.TestCase):
         """Test initializing RepositoryInfo with values."""
         repo_info = RepositoryInfo(
             git_root="/test/git",
-            workspace_folder="/test/workspace",
             project_name="test_project",
             private_tool_root="/test/private",
             additional_paths={"data": "/test/data"},
         )
 
         self.assertEqual(repo_info.git_root, "/test/git")
-        self.assertEqual(repo_info.workspace_folder, "/test/workspace")
         self.assertEqual(repo_info.project_name, "test_project")
         self.assertEqual(repo_info.private_tool_root, "/test/private")
         self.assertEqual(repo_info.additional_paths, {"data": "/test/data"})
@@ -35,7 +32,6 @@ class TestRepositoryInfo(unittest.TestCase):
         # Test with valid types
         repo_info = RepositoryInfo(
             git_root="/test/git",
-            workspace_folder="/test/workspace",
             additional_paths={"data": "/test/data"},
         )
         self.assertEqual(repo_info.git_root, "/test/git")
@@ -43,7 +39,7 @@ class TestRepositoryInfo(unittest.TestCase):
         # Test with invalid types (should be handled by pydantic)
         try:
             repo_info = RepositoryInfo(
-                git_root=123, workspace_folder="/test/workspace"  # Should be string
+                git_root=123  # Should be string
             )
             # If we get here, validation didn't happen
             self.fail("Pydantic validation didn't catch type error")
