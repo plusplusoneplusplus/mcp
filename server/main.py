@@ -340,12 +340,19 @@ def setup():
 
 
 @click.command()
-def main() -> None:
+@click.option('--port', default=None, type=int, help='Port to run the server on')
+def main(port: Optional[int] = None) -> None:
     # Run setup first (non-async)
     setup()
 
+    # Determine port from CLI argument, environment variable, or default
+    if port is None:
+        port = int(os.environ.get('SERVER_PORT', 8000))
+
+    logging.info(f"Starting server on port {port}")
+
     # Then run uvicorn directly without nested asyncio.run
-    uvicorn.run(starlette_app, host="0.0.0.0", port=8000)
+    uvicorn.run(starlette_app, host="0.0.0.0", port=port)
 
 
 if __name__ == "__main__":
