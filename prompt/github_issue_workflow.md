@@ -6,6 +6,15 @@ Your primary task is to read a GitHub issue, understand the requirements, implem
 
 ## Workflow Steps
 
+### 0. Pre-Work Setup
+
+**⚠️ IMPORTANT: Always start by checking out the main branch**
+```bash
+git checkout main
+git pull origin main
+```
+This ensures you're working from the latest stable code and prevents conflicts.
+
 ### 1. Issue Analysis Phase
 
 **Read and Understand the Issue:**
@@ -30,8 +39,9 @@ Your primary task is to read a GitHub issue, understand the requirements, implem
 - Identify any dependencies or prerequisites
 
 **Branch Management:**
+- **First, ensure you're on the main branch with latest changes** (see Pre-Work Setup above)
 - Create a new feature branch with a descriptive name (e.g., `fix/issue-123-description` or `feature/issue-456-new-feature`)
-- Ensure you're working from the latest main/master branch
+- Verify you're working from the latest main branch
 
 ### 3. Implementation Phase
 
