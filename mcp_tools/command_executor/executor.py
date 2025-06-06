@@ -23,6 +23,11 @@ g_config_sleep_when_running = True
 # Create logger with the module name
 logger = logging.getLogger(__name__)
 
+# Configuration options for periodic status reporting
+PERIODIC_STATUS_ENABLED = os.getenv("PERIODIC_STATUS_ENABLED", "false").lower() == "true"
+PERIODIC_STATUS_INTERVAL = float(os.getenv("PERIODIC_STATUS_INTERVAL", "30"))
+PERIODIC_STATUS_MAX_COMMAND_LENGTH = int(os.getenv("PERIODIC_STATUS_MAX_COMMAND_LENGTH", "60"))
+
 
 def _log_with_context(log_level: int, msg: str, context: Dict[str, Any] = None) -> None:
     """Helper function for structured logging with context
@@ -122,6 +127,12 @@ class CommandExecutor(CommandExecutorInterface):
         self.completed_processes = {}  # Store results of completed processes
         self.temp_files = {}  # Maps PIDs to (stdout_file, stderr_file) tuples
         self.cleanup_lock = asyncio.Lock()  # Lock to protect temp file operations
+
+        # Periodic status reporting attributes
+        self.status_reporter_task: Optional[asyncio.Task] = None
+        self.status_reporter_enabled = PERIODIC_STATUS_ENABLED
+        self.status_reporter_interval = PERIODIC_STATUS_INTERVAL
+        self.status_reporter_max_command_length = PERIODIC_STATUS_MAX_COMMAND_LENGTH
 
         # Use specified temp dir or system default
         self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
@@ -1024,3 +1035,173 @@ class CommandExecutor(CommandExecutorInterface):
         )
 
         return result
+
+    def list_running_processes(self) -> List[Dict[str, Any]]:
+        """List all currently running background processes.
+        
+        Returns:
+            List of dictionaries containing process information
+        """
+        running_processes = []
+        
+        for pid, process_data in self.running_processes.items():
+            process = process_data["process"]
+            
+            # Skip completed processes
+            if process.returncode is not None:
+                continue
+                
+            # Get basic process info
+            process_info = {
+                "token": process_data["token"][:8],  # First 8 characters
+                "pid": pid,
+                "command": process_data["command"],
+                "runtime": time.time() - process_data["start_time"],
+                "status": "running"
+            }
+            
+            # Get additional process info if available
+            detailed_info = self.get_process_info(pid)
+            if detailed_info:
+                process_info.update({
+                    "cpu_percent": detailed_info.get("cpu_percent", 0.0),
+                    "memory_mb": detailed_info.get("memory_info", {}).get("rss_mb", 0.0),
+                    "status": detailed_info.get("status", "running")
+                })
+            
+            running_processes.append(process_info)
+        
+        return running_processes
+
+    def _format_duration(self, seconds: float) -> str:
+        """Format duration in seconds to HH:MM:SS format.
+        
+        Args:
+            seconds: Duration in seconds
+            
+        Returns:
+            Formatted duration string
+        """
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+    def _truncate_command(self, command: str, max_length: int = None) -> str:
+        """Truncate command string if it's too long.
+        
+        Args:
+            command: Command string to truncate
+            max_length: Maximum length (uses instance setting if None)
+            
+        Returns:
+            Truncated command string
+        """
+        if max_length is None:
+            max_length = self.status_reporter_max_command_length
+            
+        if len(command) <= max_length:
+            return command
+        return command[:max_length-3] + "..."
+
+    def _print_status_report(self) -> None:
+        """Print a status report of running processes to stdout."""
+        running_processes = self.list_running_processes()
+        
+        # Get current timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Print header
+        print(f"[{timestamp}] Background Jobs Status ({len(running_processes)} running):")
+        
+        if not running_processes:
+            print("  No background processes currently running.")
+            return
+        
+        # Print each process
+        for process_info in running_processes:
+            token = process_info["token"]
+            pid = process_info["pid"]
+            runtime = self._format_duration(process_info["runtime"])
+            status = process_info["status"]
+            command = self._truncate_command(process_info["command"])
+            cpu_percent = process_info.get("cpu_percent", 0.0)
+            memory_mb = process_info.get("memory_mb", 0.0)
+            
+            print(f"  Token: {token} | PID: {pid} | Runtime: {runtime} | Status: {status}")
+            print(f"    Command: {command}")
+            print(f"    CPU: {cpu_percent:.1f}% | Memory: {memory_mb:.1f}MB")
+            print()
+
+    async def _periodic_status_reporter(self) -> None:
+        """Background task that periodically prints status reports."""
+        try:
+            while True:
+                await asyncio.sleep(self.status_reporter_interval)
+                
+                # Only print if there are running processes
+                if self.running_processes:
+                    self._print_status_report()
+                    
+        except asyncio.CancelledError:
+            _log_with_context(
+                logging.INFO,
+                "Periodic status reporter task cancelled",
+                {"interval": self.status_reporter_interval}
+            )
+            raise
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                "Error in periodic status reporter",
+                {"error": str(e), "traceback": traceback.format_exc()}
+            )
+
+    async def start_periodic_status_reporter(self, interval: float = 30.0, enabled: bool = True) -> None:
+        """Start periodic status reporting for running processes.
+        
+        Args:
+            interval: Time interval between status reports in seconds
+            enabled: Whether to enable periodic reporting
+        """
+        if not enabled:
+            _log_with_context(
+                logging.INFO,
+                "Periodic status reporter disabled",
+                {"enabled": enabled}
+            )
+            return
+            
+        # Stop existing reporter if running
+        await self.stop_periodic_status_reporter()
+        
+        # Update settings
+        self.status_reporter_interval = interval
+        self.status_reporter_enabled = enabled
+        
+        # Start new reporter task
+        self.status_reporter_task = asyncio.create_task(self._periodic_status_reporter())
+        
+        _log_with_context(
+            logging.INFO,
+            "Started periodic status reporter",
+            {"interval": interval, "enabled": enabled}
+        )
+
+    async def stop_periodic_status_reporter(self) -> None:
+        """Stop periodic status reporting."""
+        if self.status_reporter_task and not self.status_reporter_task.done():
+            self.status_reporter_task.cancel()
+            try:
+                await self.status_reporter_task
+            except asyncio.CancelledError:
+                pass
+            
+        self.status_reporter_task = None
+        self.status_reporter_enabled = False
+        
+        _log_with_context(
+            logging.INFO,
+            "Stopped periodic status reporter",
+            {}
+        )
