@@ -1,176 +1,100 @@
 # MCP Server
 
-The MCP Server provides a flexible framework for AI-powered command execution and tool management.
+The **MCP Server** provides a framework for AI-powered command execution and a plugin-based tool system. It can be run as a standalone service or embedded in other projects to expose a consistent API for invoking tools and managing tasks.
 
 ## Project Structure
 
-The MCP project is organized into several components:
-
-- **mcp_core/**: Core types and adapters
-  - **mcp_core/tests/**: Tests for core types and functionality
-
-- **mcp_tools/**: Utility tools and implementations
-  - **mcp_tools/command_executor/**: Command execution utilities
-  - **mcp_tools/tests/**: Tests for utility tools
-
-- **server/**: Main MCP server implementation
-  - **server/tests/**: Tests for server-specific functionality
-  - **server/.private/**: Directory for private configurations (git-ignored)
-
-- **scripts/**: Utility scripts for project management
-
-- **assets/**: Project assets and images for documentation
-
-- **config/**: Centralized configuration modules
-  - **config/templates/**: Configuration templates
+- **mcp_core/** – Lightweight data models and adapters used across the project
+- **mcp_tools/** – Plugin framework and built-in tools
+- **server/** – Starlette server implementation exposing HTTP/SSE endpoints
+- **plugins/** – Optional plugins (e.g., Azure DevOps, text summarization)
+- **config/** – Environment manager and configuration helpers
+- **scripts/** – Installation and utility scripts
+- **assets/** – Images used in documentation
 
 ## Installation
 
-### Manual installation
+Run the install script to set up the packages in development mode:
 
 ```bash
 scripts/install.sh
-
-# or on windows
+# on Windows
 scripts\install.ps1
 ```
 
-This will install all the local packages in development mode, allowing you to make changes to the code while using the packages.
+## Environment Setup
 
-## Environment Configuration
+Configuration is controlled by `.env` files. Create one from the template and edit it with your settings:
 
-The MCP project uses a centralized environment configuration system based on `.env` files. This allows for consistent configuration across different components.
-
-### Setting Up Your Environment
-
-1. Copy the template file to create your `.env` file:
-   ```bash
-   cp config/templates/env.template .env
-   ```
-
-2. Edit the `.env` file to configure your environment settings:
-   ```bash
-   # Repository Information
-   GIT_ROOT=/path/to/git/repo
-   PROJECT_NAME=mcp_project
-
-   # Azure Repo Configuration
-   AZREPO_ORG=your-organization
-   AZREPO_PROJECT=your-project
-   AZREPO_REPO=your-repository
-   ```
-
-3. The system will automatically load the `.env` file from:
-   - Git root directory
-   - Current working directory
-   - User's home directory
-
-### Using the Environment Manager
-
-```python
-# Import the environment manager
-from config import env_manager, env
-
-# Load the environment information
-env_manager.load()
-
-# Access environment settings
-git_root = env_manager.get_git_root()
-azrepo_params = env_manager.get_azrepo_parameters()
+```bash
+cp config/templates/env.template .env
 ```
 
-See `config/README.md` for more details on environment configuration.
+Important variables include repository paths (`GIT_ROOT`), Azure Repo details (`AZREPO_ORG`, `AZREPO_PROJECT`, `AZREPO_REPO`), and optional `PRIVATE_TOOL_ROOT` for external tool configuration. The environment manager automatically loads `.env` files from the repository root, current directory, and your home directory.
 
-## Configuration
+Access settings in code via:
 
-The MCP server uses a flexible configuration system that supports both default and user-specific settings. Configuration files are stored in YAML format.
+```python
+from config import env_manager
+env_manager.load()
+root = env_manager.get_git_root()
+```
 
-### Configuration Files
+See `docs/config_overview.md` for more information.
 
-The server uses two main configuration files:
+## Running the Server
 
-1. `prompts.yaml` - Defines available prompts and their templates
-2. `tools.yaml` - Defines available tools and their configurations
+After installing dependencies and configuring `.env`, start the server with:
 
-### User-Specific Configuration
+```bash
+python server/main.py
+# or
+scripts/start_server.sh
+```
 
-To maintain private configurations that won't be tracked in git:
+Connect to the SSE endpoint at `http://0.0.0.0:8000/sse` or use the additional routes in `server/api.py`.
 
-1. Create a `.private` directory in the `server` folder:
-   ```bash
-   mkdir server/.private
-   ```
+## Configuration Files
 
-2. Copy your configuration files to the `.private` directory:
-   ```bash
-   cp server/prompts.yaml server/.private/
-   cp server/tools.yaml server/.private/
-   ```
+The server loads prompts and tool definitions from YAML files:
 
-3. Customize the files in `.private` as needed
+- `server/prompts.yaml`
+- `server/tools.yaml`
 
-The system will:
-- First look for configuration files in the `.private` directory
-- Fall back to the default configuration files if private versions don't exist
-- The `.private` directory is automatically ignored by git
+Private overrides can be placed in `server/.private/` or in a folder pointed to by `PRIVATE_TOOL_ROOT`. Files are resolved in this order:
+1. `PRIVATE_TOOL_ROOT`
+2. `server/.private/`
+3. Defaults in `server/`
 
-### External Private Tool Directory
+## Tool System
 
-You can also define a separate directory for private tools and configurations outside the project directory:
-
-1. Define `PRIVATE_TOOL_ROOT` in your `.env` file:
-   ```
-   PRIVATE_TOOL_ROOT=/path/to/your/private/tools
-   ```
-
-2. Create and customize your configuration files in this directory
-
-3. The server will look for configuration files in this priority order:
-   1. `PRIVATE_TOOL_ROOT` directory (if set)
-   2. `.private` directory in the server folder
-   3. Default files in the server folder
-
-This approach allows you to:
-- Keep private tools and configurations completely separate from the project
-- Share the same private tools across multiple projects
-- Easily switch between different sets of private tools by changing the environment variable
-
-## Tool Types
-
-The MCP server supports several types of tools:
-
-1. **Regular Tools**: Standard tools defined in the tools.yaml configuration
-2. **Script-Based Tools**: Tools that execute external scripts with configurable parameters
-3. **Task-Based Tools**: Pre-defined tasks that can be executed with platform-specific commands
-4. **Async Command Execution**: Tools that execute commands asynchronously and allow status tracking
+Tools are modular plugins registered through `mcp_tools`. Built-in utilities include a command executor, browser automation, time helpers, and a YAML-defined tool loader. Additional examples live in the `plugins/` directory. See `mcp_tools/docs/creating_tools.md` for details on building custom tools.
 
 ## Running Tests
 
-The MCP project includes test suites.
-
-You can run tests manually using pytest:
+Execute all test suites with:
 
 ```bash
-# Run all tests
 scripts/run_tests.sh
-
-# Run tests for a specific component
-python -m pytest mcp_core/tests
-python -m pytest mcp_tools/tests
-python -m pytest server/tests
 ```
 
-## Configuring MCP Server in Cursor/VSCode
+Or run `pytest` directly on `mcp_core/tests`, `mcp_tools/tests`, or `server/tests`.
 
-The recommended way to configure MCP server is through the `.env` file. However, you can still override settings in your editor configuration:
+## Where to Go Next
+
+1. Browse the documentation under `mcp_tools/docs/` to learn about tool creation and dependency injection.
+2. Review the sample configuration files in `server/` and try adding your own tools.
+3. Explore plugins in the `plugins/` directory for concrete implementations.
+
+## Editor Integration
+
+Editors like Cursor/VSCode can use the SSE endpoint by adding the following to your settings:
 
 ```json
 {
-    "mcpServers": {
-      "mymcp-sse" : {
-        "url": "http://0.0.0.0:8000/sse"
-      }
-    }
+  "mcpServers": {
+    "mymcp-sse": { "url": "http://0.0.0.0:8000/sse" }
+  }
 }
 ```
 
@@ -178,3 +102,4 @@ The recommended way to configure MCP server is through the `.env` file. However,
 
 ![MCP Server Configuration](assets/mcp-server.png)
 ![MCP Server async command execution](assets/mcp-async-command.png)
+
