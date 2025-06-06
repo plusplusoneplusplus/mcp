@@ -240,18 +240,23 @@ async def create_mcp_client(server_url: str, worker_id: str = "test"):
     """
     logging.info(f"Worker {worker_id}: Connecting MCP client to {server_url}")
 
-    # Create SSE client and session
-    async with sse_client(server_url) as (read, write):
-        async with ClientSession(read, write) as session:
-            # Initialize the session
-            await session.initialize()
+    session = None
+    try:
+        # Create SSE client and session
+        async with sse_client(server_url) as (read, write):
+            async with ClientSession(read, write) as session:
+                # Initialize the session
+                await session.initialize()
 
-            logging.info(f"Worker {worker_id}: MCP client session initialized")
+                logging.info(f"Worker {worker_id}: MCP client session initialized")
 
-            try:
                 yield session
-            finally:
-                logging.info(f"Worker {worker_id}: MCP client session cleanup completed")
+    except Exception as e:
+        logging.error(f"Worker {worker_id}: Error in MCP client session: {e}")
+        raise
+    finally:
+        logging.info(f"Worker {worker_id}: MCP client session cleanup completed")
+
 
 
 @pytest.fixture
@@ -288,12 +293,15 @@ def sse_url(mcp_server: subprocess.Popen) -> str:
 
 # Utility fixtures for specific test scenarios
 @pytest_asyncio.fixture
-async def initialized_mcp_session(mcp_client: ClientSession) -> ClientSession:
+async def initialized_mcp_session(mcp_client_info: dict):
     """
-    Alias for mcp_client fixture for backward compatibility.
-    The mcp_client fixture already provides an initialized session.
+    Provide an initialized MCP session for backward compatibility.
     """
-    return mcp_client
+    server_url = mcp_client_info['url']
+    worker_id = mcp_client_info['worker_id']
+
+    async with create_mcp_client(server_url, worker_id) as session:
+        yield session
 
 
 @pytest.fixture
