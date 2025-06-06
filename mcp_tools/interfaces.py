@@ -117,6 +117,30 @@ class CommandExecutorInterface(ToolInterface):
         """
         pass
 
+    @abstractmethod
+    def list_running_processes(self) -> List[Dict[str, Any]]:
+        """List all currently running background processes.
+        
+        Returns:
+            List of dictionaries containing process information
+        """
+        pass
+
+    @abstractmethod
+    async def start_periodic_status_reporter(self, interval: float = 30.0, enabled: bool = True) -> None:
+        """Start periodic status reporting for running processes.
+        
+        Args:
+            interval: Time interval between status reports in seconds
+            enabled: Whether to enable periodic reporting
+        """
+        pass
+
+    @abstractmethod
+    async def stop_periodic_status_reporter(self) -> None:
+        """Stop periodic status reporting."""
+        pass
+
 
 class RepoClientInterface(ToolInterface):
     """Interface for repository client tools."""

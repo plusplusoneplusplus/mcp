@@ -37,6 +37,10 @@ class EnvironmentManager:
         "image_dir": (".images", str),
         # Vector store settings
         "vector_store_path": (".vector_store", str),
+        # Command executor periodic status reporting
+        "periodic_status_enabled": (False, bool),
+        "periodic_status_interval": (30.0, float),
+        "periodic_status_max_command_length": (60, int),
     }
 
     # Create mapping dynamically - each setting can be set via its uppercase env var

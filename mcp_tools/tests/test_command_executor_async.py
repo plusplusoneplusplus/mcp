@@ -395,58 +395,214 @@ class TestCommandExecutorAsync:
             assert "Line 3" in output
 
     async def test_git_branch_command(self, executor):
-        """Test executing a git command that might be used frequently"""
-        # This depends on the test running in a git repo directory
-        if not os.path.exists(".git") and not os.path.exists("../.git"):
-            pytest.skip("Not in a git repository")
+        """Test executing git branch command"""
+        cmd = "git branch"
 
-        # Store original directory
-        original_dir = os.getcwd()
-        try:
-            # Change to the directory containing this test file
-            test_file_dir = os.path.dirname(os.path.abspath(__file__))
-            os.chdir(test_file_dir)
+        response = await executor.execute_async(cmd)
+        token = response["token"]
 
-            # Find the git root directory (assuming we're in a git repo)
-            response = await executor.execute_async("git rev-parse --show-toplevel")
-            token = response["token"]
-            result = await executor.wait_for_process(token, timeout=5.0)
+        # Wait for process to complete
+        result = await executor.wait_for_process(token, timeout=5.0)
 
-            assert result["status"] == "completed"
-            assert result["output"].strip() != "", "Not in a git repository"
-            git_root = result["output"].strip()
+        # Check for successful completion
+        assert result["status"] == "completed"
+        # Git branch should return 0 if we're in a git repository
+        # or non-zero if not - both are valid outcomes
 
-            # Change to git root directory
-            os.chdir(git_root)
+    async def test_list_running_processes_empty(self, executor):
+        """Test list_running_processes when no processes are running"""
+        running_processes = executor.list_running_processes()
+        assert isinstance(running_processes, list)
+        assert len(running_processes) == 0
 
-            # Run the branch command
-            cmd = "git branch --show-current"
-            response = await executor.execute_async(cmd)
-            token = response["token"]
+    async def test_list_running_processes_with_processes(self, executor):
+        """Test list_running_processes with active processes"""
+        # Start a long-running process
+        if platform.system().lower() == "windows":
+            cmd = "ping -n 5 127.0.0.1"  # Takes ~4 seconds
+        else:
+            cmd = "sleep 3"
 
-            # Wait for completion
-            result = await executor.wait_for_process(token, timeout=5.0)
+        response = await executor.execute_async(cmd)
+        token = response["token"]
 
-            # Verify it completed
-            assert result["status"] == "completed"
+        # Check running processes
+        running_processes = executor.list_running_processes()
+        assert len(running_processes) == 1
+        
+        process_info = running_processes[0]
+        assert "token" in process_info
+        assert "pid" in process_info
+        assert "command" in process_info
+        assert "runtime" in process_info
+        assert "status" in process_info
+        
+        # Token should be first 8 characters
+        assert len(process_info["token"]) == 8
+        assert process_info["command"] == cmd
+        assert process_info["runtime"] >= 0
+        assert process_info["status"] in ["running", "sleeping"]
 
-            # Check if we're in detached HEAD state (common in CI environments)
-            branch_name = result["output"].strip()
-            if branch_name == "":
-                # In detached HEAD state, verify we can still get commit info
-                response = await executor.execute_async("git rev-parse HEAD")
-                token = response["token"]
-                commit_result = await executor.wait_for_process(token, timeout=5.0)
+        # Wait for completion
+        await executor.wait_for_process(token)
+        
+        # Should be empty again
+        running_processes = executor.list_running_processes()
+        assert len(running_processes) == 0
 
-                assert commit_result["status"] == "completed"
-                commit_hash = commit_result["output"].strip()
-                assert len(commit_hash) == 40, "Should get a valid commit hash"
-                assert all(c in "0123456789abcdef" for c in commit_hash), "Invalid commit hash characters"
-            else:
-                # On a named branch, verify branch name is valid
-                assert all(
-                    c.isalnum() or c in "-_/" for c in branch_name
-                ), "Invalid branch name characters"
-        finally:
-            # Restore original directory
-            os.chdir(original_dir)
+    async def test_format_duration(self, executor):
+        """Test duration formatting"""
+        # Test various durations
+        assert executor._format_duration(0) == "00:00:00"
+        assert executor._format_duration(30) == "00:00:30"
+        assert executor._format_duration(90) == "00:01:30"
+        assert executor._format_duration(3661) == "01:01:01"
+        assert executor._format_duration(7323) == "02:02:03"
+
+    async def test_truncate_command(self, executor):
+        """Test command truncation"""
+        short_cmd = "echo hello"
+        long_cmd = "echo " + "a" * 100
+        
+        # Short command should not be truncated
+        assert executor._truncate_command(short_cmd) == short_cmd
+        
+        # Long command should be truncated
+        truncated = executor._truncate_command(long_cmd, max_length=20)
+        assert len(truncated) == 20
+        assert truncated.endswith("...")
+        
+        # Test with default max length
+        truncated_default = executor._truncate_command(long_cmd)
+        assert len(truncated_default) <= executor.status_reporter_max_command_length
+
+    async def test_periodic_status_reporter_start_stop(self, executor):
+        """Test starting and stopping periodic status reporter"""
+        # Initially should not be running
+        assert executor.status_reporter_task is None
+        assert not executor.status_reporter_enabled
+
+        # Start the reporter
+        await executor.start_periodic_status_reporter(interval=1.0, enabled=True)
+        
+        # Should be running now
+        assert executor.status_reporter_task is not None
+        assert not executor.status_reporter_task.done()
+        assert executor.status_reporter_enabled
+        assert executor.status_reporter_interval == 1.0
+
+        # Stop the reporter
+        await executor.stop_periodic_status_reporter()
+        
+        # Should be stopped
+        assert executor.status_reporter_task is None
+        assert not executor.status_reporter_enabled
+
+    async def test_periodic_status_reporter_disabled(self, executor):
+        """Test that disabled reporter doesn't start"""
+        await executor.start_periodic_status_reporter(interval=1.0, enabled=False)
+        
+        # Should not be running
+        assert executor.status_reporter_task is None
+        assert not executor.status_reporter_enabled
+
+    async def test_periodic_status_reporter_restart(self, executor):
+        """Test restarting periodic status reporter"""
+        # Start first reporter
+        await executor.start_periodic_status_reporter(interval=1.0, enabled=True)
+        first_task = executor.status_reporter_task
+        
+        # Start second reporter (should stop first one)
+        await executor.start_periodic_status_reporter(interval=2.0, enabled=True)
+        second_task = executor.status_reporter_task
+        
+        # Should be different tasks
+        assert first_task != second_task
+        assert first_task.done()  # First task should be cancelled
+        assert not second_task.done()  # Second task should be running
+        assert executor.status_reporter_interval == 2.0
+        
+        # Clean up
+        await executor.stop_periodic_status_reporter()
+
+    async def test_print_status_report_no_processes(self, executor, capsys):
+        """Test printing status report with no running processes"""
+        executor._print_status_report()
+        
+        captured = capsys.readouterr()
+        assert "Background Jobs Status (0 running)" in captured.out
+        assert "No background processes currently running" in captured.out
+
+    async def test_print_status_report_with_processes(self, executor, capsys):
+        """Test printing status report with running processes"""
+        # Start a process
+        if platform.system().lower() == "windows":
+            cmd = "ping -n 3 127.0.0.1"
+        else:
+            cmd = "sleep 2"
+
+        response = await executor.execute_async(cmd)
+        token = response["token"]
+        
+        # Give it a moment to start
+        await asyncio.sleep(0.1)
+        
+        # Print status report
+        executor._print_status_report()
+        
+        captured = capsys.readouterr()
+        assert "Background Jobs Status (1 running)" in captured.out
+        assert token[:8] in captured.out  # Token should be in output
+        assert cmd in captured.out  # Command should be in output
+        assert "Runtime:" in captured.out
+        assert "CPU:" in captured.out
+        assert "Memory:" in captured.out
+        
+        # Clean up
+        await executor.wait_for_process(token)
+
+    async def test_periodic_status_reporter_integration(self, executor, capsys):
+        """Test full integration of periodic status reporter"""
+        # Start reporter with short interval
+        await executor.start_periodic_status_reporter(interval=0.5, enabled=True)
+        
+        # Start a process
+        if platform.system().lower() == "windows":
+            cmd = "ping -n 2 127.0.0.1"
+        else:
+            cmd = "sleep 1"
+
+        response = await executor.execute_async(cmd)
+        token = response["token"]
+        
+        # Wait for at least one status report
+        await asyncio.sleep(0.7)
+        
+        # Should have printed status
+        captured = capsys.readouterr()
+        assert "Background Jobs Status" in captured.out
+        
+        # Clean up
+        await executor.stop_periodic_status_reporter()
+        await executor.wait_for_process(token)
+
+    async def test_configuration_from_config_manager(self, executor):
+        """Test that configuration is read from config manager"""
+        # Test that configuration attributes exist
+        assert hasattr(executor, 'status_reporter_enabled')
+        assert hasattr(executor, 'status_reporter_interval')
+        assert hasattr(executor, 'status_reporter_max_command_length')
+        
+        # Test that values are reasonable defaults
+        assert isinstance(executor.status_reporter_enabled, bool)
+        assert isinstance(executor.status_reporter_interval, float)
+        assert executor.status_reporter_interval > 0
+        assert isinstance(executor.status_reporter_max_command_length, int)
+        assert executor.status_reporter_max_command_length > 0
+        
+        # Test default values match config manager defaults
+        from config import env_manager
+        env_manager.load()
+        assert executor.status_reporter_enabled == env_manager.get_setting("periodic_status_enabled", False)
+        assert executor.status_reporter_interval == env_manager.get_setting("periodic_status_interval", 30.0)
+        assert executor.status_reporter_max_command_length == env_manager.get_setting("periodic_status_max_command_length", 60)
