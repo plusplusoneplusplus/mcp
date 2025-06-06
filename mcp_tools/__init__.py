@@ -11,7 +11,14 @@ from mcp_tools.interfaces import (
 
 # Import concrete implementations
 from mcp_tools.command_executor import CommandExecutor
-from mcp_tools.browser import BrowserClient
+
+# BrowserClient requires optional selenium/playwright dependencies. Avoid failing
+# on import if those packages are not installed by lazily importing the class.
+try:  # pragma: no cover - optional dependency
+    from mcp_tools.browser import BrowserClient
+except Exception:  # pragma: no cover - missing optional deps
+    BrowserClient = None  # type: ignore
+
 from config import env
 
 # Import plugin system

@@ -1,8 +1,5 @@
 import pytest
 
-# Configure pytest-asyncio to use auto mode
-pytest_plugins = ["pytest_asyncio"]
-
 
 def pytest_configure(config):
     """Add custom markers for tests"""
