@@ -46,6 +46,11 @@ class YamlToolBase(ToolInterface):
         if tool_data is None:
             tool_data = {}
 
+        # Ensure tool_data is a dictionary
+        if not isinstance(tool_data, dict):
+            logger.warning(f"Invalid tool_data type for tool '{tool_name}': {type(tool_data)}. Using empty dict.")
+            tool_data = {}
+
         self._name = tool_name
         self._description = tool_data.get("description", "")
         self._input_schema = tool_data.get(
@@ -56,7 +61,11 @@ class YamlToolBase(ToolInterface):
 
         # Get command executor from injector if not provided
         if command_executor is None:
-            self._command_executor = injector.get_tool_instance("command_executor")
+            try:
+                self._command_executor = injector.get_tool_instance("command_executor")
+            except Exception as e:
+                logger.warning(f"Failed to get command executor from injector: {e}")
+                self._command_executor = None
         else:
             self._command_executor = command_executor
 
@@ -73,6 +82,10 @@ class YamlToolBase(ToolInterface):
     @property
     def input_schema(self) -> Dict[str, Any]:
         """Get the tool input schema."""
+        # Ensure input_schema is a dictionary
+        if not isinstance(self._input_schema, dict):
+            logger.warning(f"Invalid input_schema type for tool '{self._name}': {type(self._input_schema)}. Using default.")
+            return {"type": "object", "properties": {}, "required": []}
         return self._input_schema
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Any:
