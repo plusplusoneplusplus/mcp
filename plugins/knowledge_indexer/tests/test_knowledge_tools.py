@@ -346,7 +346,8 @@ class TestKnowledgeCollectionManagerTool:
         mock_store.client.delete_collection.assert_called_once_with("test_collection")
 
     @pytest.mark.asyncio
-    async def test_delete_collection_no_name(self):
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
+    async def test_delete_collection_no_name(self, mock_store_class):
         """Test collection deletion without collection name."""
         tool = KnowledgeCollectionManagerTool()
 
@@ -385,7 +386,8 @@ class TestKnowledgeCollectionManagerTool:
         assert len(result["sample_documents"]) == 3
 
     @pytest.mark.asyncio
-    async def test_collection_info_no_name(self):
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
+    async def test_collection_info_no_name(self, mock_store_class):
         """Test getting collection info without collection name."""
         tool = KnowledgeCollectionManagerTool()
 
@@ -395,7 +397,8 @@ class TestKnowledgeCollectionManagerTool:
         assert "Collection name is required" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_unknown_action(self):
+    @patch("plugins.knowledge_indexer.tool.ChromaVectorStore")
+    async def test_unknown_action(self, mock_store_class):
         """Test unknown action handling."""
         tool = KnowledgeCollectionManagerTool()
 
