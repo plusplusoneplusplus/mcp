@@ -50,7 +50,7 @@ class TestGitTool:
 
         # Check that all operations are in the enum
         operations = schema["properties"]["operation"]["enum"]
-        expected_operations = [op.value for op in GitOperationType]
+        expected_operations = [op.value for op in GitOperationType.__members__.values()]
         assert set(operations) == set(expected_operations)
 
     @pytest.mark.asyncio
