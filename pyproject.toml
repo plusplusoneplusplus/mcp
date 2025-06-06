@@ -57,6 +57,7 @@ dependencies = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.1",
     "pytest-xdist>=3.3.1",  # Parallel test execution
+    "pytest-timeout>=2.1.0",  # Test timeout support
     "requests>=2.31.0",  # HTTP client for testing
 
     # Azure Data Explorer (Kusto)
@@ -123,3 +124,5 @@ disallow_incomplete_defs = true
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
+timeout = 300  # 5 minutes default timeout per test
+timeout_method = "thread"  # Use thread-based timeout (more reliable than signal)
