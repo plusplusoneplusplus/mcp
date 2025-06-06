@@ -584,15 +584,23 @@ class TestCommandExecutorAsync:
         await executor.stop_periodic_status_reporter()
         await executor.wait_for_process(token)
 
-    async def test_configuration_from_environment(self, executor):
-        """Test that configuration is read from environment variables"""
-        # Test default values (since we can't easily modify env vars in tests)
+    async def test_configuration_from_config_manager(self, executor):
+        """Test that configuration is read from config manager"""
+        # Test that configuration attributes exist
         assert hasattr(executor, 'status_reporter_enabled')
         assert hasattr(executor, 'status_reporter_interval')
         assert hasattr(executor, 'status_reporter_max_command_length')
         
-        # Test that values are reasonable
+        # Test that values are reasonable defaults
+        assert isinstance(executor.status_reporter_enabled, bool)
         assert isinstance(executor.status_reporter_interval, float)
         assert executor.status_reporter_interval > 0
         assert isinstance(executor.status_reporter_max_command_length, int)
         assert executor.status_reporter_max_command_length > 0
+        
+        # Test default values match config manager defaults
+        from config import env_manager
+        env_manager.load()
+        assert executor.status_reporter_enabled == env_manager.get_setting("periodic_status_enabled", False)
+        assert executor.status_reporter_interval == env_manager.get_setting("periodic_status_interval", 30.0)
+        assert executor.status_reporter_max_command_length == env_manager.get_setting("periodic_status_max_command_length", 60)

@@ -18,15 +18,13 @@ import traceback
 from mcp_tools.interfaces import CommandExecutorInterface
 from mcp_tools.plugin import register_tool
 
+# Import config manager
+from config import env_manager
+
 g_config_sleep_when_running = True
 
 # Create logger with the module name
 logger = logging.getLogger(__name__)
-
-# Configuration options for periodic status reporting
-PERIODIC_STATUS_ENABLED = os.getenv("PERIODIC_STATUS_ENABLED", "false").lower() == "true"
-PERIODIC_STATUS_INTERVAL = float(os.getenv("PERIODIC_STATUS_INTERVAL", "30"))
-PERIODIC_STATUS_MAX_COMMAND_LENGTH = int(os.getenv("PERIODIC_STATUS_MAX_COMMAND_LENGTH", "60"))
 
 
 def _log_with_context(log_level: int, msg: str, context: Dict[str, Any] = None) -> None:
@@ -130,9 +128,12 @@ class CommandExecutor(CommandExecutorInterface):
 
         # Periodic status reporting attributes
         self.status_reporter_task: Optional[asyncio.Task] = None
-        self.status_reporter_enabled = PERIODIC_STATUS_ENABLED
-        self.status_reporter_interval = PERIODIC_STATUS_INTERVAL
-        self.status_reporter_max_command_length = PERIODIC_STATUS_MAX_COMMAND_LENGTH
+        
+        # Load configuration from config manager
+        env_manager.load()
+        self.status_reporter_enabled = env_manager.get_setting("periodic_status_enabled", False)
+        self.status_reporter_interval = env_manager.get_setting("periodic_status_interval", 30.0)
+        self.status_reporter_max_command_length = env_manager.get_setting("periodic_status_max_command_length", 60)
 
         # Use specified temp dir or system default
         self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
