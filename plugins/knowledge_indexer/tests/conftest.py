@@ -13,3 +13,25 @@ os.environ.setdefault("MCP_REGISTER_CODE_TOOLS", "true")
 os.environ.setdefault(
     "MCP_REGISTER_YAML_TOOLS", "false"
 )  # Disable YAML tools for simpler testing
+
+
+def pytest_configure(config):
+    """Configure pytest with custom markers."""
+    config.addinivalue_line(
+        "markers", "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
+    )
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow running (deselect with '-m \"not slow\"')"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Automatically mark integration tests based on file name."""
+    for item in items:
+        # Mark tests in test_integration.py as integration tests
+        if "test_integration" in item.fspath.basename:
+            item.add_marker("integration")
+        
+        # Mark tests with @pytest.mark.slow as slow
+        if item.get_closest_marker("slow"):
+            item.add_marker("slow")
