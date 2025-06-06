@@ -143,7 +143,8 @@ class TestCommandExecutorAsync:
         assert status["status"] in [
             "running",
             "sleeping",
-        ]  # Process could be in running or sleeping state
+            "disk-sleep",
+        ]  # Process could be in running, sleeping, or disk-sleep state
 
         # Wait for completion
         await asyncio.sleep(3)  # Wait a bit longer for Windows
@@ -255,6 +256,7 @@ class TestCommandExecutorAsync:
             assert status["status"] in [
                 "running",
                 "sleeping",
+                "disk-sleep",
                 "completed",
             ]  # May complete quickly
 
