@@ -4,63 +4,199 @@ import time
 import pytest
 import logging
 import requests
+import socket
+import os
+import signal
+import psutil
 from pathlib import Path
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 
+def find_free_port():
+    """Find a free port for the server to use."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+
+def get_worker_id():
+    """Get the pytest-xdist worker ID if available."""
+    worker_id = os.environ.get('PYTEST_XDIST_WORKER', 'master')
+    return worker_id
+
+
+def kill_process_tree(pid):
+    """Kill a process and all its children."""
+    try:
+        parent = psutil.Process(pid)
+        children = parent.children(recursive=True)
+
+        # Terminate children first
+        for child in children:
+            try:
+                child.terminate()
+            except psutil.NoSuchProcess:
+                pass
+
+        # Terminate parent
+        try:
+            parent.terminate()
+        except psutil.NoSuchProcess:
+            pass
+
+        # Wait for graceful termination
+        gone, alive = psutil.wait_procs(children + [parent], timeout=5)
+
+        # Force kill any remaining processes
+        for proc in alive:
+            try:
+                proc.kill()
+            except psutil.NoSuchProcess:
+                pass
+
+    except psutil.NoSuchProcess:
+        pass
+
+
 class TestMCPClientConnection:
     """Test MCP client connection to launched server using SSE transport."""
 
+    @pytest.fixture(autouse=True)
+    def cleanup_processes(self):
+        """Cleanup any leftover processes after each test."""
+        yield
+        # Kill any remaining test processes
+        current_process = psutil.Process()
+        children = current_process.children(recursive=True)
+        for child in children:
+            try:
+                if 'server/main.py' in ' '.join(child.cmdline()):
+                    child.terminate()
+                    try:
+                        child.wait(timeout=2)
+                    except psutil.TimeoutExpired:
+                        child.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
     @pytest.fixture
     def server_process(self):
-        """Launch the MCP server as a subprocess and clean up after test."""
+        """Launch the MCP server as a subprocess with dynamic port allocation and clean up after test."""
+        # Get worker-specific port to avoid conflicts
+        worker_id = get_worker_id()
+        port = find_free_port()
+
+        logging.info(f"Worker {worker_id} using port {port}")
+
         # Get the path to the server main.py
         server_path = Path(__file__).parent.parent / "main.py"
 
-        # Start the server process
+        # Set environment variables for the server
+        env = os.environ.copy()
+        env['SERVER_PORT'] = str(port)
+        env['PYTEST_WORKER_ID'] = worker_id
+
+        # Start the server process with the specific port
         process = subprocess.Popen(
-            ["uv", "run", str(server_path)],
+            ["uv", "run", str(server_path), "--port", str(port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            env=env,
+            preexec_fn=os.setsid if hasattr(os, 'setsid') else None  # Create new process group on Unix
         )
 
-        # Give the server more time to start up
-        time.sleep(5)
+        # Store port for cleanup and test access (dynamic attributes)
+        setattr(process, 'port', port)
+        setattr(process, 'worker_id', worker_id)
+
+        # Give the server time to start up
+        time.sleep(3)
 
         # Check if process is still running (didn't crash immediately)
         if process.poll() is not None:
             stdout, stderr = process.communicate()
-            pytest.fail(f"Server failed to start. stdout: {stdout}, stderr: {stderr}")
+            pytest.fail(f"Worker {worker_id}: Server failed to start on port {port}. stdout: {stdout}, stderr: {stderr}")
 
         # Additional check: try to connect to the HTTP endpoint to ensure server is ready
-        max_retries = 10
+        max_retries = 20
+        server_ready = False
+
         for i in range(max_retries):
             try:
-                response = requests.get("http://localhost:8000/", timeout=2)
+                response = requests.get(f"http://localhost:{port}/", timeout=2)
                 if response.status_code == 200:
+                    server_ready = True
                     break
             except requests.exceptions.RequestException:
+                if process.poll() is not None:
+                    stdout, stderr = process.communicate()
+                    pytest.fail(f"Worker {worker_id}: Server crashed during startup on port {port}. stdout: {stdout}, stderr: {stderr}")
+
                 if i == max_retries - 1:
-                    pytest.fail("Server did not become ready within timeout period")
-                time.sleep(1)
+                    # Final attempt failed, capture output for debugging
+                    try:
+                        stdout, stderr = process.communicate(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        stdout, stderr = "Process still running", "Process still running"
+                    pytest.fail(f"Worker {worker_id}: Server did not become ready within timeout period on port {port}. stdout: {stdout}, stderr: {stderr}")
+
+                time.sleep(0.5)
+
+        if not server_ready:
+            pytest.fail(f"Worker {worker_id}: Server readiness check failed on port {port}")
+
+        logging.info(f"Worker {worker_id}: Server ready on port {port}")
 
         yield process
 
-        # Cleanup: terminate the server process
-        process.terminate()
+        # Enhanced cleanup: terminate the server process and all children
+        logging.info(f"Worker {worker_id}: Starting cleanup for server on port {port}")
+
         try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
+            if process.poll() is None:  # Process is still running
+                # Kill the entire process tree
+                kill_process_tree(process.pid)
+
+                # Wait for process to actually terminate
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    logging.warning(f"Worker {worker_id}: Process did not terminate gracefully, force killing")
+                    try:
+                        if hasattr(os, 'killpg'):
+                            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                        else:
+                            process.kill()
+                        process.wait()
+                    except (ProcessLookupError, OSError):
+                        pass  # Process already dead
+
+            # Verify port is freed
+            for i in range(10):
+                try:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        s.bind(('localhost', port))
+                        break  # Port is free
+                except OSError:
+                    if i == 9:
+                        logging.warning(f"Worker {worker_id}: Port {port} still in use after cleanup")
+                    time.sleep(0.1)
+
+        except Exception as cleanup_error:
+            logging.error(f"Worker {worker_id}: Error during cleanup: {cleanup_error}")
+
+        logging.info(f"Worker {worker_id}: Cleanup completed for port {port}")
 
     @pytest.mark.asyncio
     async def test_client_can_connect_to_server(self, server_process):
         """Test that an MCP client can successfully connect to the launched server."""
-        server_url = "http://localhost:8000/sse"
+        server_url = f"http://localhost:{server_process.port}/sse"
+        worker_id = server_process.worker_id
 
         try:
             # Connect to the server using SSE transport
@@ -79,7 +215,7 @@ class TestMCPClientConnection:
 
                     # Log the available tools for debugging
                     tool_names = [tool.name for tool in tools_response.tools]
-                    logging.info(f"Successfully connected to server. Available tools: {tool_names}")
+                    logging.info(f"Worker {worker_id}: Successfully connected to server. Available tools: {tool_names}")
 
                     # Verify we have at least some tools available
                     assert len(tools_response.tools) > 0, "Server should have at least one tool available"
@@ -88,14 +224,15 @@ class TestMCPClientConnection:
             # Check if server is still running to help with debugging
             if server_process.poll() is not None:
                 stdout, stderr = server_process.communicate()
-                pytest.fail(f"Server crashed during test. stdout: {stdout}, stderr: {stderr}")
+                pytest.fail(f"Worker {worker_id}: Server crashed during test. stdout: {stdout}, stderr: {stderr}")
             else:
-                pytest.fail(f"Failed to connect to server: {e}")
+                pytest.fail(f"Worker {worker_id}: Failed to connect to server: {e}")
 
     @pytest.mark.asyncio
     async def test_client_can_call_tool(self, server_process):
         """Test that an MCP client can successfully call a tool on the server."""
-        server_url = "http://localhost:8000/sse"
+        server_url = f"http://localhost:{server_process.port}/sse"
+        worker_id = server_process.worker_id
 
         try:
             async with sse_client(url=server_url) as streams:
@@ -111,7 +248,7 @@ class TestMCPClientConnection:
                         first_tool = tools_response.tools[0]
                         tool_name = first_tool.name
 
-                        logging.info(f"Attempting to call tool: {tool_name}")
+                        logging.info(f"Worker {worker_id}: Attempting to call tool: {tool_name}")
 
                         # For this test, we'll try to call with empty arguments
                         # In a real scenario, you'd provide proper arguments based on the tool's schema
@@ -120,26 +257,27 @@ class TestMCPClientConnection:
 
                             # Verify we got some kind of response
                             assert result is not None
-                            logging.info(f"Tool call successful. Result type: {type(result)}")
+                            logging.info(f"Worker {worker_id}: Tool call successful. Result type: {type(result)}")
 
                         except Exception as tool_error:
                             # It's okay if the tool call fails due to missing arguments
                             # The important thing is that we can communicate with the server
-                            logging.info(f"Tool call failed (expected for empty args): {tool_error}")
+                            logging.info(f"Worker {worker_id}: Tool call failed (expected for empty args): {tool_error}")
                             # As long as we get a proper error response, the connection is working
                             assert "Error" in str(tool_error) or "error" in str(tool_error).lower()
 
         except Exception as e:
             if server_process.poll() is not None:
                 stdout, stderr = server_process.communicate()
-                pytest.fail(f"Server crashed during test. stdout: {stdout}, stderr: {stderr}")
+                pytest.fail(f"Worker {worker_id}: Server crashed during test. stdout: {stdout}, stderr: {stderr}")
             else:
-                pytest.fail(f"Failed during tool call test: {e}")
+                pytest.fail(f"Worker {worker_id}: Failed during tool call test: {e}")
 
     @pytest.mark.asyncio
     async def test_mcp_protocol_handshake(self, server_process):
         """Test that the MCP protocol handshake works correctly."""
-        server_url = "http://localhost:8000/sse"
+        server_url = f"http://localhost:{server_process.port}/sse"
+        worker_id = server_process.worker_id
 
         try:
             async with sse_client(url=server_url) as streams:
@@ -149,7 +287,7 @@ class TestMCPClientConnection:
 
                     # Verify initialization was successful
                     assert init_result is not None
-                    logging.info("MCP protocol handshake completed successfully")
+                    logging.info(f"Worker {worker_id}: MCP protocol handshake completed successfully")
 
                     # Test that we can perform basic MCP operations
                     tools_response = await session.list_tools()
@@ -158,27 +296,28 @@ class TestMCPClientConnection:
                     # If the server supports other capabilities, test them too
                     try:
                         resources_response = await session.list_resources()
-                        logging.info("Server supports resources")
+                        logging.info(f"Worker {worker_id}: Server supports resources")
                     except Exception:
-                        logging.info("Server does not support resources (this is fine)")
+                        logging.info(f"Worker {worker_id}: Server does not support resources (this is fine)")
 
                     try:
                         prompts_response = await session.list_prompts()
-                        logging.info("Server supports prompts")
+                        logging.info(f"Worker {worker_id}: Server supports prompts")
                     except Exception:
-                        logging.info("Server does not support prompts (this is fine)")
+                        logging.info(f"Worker {worker_id}: Server does not support prompts (this is fine)")
 
         except Exception as e:
             if server_process.poll() is not None:
                 stdout, stderr = server_process.communicate()
-                pytest.fail(f"Server crashed during handshake test. stdout: {stdout}, stderr: {stderr}")
+                pytest.fail(f"Worker {worker_id}: Server crashed during handshake test. stdout: {stdout}, stderr: {stderr}")
             else:
-                pytest.fail(f"MCP handshake failed: {e}")
+                pytest.fail(f"Worker {worker_id}: MCP handshake failed: {e}")
 
     @pytest.mark.asyncio
     async def test_expected_tools_are_registered(self, server_process):
         """Test that the expected set of tools are registered and available via MCP client."""
-        server_url = "http://localhost:8000/sse"
+        server_url = f"http://localhost:{server_process.port}/sse"
+        worker_id = server_process.worker_id
 
         # Define expected tools based on current server configuration
         # These are the tools that should always be available
@@ -229,49 +368,50 @@ class TestMCPClientConnection:
                     # Extract tool names from response
                     available_tools = {tool.name for tool in tools_response.tools}
 
-                    logging.info(f"Available tools ({len(available_tools)}): {sorted(available_tools)}")
+                    logging.info(f"Worker {worker_id}: Available tools ({len(available_tools)}): {sorted(available_tools)}")
 
                     # Check that all expected core tools are present
                     missing_core_tools = expected_core_tools - available_tools
                     if missing_core_tools:
-                        pytest.fail(f"Missing expected core tools: {sorted(missing_core_tools)}")
+                        pytest.fail(f"Worker {worker_id}: Missing expected core tools: {sorted(missing_core_tools)}")
 
                     # Log which optional tools are present
                     present_optional_tools = optional_tools & available_tools
                     missing_optional_tools = optional_tools - available_tools
 
                     if present_optional_tools:
-                        logging.info(f"Present optional tools: {sorted(present_optional_tools)}")
+                        logging.info(f"Worker {worker_id}: Present optional tools: {sorted(present_optional_tools)}")
                     if missing_optional_tools:
-                        logging.info(f"Missing optional tools (this is OK): {sorted(missing_optional_tools)}")
+                        logging.info(f"Worker {worker_id}: Missing optional tools (this is OK): {sorted(missing_optional_tools)}")
 
                     # Verify each tool has required attributes
                     for tool in tools_response.tools:
-                        assert hasattr(tool, 'name'), f"Tool missing name attribute: {tool}"
-                        assert hasattr(tool, 'description'), f"Tool missing description attribute: {tool.name}"
-                        assert hasattr(tool, 'inputSchema'), f"Tool missing inputSchema attribute: {tool.name}"
-                        assert tool.name, f"Tool has empty name: {tool}"
-                        assert tool.description, f"Tool has empty description: {tool.name}"
-                        assert tool.inputSchema, f"Tool has empty inputSchema: {tool.name}"
+                        assert hasattr(tool, 'name'), f"Worker {worker_id}: Tool missing name attribute: {tool}"
+                        assert hasattr(tool, 'description'), f"Worker {worker_id}: Tool missing description attribute: {tool.name}"
+                        assert hasattr(tool, 'inputSchema'), f"Worker {worker_id}: Tool missing inputSchema attribute: {tool.name}"
+                        assert tool.name, f"Worker {worker_id}: Tool has empty name: {tool}"
+                        assert tool.description, f"Worker {worker_id}: Tool has empty description: {tool.name}"
+                        assert tool.inputSchema, f"Worker {worker_id}: Tool has empty inputSchema: {tool.name}"
 
                     # Verify minimum number of tools
                     assert len(available_tools) >= len(expected_core_tools), \
-                        f"Expected at least {len(expected_core_tools)} tools, got {len(available_tools)}"
+                        f"Worker {worker_id}: Expected at least {len(expected_core_tools)} tools, got {len(available_tools)}"
 
-                    logging.info(f"✅ Tool verification passed. Found {len(available_tools)} tools, "
+                    logging.info(f"Worker {worker_id}: ✅ Tool verification passed. Found {len(available_tools)} tools, "
                                f"including all {len(expected_core_tools)} expected core tools.")
 
         except Exception as e:
             if server_process.poll() is not None:
                 stdout, stderr = server_process.communicate()
-                pytest.fail(f"Server crashed during tool verification test. stdout: {stdout}, stderr: {stderr}")
+                pytest.fail(f"Worker {worker_id}: Server crashed during tool verification test. stdout: {stdout}, stderr: {stderr}")
             else:
-                pytest.fail(f"Tool verification test failed: {e}")
+                pytest.fail(f"Worker {worker_id}: Tool verification test failed: {e}")
 
     @pytest.mark.asyncio
     async def test_specific_tool_schemas_are_valid(self, server_process):
         """Test that specific important tools have valid schemas."""
-        server_url = "http://localhost:8000/sse"
+        server_url = f"http://localhost:{server_process.port}/sse"
+        worker_id = server_process.worker_id
 
         # Tools to specifically validate schemas for
         tools_to_validate = {
@@ -304,23 +444,23 @@ class TestMCPClientConnection:
 
                     for tool_name, validation_spec in tools_to_validate.items():
                         if tool_name not in tools_by_name:
-                            logging.warning(f"Tool {tool_name} not found, skipping schema validation")
+                            logging.warning(f"Worker {worker_id}: Tool {tool_name} not found, skipping schema validation")
                             continue
 
                         tool = tools_by_name[tool_name]
                         schema = tool.inputSchema
 
                         # Validate schema structure
-                        assert isinstance(schema, dict), f"Tool {tool_name} schema is not a dict"
-                        assert "type" in schema, f"Tool {tool_name} schema missing 'type'"
-                        assert schema["type"] == "object", f"Tool {tool_name} schema type is not 'object'"
-                        assert "properties" in schema, f"Tool {tool_name} schema missing 'properties'"
+                        assert isinstance(schema, dict), f"Worker {worker_id}: Tool {tool_name} schema is not a dict"
+                        assert "type" in schema, f"Worker {worker_id}: Tool {tool_name} schema missing 'type'"
+                        assert schema["type"] == "object", f"Worker {worker_id}: Tool {tool_name} schema type is not 'object'"
+                        assert "properties" in schema, f"Worker {worker_id}: Tool {tool_name} schema missing 'properties'"
 
                         # Validate required properties exist
                         properties = schema["properties"]
                         for required_prop in validation_spec["required_properties"]:
                             assert required_prop in properties, \
-                                f"Tool {tool_name} missing required property '{required_prop}'"
+                                f"Worker {worker_id}: Tool {tool_name} missing required property '{required_prop}'"
 
                         # Validate required fields if specified
                         if "required" in schema:
@@ -328,13 +468,13 @@ class TestMCPClientConnection:
                             expected_required = set(validation_spec["required_fields"])
                             missing_required = expected_required - required_fields
                             assert not missing_required, \
-                                f"Tool {tool_name} missing required fields: {missing_required}"
+                                f"Worker {worker_id}: Tool {tool_name} missing required fields: {missing_required}"
 
-                        logging.info(f"✅ Tool {tool_name} schema validation passed")
+                        logging.info(f"Worker {worker_id}: ✅ Tool {tool_name} schema validation passed")
 
         except Exception as e:
             if server_process.poll() is not None:
                 stdout, stderr = server_process.communicate()
-                pytest.fail(f"Server crashed during schema validation test. stdout: {stdout}, stderr: {stderr}")
+                pytest.fail(f"Worker {worker_id}: Server crashed during schema validation test. stdout: {stdout}, stderr: {stderr}")
             else:
-                pytest.fail(f"Schema validation test failed: {e}")
+                pytest.fail(f"Worker {worker_id}: Schema validation test failed: {e}")
