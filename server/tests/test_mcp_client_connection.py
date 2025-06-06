@@ -229,8 +229,14 @@ class TestMCPClientConnection:
                 pytest.fail(f"Worker {worker_id}: Failed to connect to server: {e}")
 
     @pytest.mark.asyncio
-    async def test_client_can_call_tool(self, server_process):
-        """Test that an MCP client can successfully call a tool on the server."""
+    async def test_basic_tool_execution_via_mcp_client(self, server_process):
+        """Test that at least one tool can be successfully executed via the MCP client.
+        
+        This test fulfills the requirements of issue #12:
+        - Execute one simple tool via call_tool()
+        - Verify tool returns expected response format (MCP TextContent)
+        - Test basic error handling (invalid tool name)
+        """
         server_url = f"http://localhost:{server_process.port}/sse"
         worker_id = server_process.worker_id
 
@@ -242,36 +248,151 @@ class TestMCPClientConnection:
 
                     # List available tools
                     tools_response = await session.list_tools()
+                    available_tools = {tool.name: tool for tool in tools_response.tools}
 
-                    if len(tools_response.tools) > 0:
-                        # Try to call the first available tool
-                        first_tool = tools_response.tools[0]
-                        tool_name = first_tool.name
+                    # Test 1: Execute a simple, reliable tool successfully
+                    # Use time_tool as it's simple and doesn't require external dependencies
+                    if "time_tool" in available_tools:
+                        tool_name = "time_tool"
+                        arguments = {"operation": "get_time"}
+                        
+                        logging.info(f"Worker {worker_id}: Testing successful tool execution with {tool_name}")
+                        
+                        result = await session.call_tool(tool_name, arguments)
+                        
+                        # Verify we got a valid response
+                        assert result is not None, f"Worker {worker_id}: Tool {tool_name} returned None"
+                        
+                        # Verify response follows MCP TextContent format
+                        assert hasattr(result, 'content'), f"Worker {worker_id}: Tool response missing 'content' attribute"
+                        assert isinstance(result.content, list), f"Worker {worker_id}: Tool response content is not a list"
+                        assert len(result.content) > 0, f"Worker {worker_id}: Tool response content is empty"
+                        
+                        # Check that each content item has the expected structure
+                        text_content_found = False
+                        time_text = ""
+                        for content_item in result.content:
+                            assert hasattr(content_item, 'type'), f"Worker {worker_id}: Content item missing 'type' attribute"
+                            
+                            if hasattr(content_item, 'type') and content_item.type == "text":
+                                assert hasattr(content_item, 'text'), f"Worker {worker_id}: TextContent item missing 'text' attribute"
+                                text_attr = getattr(content_item, 'text', '')
+                                assert isinstance(text_attr, str), f"Worker {worker_id}: TextContent item text is not a string"
+                                assert len(text_attr) > 0, f"Worker {worker_id}: TextContent item text is empty"
+                                text_content_found = True
+                                if not time_text:  # Use the first text content for time verification
+                                    time_text = text_attr
+                        
+                        # Ensure we found at least one text content item
+                        assert text_content_found, f"Worker {worker_id}: No TextContent items found in response"
+                        import re
+                        time_pattern = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}"
+                        assert re.search(time_pattern, time_text), f"Worker {worker_id}: Time tool response doesn't contain expected time format: {time_text}"
+                        
+                        logging.info(f"Worker {worker_id}: ✅ Tool {tool_name} executed successfully. Response: {time_text}")
+                        
+                    else:
+                        # Fallback: try to find any tool that might work with minimal arguments
+                        # Look for tools that have simple schemas
+                        simple_tools = []
+                        for tool_name, tool in available_tools.items():
+                            schema = tool.inputSchema
+                            if isinstance(schema, dict) and schema.get("type") == "object":
+                                properties = schema.get("properties", {})
+                                required = schema.get("required", [])
+                                # Look for tools with minimal required fields
+                                if len(required) <= 1:
+                                    simple_tools.append((tool_name, tool))
+                        
+                        if simple_tools:
+                            tool_name, tool = simple_tools[0]
+                            schema = tool.inputSchema
+                            required = schema.get("required", [])
+                            
+                            # Build minimal arguments
+                            arguments = {}
+                            if required:
+                                # Try to provide a reasonable default for the first required field
+                                first_required = required[0]
+                                properties = schema.get("properties", {})
+                                if first_required in properties:
+                                    prop_info = properties[first_required]
+                                    if prop_info.get("type") == "string":
+                                        if "enum" in prop_info:
+                                            arguments[first_required] = prop_info["enum"][0]
+                                        else:
+                                            arguments[first_required] = "test"
+                            
+                            logging.info(f"Worker {worker_id}: Testing with fallback tool {tool_name} and arguments {arguments}")
+                            
+                            try:
+                                result = await session.call_tool(tool_name, arguments)
+                                assert result is not None, f"Worker {worker_id}: Tool {tool_name} returned None"
+                                assert hasattr(result, 'content'), f"Worker {worker_id}: Tool response missing 'content' attribute"
+                                logging.info(f"Worker {worker_id}: ✅ Fallback tool {tool_name} executed successfully")
+                            except Exception as tool_error:
+                                logging.info(f"Worker {worker_id}: Fallback tool {tool_name} failed (this is acceptable): {tool_error}")
+                                # As long as we get a proper error response, the connection is working
+                                assert "Error" in str(tool_error) or "error" in str(tool_error).lower()
+                        else:
+                            pytest.fail(f"Worker {worker_id}: No suitable tools found for testing. Available tools: {list(available_tools.keys())}")
 
-                        logging.info(f"Worker {worker_id}: Attempting to call tool: {tool_name}")
+                    # Test 2: Test basic error handling with invalid tool name
+                    logging.info(f"Worker {worker_id}: Testing error handling with invalid tool name")
+                    
+                    invalid_tool_name = "nonexistent_tool_12345"
+                    result = await session.call_tool(invalid_tool_name, {})
+                    
+                    # The server should return a proper MCP response with error content
+                    assert result is not None, f"Worker {worker_id}: Expected error response for invalid tool {invalid_tool_name}, but got None"
+                    assert hasattr(result, 'content'), f"Worker {worker_id}: Error response missing 'content' attribute"
+                    assert len(result.content) > 0, f"Worker {worker_id}: Error response content is empty"
+                    
+                    # Check that the response contains an error message
+                    error_found = False
+                    for content_item in result.content:
+                        if hasattr(content_item, 'type') and content_item.type == "text":
+                            text_content = getattr(content_item, 'text', '')
+                            if any(keyword in text_content.lower() for keyword in ["not found", "unknown", "invalid", "error"]):
+                                error_found = True
+                                logging.info(f"Worker {worker_id}: ✅ Error handling test passed. Got error response: {text_content}")
+                                break
+                    
+                    assert error_found, f"Worker {worker_id}: Error response doesn't contain expected error keywords: {result}"
 
-                        # For this test, we'll try to call with empty arguments
-                        # In a real scenario, you'd provide proper arguments based on the tool's schema
+                    # Test 3: Test error handling with valid tool but invalid arguments (if time_tool is available)
+                    if "time_tool" in available_tools:
+                        logging.info(f"Worker {worker_id}: Testing error handling with invalid operation")
+                        
                         try:
-                            result = await session.call_tool(tool_name, {})
-
-                            # Verify we got some kind of response
-                            assert result is not None
-                            logging.info(f"Worker {worker_id}: Tool call successful. Result type: {type(result)}")
-
+                            result = await session.call_tool("time_tool", {"operation": "invalid_operation"})
+                            
+                            # The tool should return an error response, not raise an exception
+                            assert result is not None, f"Worker {worker_id}: Tool returned None for invalid operation"
+                            assert hasattr(result, 'content'), f"Worker {worker_id}: Tool response missing 'content' attribute"
+                            
+                            # Check if the response indicates an error
+                            error_text = ""
+                            if result.content:
+                                for content_item in result.content:
+                                    if hasattr(content_item, 'type') and content_item.type == "text":
+                                        error_text = getattr(content_item, 'text', '')
+                                        break
+                            assert any(keyword in error_text.lower() for keyword in ["error", "unknown", "invalid"]), \
+                                f"Worker {worker_id}: Tool response doesn't indicate error for invalid operation: {error_text}"
+                            
+                            logging.info(f"Worker {worker_id}: ✅ Invalid operation test passed. Got error response: {error_text}")
+                            
                         except Exception as tool_error:
-                            # It's okay if the tool call fails due to missing arguments
-                            # The important thing is that we can communicate with the server
-                            logging.info(f"Worker {worker_id}: Tool call failed (expected for empty args): {tool_error}")
-                            # As long as we get a proper error response, the connection is working
-                            assert "Error" in str(tool_error) or "error" in str(tool_error).lower()
+                            # Some tools might raise exceptions for invalid operations, which is also acceptable
+                            logging.info(f"Worker {worker_id}: ✅ Invalid operation test passed. Got exception: {tool_error}")
 
         except Exception as e:
             if server_process.poll() is not None:
                 stdout, stderr = server_process.communicate()
-                pytest.fail(f"Worker {worker_id}: Server crashed during test. stdout: {stdout}, stderr: {stderr}")
+                pytest.fail(f"Worker {worker_id}: Server crashed during tool execution test. stdout: {stdout}, stderr: {stderr}")
             else:
-                pytest.fail(f"Worker {worker_id}: Failed during tool call test: {e}")
+                pytest.fail(f"Worker {worker_id}: Tool execution test failed: {e}")
 
     @pytest.mark.asyncio
     async def test_mcp_protocol_handshake(self, server_process):
