@@ -231,6 +231,10 @@ class EnvironmentManager:
                         elif key.startswith("MCP_PATH_"):
                             path_name = key[9:].lower()
                             self.repository_info.additional_paths[path_name] = value
+                        # Handle GIT_ROOT_ prefixed variables for multiple git roots
+                        elif key.startswith("GIT_ROOT_"):
+                            project_name = key[9:].lower()  # Extract project name after GIT_ROOT_
+                            self.repository_info.git_roots[project_name] = value
                         # Handle AZREPO_ prefixed variables
                         elif key.startswith("AZREPO_"):
                             param_name = key[7:].lower()
@@ -278,6 +282,10 @@ class EnvironmentManager:
             elif key.startswith("MCP_PATH_"):
                 path_name = key[9:].lower()
                 self.repository_info.additional_paths[path_name] = value
+            # Handle GIT_ROOT_ prefixed variables for multiple git roots
+            elif key.startswith("GIT_ROOT_"):
+                project_name = key[9:].lower()  # Extract project name after GIT_ROOT_
+                self.repository_info.git_roots[project_name] = value
             # Handle AZREPO_ prefixed variables
             elif key.startswith("AZREPO_"):
                 param_name = key[7:].lower()
@@ -349,6 +357,10 @@ class EnvironmentManager:
         for key, value in self.repository_info.additional_paths.items():
             result[f"path_{key}"] = value
 
+        # Add individual git roots for command substitution
+        for project_name, git_root in self.repository_info.git_roots.items():
+            result[f"git_root_{project_name}"] = git_root
+
         # Add azrepo parameters
         for key, value in self.azrepo_parameters.items():
             result[f"azrepo_{key}"] = value
@@ -372,11 +384,30 @@ class EnvironmentManager:
         return self.settings.get(name, default)
 
     # Public getters for backwards compatibility
-    def get_git_root(self) -> Optional[str]:
-        """Get git root directory"""
-        return self.get_setting("git_root")
+    def get_git_root(self, project_name: Optional[str] = None) -> Optional[str]:
+        """Get git root directory for specific project or default"""
+        if project_name:
+            return self.repository_info.git_roots.get(project_name)
+        # Return the default git_root or the first available git root from git_roots
+        return self.get_setting("git_root") or next(iter(self.repository_info.git_roots.values()), None)
 
+    def get_all_git_roots(self) -> Dict[str, str]:
+        """Get all configured git roots"""
+        result = {}
+        # Add default git root if it exists
+        if default_git_root := self.get_setting("git_root"):
+            result["default"] = default_git_root
+        # Add all named git roots
+        result.update(self.repository_info.git_roots)
+        return result
 
+    def get_git_root_projects(self) -> List[str]:
+        """Get list of all available git root project names"""
+        projects = list(self.repository_info.git_roots.keys())
+        # Add "default" if there's a default git root
+        if self.get_setting("git_root"):
+            projects.insert(0, "default")
+        return projects
 
     def get_project_name(self) -> Optional[str]:
         """Get project name"""

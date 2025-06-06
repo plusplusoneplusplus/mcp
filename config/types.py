@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 class RepositoryInfo(BaseModel):
     """Model representing repository information"""
 
-    git_root: Optional[str] = None
+    git_root: Optional[str] = None  # Keep for backward compatibility
+    git_roots: Dict[str, str] = Field(default_factory=dict)  # New multi-project support
     project_name: Optional[str] = None
     additional_paths: Dict[str, str] = Field(default_factory=dict)
     private_tool_root: Optional[str] = None  # Path for private tool root
