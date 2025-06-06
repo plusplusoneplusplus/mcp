@@ -48,18 +48,21 @@ class TestServerLaunch:
         logging.info(f"Server process info: {server_process_info}")
 
     @pytest.mark.asyncio
-    async def test_server_supports_mcp_protocol(self, mcp_client):
+    async def test_server_supports_mcp_protocol(self, mcp_client_info):
         """Test that the server properly supports the MCP protocol."""
-        # The mcp_client fixture already establishes an MCP connection
-        # If we get here, the server supports MCP protocol
+        from .conftest import create_mcp_client
 
-        # Verify we can perform basic MCP operations
-        tools_response = await mcp_client.list_tools()
-        assert tools_response is not None
-        assert hasattr(tools_response, 'tools')
-        assert isinstance(tools_response.tools, list)
+        server_url = mcp_client_info['url']
+        worker_id = mcp_client_info['worker_id']
 
-        logging.info("Server properly supports MCP protocol")
+        async with create_mcp_client(server_url, worker_id) as session:
+            # Verify we can perform basic MCP operations
+            tools_response = await session.list_tools()
+            assert tools_response is not None
+            assert hasattr(tools_response, 'tools')
+            assert isinstance(tools_response.tools, list)
+
+            logging.info("Server properly supports MCP protocol")
 
     def test_server_startup_time_reasonable(self, mcp_server):
         """Test that server startup time was reasonable."""
@@ -81,22 +84,27 @@ class TestServerLaunch:
         logging.info("Server handled multiple HTTP requests successfully")
 
     @pytest.mark.asyncio
-    async def test_server_handles_concurrent_mcp_operations(self, mcp_client):
+    async def test_server_handles_concurrent_mcp_operations(self, mcp_client_info):
         """Test that the server can handle concurrent MCP operations."""
+        from .conftest import create_mcp_client
         import asyncio
 
-        # Make multiple concurrent list_tools calls
-        async def list_tools():
-            return await mcp_client.list_tools()
+        server_url = mcp_client_info['url']
+        worker_id = mcp_client_info['worker_id']
 
-        # Execute 3 concurrent operations
-        tasks = [list_tools() for _ in range(3)]
-        results = await asyncio.gather(*tasks)
+        async with create_mcp_client(server_url, worker_id) as session:
+            # Make multiple concurrent list_tools calls
+            async def list_tools():
+                return await session.list_tools()
 
-        # Verify all operations succeeded
-        assert len(results) == 3
-        for result in results:
-            assert result is not None
-            assert hasattr(result, 'tools')
+            # Execute 3 concurrent operations
+            tasks = [list_tools() for _ in range(3)]
+            results = await asyncio.gather(*tasks)
 
-        logging.info("Server handled concurrent MCP operations successfully")
+            # Verify all operations succeeded
+            assert len(results) == 3
+            for result in results:
+                assert result is not None
+                assert hasattr(result, 'tools')
+
+            logging.info("Server handled concurrent MCP operations successfully")
