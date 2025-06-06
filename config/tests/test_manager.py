@@ -382,6 +382,184 @@ class TestEnvironmentManager(unittest.TestCase):
                 self.env_manager.kusto_parameters.get("cluster"), "env-cluster"
             )
 
+    def test_multiple_git_roots_parsing(self):
+        """Test parsing multiple git root environment variables."""
+        # Create a test .env file with multiple git roots
+        env_content = """
+        GIT_ROOT=/path/to/main/repo
+        GIT_ROOT_PROJECT_A=/path/to/project-a
+        GIT_ROOT_PROJECT_B=/path/to/project-b
+        GIT_ROOT_MICROSERVICE_X=/path/to/microservice
+        """
+        env_file = self.create_env_file(env_content)
+
+        # Parse the file
+        self.env_manager._parse_env_file(env_file)
+
+        # Check the default git root is set
+        self.assertEqual(self.env_manager.repository_info.git_root, "/path/to/main/repo")
+
+        # Check the multiple git roots are set
+        expected_git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+            "microservice_x": "/path/to/microservice",
+        }
+        self.assertEqual(self.env_manager.repository_info.git_roots, expected_git_roots)
+
+    def test_get_git_root_with_project_name(self):
+        """Test getting git root for specific projects."""
+        # Set up multiple git roots
+        self.env_manager.repository_info.git_root = "/path/to/main"
+        self.env_manager.repository_info.git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+
+        # Test getting specific project git roots
+        self.assertEqual(
+            self.env_manager.get_git_root("project_a"), "/path/to/project-a"
+        )
+        self.assertEqual(
+            self.env_manager.get_git_root("project_b"), "/path/to/project-b"
+        )
+
+        # Test getting non-existent project
+        self.assertIsNone(self.env_manager.get_git_root("nonexistent"))
+
+        # Test getting default git root (no project name)
+        self.assertEqual(self.env_manager.get_git_root(), "/path/to/main")
+
+    def test_get_git_root_fallback_to_git_roots(self):
+        """Test that get_git_root falls back to git_roots when no default git_root."""
+        # Set up only named git roots, no default
+        self.env_manager.repository_info.git_root = None
+        self.env_manager.repository_info.git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.env_manager.settings["git_root"] = None
+
+        # Test getting default should return first available git root
+        result = self.env_manager.get_git_root()
+        self.assertIn(result, ["/path/to/project-a", "/path/to/project-b"])
+
+    def test_get_all_git_roots(self):
+        """Test getting all configured git roots."""
+        # Set up both default and named git roots
+        self.env_manager.repository_info.git_root = "/path/to/main"
+        self.env_manager.repository_info.git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.env_manager.settings["git_root"] = "/path/to/main"
+
+        # Get all git roots
+        all_roots = self.env_manager.get_all_git_roots()
+
+        # Check expected structure
+        expected = {
+            "default": "/path/to/main",
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.assertEqual(all_roots, expected)
+
+    def test_get_all_git_roots_no_default(self):
+        """Test getting all git roots when no default is set."""
+        # Set up only named git roots
+        self.env_manager.repository_info.git_root = None
+        self.env_manager.repository_info.git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.env_manager.settings["git_root"] = None
+
+        # Get all git roots
+        all_roots = self.env_manager.get_all_git_roots()
+
+        # Check expected structure (no default key)
+        expected = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.assertEqual(all_roots, expected)
+
+    def test_get_git_root_projects(self):
+        """Test getting list of git root project names."""
+        # Set up both default and named git roots
+        self.env_manager.repository_info.git_root = "/path/to/main"
+        self.env_manager.repository_info.git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.env_manager.settings["git_root"] = "/path/to/main"
+
+        # Get project names
+        projects = self.env_manager.get_git_root_projects()
+
+        # Check expected list (default should be first)
+        expected = ["default", "project_a", "project_b"]
+        self.assertEqual(projects, expected)
+
+    def test_get_git_root_projects_no_default(self):
+        """Test getting project names when no default is set."""
+        # Set up only named git roots
+        self.env_manager.repository_info.git_root = None
+        self.env_manager.repository_info.git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.env_manager.settings["git_root"] = None
+
+        # Get project names
+        projects = self.env_manager.get_git_root_projects()
+
+        # Check expected list (no default)
+        expected = ["project_a", "project_b"]
+        self.assertEqual(projects, expected)
+
+    def test_parameter_dict_includes_git_roots(self):
+        """Test that parameter dictionary includes all git roots."""
+        # Set up multiple git roots
+        self.env_manager.repository_info.git_root = "/path/to/main"
+        self.env_manager.repository_info.git_roots = {
+            "project_a": "/path/to/project-a",
+            "project_b": "/path/to/project-b",
+        }
+        self.env_manager.settings["git_root"] = "/path/to/main"
+
+        # Get parameter dictionary
+        params = self.env_manager.get_parameter_dict()
+
+        # Check that individual git roots are included
+        self.assertEqual(params["git_root"], "/path/to/main")
+        self.assertEqual(params["git_root_project_a"], "/path/to/project-a")
+        self.assertEqual(params["git_root_project_b"], "/path/to/project-b")
+
+    def test_backward_compatibility(self):
+        """Test that existing functionality still works with only GIT_ROOT."""
+        # Create a test .env file with only the traditional GIT_ROOT
+        env_content = """
+        GIT_ROOT=/path/to/traditional/git
+        PROJECT_NAME=traditional_project
+        """
+        env_file = self.create_env_file(env_content)
+
+        # Parse the file
+        self.env_manager._parse_env_file(env_file)
+
+        # Check traditional functionality still works
+        self.assertEqual(self.env_manager.get_git_root(), "/path/to/traditional/git")
+        self.assertEqual(self.env_manager.repository_info.git_root, "/path/to/traditional/git")
+
+        # Check that git_roots is empty but doesn't break anything
+        self.assertEqual(self.env_manager.repository_info.git_roots, {})
+
+        # Check parameter dictionary includes the traditional git_root
+        params = self.env_manager.get_parameter_dict()
+        self.assertEqual(params["git_root"], "/path/to/traditional/git")
+
 
 if __name__ == "__main__":
     unittest.main()
