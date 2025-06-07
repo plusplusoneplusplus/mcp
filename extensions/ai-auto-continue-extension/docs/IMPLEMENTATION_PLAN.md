@@ -232,4 +232,4 @@ extensions/ai-auto-continue-extension/
 
 This AI Auto Continue extension will significantly improve the workflow for developers using AI-powered IDEs by automatically handling common interruption patterns. The modular design allows for easy extension and customization while maintaining high performance and compatibility across different platforms.
 
-The implementation focuses on being a universal solution that works seamlessly with Cursor, Windsurf, and other AI IDEs, making it a valuable tool for the growing community of AI-assisted developers. 
+The implementation focuses on being a universal solution that works seamlessly with Cursor, Windsurf, and other AI IDEs, making it a valuable tool for the growing community of AI-assisted developers.
