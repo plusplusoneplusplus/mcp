@@ -3,11 +3,15 @@
 import re
 import uuid
 import os
+import logging
 from typing import List, Dict, Any, Optional, Tuple, Union
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from utils.vector_store.vector_store import ChromaVectorStore
 from utils.vector_store.markdown_table_segmenter import MarkdownTableSegmenter
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 class MarkdownSegmenter:
@@ -36,16 +40,71 @@ class MarkdownSegmenter:
         # Prevent invalid configurations
         if chunk_overlap >= chunk_size:
             chunk_overlap = max(0, chunk_size - 1)
-        self.model = SentenceTransformer(model_name)
+
+        # Initialize the sentence transformer model with fallback support
+        self.model = self._initialize_model(model_name)
         self.vector_store = vector_store
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.table_max_rows = table_max_rows
 
-        # Create a table segmenter for handling tables
+        # Create a table segmenter for handling tables, reusing the same model
         self.markdown_table_segmenter = MarkdownTableSegmenter(
-            model_name=model_name, vector_store=self.vector_store
+            vector_store=self.vector_store, model=self.model
         )
+
+    def _initialize_model(self, model_name: str) -> SentenceTransformer:
+        """
+        Initialize the sentence transformer model with fallback support.
+
+        Args:
+            model_name: Name of the sentence transformer model to use
+
+        Returns:
+            SentenceTransformer: Initialized model instance
+
+        Raises:
+            RuntimeError: If both primary and fallback models fail to load
+        """
+        # List of fallback models to try if the primary model fails
+        fallback_models = [
+            "all-mpnet-base-v2",
+            "all-MiniLM-L12-v2",
+            "paraphrase-MiniLM-L6-v2"
+        ]
+
+        # Try to load the primary model
+        try:
+            logger.info(f"Attempting to load primary model: {model_name}")
+            return SentenceTransformer(model_name)
+        except ValueError as e:
+            if "Unrecognized model" in str(e):
+                logger.warning(f"Failed to load primary model {model_name}: {e}")
+
+                # Try fallback models
+                for fallback_model in fallback_models:
+                    try:
+                        logger.info(f"Attempting fallback model: {fallback_model}")
+                        model = SentenceTransformer(fallback_model)
+                        logger.warning(f"Successfully loaded fallback model: {fallback_model}")
+                        return model
+                    except Exception as fallback_error:
+                        logger.warning(f"Fallback model {fallback_model} also failed: {fallback_error}")
+                        continue
+
+                # If all fallback models fail, raise an error
+                raise RuntimeError(
+                    f"Failed to load primary model '{model_name}' and all fallback models. "
+                    f"This may be due to a compatibility issue between sentence-transformers and transformers libraries. "
+                    f"Tried fallback models: {fallback_models}"
+                ) from e
+            else:
+                # Re-raise if it's a different type of ValueError
+                raise
+        except Exception as e:
+            # Handle other types of exceptions
+            logger.error(f"Unexpected error loading model {model_name}: {e}")
+            raise
 
     def segment_markdown(self, markdown_content: str) -> List[Dict[str, Any]]:
         """
@@ -380,10 +439,10 @@ class MarkdownSegmenter:
     def segment_and_store(
         self,
         markdown_content: str,
-        file_name: str = None,
-        rel_path: str = None,
-        file_size: int = None,
-        file_date: str = None,
+        file_name: Optional[str] = None,
+        rel_path: Optional[str] = None,
+        file_size: Optional[int] = None,
+        file_date: Optional[str] = None,
     ) -> Tuple[int, Dict[str, List[str]]]:
         """
         Segment markdown content and store it in the vector database.
