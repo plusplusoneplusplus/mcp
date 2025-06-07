@@ -2,12 +2,25 @@
 
 import logging
 import inspect
+import time
 from typing import Dict, Any, Type, Optional, List, Set, Callable, Tuple
+from contextlib import contextmanager
 
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import registry
 
 logger = logging.getLogger(__name__)
+
+# Simple timing utility for dependency injection
+@contextmanager
+def time_dependency_operation(name: str):
+    start_time = time.time()
+    logger.info(f"🚀 Starting {name}...")
+    try:
+        yield
+    finally:
+        duration = time.time() - start_time
+        logger.info(f"✅ {name} completed in {duration:.2f}s")
 
 
 class DependencyInjector:
@@ -236,7 +249,8 @@ class DependencyInjector:
         successful_tools = []
         failed_tools = []
 
-        logger.info("Starting dependency resolution for all registered tools")
+        with time_dependency_operation("Complete Dependency Resolution"):
+            logger.info("Starting dependency resolution for all registered tools")
 
         # Discover all dependencies from constructor parameters with error handling
         for tool_name, tool_class in registry.tools.items():
