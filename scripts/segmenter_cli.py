@@ -28,7 +28,7 @@ async def main():
 
     try:
         # Validate and process arguments (fixes the persist_directory linter error)
-        args = validate_and_process_args(args)
+        args = validate_and_process_args(parser, args)
 
         # Convert arguments to configuration objects
         segmenter_config, vector_store_config, search_config = args_to_configs(args)

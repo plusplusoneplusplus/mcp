@@ -90,13 +90,13 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def validate_and_process_args(args: argparse.Namespace) -> argparse.Namespace:
+def validate_and_process_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> argparse.Namespace:
     """Validate and process parsed arguments, fixing the persist_directory issue."""
     # Validate arguments based on operation
     if args.operation in ["segment", "store"] and not args.input_file:
-        raise ValueError('Input file is required for "segment" and "store" operations.')
+        parser.error('Input file is required for "segment" and "store" operations.')
     if args.operation == "search" and not args.query:
-        raise ValueError('Query is required for "search" operation.')
+        parser.error('Query is required for "search" operation.')
 
     # Fix the persist_directory handling (this fixes the linter error)
     persist_directory = getattr(args, 'persist_directory', None)
