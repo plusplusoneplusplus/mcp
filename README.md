@@ -160,6 +160,16 @@ python -m pytest mcp_tools/tests
 python -m pytest server/tests
 ```
 
+## Background Job REST API
+
+The server exposes endpoints for monitoring asynchronous commands.
+
+- `GET /api/background-jobs` - list running and recently completed jobs.
+- `GET /api/background-jobs/{token}` - retrieve details about a specific job.
+- `GET /api/background-jobs/stats` - aggregated statistics about job execution.
+
+These endpoints return JSON data for external dashboards or monitoring tools.
+
 ## Configuring MCP Server in Cursor/VSCode
 
 The recommended way to configure MCP server is through the `.env` file. However, you can still override settings in your editor configuration:

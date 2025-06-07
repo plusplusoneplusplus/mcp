@@ -667,7 +667,10 @@ class CommandExecutor(CommandExecutorInterface):
 
             # Add psutil info if available
             if process_info:
+                proc_status = process_info.pop("status", None)
                 status_info.update(process_info)
+                if proc_status:
+                    status_info["process_status"] = proc_status
 
             return status_info
 
@@ -685,7 +688,11 @@ class CommandExecutor(CommandExecutorInterface):
 
         # Add psutil info if available
         if process_info:
+            # Preserve our high level status but expose detailed process status
+            proc_status = process_info.pop("status", None)
             status_info.update(process_info)
+            if proc_status:
+                status_info["process_status"] = proc_status
 
         return status_info
 
@@ -1006,6 +1013,7 @@ class CommandExecutor(CommandExecutorInterface):
             await self._cleanup_temp_files(pid)
 
         # Prepare result
+        runtime = time.time() - process_data["start_time"]
         result = {
             "status": "completed",
             "success": returncode == 0,
@@ -1013,7 +1021,13 @@ class CommandExecutor(CommandExecutorInterface):
             "output": stdout_content,
             "error": stderr_content,
             "pid": pid,
-            "duration": 0.0,  # Adding a dummy duration
+            "duration": runtime,
+            "runtime": runtime,
+            "command": process_data["command"],
+            "token": token,
+            "start_time": datetime.fromtimestamp(
+                process_data["start_time"], tz=UTC
+            ).isoformat(),
         }
 
         # If process was terminated, update status
@@ -1054,11 +1068,15 @@ class CommandExecutor(CommandExecutorInterface):
                 
             # Get basic process info
             process_info = {
-                "token": process_data["token"][:8],  # First 8 characters
+                "token": process_data["token"][:8],  # Short token for legacy tests
+                "full_token": process_data["token"],
                 "pid": pid,
                 "command": process_data["command"],
                 "runtime": time.time() - process_data["start_time"],
-                "status": "running"
+                "start_time": datetime.fromtimestamp(
+                    process_data["start_time"], tz=UTC
+                ).isoformat(),
+                "status": "running",
             }
             
             # Get additional process info if available
@@ -1073,6 +1091,47 @@ class CommandExecutor(CommandExecutorInterface):
             running_processes.append(process_info)
         
         return running_processes
+
+    def list_completed_processes(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return a list of recently completed background processes."""
+        items = list(self.completed_processes.items())[-limit:]
+        processes = []
+        for token, data in items:
+            entry = data.copy()
+            entry.setdefault("token", token)
+            processes.append(entry)
+        return processes
+
+    def get_job_statistics(self) -> Dict[str, Any]:
+        """Return aggregate statistics about background jobs."""
+        running_count = len(self.list_running_processes())
+        total_completed = len(self.completed_processes)
+        total_failed = sum(1 for v in self.completed_processes.values() if not v.get("success", True))
+        avg_runtime = 0.0
+        if total_completed:
+            avg_runtime = sum(v.get("runtime", 0.0) for v in self.completed_processes.values()) / total_completed
+
+        longest_running_token = None
+        longest_runtime = 0.0
+        for pid, proc in self.running_processes.items():
+            runtime = time.time() - proc["start_time"]
+            if runtime > longest_runtime:
+                longest_runtime = runtime
+                longest_running_token = proc["token"]
+
+        system_load = {
+            "cpu_usage": psutil.cpu_percent(interval=0.1),
+            "memory_usage": psutil.virtual_memory().percent,
+        }
+
+        return {
+            "current_running": running_count,
+            "total_completed": total_completed,
+            "total_failed": total_failed,
+            "average_runtime": avg_runtime,
+            "longest_running_token": longest_running_token,
+            "system_load": system_load,
+        }
 
     def _format_duration(self, seconds: float) -> str:
         """Format duration in seconds to HH:MM:SS format.

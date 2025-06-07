@@ -31,6 +31,7 @@ PERSIST_DIR = env.get_vector_store_path()
 _knowledge_indexer = None
 _knowledge_query = None
 _knowledge_collections = None
+_command_executor = None
 
 
 def get_knowledge_indexer():
@@ -55,6 +56,15 @@ def get_knowledge_collections():
     if _knowledge_collections is None:
         _knowledge_collections = KnowledgeCollectionManagerTool()
     return _knowledge_collections
+
+
+def get_command_executor():
+    """Get or create the command executor instance."""
+    global _command_executor
+    if _command_executor is None:
+        from mcp_tools.dependency import injector
+        _command_executor = injector.get_tool_instance("command_executor")
+    return _command_executor
 
 
 async def api_import_knowledge(request: Request):
@@ -216,10 +226,72 @@ async def api_delete_collection(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+async def api_list_background_jobs(request: Request):
+    """List running and completed background jobs."""
+    try:
+        status = request.query_params.get("status")
+        try:
+            limit = int(request.query_params.get("limit", 50))
+        except Exception:
+            limit = 50
+        include_completed = request.query_params.get("include_completed", "true").lower() != "false"
+
+        executor = get_command_executor()
+        jobs = []
+        running = executor.list_running_processes()
+
+        if status in (None, "running"):
+            jobs.extend(running)
+
+        if include_completed:
+            completed = executor.list_completed_processes(limit)
+            if status:
+                completed = [j for j in completed if j.get("status") == status]
+            jobs.extend(completed)
+
+        response = {
+            "jobs": jobs[:limit],
+            "total_count": len(jobs),
+            "running_count": len(running),
+            "completed_count": len(executor.completed_processes),
+        }
+        return JSONResponse(response)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_get_background_job(request: Request):
+    """Return details about a specific background job."""
+    try:
+        token = request.path_params.get("token")
+        if not token:
+            return JSONResponse({"error": "Missing token"}, status_code=400)
+
+        executor = get_command_executor()
+        result = await executor.get_process_status(token)
+        status_code = 200 if result.get("status") != "not_found" else 404
+        return JSONResponse(result, status_code=status_code)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_background_job_stats(request: Request):
+    """Return aggregated background job statistics."""
+    try:
+        executor = get_command_executor()
+        stats = executor.get_job_statistics()
+        return JSONResponse(stats)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 api_routes = [
     Route("/api/import-knowledge", endpoint=api_import_knowledge, methods=["POST"]),
     Route("/api/collections", endpoint=api_list_collections, methods=["GET"]),
     Route("/api/collection-documents", endpoint=api_list_documents, methods=["GET"]),
     Route("/api/query-segments", endpoint=api_query_segments, methods=["GET"]),
     Route("/api/delete-collection", endpoint=api_delete_collection, methods=["POST"]),
+    Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),
+    Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
+    Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
 ]

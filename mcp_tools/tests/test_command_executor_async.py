@@ -16,7 +16,7 @@ from pathlib import Path
 
 # Add the parent directory to the path so we can import server modules
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-from mcp_tools.command_executor import CommandExecutor
+from mcp_tools.command_executor.executor import CommandExecutor
 
 # Set up logging
 logging.basicConfig(
@@ -606,3 +606,20 @@ class TestCommandExecutorAsync:
         assert executor.status_reporter_enabled == env_manager.get_setting("periodic_status_enabled", False)
         assert executor.status_reporter_interval == env_manager.get_setting("periodic_status_interval", 30.0)
         assert executor.status_reporter_max_command_length == env_manager.get_setting("periodic_status_max_command_length", 60)
+@pytest.mark.asyncio
+async def test_get_job_statistics(executor):
+    """Test retrieving background job statistics."""
+    if platform.system().lower() == "windows":
+        cmd = "cmd /c echo JobStats"
+    else:
+        cmd = "echo JobStats"
+
+    response = await executor.execute_async(cmd)
+    token = response["token"]
+    await executor.wait_for_process(token)
+
+    stats = executor.get_job_statistics()
+    assert stats["current_running"] == 0
+    assert stats["total_completed"] >= 1
+    assert "system_load" in stats
+
