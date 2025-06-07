@@ -276,6 +276,31 @@ async def api_get_background_job(request: Request):
     return JSONResponse(result)
 
 
+async def api_terminate_background_job(request: Request):
+    """Terminate a specific background job."""
+    token = request.path_params.get("token")
+    if not token:
+        return JSONResponse(
+            {"success": False, "error": "Missing job token."}, status_code=400
+        )
+
+    executor = get_command_executor()
+    try:
+        success = executor.terminate_by_token(token)
+        if success:
+            return JSONResponse({"success": True, "message": f"Job {token} terminated successfully."})
+        else:
+            return JSONResponse(
+                {"success": False, "error": f"Failed to terminate job {token}. Job may not exist or already completed."},
+                status_code=404
+            )
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": f"Error terminating job: {str(e)}"},
+            status_code=500
+        )
+
+
 async def api_background_job_stats(request: Request):
     """Get aggregate statistics about background job execution."""
     executor = get_command_executor()
@@ -318,4 +343,5 @@ api_routes = [
     Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),
     Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
     Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
+    Route("/api/background-jobs/{token}/terminate", endpoint=api_terminate_background_job, methods=["POST"]),
 ]
