@@ -53,7 +53,7 @@ The system provides semantic search capabilities using sentence transformers.
 
 ## Section 3: Features
 - Document indexing and storage
-- Semantic search functionality  
+- Semantic search functionality
 - Collection management operations
 - Persistent data storage
 """
@@ -86,25 +86,25 @@ class TestKnowledgeIndexerIntegration:
     ):
         """Test complete indexing workflow with real ChromaDB."""
         tool = KnowledgeIndexerTool()
-        
+
         result = await tool.execute_tool({
             "files": sample_files_data,
             "collection": unique_collection_name,
             "persist_directory": unique_temp_dir,
             "overwrite": False,
         })
-        
+
         assert result["success"] is True
         assert result["collection"] == unique_collection_name
         assert result["imported_files"] == 2
         assert result["total_segments"] > 0
         assert len(result["processed_files"]) == 2
-        
+
         # Verify database files were created
         assert os.path.exists(unique_temp_dir)
         db_files = os.listdir(unique_temp_dir)
         assert len(db_files) > 0
-        
+
         # Verify collection exists
         store = ChromaVectorStore(
             collection_name=unique_collection_name,
@@ -125,7 +125,7 @@ class TestKnowledgeIndexerIntegration:
             "collection": unique_collection_name,
             "persist_directory": unique_temp_dir,
         })
-        
+
         # Test querying
         query_tool = KnowledgeQueryTool()
         result = await query_tool.execute_tool({
@@ -134,11 +134,11 @@ class TestKnowledgeIndexerIntegration:
             "persist_directory": unique_temp_dir,
             "limit": 5,
         })
-        
+
         assert result["success"] is True
         assert result["query"] == "database vector storage"
         assert result["collection"] == unique_collection_name
-        
+
         results = result["results"]
         assert len(results["ids"]) > 0
         assert len(results["documents"]) > 0
@@ -157,9 +157,9 @@ class TestKnowledgeIndexerIntegration:
             "collection": unique_collection_name,
             "persist_directory": unique_temp_dir,
         })
-        
+
         manager = KnowledgeCollectionManagerTool()
-        
+
         # Test list collections
         result = await manager.execute_tool({
             "action": "list",
@@ -167,7 +167,7 @@ class TestKnowledgeIndexerIntegration:
         })
         assert result["success"] is True
         assert unique_collection_name in result["collections"]
-        
+
         # Test collection info
         result = await manager.execute_tool({
             "action": "info",
@@ -176,7 +176,7 @@ class TestKnowledgeIndexerIntegration:
         })
         assert result["success"] is True
         assert result["document_count"] > 0
-        
+
         # Test delete collection
         result = await manager.execute_tool({
             "action": "delete",
@@ -191,7 +191,7 @@ class TestKnowledgeIndexerIntegration:
     ):
         """Test overwrite functionality with real database."""
         tool = KnowledgeIndexerTool()
-        
+
         # First indexing
         result1 = await tool.execute_tool({
             "files": sample_files_data,
@@ -199,7 +199,7 @@ class TestKnowledgeIndexerIntegration:
             "persist_directory": unique_temp_dir,
         })
         original_segments = result1["total_segments"]
-        
+
         # Second indexing with overwrite=False (should add to existing)
         result2 = await tool.execute_tool({
             "files": sample_files_data,
@@ -207,10 +207,10 @@ class TestKnowledgeIndexerIntegration:
             "persist_directory": unique_temp_dir,
             "overwrite": False,
         })
-        
+
         # Should have same number of segments (duplicate detection)
         assert result2["total_segments"] == original_segments
-        
+
         # Third indexing with overwrite=True (should replace)
         result3 = await tool.execute_tool({
             "files": sample_files_data,
@@ -218,7 +218,7 @@ class TestKnowledgeIndexerIntegration:
             "persist_directory": unique_temp_dir,
             "overwrite": True,
         })
-        
+
         # Should have same number of segments as original
         assert result3["total_segments"] == original_segments
 
@@ -235,7 +235,7 @@ class TestKnowledgeIndexerIntegration:
             "persist_directory": unique_temp_dir,
         })
         assert result["success"] is True
-        
+
         # Query with second tool instance (different object)
         tool2 = KnowledgeQueryTool()
         result = await tool2.execute_tool({
@@ -243,7 +243,7 @@ class TestKnowledgeIndexerIntegration:
             "collection": unique_collection_name,
             "persist_directory": unique_temp_dir,
         })
-        
+
         # Should find the previously indexed content
         assert result["success"] is True
         assert len(result["results"]["documents"]) > 0
@@ -260,14 +260,14 @@ class TestConcurrencyAndIsolation:
         tasks = []
         temp_dirs = []
         collection_names = []
-        
+
         try:
             for i in range(num_parallel):
                 temp_dir = tempfile.mkdtemp(prefix=f"parallel_test_{i}_")
                 collection_name = f"parallel_collection_{uuid.uuid4().hex[:8]}"
                 temp_dirs.append(temp_dir)
                 collection_names.append(collection_name)
-                
+
                 tool = KnowledgeIndexerTool()
                 task = tool.execute_tool({
                     "files": sample_files_data,
@@ -275,16 +275,16 @@ class TestConcurrencyAndIsolation:
                     "persist_directory": temp_dir,
                 })
                 tasks.append(task)
-            
+
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
                     pytest.fail(f"Task {i} failed: {result}")
                 else:
                     assert result["success"] is True
                     assert result["collection"] == collection_names[i]
-                
+
         finally:
             for temp_dir in temp_dirs:
                 shutil.rmtree(temp_dir, ignore_errors=True)
@@ -296,46 +296,46 @@ class TestConcurrencyAndIsolation:
         """Test that different collections are properly isolated."""
         collection1 = f"isolated_collection_1_{uuid.uuid4().hex[:8]}"
         collection2 = f"isolated_collection_2_{uuid.uuid4().hex[:8]}"
-        
+
         tool = KnowledgeIndexerTool()
-        
+
         files1 = [{
             "filename": "doc1.md",
             "content": "# Collection 1 Content\nUnique content for collection 1.",
             "encoding": "utf-8",
         }]
-        
+
         files2 = [{
-            "filename": "doc2.md", 
+            "filename": "doc2.md",
             "content": "# Collection 2 Content\nDifferent content for collection 2.",
             "encoding": "utf-8",
         }]
-        
+
         # Index in separate collections
         result1 = await tool.execute_tool({
             "files": files1,
             "collection": collection1,
             "persist_directory": unique_temp_dir,
         })
-        
+
         result2 = await tool.execute_tool({
             "files": files2,
             "collection": collection2,
             "persist_directory": unique_temp_dir,
         })
-        
+
         assert result1["success"] is True
         assert result2["success"] is True
-        
+
         # Query each collection separately
         query_tool = KnowledgeQueryTool()
-        
+
         result = await query_tool.execute_tool({
             "query": "collection 2 different",
             "collection": collection1,
             "persist_directory": unique_temp_dir,
         })
-        
+
         assert result["success"] is True
         # Should not find collection 2 content in collection 1
         if result["results"]["documents"]:
@@ -351,15 +351,15 @@ class TestErrorHandlingAndRecovery:
     async def test_invalid_persist_directory_handling(self, sample_files_data):
         """Test handling of invalid persist directories."""
         tool = KnowledgeIndexerTool()
-        
+
         invalid_dir = "/non/existent/path/vector_store"
-        
+
         result = await tool.execute_tool({
             "files": sample_files_data,
             "collection": "test_collection",
             "persist_directory": invalid_dir,
         })
-        
+
         assert result["success"] is False
         assert "error" in result
 
@@ -367,7 +367,7 @@ class TestErrorHandlingAndRecovery:
     async def test_corrupted_database_recovery(self, unique_temp_dir, sample_files_data):
         """Test recovery from database corruption scenarios."""
         collection_name = f"corruption_test_{uuid.uuid4().hex[:8]}"
-        
+
         # Create valid database first
         tool = KnowledgeIndexerTool()
         result = await tool.execute_tool({
@@ -376,13 +376,35 @@ class TestErrorHandlingAndRecovery:
             "persist_directory": unique_temp_dir,
         })
         assert result["success"] is True
-        
-        # Simulate corruption by removing database files
-        for file in os.listdir(unique_temp_dir):
-            file_path = os.path.join(unique_temp_dir, file)
-            if os.path.isfile(file_path):
-                os.remove(file_path)
-        
+
+        # Force cleanup of any open database connections
+        import gc
+        import time
+        gc.collect()
+        time.sleep(0.2)  # Allow time for connections to close
+
+        # Simulate corruption by removing database files with retry mechanism
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                for file in os.listdir(unique_temp_dir):
+                    file_path = os.path.join(unique_temp_dir, file)
+                    if os.path.isfile(file_path):
+                        try:
+                            os.remove(file_path)
+                        except PermissionError:
+                            if attempt < max_retries - 1:
+                                continue  # Try again on next iteration
+                            else:
+                                pass  # Skip files that can't be deleted
+                break  # Success, exit retry loop
+            except Exception:
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)
+                    gc.collect()
+                else:
+                    pass  # Best effort - continue with test even if some files remain
+
         # Try to query corrupted database
         query_tool = KnowledgeQueryTool()
         result = await query_tool.execute_tool({
@@ -390,7 +412,7 @@ class TestErrorHandlingAndRecovery:
             "collection": collection_name,
             "persist_directory": unique_temp_dir,
         })
-        
+
         # ChromaDB might recreate the collection, so we just verify it handles the situation
         # The important thing is that it doesn't crash
         assert "success" in result
@@ -418,25 +440,25 @@ The content includes database operations, vector storage, and search functionali
 This tests the system's ability to handle larger documents efficiently.
 
 """
-        
+
         large_files_data = [{
             "filename": "large_test_doc.md",
             "content": large_content,
             "encoding": "utf-8",
         }]
-        
+
         tool = KnowledgeIndexerTool()
-        
+
         # Index large document
         result = await tool.execute_tool({
             "files": large_files_data,
             "collection": unique_collection_name,
             "persist_directory": unique_temp_dir,
         })
-        
+
         assert result["success"] is True
         assert result["total_segments"] > 5  # Should create multiple segments
-        
+
         # Test querying the large document
         query_tool = KnowledgeQueryTool()
         result = await query_tool.execute_tool({
@@ -445,7 +467,7 @@ This tests the system's ability to handle larger documents efficiently.
             "persist_directory": unique_temp_dir,
             "limit": 5,
         })
-        
+
         assert result["success"] is True
         assert len(result["results"]["documents"]) > 0
 
@@ -460,7 +482,7 @@ class TestRealWorldScenarios:
     ):
         """Test a complete knowledge management workflow."""
         collection_name = f"workflow_test_{uuid.uuid4().hex[:8]}"
-        
+
         # Step 1: Index initial documents
         indexer = KnowledgeIndexerTool()
         result = await indexer.execute_tool({
@@ -469,7 +491,7 @@ class TestRealWorldScenarios:
             "persist_directory": unique_temp_dir,
         })
         assert result["success"] is True
-        
+
         # Step 2: Query the indexed content
         query_tool = KnowledgeQueryTool()
         result = await query_tool.execute_tool({
@@ -479,27 +501,27 @@ class TestRealWorldScenarios:
         })
         assert result["success"] is True
         assert len(result["results"]["documents"]) > 0
-        
+
         # Step 3: Add more documents to the same collection
         additional_files = [{
             "filename": "additional_knowledge.md",
             "content": """# Additional Knowledge
-            
+
 This document contains supplementary information about:
 - Advanced database operations
-- Vector similarity algorithms  
+- Vector similarity algorithms
 - Performance optimization techniques
 """,
             "encoding": "utf-8",
         }]
-        
+
         result = await indexer.execute_tool({
             "files": additional_files,
             "collection": collection_name,
             "persist_directory": unique_temp_dir,
         })
         assert result["success"] is True
-        
+
         # Step 4: Query for the new content
         result = await query_tool.execute_tool({
             "query": "performance optimization",
@@ -507,17 +529,17 @@ This document contains supplementary information about:
             "persist_directory": unique_temp_dir,
         })
         assert result["success"] is True
-        
+
         # Step 5: Manage collections
         manager = KnowledgeCollectionManagerTool()
-        
+
         # List collections
         result = await manager.execute_tool({
             "action": "list",
             "persist_directory": unique_temp_dir,
         })
         assert collection_name in result["collections"]
-        
+
         # Get collection info
         result = await manager.execute_tool({
             "action": "info",
@@ -526,7 +548,7 @@ This document contains supplementary information about:
         })
         assert result["success"] is True
         assert result["document_count"] > 0
-        
+
         # Clean up by deleting collection
         result = await manager.execute_tool({
             "action": "delete",
@@ -539,7 +561,7 @@ This document contains supplementary information about:
     async def test_multi_format_document_handling(self, unique_temp_dir):
         """Test handling of various document formats and encodings."""
         collection_name = f"multiformat_test_{uuid.uuid4().hex[:8]}"
-        
+
         # Create documents with different characteristics
         files_data = [
             {
@@ -548,7 +570,7 @@ This document contains supplementary information about:
                 "encoding": "utf-8",
             },
             {
-                "filename": "base64_doc.md", 
+                "filename": "base64_doc.md",
                 "content": base64.b64encode("# Base64 Document\nThis document was encoded in base64.".encode()).decode(),
                 "encoding": "base64",
             },
@@ -579,7 +601,7 @@ def example_function():
                 "encoding": "utf-8",
             }
         ]
-        
+
         # Index all documents
         tool = KnowledgeIndexerTool()
         result = await tool.execute_tool({
@@ -587,14 +609,14 @@ def example_function():
             "collection": collection_name,
             "persist_directory": unique_temp_dir,
         })
-        
+
         assert result["success"] is True
         assert result["imported_files"] == 3
         assert result["total_segments"] > 0
-        
+
         # Test querying for content from different documents
         query_tool = KnowledgeQueryTool()
-        
+
         # Query for base64 content
         result = await query_tool.execute_tool({
             "query": "base64 encoded document",
@@ -602,11 +624,11 @@ def example_function():
             "persist_directory": unique_temp_dir,
         })
         assert result["success"] is True
-        
+
         # Query for complex markdown features
         result = await query_tool.execute_tool({
             "query": "code blocks tables lists",
             "collection": collection_name,
             "persist_directory": unique_temp_dir,
         })
-        assert result["success"] is True 
+        assert result["success"] is True

@@ -93,3 +93,18 @@ jobs:
           source .venv/Scripts/activate
           chmod +x ./scripts/run_tests.sh
           ./scripts/run_tests.sh
+
+      - name: Cleanup Temporary Files (Unix)
+        if: always() && runner.os != 'Windows'
+        run: |
+          # Clean up any remaining temporary test files
+          find /tmp -name "*test_chroma*" -type d -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -name "*pytest*" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Cleanup Temporary Files (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: powershell
+        run: |
+          # Clean up any remaining temporary test files
+          Get-ChildItem -Path $env:TEMP -Filter "*test_chroma*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $env:TEMP -Filter "*pytest*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
