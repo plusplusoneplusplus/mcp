@@ -53,6 +53,7 @@ scripts/start_server.sh
 ```
 
 Connect to the SSE endpoint at `http://0.0.0.0:8000/sse` or use the additional routes in `server/api.py`.
+Background job endpoints are documented in `docs/background_jobs_api.md`.
 
 ## Configuration Files
 

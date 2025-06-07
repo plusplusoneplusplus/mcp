@@ -128,12 +128,18 @@ class CommandExecutor(CommandExecutorInterface):
 
         # Periodic status reporting attributes
         self.status_reporter_task: Optional[asyncio.Task] = None
-        
+
         # Load configuration from config manager
         env_manager.load()
-        self.status_reporter_enabled = env_manager.get_setting("periodic_status_enabled", False)
-        self.status_reporter_interval = env_manager.get_setting("periodic_status_interval", 30.0)
-        self.status_reporter_max_command_length = env_manager.get_setting("periodic_status_max_command_length", 60)
+        self.status_reporter_enabled = env_manager.get_setting(
+            "periodic_status_enabled", False
+        )
+        self.status_reporter_interval = env_manager.get_setting(
+            "periodic_status_interval", 30.0
+        )
+        self.status_reporter_max_command_length = env_manager.get_setting(
+            "periodic_status_max_command_length", 60
+        )
 
         # Use specified temp dir or system default
         self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
@@ -312,6 +318,7 @@ class CommandExecutor(CommandExecutorInterface):
         """
         # Create temporary files for output capture
         stdout_path, stderr_path, stdout_file, stderr_file = self._create_temp_files()
+        start_time = time.time()
 
         try:
             _log_with_context(
@@ -363,7 +370,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "output": stdout_content,
                 "error": stderr_content,
                 "pid": os.getpid(),  # Adding the current process PID
-                "duration": 0.0,  # Adding a dummy duration
+                "duration": time.time() - start_time,
             }
 
         except subprocess.TimeoutExpired:
@@ -383,7 +390,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "output": stdout_content,
                 "error": f"Command timed out after {timeout} seconds\n{stderr_content}",
                 "pid": os.getpid(),  # Adding the current process PID
-                "duration": 0.0,  # Adding a dummy duration
+                "duration": time.time() - start_time,
             }
 
         except Exception as e:
@@ -403,7 +410,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "output": "",
                 "error": f"Error executing command: {str(e)}",
                 "pid": os.getpid(),  # Adding the current process PID
-                "duration": 0.0,  # Adding a dummy duration
+                "duration": time.time() - start_time,
             }
 
         finally:
@@ -1013,7 +1020,7 @@ class CommandExecutor(CommandExecutorInterface):
             "output": stdout_content,
             "error": stderr_content,
             "pid": pid,
-            "duration": 0.0,  # Adding a dummy duration
+            "duration": time.time() - process_data.get("start_time", time.time()),
         }
 
         # If process was terminated, update status
@@ -1039,47 +1046,51 @@ class CommandExecutor(CommandExecutorInterface):
 
     def list_running_processes(self) -> List[Dict[str, Any]]:
         """List all currently running background processes.
-        
+
         Returns:
             List of dictionaries containing process information
         """
         running_processes = []
-        
+
         for pid, process_data in self.running_processes.items():
             process = process_data["process"]
-            
+
             # Skip completed processes
             if process.returncode is not None:
                 continue
-                
+
             # Get basic process info
             process_info = {
                 "token": process_data["token"][:8],  # First 8 characters
                 "pid": pid,
                 "command": process_data["command"],
                 "runtime": time.time() - process_data["start_time"],
-                "status": "running"
+                "status": "running",
             }
-            
+
             # Get additional process info if available
             detailed_info = self.get_process_info(pid)
             if detailed_info:
-                process_info.update({
-                    "cpu_percent": detailed_info.get("cpu_percent", 0.0),
-                    "memory_mb": detailed_info.get("memory_info", {}).get("rss_mb", 0.0),
-                    "status": detailed_info.get("status", "running")
-                })
-            
+                process_info.update(
+                    {
+                        "cpu_percent": detailed_info.get("cpu_percent", 0.0),
+                        "memory_mb": detailed_info.get("memory_info", {}).get(
+                            "rss_mb", 0.0
+                        ),
+                        "status": detailed_info.get("status", "running"),
+                    }
+                )
+
             running_processes.append(process_info)
-        
+
         return running_processes
 
     def _format_duration(self, seconds: float) -> str:
         """Format duration in seconds to HH:MM:SS format.
-        
+
         Args:
             seconds: Duration in seconds
-            
+
         Returns:
             Formatted duration string
         """
@@ -1090,35 +1101,37 @@ class CommandExecutor(CommandExecutorInterface):
 
     def _truncate_command(self, command: str, max_length: int = None) -> str:
         """Truncate command string if it's too long.
-        
+
         Args:
             command: Command string to truncate
             max_length: Maximum length (uses instance setting if None)
-            
+
         Returns:
             Truncated command string
         """
         if max_length is None:
             max_length = self.status_reporter_max_command_length
-            
+
         if len(command) <= max_length:
             return command
-        return command[:max_length-3] + "..."
+        return command[: max_length - 3] + "..."
 
     def _print_status_report(self) -> None:
         """Print a status report of running processes to stdout."""
         running_processes = self.list_running_processes()
-        
+
         # Get current timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
+
         # Print header
-        print(f"[{timestamp}] Background Jobs Status ({len(running_processes)} running):")
-        
+        print(
+            f"[{timestamp}] Background Jobs Status ({len(running_processes)} running):"
+        )
+
         if not running_processes:
             print("  No background processes currently running.")
             return
-        
+
         # Print each process
         for process_info in running_processes:
             token = process_info["token"]
@@ -1128,8 +1141,10 @@ class CommandExecutor(CommandExecutorInterface):
             command = self._truncate_command(process_info["command"])
             cpu_percent = process_info.get("cpu_percent", 0.0)
             memory_mb = process_info.get("memory_mb", 0.0)
-            
-            print(f"  Token: {token} | PID: {pid} | Runtime: {runtime} | Status: {status}")
+
+            print(
+                f"  Token: {token} | PID: {pid} | Runtime: {runtime} | Status: {status}"
+            )
             print(f"    Command: {command}")
             print(f"    CPU: {cpu_percent:.1f}% | Memory: {memory_mb:.1f}MB")
             print()
@@ -1139,54 +1154,56 @@ class CommandExecutor(CommandExecutorInterface):
         try:
             while True:
                 await asyncio.sleep(self.status_reporter_interval)
-                
+
                 # Only print if there are running processes
                 if self.running_processes:
                     self._print_status_report()
-                    
+
         except asyncio.CancelledError:
             _log_with_context(
                 logging.INFO,
                 "Periodic status reporter task cancelled",
-                {"interval": self.status_reporter_interval}
+                {"interval": self.status_reporter_interval},
             )
             raise
         except Exception as e:
             _log_with_context(
                 logging.ERROR,
                 "Error in periodic status reporter",
-                {"error": str(e), "traceback": traceback.format_exc()}
+                {"error": str(e), "traceback": traceback.format_exc()},
             )
 
-    async def start_periodic_status_reporter(self, interval: float = 30.0, enabled: bool = True) -> None:
+    async def start_periodic_status_reporter(
+        self, interval: float = 30.0, enabled: bool = True
+    ) -> None:
         """Start periodic status reporting for running processes.
-        
+
         Args:
             interval: Time interval between status reports in seconds
             enabled: Whether to enable periodic reporting
         """
         if not enabled:
             _log_with_context(
-                logging.INFO,
-                "Periodic status reporter disabled",
-                {"enabled": enabled}
+                logging.INFO, "Periodic status reporter disabled", {"enabled": enabled}
             )
             return
-            
+
         # Stop existing reporter if running
         await self.stop_periodic_status_reporter()
-        
+
         # Update settings
         self.status_reporter_interval = interval
         self.status_reporter_enabled = enabled
-        
+
         # Start new reporter task
-        self.status_reporter_task = asyncio.create_task(self._periodic_status_reporter())
-        
+        self.status_reporter_task = asyncio.create_task(
+            self._periodic_status_reporter()
+        )
+
         _log_with_context(
             logging.INFO,
             "Started periodic status reporter",
-            {"interval": interval, "enabled": enabled}
+            {"interval": interval, "enabled": enabled},
         )
 
     async def stop_periodic_status_reporter(self) -> None:
@@ -1197,12 +1214,8 @@ class CommandExecutor(CommandExecutorInterface):
                 await self.status_reporter_task
             except asyncio.CancelledError:
                 pass
-            
+
         self.status_reporter_task = None
         self.status_reporter_enabled = False
-        
-        _log_with_context(
-            logging.INFO,
-            "Stopped periodic status reporter",
-            {}
-        )
+
+        _log_with_context(logging.INFO, "Stopped periodic status reporter", {})
