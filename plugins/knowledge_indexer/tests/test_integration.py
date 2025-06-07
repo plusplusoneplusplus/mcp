@@ -13,6 +13,7 @@ import uuid
 import asyncio
 import base64
 from typing import Dict, Any
+import platform
 
 from plugins.knowledge_indexer.tool import (
     KnowledgeIndexerTool,
@@ -352,7 +353,14 @@ class TestErrorHandlingAndRecovery:
         """Test handling of invalid persist directories."""
         tool = KnowledgeIndexerTool()
 
-        invalid_dir = "/non/existent/path/vector_store"
+        # Use a path that will actually cause an error on Windows
+        # Windows doesn't allow certain characters in paths
+        if platform.system().lower() == "windows":
+            # Use invalid characters for Windows paths
+            invalid_dir = "C:\\invalid<>path|with*forbidden?chars"
+        else:
+            # For Unix systems, use a path that requires root permissions
+            invalid_dir = "/root/forbidden/vector_store"
 
         result = await tool.execute_tool({
             "files": sample_files_data,
