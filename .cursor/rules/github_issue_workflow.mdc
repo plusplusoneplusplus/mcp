@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: false
 ---
 # AI Prompt: GitHub Issue Resolution Workflow
@@ -8,6 +8,8 @@ alwaysApply: false
 ## Task Overview
 
 Your primary task is to read a GitHub issue, understand the requirements, implement the necessary changes, create a pull request, and manage the git workflow properly. This is a complete end-to-end workflow for issue resolution.
+
+**Code Editor Context:** Always identify and mention the current code editor being used (e.g., Cursor, Windsurf, VSCode, etc.) in your workflow updates. This helps provide context for the development environment and any editor-specific features or limitations that may affect the implementation.
 
 ## Workflow Steps
 
@@ -135,6 +137,7 @@ When working through this workflow, provide updates at each major step:
 ### Issue Analysis Summary
 ```markdown
 ## Issue Analysis
+- **Code Editor:** [Current editor: Cursor/Windsurf/VSCode/etc.]
 - **Issue Number:** #123
 - **Problem:** [Brief description]
 - **Requirements:** [Key requirements identified]
@@ -145,15 +148,18 @@ When working through this workflow, provide updates at each major step:
 ### Implementation Progress
 ```markdown
 ## Implementation Progress
+- **Code Editor:** [Current editor being used]
 - **Branch Created:** `fix/issue-123-description`
 - **Files Modified:** [List of files changed]
 - **Key Changes:** [Summary of main changes]
 - **Tests Added/Updated:** [Testing changes]
+- **Editor Features Used:** [Any specific editor features utilized, e.g., AI assistance, extensions, etc.]
 ```
 
 ### Pull Request Summary
 ```markdown
 ## Pull Request Created
+- **Code Editor:** [Editor used for development]
 - **PR Title:** [Title]
 - **PR Number:** #456
 - **Description:** [Brief summary of PR description]
@@ -163,6 +169,7 @@ When working through this workflow, provide updates at each major step:
 ### Completion Confirmation
 ```markdown
 ## Workflow Complete
+- **Code Editor:** [Editor used throughout workflow]
 - **PR Status:** Merged
 - **Issue Status:** Closed
 - **Branch Cleanup:** Complete
