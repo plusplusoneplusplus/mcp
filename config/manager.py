@@ -2,6 +2,18 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable, Union
 from config.types import RepositoryInfo
 
+# Add import for truncation configuration
+try:
+    from utils.output_processor.schemas import (
+        TruncationConfig,
+        TruncationStrategy,
+        DEFAULT_SYSTEM_CONFIG,
+        parse_env_config
+    )
+    TRUNCATION_AVAILABLE = True
+except ImportError:
+    TRUNCATION_AVAILABLE = False
+
 
 class EnvironmentManager:
     """
@@ -61,12 +73,22 @@ class EnvironmentManager:
         self.kusto_parameters: Dict[str, Any] = {}
         self.settings: Dict[str, Any] = {}
 
+        # Initialize truncation configuration if available
+        if TRUNCATION_AVAILABLE:
+            self._truncation_tool_configs: Dict[str, TruncationConfig] = {}
+            self._truncation_task_configs: Dict[str, TruncationConfig] = {}
+            self._truncation_user_config: Optional[TruncationConfig] = None
+
         # Initialize settings with default values
         for key, (default_value, _) in self.DEFAULT_SETTINGS.items():
             self.settings[key] = default_value
 
         self._load_from_env_file()
         self._sync_settings_to_repo()
+
+        # Load truncation configuration from environment if available
+        if TRUNCATION_AVAILABLE:
+            self._truncation_user_config = parse_env_config()
 
         # Resolve all path settings to absolute paths relative to server/main.py
         server_main = Path(__file__).parent.parent / "server" / "main.py"
@@ -446,13 +468,174 @@ class EnvironmentManager:
         return self.get_setting("tool_history_enabled", True)
 
     def get_tool_history_path(self) -> str:
-        """Get the path for storing tool invoke history"""
+        """Get tool history path"""
         return self.get_setting("tool_history_path", ".history")
 
     def get_vector_store_path(self) -> str:
-        """Get the vector store persistence path"""
+        """Get vector store path"""
         return self.get_setting("vector_store_path", ".vector_store")
 
+    # Truncation Configuration Methods
+    def add_truncation_tool_config(self, tool_name: str, config_data: Dict[str, Any],
+                                 source_path: Optional[str] = None):
+        """
+        Add tool-level truncation configuration from YAML tool definition.
+
+        Args:
+            tool_name: Name of the tool
+            config_data: Configuration data from YAML
+            source_path: Path to the YAML file (optional)
+        """
+        if not TRUNCATION_AVAILABLE:
+            return
+
+        try:
+            truncation_data = config_data.get('truncation', {})
+            if not truncation_data:
+                return
+
+            tool_config = TruncationConfig.from_dict(truncation_data)
+            self._truncation_tool_configs[tool_name] = tool_config
+
+        except Exception as e:
+            print(f"Failed to parse tool truncation configuration for {tool_name}: {e}")
+
+    def add_truncation_task_config(self, task_id: str, config: 'TruncationConfig'):
+        """
+        Add task-level truncation configuration (highest priority).
+
+        Args:
+            task_id: Unique identifier for the task
+            config: Task-specific truncation configuration
+        """
+        if not TRUNCATION_AVAILABLE:
+            return
+
+        self._truncation_task_configs[task_id] = config
+
+    def remove_truncation_task_config(self, task_id: str):
+        """
+        Remove task-level truncation configuration.
+
+        Args:
+            task_id: Unique identifier for the task
+        """
+        if not TRUNCATION_AVAILABLE:
+            return
+
+        self._truncation_task_configs.pop(task_id, None)
+
+    def resolve_truncation_config(self, tool_name: Optional[str] = None,
+                                task_id: Optional[str] = None) -> Optional['TruncationConfig']:
+        """
+        Resolve the effective truncation configuration based on the hierarchy.
+
+        Args:
+            tool_name: Name of the tool (for tool-specific config)
+            task_id: Task identifier (for task-specific config)
+
+        Returns:
+            Resolved TruncationConfig with highest priority settings, or None if not available
+        """
+        if not TRUNCATION_AVAILABLE:
+            return None
+
+        # Start with system defaults
+        effective_config = DEFAULT_SYSTEM_CONFIG
+
+        # Apply user-level configuration (environment variables)
+        if self._truncation_user_config:
+            effective_config = effective_config.merge_with(self._truncation_user_config)
+
+        # Apply tool-level configuration
+        if tool_name and tool_name in self._truncation_tool_configs:
+            effective_config = effective_config.merge_with(self._truncation_tool_configs[tool_name])
+
+        # Apply task-level configuration (highest priority)
+        if task_id and task_id in self._truncation_task_configs:
+            effective_config = effective_config.merge_with(self._truncation_task_configs[task_id])
+
+        return effective_config
+
+    def load_truncation_tool_configs_from_directory(self, directory_path: Union[str, Path]):
+        """
+        Load tool truncation configurations from YAML files in a directory.
+
+        Args:
+            directory_path: Path to directory containing YAML tool definitions
+        """
+        if not TRUNCATION_AVAILABLE:
+            return
+
+        directory = Path(directory_path)
+
+        if not directory.exists() or not directory.is_dir():
+            return
+
+        yaml_files = list(directory.glob("*.yaml")) + list(directory.glob("*.yml"))
+
+        for yaml_file in yaml_files:
+            try:
+                self.load_truncation_tool_config_from_file(yaml_file)
+            except Exception as e:
+                print(f"Failed to load tool truncation config from {yaml_file}: {e}")
+
+    def load_truncation_tool_config_from_file(self, file_path: Union[str, Path]):
+        """
+        Load tool truncation configuration from a YAML file.
+
+        Args:
+            file_path: Path to YAML file containing tool definition
+        """
+        if not TRUNCATION_AVAILABLE:
+            return
+
+        file_path = Path(file_path)
+
+        if not file_path.exists():
+            return
+
+        try:
+            import yaml
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = yaml.safe_load(f)
+
+            if not isinstance(data, dict):
+                return
+
+            # Extract tool name from filename or from YAML data
+            tool_name = data.get('name', file_path.stem)
+
+            self.add_truncation_tool_config(tool_name, data, str(file_path))
+
+        except Exception as e:
+            print(f"Error loading tool truncation config from {file_path}: {e}")
+
+    def get_truncation_config_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of all truncation configuration levels.
+
+        Returns:
+            Dictionary containing truncation configuration summary
+        """
+        if not TRUNCATION_AVAILABLE:
+            return {"available": False, "message": "Truncation configuration not available"}
+
+        summary = {
+            "available": True,
+            "system_config": DEFAULT_SYSTEM_CONFIG.to_dict(),
+            "user_config": self._truncation_user_config.to_dict() if self._truncation_user_config else None,
+            "tool_configs": {
+                tool_name: config.to_dict()
+                for tool_name, config in self._truncation_tool_configs.items()
+            },
+            "task_configs": {
+                task_id: config.to_dict()
+                for task_id, config in self._truncation_task_configs.items()
+            }
+        }
+
+        return summary
 
 # Create singleton instance
 env_manager = EnvironmentManager()
