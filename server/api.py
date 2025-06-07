@@ -10,6 +10,8 @@ if str(PROJECT_ROOT) not in sys.path:
 import tempfile
 import shutil
 import base64
+import time
+import psutil
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
@@ -31,6 +33,7 @@ PERSIST_DIR = env.get_vector_store_path()
 _knowledge_indexer = None
 _knowledge_query = None
 _knowledge_collections = None
+_command_executor = None
 
 
 def get_knowledge_indexer():
@@ -55,6 +58,15 @@ def get_knowledge_collections():
     if _knowledge_collections is None:
         _knowledge_collections = KnowledgeCollectionManagerTool()
     return _knowledge_collections
+
+
+def get_command_executor():
+    """Get or create the command executor instance."""
+    global _command_executor
+    if _command_executor is None:
+        from mcp_tools.dependency import injector
+        _command_executor = injector.get_tool_instance("command_executor")
+    return _command_executor
 
 
 async def api_import_knowledge(request: Request):
@@ -216,10 +228,94 @@ async def api_delete_collection(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+async def api_list_background_jobs(request: Request):
+    """List running and completed background jobs."""
+    executor = get_command_executor()
+
+    status_filter = request.query_params.get("status")
+    try:
+        limit = int(request.query_params.get("limit", 50))
+    except Exception:
+        limit = 50
+    include_completed = request.query_params.get("include_completed", "true").lower() != "false"
+
+    jobs = []
+
+    # Running jobs
+    for info in executor.list_running_processes():
+        if not status_filter or status_filter == info.get("status"):
+            info["token"] = executor.running_processes[info["pid"]]["token"]
+            jobs.append(info)
+
+    if include_completed:
+        for token, result in executor.completed_processes.items():
+            status = result.get("status", "completed")
+            if not status_filter or status_filter == status:
+                job = result.copy()
+                job["token"] = token
+                jobs.append(job)
+
+    total_count = len(jobs)
+    running_count = len([j for j in jobs if j.get("status") == "running"])
+    completed_count = len([j for j in jobs if j.get("status") != "running"])
+
+    jobs = jobs[:limit]
+    return JSONResponse({
+        "jobs": jobs,
+        "total_count": total_count,
+        "running_count": running_count,
+        "completed_count": completed_count,
+    })
+
+
+async def api_get_background_job(request: Request):
+    """Get detailed information about a specific background job."""
+    token = request.path_params.get("token")
+    executor = get_command_executor()
+    result = await executor.get_process_status(token)
+    return JSONResponse(result)
+
+
+async def api_background_job_stats(request: Request):
+    """Get aggregate statistics about background job execution."""
+    executor = get_command_executor()
+    current_running = len(executor.running_processes)
+    total_completed = len(executor.completed_processes)
+    total_failed = sum(1 for r in executor.completed_processes.values() if not r.get("success"))
+    durations = [r.get("duration", 0.0) for r in executor.completed_processes.values()]
+    average_runtime = sum(durations) / len(durations) if durations else 0.0
+
+    # Determine longest running token
+    longest_running_token = None
+    longest_runtime = 0.0
+    for pid, data in executor.running_processes.items():
+        runtime = time.time() - data.get("start_time", 0)
+        if runtime > longest_runtime:
+            longest_runtime = runtime
+            longest_running_token = data.get("token")
+
+    system_load = {
+        "cpu_usage": psutil.cpu_percent(interval=0.1),
+        "memory_usage": psutil.virtual_memory().percent,
+    }
+
+    return JSONResponse({
+        "current_running": current_running,
+        "total_completed": total_completed,
+        "total_failed": total_failed,
+        "average_runtime": average_runtime,
+        "longest_running_token": longest_running_token,
+        "system_load": system_load,
+    })
+
+
 api_routes = [
     Route("/api/import-knowledge", endpoint=api_import_knowledge, methods=["POST"]),
     Route("/api/collections", endpoint=api_list_collections, methods=["GET"]),
     Route("/api/collection-documents", endpoint=api_list_documents, methods=["GET"]),
     Route("/api/query-segments", endpoint=api_query_segments, methods=["GET"]),
     Route("/api/delete-collection", endpoint=api_delete_collection, methods=["POST"]),
+    Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),
+    Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
+    Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
 ]
