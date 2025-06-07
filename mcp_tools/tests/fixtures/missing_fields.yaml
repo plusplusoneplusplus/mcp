@@ -1,0 +1,6 @@
+tools:
+  bad_tool_1:
+    inputSchema:
+      type: object
+  bad_tool_2:
+    description: Missing schema

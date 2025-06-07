@@ -1,0 +1,10 @@
+tools:
+  echo:
+    description: Echo a message
+    inputSchema:
+      type: object
+      properties:
+        message:
+          type: string
+    scripts:
+      linux: "echo {message}"
