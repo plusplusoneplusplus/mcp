@@ -192,7 +192,6 @@ class AIDetectionManager {
             }
         });
     }
-
     private shouldMonitorDocument(doc: vscode.TextDocument): boolean {
         // Check if document contains AI conversation
         const text = doc.getText();
@@ -246,7 +245,7 @@ class SmartMonitoring {
 ```typescript
 class OptimizedDetection {
     private lastKnownContent = new Map<string, string>();
-
+    
     checkForChanges(doc: vscode.TextDocument): boolean {
         const currentContent = doc.getText();
         const lastContent = this.lastKnownContent.get(doc.uri.toString());
