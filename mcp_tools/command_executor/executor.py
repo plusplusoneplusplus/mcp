@@ -672,9 +672,14 @@ class CommandExecutor(CommandExecutorInterface):
                 "runtime": time.time() - process_data["start_time"],
             }
 
-            # Add psutil info if available
+            # Add psutil info if available, but preserve logical status
             if process_info:
+                # Extract OS status before updating to avoid overwriting logical status
+                os_status = process_info.pop("status", None)
                 status_info.update(process_info)
+                # Add OS status as separate field
+                if os_status:
+                    status_info["os_status"] = os_status
 
             return status_info
 
@@ -690,9 +695,14 @@ class CommandExecutor(CommandExecutorInterface):
             "runtime": time.time() - process_data["start_time"],
         }
 
-        # Add psutil info if available
+        # Add psutil info if available, but preserve logical status
         if process_info:
+            # Extract OS status before updating to avoid overwriting logical status
+            os_status = process_info.pop("status", None)
             status_info.update(process_info)
+            # Add OS status as separate field
+            if os_status:
+                status_info["os_status"] = os_status
 
         return status_info
 
