@@ -605,6 +605,22 @@ class CommandExecutor(CommandExecutorInterface):
                 "error": f"Error starting command: {str(e)}",
             }
 
+    def _merge_psutil_info(self, status_info: Dict[str, Any], process_info: Optional[Dict[str, Any]]) -> None:
+        """Merge psutil process info while preserving logical status.
+
+        Args:
+            status_info: The status dictionary to update
+            process_info: Optional psutil process information
+        """
+        # Add psutil info if available, but preserve logical status
+        if process_info:
+            # Extract OS status before updating to avoid overwriting logical status
+            os_status = process_info.pop("status", None)
+            status_info.update(process_info)
+            # Add OS status as separate field
+            if os_status:
+                status_info["os_status"] = os_status
+
     async def get_process_status(self, token: str) -> Dict[str, Any]:
         """Get the status of an asynchronous process
 
@@ -672,14 +688,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "runtime": time.time() - process_data["start_time"],
             }
 
-            # Add psutil info if available, but preserve logical status
-            if process_info:
-                # Extract OS status before updating to avoid overwriting logical status
-                os_status = process_info.pop("status", None)
-                status_info.update(process_info)
-                # Add OS status as separate field
-                if os_status:
-                    status_info["os_status"] = os_status
+            self._merge_psutil_info(status_info, process_info)
 
             return status_info
 
@@ -695,14 +704,7 @@ class CommandExecutor(CommandExecutorInterface):
             "runtime": time.time() - process_data["start_time"],
         }
 
-        # Add psutil info if available, but preserve logical status
-        if process_info:
-            # Extract OS status before updating to avoid overwriting logical status
-            os_status = process_info.pop("status", None)
-            status_info.update(process_info)
-            # Add OS status as separate field
-            if os_status:
-                status_info["os_status"] = os_status
+        self._merge_psutil_info(status_info, process_info)
 
         return status_info
 
