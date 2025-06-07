@@ -9,7 +9,7 @@ alwaysApply: false
 
 Your primary task is to read a GitHub issue, understand the requirements, implement the necessary changes, create a pull request, and manage the git workflow properly. This is a complete end-to-end workflow for issue resolution.
 
-**Code Editor Context:** Always identify and mention the current code editor being used (e.g., Cursor, Windsurf, VSCode, etc.) in your workflow updates. This helps provide context for the development environment and any editor-specific features or limitations that may affect the implementation.
+**Code Editor Context:** Always identify and mention the current code editor being used (e.g., Cursor, Windsurf, VSCode, etc.) in your workflow updates, commit messages, and PR descriptions. This helps provide context for the development environment and any editor-specific features or limitations that may affect the implementation.
 
 ## Workflow Steps
 
@@ -77,16 +77,18 @@ This ensures you're working from the latest stable code and prevents conflicts.
 - Verify that the implementation fully addresses the issue requirements
 
 **Commit Management:**
-- Make atomic, logical commits with clear commit messages
+- Make atomic, logical commits with clear commit messages that include the editor name at the end (e.g., "Fix issue #123: Update validation logic (Cursor)")
 - Follow the project's commit message conventions
+- Include the code editor name at the end of commit messages for development context
 - Squash or organize commits if needed for a clean history
 
 ### 5. Pull Request Phase
 
 **Create Pull Request:**
-- Write a clear, descriptive PR title that references the issue
+- Write a clear, descriptive PR title that references the issue (e.g., "Fix issue #123: Update validation logic")
 - Include a comprehensive PR description that:
   - References the original issue (e.g., "Fixes #123" or "Closes #456")
+  - Mentions the code editor used for development (e.g., "Developed using Cursor")
   - Summarizes the changes made
   - Explains the approach taken
   - Lists any breaking changes or migration steps
@@ -121,6 +123,10 @@ git checkout main && git pull origin main
 # Create and switch to feature branch
 git checkout -b fix/issue-123-description
 
+# Make commits with editor context
+git commit -m "Fix issue #123: Update validation logic (Cursor)"
+git commit -m "Add tests for issue #123: Validation improvements (VSCode)"
+
 # After making changes and commits
 git push origin fix/issue-123-description
 
@@ -129,6 +135,15 @@ git checkout main && git pull origin main
 git branch -d fix/issue-123-description
 git push origin --delete fix/issue-123-description  # if needed
 ```
+
+## Commit Message Format
+
+Always include the code editor name at the end of your commit messages using this format:
+- `Action: Brief description (EditorName)`
+- Examples:
+  - `Fix issue #123: Update validation logic (Cursor)`
+  - `Add feature #456: New user authentication (VSCode)`
+  - `Refactor: Improve error handling in API calls (Windsurf)`
 
 ## Output Format
 
