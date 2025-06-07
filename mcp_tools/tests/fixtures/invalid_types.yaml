@@ -1,0 +1,8 @@
+tools:
+  bad_tool_1:
+    description: 123
+    inputSchema: "not a dict"
+  bad_tool_2:
+    description: Valid
+    inputSchema:
+      type: 5
