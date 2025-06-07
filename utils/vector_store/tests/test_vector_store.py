@@ -3,10 +3,17 @@ from utils.vector_store import ChromaVectorStore
 import numpy as np
 import tempfile
 import shutil
+import threading
+import time
+import gc
+import os
 from sentence_transformers import SentenceTransformer
 
 # Use a lightweight model for embedding generation
 EMBED_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Lock for thread-safe operations
+lock = threading.Lock()
 
 
 def test_init_and_collection_switch():
@@ -79,21 +86,59 @@ def test_persistent_mode():
     # Create a temporary directory for persistence
     temp_dir = tempfile.mkdtemp()
     try:
-        # First instance: add data
-        store1 = ChromaVectorStore(
-            collection_name="persisted", persist_directory=temp_dir
-        )
-        ids = ["pid1", "pid2"]
-        documents = ["Persistent doc one.", "Persistent doc two."]
-        embeddings = EMBED_MODEL.encode(documents).tolist()
-        store1.add(ids=ids, embeddings=embeddings)
-        # Second instance: query data (should persist)
-        store2 = ChromaVectorStore(
-            collection_name="persisted", persist_directory=temp_dir
-        )
-        query = EMBED_MODEL.encode([documents[0]]).tolist()
-        result = store2.query(query_embeddings=query, n_results=2)
-        all_ids = [item for sublist in result["ids"] for item in sublist]
-        assert "pid1" in all_ids or "pid2" in all_ids
+        with lock:
+            # First instance: add data
+            store1 = ChromaVectorStore(
+                collection_name="persisted", persist_directory=temp_dir
+            )
+            ids = ["pid1", "pid2"]
+            documents = ["Persistent doc one.", "Persistent doc two."]
+            embeddings = EMBED_MODEL.encode(documents).tolist()
+            store1.add(ids=ids, embeddings=embeddings)
+
+            # Explicitly clean up the first store
+            del store1
+            gc.collect()  # Force garbage collection
+            time.sleep(0.1)  # Brief pause to allow file handles to close
+
+            # Second instance: query data (should persist)
+            store2 = ChromaVectorStore(
+                collection_name="persisted", persist_directory=temp_dir
+            )
+            query = EMBED_MODEL.encode([documents[0]]).tolist()
+            result = store2.query(query_embeddings=query, n_results=2)
+            all_ids = [item for sublist in result["ids"] for item in sublist]
+            assert "pid1" in all_ids or "pid2" in all_ids
+
+            # Clean up the second store
+            del store2
+            gc.collect()
+            time.sleep(0.1)
     finally:
-        shutil.rmtree(temp_dir)
+        # Robust cleanup with retry mechanism for Windows
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                shutil.rmtree(temp_dir)
+                break
+            except PermissionError:
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # Wait longer before retry
+                    gc.collect()
+                else:
+                    # On final attempt, try to remove individual files
+                    try:
+                        for root, dirs, files in os.walk(temp_dir, topdown=False):
+                            for file in files:
+                                try:
+                                    os.remove(os.path.join(root, file))
+                                except:
+                                    pass
+                            for dir in dirs:
+                                try:
+                                    os.rmdir(os.path.join(root, dir))
+                                except:
+                                    pass
+                        os.rmdir(temp_dir)
+                    except:
+                        pass  # Best effort cleanup

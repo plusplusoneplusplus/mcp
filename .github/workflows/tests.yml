@@ -9,22 +9,26 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          
+
       # - name: Install Chrome
       #   run: |
       #     wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
       #     echo "deb http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
       #     sudo apt-get update
       #     sudo apt-get install -y google-chrome-stable
-          
+
       # - name: Install ChromeDriver
       #   run: |
       #     CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1)
@@ -33,29 +37,74 @@ jobs:
       #     unzip chromedriver_linux64.zip
       #     sudo mv chromedriver /usr/local/bin/
       #     sudo chmod +x /usr/local/bin/chromedriver
-          
-      - name: Install uv
+
+      - name: Install uv (Unix)
+        if: runner.os != 'Windows'
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          
-      - name: Create virtual environment
+
+      - name: Install uv (Windows)
+        if: runner.os == 'Windows'
         run: |
-          uv venv
-          
-      - name: Install dependencies
+          irm https://astral.sh/uv/install.ps1 | iex
+          echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies (Unix)
+        if: runner.os != 'Windows'
         run: |
           source .venv/bin/activate
           uv pip install pytest pytest-asyncio
           uv pip install -e .
-          
-      - name: Install Playwright Browsers
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .venv\Scripts\activate
+          uv pip install pytest pytest-asyncio
+          uv pip install -e .
+
+      - name: Install Playwright Browsers (Unix)
+        if: runner.os != 'Windows'
         run: |
           source .venv/bin/activate
           playwright install chromium
 
-      - name: Run tests
+      - name: Install Playwright Browsers (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          .venv\Scripts\activate
+          playwright install chromium
+
+      - name: Run tests (Unix)
+        if: runner.os != 'Windows'
         run: |
           source .venv/bin/activate
           chmod +x ./scripts/run_tests.sh
-          ./scripts/run_tests.sh 
+          ./scripts/run_tests.sh
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          source .venv/Scripts/activate
+          chmod +x ./scripts/run_tests.sh
+          ./scripts/run_tests.sh
+
+      - name: Cleanup Temporary Files (Unix)
+        if: always() && runner.os != 'Windows'
+        run: |
+          # Clean up any remaining temporary test files
+          find /tmp -name "*test_chroma*" -type d -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -name "*pytest*" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Cleanup Temporary Files (Windows)
+        if: always() && runner.os == 'Windows'
+        shell: powershell
+        run: |
+          # Clean up any remaining temporary test files
+          Get-ChildItem -Path $env:TEMP -Filter "*test_chroma*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $env:TEMP -Filter "*pytest*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
