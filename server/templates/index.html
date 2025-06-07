@@ -1,26 +1,268 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>MCP Knowledge Server</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; background: #fafbfc; }
-        .container { width: 100vw; margin: 0; padding: 0; }
-        h1 { color: #333; margin-left: 2em; margin-top: 1.5em; }
-        .card { background: #f8f8f8; padding: 2em; border-radius: 10px; box-shadow: 0 2px 8px #eee; margin-bottom: 2em; margin-left: 0; margin-right: 0; width: 100vw; box-sizing: border-box; }
-        label { font-weight: bold; }
-        .tabs { display: flex; gap: 0.5em; margin-bottom: 1.5em; margin-left: 2em; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #fafbfc;
+        }
+
+        .container {
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            color: #333;
+            margin-left: 2em;
+            margin-top: 1.5em;
+        }
+
+        .card {
+            background: #f8f8f8;
+            padding: 2em;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px #eee;
+            margin-bottom: 2em;
+            margin-left: 0;
+            margin-right: 0;
+            width: 100vw;
+            box-sizing: border-box;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5em;
+            margin-bottom: 1.5em;
+            margin-left: 2em;
+        }
+
         .tab-btn {
-            background: #eee; border: none; border-radius: 6px 6px 0 0; padding: 0.7em 1.5em; font-size: 1em; cursor: pointer; color: #333;
+            background: #eee;
+            border: none;
+            border-radius: 6px 6px 0 0;
+            padding: 0.7em 1.5em;
+            font-size: 1em;
+            cursor: pointer;
+            color: #333;
             transition: background 0.2s, color 0.2s;
         }
+
         .tab-btn.active {
-            background: #fff; color: #0077cc; border-bottom: 2px solid #fff; font-weight: bold;
+            background: #fff;
+            color: #0077cc;
+            border-bottom: 2px solid #fff;
+            font-weight: bold;
             box-shadow: 0 -2px 8px #eee;
         }
-        .tab-content { display: block; width: 100vw; margin: 0; }
 
+        .tab-content {
+            display: block;
+            width: 100vw;
+            margin: 0;
+        }
+
+        /* Background Jobs Styles */
+        .jobs-dashboard {
+            display: flex;
+            gap: 1em;
+            margin-bottom: 1.5em;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: #fff;
+            padding: 1em;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .stat-card h3 {
+            margin: 0 0 0.5em 0;
+            font-size: 1.8em;
+            color: #0077cc;
+        }
+
+        .stat-card p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .jobs-controls {
+            display: flex;
+            gap: 1em;
+            margin-bottom: 1.5em;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .jobs-controls select,
+        .jobs-controls input[type="text"] {
+            padding: 0.5em;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .jobs-controls button {
+            padding: 0.5em 1em;
+            background: #0077cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .jobs-controls button:hover {
+            background: #005fa3;
+        }
+
+        .jobs-table-container {
+            overflow-x: auto;
+            margin-bottom: 1em;
+        }
+
+        #jobs-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        #jobs-table th,
+        #jobs-table td {
+            padding: 0.75em;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        #jobs-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+        }
+
+        #jobs-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 0.25em 0.5em;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-running {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-completed {
+            background: #cce7ff;
+            color: #004085;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-terminated {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .token {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .command {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 2em;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .job-action-btn {
+            padding: 0.3em 0.6em;
+            margin: 0 0.2em;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .btn-details {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-terminate {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-details:hover {
+            background: #5a6268;
+        }
+
+        .btn-terminate:hover {
+            background: #c82333;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>MCP Knowledge Server</h1>
@@ -32,6 +274,7 @@
             <button class="tab-btn" data-tab="list-tab">List</button>
             <button class="tab-btn" data-tab="query-tab">Query</button>
             <button class="tab-btn" data-tab="collections-tab">Collections</button>
+            <button class="tab-btn" data-tab="jobs-tab">Background Jobs</button>
         </div>
         <div class="tab-content" id="collections-tab" style="display:none;">
             <div class="card">
@@ -43,24 +286,31 @@
             <div class="card">
                 <h2>Import Knowledge Directory</h2>
                 <form id="import-form" enctype="multipart/form-data">
-                  <label for="import-files" style="font-weight:bold;">Select Files:</label>
-                  <div style="margin-bottom:0.5em;">
-                      <span style="font-size:0.97em;">Show extensions:</span>
-                      <label style="margin-left:1em;"><input type="checkbox" class="ext-filter" value=".md" checked> .md</label>
-                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".txt"> .txt</label>
-                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".rst"> .rst</label>
-                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".docx"> .docx</label>
-                      <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".pdf"> .pdf</label>
-                  </div>
-                  <input type="file" id="import-files" name="files" multiple accept=".md" style="margin-bottom:1em;" />
-                  <div id="selected-folder-path" style="font-size:0.95em; color:#666; margin:0.5em 0 0.2em 0;"></div>
-                  <div id="selected-files-list" style="margin:0.2em 0 0.5em 0;"></div>
-                  <label>Collection name (optional): <input type="text" name="collection" /></label>
-                  <div style="margin:0.5em 0;">
-                      <label><input type="checkbox" id="import-overwrite" name="overwrite" value="true"> Overwrite collection (delete all existing documents first)</label>
-                  </div>
-                  <button type="submit" style="margin-left:1em;">Import</button>
-                  <span id="import-status" style="margin-left:1em;"></span>
+                    <label for="import-files" style="font-weight:bold;">Select Files:</label>
+                    <div style="margin-bottom:0.5em;">
+                        <span style="font-size:0.97em;">Show extensions:</span>
+                        <label style="margin-left:1em;"><input type="checkbox" class="ext-filter" value=".md" checked>
+                            .md</label>
+                        <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".txt">
+                            .txt</label>
+                        <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".rst">
+                            .rst</label>
+                        <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".docx">
+                            .docx</label>
+                        <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".pdf">
+                            .pdf</label>
+                    </div>
+                    <input type="file" id="import-files" name="files" multiple accept=".md"
+                        style="margin-bottom:1em;" />
+                    <div id="selected-folder-path" style="font-size:0.95em; color:#666; margin:0.5em 0 0.2em 0;"></div>
+                    <div id="selected-files-list" style="margin:0.2em 0 0.5em 0;"></div>
+                    <label>Collection name (optional): <input type="text" name="collection" /></label>
+                    <div style="margin:0.5em 0;">
+                        <label><input type="checkbox" id="import-overwrite" name="overwrite" value="true"> Overwrite
+                            collection (delete all existing documents first)</label>
+                    </div>
+                    <button type="submit" style="margin-left:1em;">Import</button>
+                    <span id="import-status" style="margin-left:1em;"></span>
                 </form>
                 <div id="import-status" style="margin-top:1em;"></div>
             </div>
@@ -73,13 +323,15 @@
                 <button id="list-docs-btn">List Documents</button>
                 <div id="docs-status" style="margin-top:1em;"></div>
                 <div id="doc-viewer-area" style="margin-top:1em; display:none;">
-                  <label for="doc-selector" style="font-family:monospace;">Select document:</label>
-                  <select id="doc-selector" style="font-family:monospace;"></select>
-                  <br><br>
-                  <textarea id="doc-content-area" rows="24" style="width:100%;font-family:monospace;resize:vertical;"></textarea>
-                  <br>
-                  <label for="doc-metadata-area" style="font-family:monospace;">Metadata:</label>
-                  <textarea id="doc-metadata-area" rows="8" style="width:100%;font-family:monospace;resize:vertical;" readonly></textarea>
+                    <label for="doc-selector" style="font-family:monospace;">Select document:</label>
+                    <select id="doc-selector" style="font-family:monospace;"></select>
+                    <br><br>
+                    <textarea id="doc-content-area" rows="24"
+                        style="width:100%;font-family:monospace;resize:vertical;"></textarea>
+                    <br>
+                    <label for="doc-metadata-area" style="font-family:monospace;">Metadata:</label>
+                    <textarea id="doc-metadata-area" rows="8" style="width:100%;font-family:monospace;resize:vertical;"
+                        readonly></textarea>
                 </div>
             </div>
         </div>
@@ -99,293 +351,626 @@
                 <ul id="query-results"></ul>
             </div>
         </div>
+
+        <div class="tab-content" id="jobs-tab" style="display:none;">
+            <div class="card">
+                <h2>Background Jobs Monitor</h2>
+
+                <!-- Dashboard Stats -->
+                <div class="jobs-dashboard">
+                    <div class="stat-card">
+                        <h3 id="running-count">0</h3>
+                        <p>Running Jobs</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="completed-count">0</h3>
+                        <p>Completed</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="failed-count">0</h3>
+                        <p>Failed</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="avg-runtime">0s</h3>
+                        <p>Avg Runtime</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="cpu-usage">0%</h3>
+                        <p>CPU Usage</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3 id="memory-usage">0%</h3>
+                        <p>Memory Usage</p>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="jobs-controls">
+                    <label for="status-filter">Filter by status:</label>
+                    <select id="status-filter">
+                        <option value="all">All</option>
+                        <option value="running">Running</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                        <option value="terminated">Terminated</option>
+                    </select>
+
+                    <input type="text" id="job-search" placeholder="Search by command or token..." />
+                    <button id="refresh-jobs">Refresh</button>
+                    <label><input type="checkbox" id="auto-refresh" checked> Auto-refresh</label>
+                </div>
+
+                <!-- Jobs Table -->
+                <div class="jobs-table-container">
+                    <table id="jobs-table">
+                        <thead>
+                            <tr>
+                                <th>Token</th>
+                                <th>Status</th>
+                                <th>Command</th>
+                                <th>Runtime</th>
+                                <th>CPU %</th>
+                                <th>Memory</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-table-body">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Job Details Modal -->
+                <div id="job-details-modal" class="modal" style="display:none;">
+                    <div class="modal-content">
+                        <span class="close">&times;</span>
+                        <h3>Job Details</h3>
+                        <div id="job-details-content">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     <script>
-    // --- Tab Switching ---
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
-            btn.classList.add('active');
-            document.getElementById(btn.dataset.tab).style.display = 'block';
-            if (btn.dataset.tab === 'collections-tab') loadCollectionsList();
+        // --- Tab Switching ---
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab).style.display = 'block';
+                if (btn.dataset.tab === 'collections-tab') loadCollectionsList();
+                if (btn.dataset.tab === 'jobs-tab') {
+                    loadBackgroundJobs();
+                    if (jobsAutoRefresh) startJobsAutoRefresh();
+                }
+            });
         });
-    });
 
-    // --- Manage Collections Tab ---
-    async function loadCollectionsList() {
-        const area = document.getElementById('collections-list-area');
-        area.innerHTML = 'Loading collections...';
-        try {
-            const resp = await fetch('/api/collections');
-            const data = await resp.json();
-            if (!data.collections || data.collections.length === 0) {
-                area.innerHTML = '<span>No collections found.</span>';
+        // --- Manage Collections Tab ---
+        async function loadCollectionsList() {
+            const area = document.getElementById('collections-list-area');
+            area.innerHTML = 'Loading collections...';
+            try {
+                const resp = await fetch('/api/collections');
+                const data = await resp.json();
+                if (!data.collections || data.collections.length === 0) {
+                    area.innerHTML = '<span>No collections found.</span>';
+                    return;
+                }
+                let html = '<ul style="list-style:none;padding:0;">';
+                data.collections.forEach(col => {
+                    html += `<li style='margin-bottom:0.7em;'><span style='font-family:monospace;'>${col}</span> <button class='delete-col-btn' data-col='${col}' style='color:#fff;background:#d9534f;border:none;border-radius:4px;padding:0.3em 0.8em;cursor:pointer;margin-left:1em;'>Delete</button></li>`;
+                });
+                html += '</ul>';
+                area.innerHTML = html;
+                document.querySelectorAll('.delete-col-btn').forEach(btn => {
+                    btn.addEventListener('click', async function () {
+                        const col = btn.dataset.col;
+                        if (!confirm(`Are you sure you want to delete collection '${col}'? This cannot be undone.`)) return;
+                        btn.disabled = true;
+                        btn.textContent = 'Deleting...';
+                        const resp = await fetch('/api/delete-collection', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ collection: col })
+                        });
+                        const result = await resp.json();
+                        if (result.success) {
+                            btn.parentElement.remove();
+                        } else {
+                            alert('Failed to delete: ' + (result.error || 'Unknown error'));
+                            btn.disabled = false;
+                            btn.textContent = 'Delete';
+                        }
+                    });
+                });
+            } catch (err) {
+                area.innerHTML = `<span style='color:red;'>Error loading collections: ${err}</span>`;
+            }
+        }
+
+
+        // --- Import Extension Filters ---
+        function updateImportAccept() {
+            const fileInput = document.getElementById('import-files');
+            const checked = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+            fileInput.setAttribute('accept', checked.join(','));
+            // Trigger change event to refresh file list
+            fileInput.dispatchEvent(new Event('change'));
+        }
+        document.querySelectorAll('.ext-filter').forEach(cb => {
+            cb.addEventListener('change', updateImportAccept);
+        });
+
+        // --- Show Selected Files (Top 10) and Folder Name ---
+        document.getElementById('import-files').addEventListener('change', function (e) {
+            const files = Array.from(e.target.files);
+            const listDiv = document.getElementById('selected-files-list');
+            const folderDiv = document.getElementById('selected-folder-path');
+            if (!files.length) {
+                listDiv.textContent = '';
+                folderDiv.textContent = '';
                 return;
             }
-            let html = '<ul style="list-style:none;padding:0;">';
-            data.collections.forEach(col => {
-                html += `<li style='margin-bottom:0.7em;'><span style='font-family:monospace;'>${col}</span> <button class='delete-col-btn' data-col='${col}' style='color:#fff;background:#d9534f;border:none;border-radius:4px;padding:0.3em 0.8em;cursor:pointer;margin-left:1em;'>Delete</button></li>`;
-            });
+            const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+            const filtered = files.filter(f => exts.some(ext => f.name.endsWith(ext)));
+            const shown = filtered.slice(0, 10).map(f => f.name).join(', ');
+            listDiv.textContent = filtered.length ? `Selected (${filtered.length}): ${shown}${filtered.length > 10 ? ', ...' : ''}` : 'No matching files selected.';
+            let folder = '';
+            for (const file of files) {
+                if (file.webkitRelativePath) {
+                    folder = file.webkitRelativePath.split('/')[0];
+                    break;
+                }
+            }
+            if (folder) {
+                folderDiv.innerHTML = `<b>Selected folder:</b> <code>${folder}</code> <span title='Browsers do not expose the absolute path for privacy.' style='color:#888;'>(absolute path not available)</span>`;
+            } else {
+                folderDiv.innerHTML = `<span style='color:#888;'>Absolute path not available for privacy. Showing top-level folder name if possible.</span>`;
+            }
+            let html = '<b>Selected files:</b><ul style="margin:0.3em 0 0.3em 1em;">';
+            const showFiles = files.slice(0, 10);
+            for (const file of showFiles) {
+                html += `<li>${file.webkitRelativePath || file.name}</li>`;
+            }
             html += '</ul>';
-            area.innerHTML = html;
-            document.querySelectorAll('.delete-col-btn').forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    const col = btn.dataset.col;
-                    if (!confirm(`Are you sure you want to delete collection '${col}'? This cannot be undone.`)) return;
-                    btn.disabled = true;
-                    btn.textContent = 'Deleting...';
-                    const resp = await fetch('/api/delete-collection', {
-                        method: 'POST',
-                        headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify({collection: col})
+            if (files.length > 10) {
+                html += `<span style='color:#888;'>...and ${files.length - 10} more files.</span>`;
+            }
+            listDiv.innerHTML = html;
+        });
+
+        // --- Import Knowledge AJAX ---
+        document.getElementById('import-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const statusDiv = document.getElementById('import-status');
+            statusDiv.textContent = 'Uploading and importing...';
+            const form = e.target;
+            const formData = new FormData(form);
+            try {
+                const response = await fetch('/api/import-knowledge', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    statusDiv.innerHTML = `<span style='color:green;'>Successfully imported ${result.imported_files} markdown files. Total segments stored: ${result.total_segments}.</span>`;
+                    form.reset();
+                    document.getElementById('selected-files-list').innerHTML = '';
+                    document.getElementById('selected-folder-path').innerHTML = '';
+                    // Refresh collections dropdown in case new collection was added
+                    await loadCollections();
+                } else {
+                    statusDiv.innerHTML = `<span style='color:red;'>Error: ${result.error || 'Unknown error'}</span>`;
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+            }
+        });
+
+        // --- Collections Dropdown and List Documents ---
+        async function loadCollections() {
+            const dropdown = document.getElementById('collections-dropdown');
+            dropdown.innerHTML = '';
+            try {
+                const resp = await fetch('/api/collections');
+                const data = await resp.json();
+                if (data.collections && data.collections.length > 0) {
+                    data.collections.forEach(col => {
+                        const opt = document.createElement('option');
+                        opt.value = col;
+                        opt.textContent = col;
+                        dropdown.appendChild(opt);
                     });
-                    const result = await resp.json();
-                    if (result.success) {
-                        btn.parentElement.remove();
-                    } else {
-                        alert('Failed to delete: ' + (result.error || 'Unknown error'));
-                        btn.disabled = false;
-                        btn.textContent = 'Delete';
-                    }
-                });
-            });
-        } catch (err) {
-            area.innerHTML = `<span style='color:red;'>Error loading collections: ${err}</span>`;
-        }
-    }
-
-
-    // --- Import Extension Filters ---
-    function updateImportAccept() {
-        const fileInput = document.getElementById('import-files');
-        const checked = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
-        fileInput.setAttribute('accept', checked.join(','));
-        // Trigger change event to refresh file list
-        fileInput.dispatchEvent(new Event('change'));
-    }
-    document.querySelectorAll('.ext-filter').forEach(cb => {
-        cb.addEventListener('change', updateImportAccept);
-    });
-
-    // --- Show Selected Files (Top 10) and Folder Name ---
-    document.getElementById('import-files').addEventListener('change', function(e) {
-        const files = Array.from(e.target.files);
-        const listDiv = document.getElementById('selected-files-list');
-        const folderDiv = document.getElementById('selected-folder-path');
-        if (!files.length) {
-            listDiv.textContent = '';
-            folderDiv.textContent = '';
-            return;
-        }
-        const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
-        const filtered = files.filter(f => exts.some(ext => f.name.endsWith(ext)));
-        const shown = filtered.slice(0, 10).map(f => f.name).join(', ');
-        listDiv.textContent = filtered.length ? `Selected (${filtered.length}): ${shown}${filtered.length > 10 ? ', ...' : ''}` : 'No matching files selected.';
-        let folder = '';
-        for (const file of files) {
-            if (file.webkitRelativePath) {
-                folder = file.webkitRelativePath.split('/')[0];
-                break;
-            }
-        }
-        if (folder) {
-            folderDiv.innerHTML = `<b>Selected folder:</b> <code>${folder}</code> <span title='Browsers do not expose the absolute path for privacy.' style='color:#888;'>(absolute path not available)</span>`;
-        } else {
-            folderDiv.innerHTML = `<span style='color:#888;'>Absolute path not available for privacy. Showing top-level folder name if possible.</span>`;
-        }
-        let html = '<b>Selected files:</b><ul style="margin:0.3em 0 0.3em 1em;">';
-        const showFiles = files.slice(0, 10);
-        for (const file of showFiles) {
-            html += `<li>${file.webkitRelativePath || file.name}</li>`;
-        }
-        html += '</ul>';
-        if (files.length > 10) {
-            html += `<span style='color:#888;'>...and ${files.length - 10} more files.</span>`;
-        }
-        listDiv.innerHTML = html;
-    });
-
-    // --- Import Knowledge AJAX ---
-    document.getElementById('import-form').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const statusDiv = document.getElementById('import-status');
-        statusDiv.textContent = 'Uploading and importing...';
-        const form = e.target;
-        const formData = new FormData(form);
-        try {
-            const response = await fetch('/api/import-knowledge', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await response.json();
-            if (result.success) {
-                statusDiv.innerHTML = `<span style='color:green;'>Successfully imported ${result.imported_files} markdown files. Total segments stored: ${result.total_segments}.</span>`;
-                form.reset();
-                document.getElementById('selected-files-list').innerHTML = '';
-                document.getElementById('selected-folder-path').innerHTML = '';
-                // Refresh collections dropdown in case new collection was added
-                await loadCollections();
-            } else {
-                statusDiv.innerHTML = `<span style='color:red;'>Error: ${result.error || 'Unknown error'}</span>`;
-            }
-        } catch (err) {
-            statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
-        }
-    });
-
-    // --- Collections Dropdown and List Documents ---
-    async function loadCollections() {
-        const dropdown = document.getElementById('collections-dropdown');
-        dropdown.innerHTML = '';
-        try {
-            const resp = await fetch('/api/collections');
-            const data = await resp.json();
-            if (data.collections && data.collections.length > 0) {
-                data.collections.forEach(col => {
+                } else {
                     const opt = document.createElement('option');
-                    opt.value = col;
-                    opt.textContent = col;
+                    opt.value = '';
+                    opt.textContent = 'No collections';
                     dropdown.appendChild(opt);
-                });
-            } else {
+                }
+            } catch (err) {
                 const opt = document.createElement('option');
                 opt.value = '';
-                opt.textContent = 'No collections';
+                opt.textContent = 'Error loading collections';
                 dropdown.appendChild(opt);
             }
-        } catch (err) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'Error loading collections';
-            dropdown.appendChild(opt);
         }
-    }
 
-    document.getElementById('list-docs-btn').addEventListener('click', async function() {
-        const dropdown = document.getElementById('collections-dropdown');
-        const col = dropdown.value;
-        const docsStatus = document.getElementById('docs-status');
-        const docViewer = document.getElementById('doc-viewer-area');
-        const docSelector = document.getElementById('doc-selector');
-        const docContentArea = document.getElementById('doc-content-area');
-        docViewer.style.display = 'none';
-        docSelector.innerHTML = '';
-        docContentArea.value = '';
-        if (!col) {
-            docsStatus.innerHTML = '<span style="color:red;">Please select a collection.</span>';
-            return;
-        }
-        docsStatus.textContent = 'Loading documents...';
-        try {
-            const resp = await fetch(`/api/collection-documents?collection=${encodeURIComponent(col)}`);
-            const data = await resp.json();
-            if (data.error) {
-                docsStatus.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
-            } else if (data.documents && data.documents.length > 0) {
-                docsStatus.innerHTML = `<span style='color:green;'>Found ${data.documents.length} documents.</span>`;
-                // Populate selector and textarea
-                docSelector.innerHTML = '';
-                data.documents.forEach((doc, i) => {
-                    const id = (data.ids && data.ids[i]) ? data.ids[i] : `#${i+1}`;
-                    const opt = document.createElement('option');
-                    opt.value = i;
-                    opt.textContent = id.length > 40 ? id.slice(0, 40) + '...' : id;
-                    docSelector.appendChild(opt);
-                });
-                docContentArea.value = data.documents[0] || '';
-                // Metadata display
-                const docMetadataArea = document.getElementById('doc-metadata-area');
-                function setMetadata(idx) {
-                    const meta = (data.metadatas && data.metadatas[idx]) ? data.metadatas[idx] : undefined;
-                    docMetadataArea.value = meta ? JSON.stringify(meta, null, 2) : '';
+        document.getElementById('list-docs-btn').addEventListener('click', async function () {
+            const dropdown = document.getElementById('collections-dropdown');
+            const col = dropdown.value;
+            const docsStatus = document.getElementById('docs-status');
+            const docViewer = document.getElementById('doc-viewer-area');
+            const docSelector = document.getElementById('doc-selector');
+            const docContentArea = document.getElementById('doc-content-area');
+            docViewer.style.display = 'none';
+            docSelector.innerHTML = '';
+            docContentArea.value = '';
+            if (!col) {
+                docsStatus.innerHTML = '<span style="color:red;">Please select a collection.</span>';
+                return;
+            }
+            docsStatus.textContent = 'Loading documents...';
+            try {
+                const resp = await fetch(`/api/collection-documents?collection=${encodeURIComponent(col)}`);
+                const data = await resp.json();
+                if (data.error) {
+                    docsStatus.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
+                } else if (data.documents && data.documents.length > 0) {
+                    docsStatus.innerHTML = `<span style='color:green;'>Found ${data.documents.length} documents.</span>`;
+                    // Populate selector and textarea
+                    docSelector.innerHTML = '';
+                    data.documents.forEach((doc, i) => {
+                        const id = (data.ids && data.ids[i]) ? data.ids[i] : `#${i + 1}`;
+                        const opt = document.createElement('option');
+                        opt.value = i;
+                        opt.textContent = id.length > 40 ? id.slice(0, 40) + '...' : id;
+                        docSelector.appendChild(opt);
+                    });
+                    docContentArea.value = data.documents[0] || '';
+                    // Metadata display
+                    const docMetadataArea = document.getElementById('doc-metadata-area');
+                    function setMetadata(idx) {
+                        const meta = (data.metadatas && data.metadatas[idx]) ? data.metadatas[idx] : undefined;
+                        docMetadataArea.value = meta ? JSON.stringify(meta, null, 2) : '';
+                    }
+                    setMetadata(0);
+                    docViewer.style.display = '';
+                    docSelector.onchange = function () {
+                        const idx = parseInt(this.value);
+                        docContentArea.value = data.documents[idx] || '';
+                        setMetadata(idx);
+                    };
+                } else {
+                    docsStatus.innerHTML = '<span>No documents found in this collection.</span>';
+                    docViewer.style.display = 'none';
                 }
-                setMetadata(0);
-                docViewer.style.display = '';
-                docSelector.onchange = function() {
-                    const idx = parseInt(this.value);
-                    docContentArea.value = data.documents[idx] || '';
-                    setMetadata(idx);
-                };
-            } else {
-                docsStatus.innerHTML = '<span>No documents found in this collection.</span>';
+            } catch (err) {
+                docsStatus.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
                 docViewer.style.display = 'none';
             }
-        } catch (err) {
-            docsStatus.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
-            docViewer.style.display = 'none';
-        }
-    });
+        });
 
-    // --- Query Segments (Semantic Search) ---
-    async function loadQueryCollections() {
-        const dropdown = document.getElementById('query-collections-dropdown');
-        dropdown.innerHTML = '';
-        try {
-            const resp = await fetch('/api/collections');
-            const data = await resp.json();
-            if (data.collections && data.collections.length > 0) {
-                data.collections.forEach(col => {
+        // --- Query Segments (Semantic Search) ---
+        async function loadQueryCollections() {
+            const dropdown = document.getElementById('query-collections-dropdown');
+            dropdown.innerHTML = '';
+            try {
+                const resp = await fetch('/api/collections');
+                const data = await resp.json();
+                if (data.collections && data.collections.length > 0) {
+                    data.collections.forEach(col => {
+                        const opt = document.createElement('option');
+                        opt.value = col;
+                        opt.textContent = col;
+                        dropdown.appendChild(opt);
+                    });
+                } else {
                     const opt = document.createElement('option');
-                    opt.value = col;
-                    opt.textContent = col;
+                    opt.value = '';
+                    opt.textContent = 'No collections';
                     dropdown.appendChild(opt);
-                });
-            } else {
+                }
+            } catch (err) {
                 const opt = document.createElement('option');
                 opt.value = '';
-                opt.textContent = 'No collections';
+                opt.textContent = 'Error loading collections';
                 dropdown.appendChild(opt);
             }
-        } catch (err) {
-            const opt = document.createElement('option');
-            opt.value = '';
-            opt.textContent = 'Error loading collections';
-            dropdown.appendChild(opt);
         }
-    }
 
-    document.getElementById('run-query-btn').addEventListener('click', async function() {
-        const col = document.getElementById('query-collections-dropdown').value;
-        const query = document.getElementById('query-text').value;
-        const limit = document.getElementById('query-limit').value || 3;
-        const statusDiv = document.getElementById('query-status');
-        const resultsList = document.getElementById('query-results');
-        resultsList.innerHTML = '';
-        if (!col) {
-            statusDiv.innerHTML = '<span style="color:red;">Please select a collection.</span>';
-            return;
-        }
-        if (!query) {
-            statusDiv.innerHTML = '<span style="color:red;">Please enter a query.</span>';
-            return;
-        }
-        statusDiv.textContent = 'Searching...';
-        try {
-            const resp = await fetch(`/api/query-segments?collection=${encodeURIComponent(col)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
-            const data = await resp.json();
-            if (data.error) {
-                statusDiv.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
-            } else if (data.documents && data.documents.length > 0) {
-                statusDiv.innerHTML = `<span style='color:green;'>Top ${data.documents.length} results:</span>`;
-                data.documents.forEach((doc, i) => {
-                    const li = document.createElement('li');
-                    const meta = data.metadatas && data.metadatas[i] ? JSON.stringify(data.metadatas[i]) : '';
-                    const score = data.distances && data.distances[i] !== undefined ? ` (distance: ${data.distances[i].toFixed(4)})` : '';
-                    li.innerHTML = `<b>#${i+1}</b> ${doc.length > 100 ? doc.slice(0, 100) + '...' : doc} <small>${meta}${score}</small>`;
-                    resultsList.appendChild(li);
-                });
-            } else {
-                statusDiv.innerHTML = '<span>No relevant segments found.</span>';
+        document.getElementById('run-query-btn').addEventListener('click', async function () {
+            const col = document.getElementById('query-collections-dropdown').value;
+            const query = document.getElementById('query-text').value;
+            const limit = document.getElementById('query-limit').value || 3;
+            const statusDiv = document.getElementById('query-status');
+            const resultsList = document.getElementById('query-results');
+            resultsList.innerHTML = '';
+            if (!col) {
+                statusDiv.innerHTML = '<span style="color:red;">Please select a collection.</span>';
+                return;
             }
-        } catch (err) {
-            statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
-        }
-    });
+            if (!query) {
+                statusDiv.innerHTML = '<span style="color:red;">Please enter a query.</span>';
+                return;
+            }
+            statusDiv.textContent = 'Searching...';
+            try {
+                const resp = await fetch(`/api/query-segments?collection=${encodeURIComponent(col)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+                const data = await resp.json();
+                if (data.error) {
+                    statusDiv.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
+                } else if (data.documents && data.documents.length > 0) {
+                    statusDiv.innerHTML = `<span style='color:green;'>Top ${data.documents.length} results:</span>`;
+                    data.documents.forEach((doc, i) => {
+                        const li = document.createElement('li');
+                        const meta = data.metadatas && data.metadatas[i] ? JSON.stringify(data.metadatas[i]) : '';
+                        const score = data.distances && data.distances[i] !== undefined ? ` (distance: ${data.distances[i].toFixed(4)})` : '';
+                        li.innerHTML = `<b>#${i + 1}</b> ${doc.length > 100 ? doc.slice(0, 100) + '...' : doc} <small>${meta}${score}</small>`;
+                        resultsList.appendChild(li);
+                    });
+                } else {
+                    statusDiv.innerHTML = '<span>No relevant segments found.</span>';
+                }
+            } catch (err) {
+                statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+            }
+        });
 
-    // Load collections on page load for both dropdowns
-    loadCollections();
-    loadQueryCollections();
+        // Load collections on page load for both dropdowns
+        loadCollections();
+        loadQueryCollections();
+
+        // --- Background Jobs Tab Management ---
+        let jobsAutoRefresh = true;
+        let jobsRefreshInterval;
+
+        async function loadBackgroundJobs() {
+            try {
+                const [jobsResponse, statsResponse] = await Promise.all([
+                    fetch('/api/background-jobs'),
+                    fetch('/api/background-jobs/stats')
+                ]);
+
+                const jobsData = await jobsResponse.json();
+                const statsData = await statsResponse.json();
+
+                updateJobsDashboard(jobsData, statsData);
+                updateJobsTable(jobsData.jobs || []);
+            } catch (error) {
+                console.error('Error loading background jobs:', error);
+                document.getElementById('jobs-table-body').innerHTML =
+                    '<tr><td colspan="7" style="text-align:center;color:red;">Error loading jobs: ' + error.message + '</td></tr>';
+            }
+        }
+
+        function updateJobsDashboard(jobsData, statsData) {
+            document.getElementById('running-count').textContent = jobsData.running_count || 0;
+            document.getElementById('completed-count').textContent = jobsData.total_count - jobsData.running_count || 0;
+            document.getElementById('failed-count').textContent = statsData.total_failed || 0;
+            document.getElementById('avg-runtime').textContent = formatDuration(statsData.average_runtime || 0);
+            document.getElementById('cpu-usage').textContent = Math.round(statsData.system_load?.cpu_usage || 0) + '%';
+            document.getElementById('memory-usage').textContent = Math.round(statsData.system_load?.memory_usage || 0) + '%';
+        }
+
+        function updateJobsTable(jobs) {
+            const tbody = document.getElementById('jobs-table-body');
+            const statusFilter = document.getElementById('status-filter').value;
+            const searchTerm = document.getElementById('job-search').value.toLowerCase();
+
+            // Filter jobs
+            let filteredJobs = jobs.filter(job => {
+                const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+                const matchesSearch = !searchTerm ||
+                    job.token.toLowerCase().includes(searchTerm) ||
+                    (job.command && job.command.toLowerCase().includes(searchTerm));
+                return matchesStatus && matchesSearch;
+            });
+
+            if (filteredJobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#666;">No jobs found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            filteredJobs.forEach(job => {
+                const row = createJobRow(job);
+                tbody.appendChild(row);
+            });
+        }
+
+        function createJobRow(job) {
+            const row = document.createElement('tr');
+            row.className = `job-row job-${job.status}`;
+
+            const runtime = calculateRuntime(job);
+            const cpuPercent = job.cpu_percent || '-';
+            const memoryMB = job.memory_mb ? formatMemory(job.memory_mb) : '-';
+
+            row.innerHTML = `
+                <td><code class="token" title="${job.token}">${job.token.substring(0, 8)}...</code></td>
+                <td><span class="status-badge status-${job.status}">${job.status}</span></td>
+                <td class="command" title="${job.command || 'N/A'}">${truncateCommand(job.command || 'N/A')}</td>
+                <td>${runtime}</td>
+                <td>${cpuPercent}${typeof cpuPercent === 'number' ? '%' : ''}</td>
+                <td>${memoryMB}</td>
+                <td>
+                    <button class="job-action-btn btn-details" onclick="showJobDetails('${job.token}')">Details</button>
+                    ${job.status === 'running' ? `<button class="job-action-btn btn-terminate" onclick="terminateJob('${job.token}')">Terminate</button>` : ''}
+                </td>
+            `;
+
+            return row;
+        }
+
+        function calculateRuntime(job) {
+            if (job.status === 'running' && job.start_time) {
+                const runtime = Date.now() / 1000 - job.start_time;
+                return formatDuration(runtime);
+            } else if (job.duration !== undefined) {
+                return formatDuration(job.duration);
+            }
+            return '-';
+        }
+
+        function formatDuration(seconds) {
+            if (seconds < 60) {
+                return Math.round(seconds) + 's';
+            } else if (seconds < 3600) {
+                return Math.round(seconds / 60) + 'm';
+            } else {
+                return Math.round(seconds / 3600 * 10) / 10 + 'h';
+            }
+        }
+
+        function formatMemory(mb) {
+            if (mb < 1024) {
+                return Math.round(mb) + 'MB';
+            } else {
+                return Math.round(mb / 1024 * 10) / 10 + 'GB';
+            }
+        }
+
+        function truncateCommand(command) {
+            if (!command) return 'N/A';
+            return command.length > 50 ? command.substring(0, 50) + '...' : command;
+        }
+
+        // Auto-refresh functionality
+        function startJobsAutoRefresh() {
+            if (jobsRefreshInterval) clearInterval(jobsRefreshInterval);
+            jobsRefreshInterval = setInterval(loadBackgroundJobs, 10000); // 10 seconds
+        }
+
+        function stopJobsAutoRefresh() {
+            if (jobsRefreshInterval) {
+                clearInterval(jobsRefreshInterval);
+                jobsRefreshInterval = null;
+            }
+        }
+
+        // Job actions
+        async function terminateJob(token) {
+            if (!confirm('Are you sure you want to terminate this job?')) return;
+
+            try {
+                const response = await fetch(`/api/background-jobs/${token}/terminate`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    loadBackgroundJobs(); // Refresh the list
+                    alert('Job terminated successfully.');
+                } else {
+                    alert('Failed to terminate job: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error terminating job: ' + error.message);
+            }
+        }
+
+        async function showJobDetails(token) {
+            try {
+                const response = await fetch(`/api/background-jobs/${token}`);
+                const job = await response.json();
+
+                // Populate and show modal
+                document.getElementById('job-details-content').innerHTML = createJobDetailsHTML(job);
+                document.getElementById('job-details-modal').style.display = 'block';
+            } catch (error) {
+                alert('Error loading job details: ' + error.message);
+            }
+        }
+
+        function createJobDetailsHTML(job) {
+            const startTime = job.start_time ? new Date(job.start_time * 1000).toLocaleString() : 'N/A';
+            const endTime = job.end_time ? new Date(job.end_time * 1000).toLocaleString() : 'N/A';
+
+            return `
+                <div style="margin-bottom: 1em;">
+                    <h4>Job Information</h4>
+                    <p><strong>Token:</strong> <code>${job.token}</code></p>
+                    <p><strong>Status:</strong> <span class="status-badge status-${job.status}">${job.status}</span></p>
+                    <p><strong>Command:</strong> <code>${job.command || 'N/A'}</code></p>
+                    <p><strong>Start Time:</strong> ${startTime}</p>
+                    <p><strong>End Time:</strong> ${endTime}</p>
+                    <p><strong>Duration:</strong> ${job.duration ? formatDuration(job.duration) : 'N/A'}</p>
+                    <p><strong>PID:</strong> ${job.pid || 'N/A'}</p>
+                    <p><strong>Exit Code:</strong> ${job.exit_code !== undefined ? job.exit_code : 'N/A'}</p>
+                </div>
+
+                ${job.output ? `
+                <div style="margin-bottom: 1em;">
+                    <h4>Output</h4>
+                    <pre style="background: #f8f9fa; padding: 1em; border-radius: 4px; max-height: 200px; overflow-y: auto;">${job.output}</pre>
+                </div>
+                ` : ''}
+
+                ${job.error ? `
+                <div style="margin-bottom: 1em;">
+                    <h4>Error Output</h4>
+                    <pre style="background: #f8d7da; padding: 1em; border-radius: 4px; max-height: 200px; overflow-y: auto;">${job.error}</pre>
+                </div>
+                ` : ''}
+
+                ${job.cpu_percent !== undefined || job.memory_mb !== undefined ? `
+                <div style="margin-bottom: 1em;">
+                    <h4>Resource Usage</h4>
+                    <p><strong>CPU:</strong> ${job.cpu_percent || 'N/A'}${job.cpu_percent ? '%' : ''}</p>
+                    <p><strong>Memory:</strong> ${job.memory_mb ? formatMemory(job.memory_mb) : 'N/A'}</p>
+                </div>
+                ` : ''}
+            `;
+        }
+
+        // Event listeners for jobs tab
+        document.getElementById('refresh-jobs').addEventListener('click', loadBackgroundJobs);
+
+        document.getElementById('auto-refresh').addEventListener('change', function () {
+            jobsAutoRefresh = this.checked;
+            if (jobsAutoRefresh && document.getElementById('jobs-tab').style.display !== 'none') {
+                startJobsAutoRefresh();
+            } else {
+                stopJobsAutoRefresh();
+            }
+        });
+
+        document.getElementById('status-filter').addEventListener('change', function () {
+            const tbody = document.getElementById('jobs-table-body');
+            if (tbody.children.length > 0) {
+                // Re-filter existing data instead of making new API call
+                loadBackgroundJobs();
+            }
+        });
+
+        document.getElementById('job-search').addEventListener('input', function () {
+            const tbody = document.getElementById('jobs-table-body');
+            if (tbody.children.length > 0) {
+                // Re-filter existing data instead of making new API call
+                loadBackgroundJobs();
+            }
+        });
+
+        // Modal close functionality
+        document.querySelector('#job-details-modal .close').addEventListener('click', function () {
+            document.getElementById('job-details-modal').style.display = 'none';
+        });
+
+        window.addEventListener('click', function (event) {
+            const modal = document.getElementById('job-details-modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        // Make functions globally available
+        window.terminateJob = terminateJob;
+        window.showJobDetails = showJobDetails;
     </script>
 </body>
+
 </html>
