@@ -76,19 +76,19 @@ vscode.window.onDidChangeActiveTextEditor(editor => {
 const AI_CONTEXT_INDICATORS = [
     // Conversation starters
     /^(User:|Human:|Assistant:|AI:)/m,
-    
+
     // AI model signatures
     /Claude|GPT|Copilot|Cursor|Windsurf/i,
-    
+
     // Tool call patterns
     /tool_calls?|function_calls?|execute/i,
-    
+
     // Conversation flow
     /```[\s\S]*```/g, // Code blocks in chat
 ];
 
 function isAIConversationWindow(text: string): boolean {
-    return AI_CONTEXT_INDICATORS.some(pattern => 
+    return AI_CONTEXT_INDICATORS.some(pattern =>
         pattern.test(text)
     );
 }
@@ -98,12 +98,12 @@ function isAIConversationWindow(text: string): boolean {
 ```typescript
 function analyzeWindowContent(document: vscode.TextDocument) {
     const text = document.getText();
-    
+
     // Check if this looks like an AI conversation
     const hasAIIndicators = isAIConversationWindow(text);
     const hasRecentActivity = wasRecentlyModified(document);
     const hasToolCallPatterns = containsToolCallPatterns(text);
-    
+
     return {
         isAIWindow: hasAIIndicators,
         priority: calculatePriority(hasRecentActivity, hasToolCallPatterns),
@@ -118,7 +118,7 @@ function analyzeWindowContent(document: vscode.TextDocument) {
 ```typescript
 vscode.workspace.onDidChangeTextDocument(event => {
     const document = event.document;
-    
+
     // Only check recently changed documents
     if (isRecentChange(event) && isAIConversationWindow(document.getText())) {
         // Check for trigger patterns in the changes
@@ -174,17 +174,17 @@ function detectWindsurfAIPanel(): vscode.TextDocument | null {
 class AIDetectionManager {
     private monitoredDocuments = new Set<string>();
     private checkInterval: NodeJS.Timeout;
-    
+
     start() {
         // Monitor all documents, prioritize AI conversations
         this.checkInterval = setInterval(() => {
             this.scanAllDocuments();
         }, 500);
-        
+
         // React to document changes immediately
         vscode.workspace.onDidChangeTextDocument(this.onDocumentChange);
     }
-    
+
     private scanAllDocuments() {
         vscode.workspace.textDocuments.forEach(doc => {
             if (this.shouldMonitorDocument(doc)) {
@@ -192,11 +192,10 @@ class AIDetectionManager {
             }
         });
     }
-    
     private shouldMonitorDocument(doc: vscode.TextDocument): boolean {
         // Check if document contains AI conversation
         const text = doc.getText();
-        return isAIConversationWindow(text) && 
+        return isAIConversationWindow(text) &&
                wasRecentlyModified(doc);
     }
 }
@@ -213,7 +212,7 @@ interface DocumentPriority {
 
 class SmartMonitoring {
     private documentPriorities: DocumentPriority[] = [];
-    
+
     updatePriorities() {
         this.documentPriorities = vscode.workspace.textDocuments
             .map(doc => ({
@@ -224,19 +223,19 @@ class SmartMonitoring {
             }))
             .sort((a, b) => b.priority - a.priority);
     }
-    
+
     private calculatePriority(doc: vscode.TextDocument): number {
         let priority = 0;
-        
+
         // Higher priority for active window
         if (doc === vscode.window.activeTextEditor?.document) priority += 100;
-        
+
         // Higher priority for AI conversation windows
         if (isAIConversationWindow(doc.getText())) priority += 50;
-        
+
         // Higher priority for recently modified
         if (wasRecentlyModified(doc)) priority += 25;
-        
+
         return priority;
     }
 }
@@ -250,15 +249,15 @@ class OptimizedDetection {
     checkForChanges(doc: vscode.TextDocument): boolean {
         const currentContent = doc.getText();
         const lastContent = this.lastKnownContent.get(doc.uri.toString());
-        
+
         if (currentContent !== lastContent) {
             this.lastKnownContent.set(doc.uri.toString(), currentContent);
-            
+
             // Only check the new content, not the entire document
             const newContent = this.extractNewContent(currentContent, lastContent);
             return this.checkTriggersInText(newContent);
         }
-        
+
         return false;
     }
 }
@@ -274,4 +273,4 @@ The extension will:
 4. **Performance Optimized**: Only check relevant windows and new content
 5. **IDE-Specific**: Adapt to Cursor, Windsurf, and other AI IDE patterns
 
-This approach ensures the extension catches AI pause messages regardless of which window or panel they appear in, while maintaining good performance and avoiding false positives. 
+This approach ensures the extension catches AI pause messages regardless of which window or panel they appear in, while maintaining good performance and avoiding false positives.
