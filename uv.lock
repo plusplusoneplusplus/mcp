@@ -2204,6 +2204,11 @@ dev = [
     { name = "mypy" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "azure-identity", specifier = ">=1.15.0" },
@@ -2251,6 +2256,9 @@ requires-dist = [
     { name = "zstandard", specifier = ">=0.21.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.3.5" }]
 
 [[package]]
 name = "mdurl"
