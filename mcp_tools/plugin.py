@@ -5,6 +5,7 @@ import logging
 import os
 import pkgutil
 import sys
+import time
 from typing import Dict, List, Type, Set, Optional, Any
 from pathlib import Path
 
@@ -12,6 +13,19 @@ from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin_config import config
 
 logger = logging.getLogger(__name__)
+
+# Simple timing utility for plugin discovery
+from contextlib import contextmanager
+
+@contextmanager
+def time_plugin_operation(name: str):
+    start_time = time.time()
+    logger.info(f"🚀 Starting {name}...")
+    try:
+        yield
+    finally:
+        duration = time.time() - start_time
+        logger.info(f"✅ {name} completed in {duration:.2f}s")
 
 
 class PluginRegistry:
@@ -569,49 +583,50 @@ def discover_and_register_tools():
 
     # Load YAML tools first if enabled
     if config.register_yaml_tools:
-        logger.info("Attempting to discover YAML tools...")
         try:
-            # Use a dynamic import to avoid circular imports
-            yaml_tools_module = importlib.import_module("mcp_tools.yaml_tools")
+            with time_plugin_operation("YAML Tools Discovery"):
+                logger.info("Attempting to discover YAML tools...")
+                # Use a dynamic import to avoid circular imports
+                yaml_tools_module = importlib.import_module("mcp_tools.yaml_tools")
 
-            # Get YAML tool names before registering with error handling
-            try:
-                get_yaml_names = getattr(yaml_tools_module, "get_yaml_tool_names", None)
-                if get_yaml_names:
-                    yaml_tool_names = get_yaml_names()
-                    registry.add_yaml_tool_names(yaml_tool_names)
-                    logger.info(f"Found {len(yaml_tool_names)} YAML tool names")
-                else:
-                    logger.warning(
-                        "get_yaml_tool_names function not found in yaml_tools module"
-                    )
-            except Exception as e:
-                logger.error(f"Error getting YAML tool names: {e}")
-                failed_tools.append(f"YAML tool names discovery: {str(e)}")
-
-            # Register YAML tools with error handling
-            try:
-                yaml_tools_function = getattr(
-                    yaml_tools_module, "discover_and_register_yaml_tools", None
-                )
-                if yaml_tools_function:
-                    yaml_tool_classes = yaml_tools_function()
-                    if yaml_tool_classes:
-                        successful_tools.extend(
-                            [f"YAML:{cls.__name__}" for cls in yaml_tool_classes]
-                        )
-                        logger.info(
-                            f"Successfully registered {len(yaml_tool_classes)} YAML tools"
-                        )
+                # Get YAML tool names before registering with error handling
+                try:
+                    get_yaml_names = getattr(yaml_tools_module, "get_yaml_tool_names", None)
+                    if get_yaml_names:
+                        yaml_tool_names = get_yaml_names()
+                        registry.add_yaml_tool_names(yaml_tool_names)
+                        logger.info(f"Found {len(yaml_tool_names)} YAML tool names")
                     else:
-                        logger.info("No YAML tools were registered")
-                else:
-                    logger.warning(
-                        "discover_and_register_yaml_tools function not found"
+                        logger.warning(
+                            "get_yaml_tool_names function not found in yaml_tools module"
+                        )
+                except Exception as e:
+                    logger.error(f"Error getting YAML tool names: {e}")
+                    failed_tools.append(f"YAML tool names discovery: {str(e)}")
+
+                # Register YAML tools with error handling
+                try:
+                    yaml_tools_function = getattr(
+                        yaml_tools_module, "discover_and_register_yaml_tools", None
                     )
-            except Exception as e:
-                logger.error(f"Error registering YAML tools: {e}")
-                failed_tools.append(f"YAML tools registration: {str(e)}")
+                    if yaml_tools_function:
+                        yaml_tool_classes = yaml_tools_function()
+                        if yaml_tool_classes:
+                            successful_tools.extend(
+                                [f"YAML:{cls.__name__}" for cls in yaml_tool_classes]
+                            )
+                            logger.info(
+                                f"Successfully registered {len(yaml_tool_classes)} YAML tools"
+                            )
+                        else:
+                            logger.info("No YAML tools were registered")
+                    else:
+                        logger.warning(
+                            "discover_and_register_yaml_tools function not found"
+                        )
+                except Exception as e:
+                    logger.error(f"Error registering YAML tools: {e}")
+                    failed_tools.append(f"YAML tools registration: {str(e)}")
         except ImportError as e:
             logger.error(f"Could not import YAML tools module: {e}")
             failed_tools.append(f"YAML tools module import: {str(e)}")
@@ -623,37 +638,40 @@ def discover_and_register_tools():
 
     # Then discover code-based tools if enabled
     if config.register_code_tools:
-        logger.info("Attempting to discover code-based tools...")
+        with time_plugin_operation("Code-based Tools Discovery"):
+            logger.info("Attempting to discover code-based tools...")
 
-        # Discover tools in the mcp_tools package with error handling
-        try:
-            registry.discover_tools("mcp_tools")
-            logger.info("Successfully completed mcp_tools package discovery")
-        except Exception as e:
-            logger.error(f"Error discovering tools in mcp_tools package: {e}")
-            failed_tools.append(f"mcp_tools package discovery: {str(e)}")
+            # Discover tools in the mcp_tools package with error handling
+            try:
+                with time_plugin_operation("mcp_tools Package Discovery"):
+                    registry.discover_tools("mcp_tools")
+                    logger.info("Successfully completed mcp_tools package discovery")
+            except Exception as e:
+                logger.error(f"Error discovering tools in mcp_tools package: {e}")
+                failed_tools.append(f"mcp_tools package discovery: {str(e)}")
 
-        # Discover tools in plugin root directories with error handling
-        try:
-            plugin_roots = config.get_plugin_roots()
-            logger.info(f"Discovering tools in {len(plugin_roots)} plugin directories")
+            # Discover tools in plugin root directories with error handling
+            try:
+                plugin_roots = config.get_plugin_roots()
+                logger.info(f"Discovering tools in {len(plugin_roots)} plugin directories")
 
-            for plugin_dir in plugin_roots:
-                try:
-                    registry.discover_plugin_directory(plugin_dir)
-                    logger.debug(
-                        f"Successfully processed plugin directory: {plugin_dir}"
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error discovering tools in plugin directory {plugin_dir}: {e}"
-                    )
-                    failed_tools.append(f"Plugin directory {plugin_dir}: {str(e)}")
-        except Exception as e:
-            logger.error(
-                f"Error getting plugin roots or processing plugin directories: {e}"
-            )
-            failed_tools.append(f"Plugin directories discovery: {str(e)}")
+                with time_plugin_operation("Plugin Directories Discovery"):
+                    for plugin_dir in plugin_roots:
+                        try:
+                            registry.discover_plugin_directory(plugin_dir)
+                            logger.debug(
+                                f"Successfully processed plugin directory: {plugin_dir}"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Error discovering tools in plugin directory {plugin_dir}: {e}"
+                            )
+                            failed_tools.append(f"Plugin directory {plugin_dir}: {str(e)}")
+            except Exception as e:
+                logger.error(
+                    f"Error getting plugin roots or processing plugin directories: {e}"
+                )
+                failed_tools.append(f"Plugin directories discovery: {str(e)}")
     else:
         logger.info("Code tool registration is disabled")
 

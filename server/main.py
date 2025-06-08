@@ -5,7 +5,17 @@ import click
 import json
 import datetime
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union, List
+
+# Import startup tracing utilities
+from server.startup_tracer import (
+    time_operation, 
+    trace_startup_time, 
+    log_startup_summary, 
+    save_startup_report,
+    start_timing,
+    finish_timing
+)
 
 # Starlette and uvicorn imports
 from starlette.applications import Starlette
@@ -20,7 +30,7 @@ import uvicorn
 # MCP imports
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
-from mcp.types import TextContent, Tool, PromptsCapability
+from mcp.types import TextContent, ImageContent, Tool, PromptsCapability
 
 # Import tools directly from mcp_tools
 from mcp_tools.plugin import registry, discover_and_register_tools
@@ -31,14 +41,17 @@ from mcp_tools.plugin_config import config
 
 from config import env
 
-import image_tool
+from server import image_tool
 
 # Create the server
 server = Server("mymcp")
 
-# Initialize tools system directly
-discover_and_register_tools()
-injector.resolve_all_dependencies()
+# Initialize tools system directly with tracing
+with time_operation("Tool Discovery and Registration"):
+    discover_and_register_tools()
+
+with time_operation("Dependency Resolution"):
+    injector.resolve_all_dependencies()
 
 # Get all tools and filtered active tools
 all_tool_instances = list(injector.get_all_instances().values())
@@ -74,7 +87,7 @@ for tool in active_tool_instances:
 
 
 # Tool history recording functions
-def get_new_invocation_dir(tool_name: str) -> Path:
+def get_new_invocation_dir(tool_name: str) -> Optional[Path]:
     """Create and return a new directory for this tool invocation."""
     if not env.is_tool_history_enabled():
         return None
@@ -147,7 +160,7 @@ async def list_tools() -> list[Tool]:
 
 
 @server.call_tool()
-async def call_tool_handler(name: str, arguments: dict) -> list[TextContent]:
+async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextContent, ImageContent]]:
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
     )
@@ -284,71 +297,80 @@ starlette_app = Starlette(routes=routes)
 
 
 # Setup function for logging and environment
+@trace_startup_time("Server Setup")
 def setup():
-    # Setup logging
-    SCRIPT_DIR = Path(__file__).resolve().parent
-    # Ensure the logs directory exists
-    log_dir = SCRIPT_DIR / ".logs"
-    log_dir.mkdir(exist_ok=True)
+    with time_operation("Logging Configuration"):
+        # Setup logging
+        SCRIPT_DIR = Path(__file__).resolve().parent
+        # Ensure the logs directory exists
+        log_dir = SCRIPT_DIR / ".logs"
+        log_dir.mkdir(exist_ok=True)
 
-    # Use Path consistently for the log file path
-    log_file = log_dir / "server.log"
+        # Use Path consistently for the log file path
+        log_file = log_dir / "server.log"
 
-    # Reset the logging configuration
-    # This is important as basicConfig won't do anything if the root logger
-    # already has handlers configured
-    for handler in logging.root.handlers[:]:
-        logging.root.removeHandler(handler)
-        handler.close()
+        # Reset the logging configuration
+        # This is important as basicConfig won't do anything if the root logger
+        # already has handlers configured
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+            handler.close()
 
-    # Configure logging with explicit handler setup
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
+        # Configure logging with explicit handler setup
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
 
-    # File handler
-    file_handler = logging.FileHandler(str(log_file.absolute()))
-    file_handler.setLevel(logging.DEBUG)
+        # File handler
+        file_handler = logging.FileHandler(str(log_file.absolute()))
+        file_handler.setLevel(logging.DEBUG)
 
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
+        # Console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
 
-    # Formatter
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    file_handler.setFormatter(formatter)
-    console_handler.setFormatter(formatter)
+        # Formatter
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
 
-    # Add handlers
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+        # Add handlers
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
 
-    # Initialize environment using the new module
-    env.load()
-    logger.info(
-        f"Initialized environment: Git root={env.get_git_root()}"
-    )
+    with time_operation("Environment Initialization"):
+        # Initialize environment using the new module
+        env.load()
+        logger.info(
+            f"Initialized environment: Git root={env.get_git_root()}"
+        )
 
-    # Log tool history settings
-    if env.is_tool_history_enabled():
-        history_path = get_new_invocation_dir("NEW_SERVER_START")
-        logger.info(f"Tool history recording is enabled. Recording to: {history_path}")
-    else:
-        logger.info("Tool history recording is disabled")
+        # Log tool history settings
+        if env.is_tool_history_enabled():
+            history_path = get_new_invocation_dir("NEW_SERVER_START")
+            logger.info(f"Tool history recording is enabled. Recording to: {history_path}")
+        else:
+            logger.info("Tool history recording is disabled")
 
 
 @click.command()
 @click.option('--port', default=None, type=int, help='Port to run the server on')
+@trace_startup_time("Main Server Startup")
 def main(port: Optional[int] = None) -> None:
-    # Run setup first (non-async)
-    setup()
+    with time_operation("Complete Server Initialization"):
+        # Run setup first (non-async)
+        setup()
 
-    # Determine port from CLI argument, environment variable, or default
-    if port is None:
-        port = int(os.environ.get('SERVER_PORT', 8000))
+        # Determine port from CLI argument, environment variable, or default
+        if port is None:
+            port = int(os.environ.get('SERVER_PORT', 8000))
 
-    logging.info(f"Starting server on port {port}")
+        logging.info(f"Starting server on port {port}")
+        
+        # Log startup summary before starting the server
+        log_startup_summary()
+        save_startup_report()
 
     # Then run uvicorn directly without nested asyncio.run
     uvicorn.run(starlette_app, host="0.0.0.0", port=port)
