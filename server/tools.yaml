@@ -127,11 +127,15 @@ tools:
       windows: powershell -file {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.ps1
       darwin: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.sh
       linux: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.sh
-    # Post-processing configuration to control output attachment
+    # Post-processing configuration to control output attachment and security
     post_processing:
       attach_stdout: true              # Include stdout in output (default: true)
       attach_stderr: false             # Include stderr in output (default: true)
       stderr_on_failure_only: true    # Only include stderr if return_code != 0 (default: false)
+      security_filtering:
+        enabled: true                  # Enable security filtering for sensitive data
+        apply_to: ["stdout", "stderr"] # Filter both stdout and stderr (default: both)
+        log_findings: true             # Log security alerts (default: true)
     inputSchema:
       type: object
       properties:
@@ -198,6 +202,94 @@ tools:
           type: string
           description: Path to configuration file to validate
           default: "config.yaml"
+
+  # Example: Database migration tool with security filtering
+  db_migrate:
+    enabled: false  # Disabled by default for security
+    name: db_migrate
+    description: |
+      Run database migrations with automatic secret redaction.
+      Use the token to query the status (tool/query_script_status).
+    type: script
+    scripts:
+      windows: powershell -command "echo 'Migration started'; echo 'DB_PASSWORD=secret123'; echo 'Migration completed'"
+      darwin: bash -c "echo 'Migration started'; echo 'DB_PASSWORD=secret123'; echo 'Migration completed'"
+      linux: bash -c "echo 'Migration started'; echo 'DB_PASSWORD=secret123'; echo 'Migration completed'"
+    post_processing:
+      attach_stdout: true
+      attach_stderr: true
+      security_filtering:
+        enabled: true                  # Critical for database operations
+        apply_to: ["stdout", "stderr"] # Filter all outputs
+        log_findings: true             # Log security alerts
+    inputSchema:
+      type: object
+      properties:
+        migration_name:
+          type: string
+          description: Name of the migration to run
+        dry_run:
+          type: boolean
+          description: Run in dry-run mode without making changes
+          default: true
+      required:
+        - migration_name
+
+  # Example: Backup tool with stdout-only security filtering
+  backup_database:
+    enabled: false  # Disabled by default for security
+    name: backup_database
+    description: |
+      Create database backup with security filtering on output only.
+      Use the token to query the status (tool/query_script_status).
+    type: script
+    scripts:
+      windows: powershell -command "echo 'Backup started'; echo 'Connection string: server=db.example.com;password=mypassword123'; echo 'Backup completed'"
+      darwin: bash -c "echo 'Backup started'; echo 'Connection string: server=db.example.com;password=mypassword123'; echo 'Backup completed'"
+      linux: bash -c "echo 'Backup started'; echo 'Connection string: server=db.example.com;password=mypassword123'; echo 'Backup completed'"
+    post_processing:
+      attach_stdout: true
+      attach_stderr: true
+      security_filtering:
+        enabled: true
+        apply_to: ["stdout"]           # Only filter stdout, allow stderr for debugging
+        log_findings: true
+    inputSchema:
+      type: object
+      properties:
+        backup_name:
+          type: string
+          description: Name for the backup file
+        compress:
+          type: boolean
+          description: Compress the backup file
+          default: true
+      required:
+        - backup_name
+
+  # Demo tool for testing security filtering
+  security_demo:
+    enabled: true
+    name: security_demo
+    description: |
+      Demo tool that outputs various secrets to test security filtering.
+      Use the token to query the status (tool/query_script_status).
+    type: script
+    scripts:
+      darwin: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_security_demo.sh
+      linux: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_security_demo.sh
+      windows: powershell -command "echo 'Demo script'; echo 'DB_PASSWORD=secret123'; echo 'API_KEY=abc123def456'"
+    post_processing:
+      attach_stdout: true
+      attach_stderr: true
+      security_filtering:
+        enabled: true                  # Enable security filtering
+        apply_to: ["stdout", "stderr"] # Filter both outputs
+        log_findings: true             # Log security alerts
+    inputSchema:
+      type: object
+      properties: {}
+      required: []
         timeout:
           type: number
           description: Optional timeout in seconds

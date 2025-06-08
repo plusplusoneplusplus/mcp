@@ -9,11 +9,12 @@ import os
 import inspect
 import yaml
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Union, Type
+from typing import Dict, Any, List, Optional, Union, Type, Tuple
 
 from mcp_tools.interfaces import ToolInterface, CommandExecutorInterface
 from mcp_tools.plugin import register_tool, registry
 from mcp_tools.dependency import injector
+from utils.secret_scanner import redact_secrets
 
 # Configuration
 DEFAULT_WAIT_FOR_QUERY = True  # Default wait for task
@@ -293,6 +294,123 @@ class YamlToolBase(ToolInterface):
 
         return processed_result
 
+    def _apply_security_filtering(self, stdout: str, stderr: str, config: Dict) -> Tuple[str, str]:
+        """Apply security filtering using existing proven security detection.
+
+        Args:
+            stdout: Standard output content
+            stderr: Standard error content
+            config: Security filtering configuration
+
+        Returns:
+            Tuple of (filtered_stdout, filtered_stderr)
+        """
+        apply_to = config.get("apply_to", ["stdout", "stderr"])
+        
+        filtered_stdout = stdout
+        filtered_stderr = stderr
+        all_findings = []
+
+        if "stdout" in apply_to:
+            filtered_stdout, stdout_findings = redact_secrets(stdout)
+            all_findings.extend(stdout_findings)
+
+        if "stderr" in apply_to:
+            filtered_stderr, stderr_findings = redact_secrets(stderr)
+            all_findings.extend(stderr_findings)
+
+        # Log security alerts (without exposing secrets)
+        if all_findings and config.get("log_findings", True):
+            self._log_security_findings(all_findings)
+
+        return filtered_stdout, filtered_stderr
+
+    def _log_security_findings(self, findings: List[Dict]) -> None:
+        """Log security findings without revealing secrets (following browser client pattern).
+
+        Args:
+            findings: List of security findings from the secret scanner
+        """
+        if not findings:
+            return
+
+        # Group findings by type
+        secret_types = {}
+        for finding in findings:
+            secret_type = finding.get("SecretType", "Unknown")
+            line_num = finding.get("LineNumber", 0)
+            
+            if secret_type not in secret_types:
+                secret_types[secret_type] = []
+            secret_types[secret_type].append(line_num)
+
+        # Log security alert
+        logger.warning(
+            f"*******************************************************************\n"
+            f"*** SECURITY ALERT: Detected and redacted {len(findings)} potential secrets\n"
+            f"*** Tool: {self._name}\n"
+            f"*** Type: Script output\n"
+            f"*******************************************************************"
+        )
+
+        # Log details for each type
+        for secret_type, line_numbers in secret_types.items():
+            line_ranges = self._summarize_line_numbers(line_numbers)
+            logger.warning(
+                f"SECURITY DETAIL: Found {len(line_numbers)} instance(s) of '{secret_type}' "
+                f"at {line_ranges} in tool '{self._name}' output"
+            )
+
+    def _summarize_line_numbers(self, line_numbers: List[int]) -> str:
+        """Create a readable summary of line numbers.
+
+        Args:
+            line_numbers: List of line numbers
+
+        Returns:
+            A string representation of the line numbers in a readable format
+        """
+        if not line_numbers:
+            return "unknown locations"
+
+        # Sort line numbers
+        sorted_lines = sorted(line_numbers)
+
+        if len(sorted_lines) == 1:
+            return f"line {sorted_lines[0]}"
+        elif len(sorted_lines) == 2:
+            return f"lines {sorted_lines[0]} and {sorted_lines[1]}"
+        else:
+            # Group consecutive numbers into ranges
+            ranges = []
+            range_start = sorted_lines[0]
+            range_end = range_start
+
+            for line in sorted_lines[1:]:
+                if line == range_end + 1:
+                    range_end = line
+                else:
+                    if range_start == range_end:
+                        ranges.append(f"{range_start}")
+                    else:
+                        ranges.append(f"{range_start}-{range_end}")
+                    range_start = line
+                    range_end = line
+
+            # Add the last range
+            if range_start == range_end:
+                ranges.append(f"{range_start}")
+            else:
+                ranges.append(f"{range_start}-{range_end}")
+
+            if len(ranges) == 1:
+                return f"lines {ranges[0]}"
+            elif len(ranges) == 2:
+                return f"lines {ranges[0]} and {ranges[1]}"
+            else:
+                last_range = ranges.pop()
+                return f"lines {', '.join(ranges)}, and {last_range}"
+
     def _format_result(self, result: Dict, token: str) -> str:
         """Format the final result for display.
 
@@ -416,6 +534,22 @@ class YamlToolBase(ToolInterface):
                 if result.get("status") == "completed":
                     # Apply post-processing configuration
                     post_config = self._tool_data.get("post_processing", {})
+                    
+                    # Apply security filtering if enabled
+                    security_config = post_config.get("security_filtering", {})
+                    if security_config.get("enabled", False):
+                        stdout_content = result.get("output", "")
+                        stderr_content = result.get("error", "")
+                        
+                        filtered_stdout, filtered_stderr = self._apply_security_filtering(
+                            stdout_content, stderr_content, security_config
+                        )
+                        
+                        # Update result with filtered content
+                        result = result.copy()
+                        result["output"] = filtered_stdout
+                        result["error"] = filtered_stderr
+                    
                     processed_result = self._apply_output_attachment_config(result, post_config)
 
                     return [
