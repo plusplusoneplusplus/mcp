@@ -152,3 +152,6 @@ service-account*.json
 *.db
 *.sqlite
 *.sqlite3
+
+# Generated performance reports
+startup_timing_report.json
