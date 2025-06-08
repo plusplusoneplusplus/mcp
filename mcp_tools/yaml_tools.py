@@ -267,6 +267,58 @@ class YamlToolBase(ToolInterface):
 
         return None
 
+    def _apply_output_attachment_config(self, result: Dict, config: Dict) -> Dict:
+        """Apply output attachment configuration to command result.
+
+        Args:
+            result: The command execution result
+            config: The post_processing configuration
+
+        Returns:
+            Modified result with output attachment configuration applied
+        """
+        # Create a copy to avoid modifying the original
+        processed_result = result.copy()
+
+        # Control stdout attachment
+        if not config.get("attach_stdout", True):
+            processed_result["output"] = ""
+
+        # Control stderr attachment
+        attach_stderr = config.get("attach_stderr", True)
+        stderr_on_failure_only = config.get("stderr_on_failure_only", False)
+
+        if not attach_stderr or (stderr_on_failure_only and result.get("success", False)):
+            processed_result["error"] = ""
+
+        return processed_result
+
+    def _format_result(self, result: Dict, token: str) -> str:
+        """Format the final result for display.
+
+        Args:
+            result: The processed command execution result
+            token: The process token
+
+        Returns:
+            Formatted result string
+        """
+        output_text = result.get("output", "")
+        error_text = result.get("error", "")
+
+        # Build the result text
+        result_parts = [f"Process completed (token: {token})", f"Success: {result.get('success')}"]
+
+        # Add output section if there's content
+        if output_text and output_text.strip():
+            result_parts.append(f"Output:\n{output_text}")
+
+        # Add error section if there's content
+        if error_text and error_text.strip():
+            result_parts.append(f"Error:\n{error_text}")
+
+        return "\n".join(result_parts)
+
     async def _execute_task(self, arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Execute a predefined task.
 
@@ -362,17 +414,14 @@ class YamlToolBase(ToolInterface):
 
                 # If process completed, return the result
                 if result.get("status") == "completed":
-                    error_text = result.get("error")
-                    error_section = (
-                        f"\nError:\n{error_text}"
-                        if error_text and error_text.strip()
-                        else ""
-                    )
+                    # Apply post-processing configuration
+                    post_config = self._tool_data.get("post_processing", {})
+                    processed_result = self._apply_output_attachment_config(result, post_config)
 
                     return [
                         {
                             "type": "text",
-                            "text": f"Process completed (token: {token})\nSuccess: {result.get('success')}\nOutput:\n{result.get('output')}{error_section}",
+                            "text": self._format_result(processed_result, token),
                         }
                     ]
 

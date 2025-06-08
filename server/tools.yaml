@@ -127,6 +127,11 @@ tools:
       windows: powershell -file {pwd}/test_deploy.ps1
       darwin: bash {pwd}/test_deploy.sh
       linux: bash {pwd}/test_deploy.sh
+    # Post-processing configuration to control output attachment
+    post_processing:
+      attach_stdout: true              # Include stdout in output (default: true)
+      attach_stderr: false             # Include stderr in output (default: true)
+      stderr_on_failure_only: true    # Only include stderr if return_code != 0 (default: false)
     inputSchema:
       type: object
       properties:
@@ -147,6 +152,56 @@ tools:
           description: Optional timeout in seconds
       required:
         - environment
+
+  # Example: Health check tool (no stderr noise)
+  health_check:
+    enabled: true
+    name: health_check
+    description: |
+      Check application health status without verbose curl output.
+      Use the token to query the status (tool/query_script_status).
+    type: script
+    scripts:
+      windows: powershell -command "Invoke-WebRequest -Uri http://localhost:8080/health -UseBasicParsing"
+      darwin: curl -s http://localhost:8080/health
+      linux: curl -s http://localhost:8080/health
+    post_processing:
+      attach_stdout: true
+      attach_stderr: false  # Ignore curl's verbose output
+    inputSchema:
+      type: object
+      properties:
+        timeout:
+          type: number
+          description: Optional timeout in seconds
+      required: []
+
+  # Example: Validation tool (errors only)
+  validate_config:
+    enabled: true
+    name: validate_config
+    description: |
+      Validate configuration files and show only validation errors.
+      Use the token to query the status (tool/query_script_status).
+    type: script
+    scripts:
+      windows: powershell -file {pwd}/validate_config.ps1
+      darwin: bash {pwd}/validate_config.sh
+      linux: bash {pwd}/validate_config.sh
+    post_processing:
+      attach_stdout: false   # Only show validation errors
+      attach_stderr: true
+    inputSchema:
+      type: object
+      properties:
+        config_file:
+          type: string
+          description: Path to configuration file to validate
+          default: "config.yaml"
+        timeout:
+          type: number
+          description: Optional timeout in seconds
+      required: []
 
 # Predefined tasks with associated command lines
 tasks:
