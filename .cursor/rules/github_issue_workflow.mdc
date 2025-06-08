@@ -82,7 +82,48 @@ This ensures you're working from the latest stable code and prevents conflicts.
 - Include the code editor name at the end of commit messages for development context
 - Squash or organize commits if needed for a clean history
 
-### 5. Pull Request Phase
+### 5. Pre-Submission Code Review Phase
+
+**⚠️ MANDATORY: Automated Code Review Before PR Submission**
+
+Before creating a pull request, you MUST perform an automated code review using available tools (GitHub Copilot, AI code review tools, etc.) to assess the quality of your implementation.
+
+**Code Review Process:**
+1. **Request Automated Review:** Use available code review tools to analyze your changes
+2. **Evaluate Review Results:** Carefully assess the feedback for:
+   - Code quality issues (bugs, performance problems, security vulnerabilities)
+   - Best practice violations
+   - Maintainability concerns
+   - Test coverage gaps
+   - Documentation issues
+3. **Quality Gate Decision:** Based on the review results:
+   - **PROCEED:** If review results are positive with only minor suggestions
+   - **STOP:** If review results indicate significant issues, bugs, or poor code quality
+
+**If Review Results Are Poor:**
+- **DO NOT CREATE THE PULL REQUEST**
+- **CLEARLY NOTIFY THE USER** with a detailed explanation including:
+  - Specific issues identified by the code review
+  - Severity of the problems found
+  - Recommended actions to address the issues
+  - Estimated effort required for fixes
+
+**Review Results Documentation:**
+Document the review process and results in your workflow output:
+
+```markdown
+## Pre-Submission Code Review
+- **Code Editor:** [Editor used for development]
+- **Review Tool Used:** [GitHub Copilot/AI Review Tool/etc.]
+- **Review Status:** [PASSED/FAILED]
+- **Issues Found:** [List of significant issues, if any]
+- **Decision:** [PROCEED_TO_PR/STOP_AND_FIX]
+- **Next Steps:** [Actions required before PR submission]
+```
+
+**Only proceed to the next phase if the code review results are satisfactory.**
+
+### 6. Pull Request Phase
 
 **Create Pull Request:**
 - Write a clear, descriptive PR title that references the issue (e.g., "Fix issue #123: Update validation logic")
@@ -100,7 +141,7 @@ This ensures you're working from the latest stable code and prevents conflicts.
 - Include screenshots or demos for UI changes
 - Link to any related issues or PRs
 
-### 6. Post-Submission Phase
+### 7. Post-Submission Phase
 
 **Monitor and Respond:**
 - Respond promptly to review comments and feedback
@@ -171,6 +212,17 @@ When working through this workflow, provide updates at each major step:
 - **Editor Features Used:** [Any specific editor features utilized, e.g., AI assistance, extensions, etc.]
 ```
 
+### Pre-Submission Code Review
+```markdown
+## Pre-Submission Code Review
+- **Code Editor:** [Editor used for development]
+- **Review Tool Used:** [GitHub Copilot/AI Review Tool/etc.]
+- **Review Status:** [PASSED/FAILED]
+- **Issues Found:** [List of significant issues, if any]
+- **Decision:** [PROCEED_TO_PR/STOP_AND_FIX]
+- **Next Steps:** [Actions required before PR submission]
+```
+
 ### Pull Request Summary
 ```markdown
 ## Pull Request Created
@@ -197,9 +249,11 @@ When working through this workflow, provide updates at each major step:
 2. **Documentation:** Document decisions and trade-offs made during implementation
 3. **Testing:** Prioritize thorough testing to prevent regressions
 4. **Code Quality:** Maintain high code quality standards throughout
-5. **Git Hygiene:** Keep commit history clean and meaningful
-6. **Branch Management:** Always return to main branch after completion
-7. **Issue Tracking:** Ensure proper linking between issues, commits, and PRs
+5. **Pre-Submission Review:** Always perform automated code review before creating PRs
+6. **Quality Gates:** Never submit PRs with significant code quality issues
+7. **Git Hygiene:** Keep commit history clean and meaningful
+8. **Branch Management:** Always return to main branch after completion
+9. **Issue Tracking:** Ensure proper linking between issues, commits, and PRs
 
 ## Error Handling
 
