@@ -58,4 +58,4 @@ echo "4. Deploying to $environment environment..."
 echo "5. Running post-deployment checks..."
 
 echo
-echo "Deployment completed successfully!" 
+echo "Deployment completed successfully!"
