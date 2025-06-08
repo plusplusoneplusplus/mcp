@@ -73,7 +73,7 @@ class StartupTracer:
         self.phase_stack.append(name)
         
         elapsed = entry.start_time - self.startup_start
-        logger.info(f"🚀 [{elapsed:.2f}s] Starting {name}...")
+        logger.info(f">> [{elapsed:.2f}s] Starting {name}...")
         
         return entry
     
@@ -97,7 +97,7 @@ class StartupTracer:
             self.phase_stack.remove(name)
         
         elapsed = time.time() - self.startup_start
-        logger.info(f"✅ [{elapsed:.2f}s] {name} completed in {duration:.2f}s")
+        logger.info(f"OK [{elapsed:.2f}s] {name} completed in {duration:.2f}s")
         
         return duration
     
@@ -189,7 +189,7 @@ class StartupTracer:
         summary = self.get_timing_summary()
         
         logger.info("=" * 60)
-        logger.info("🔍 STARTUP PERFORMANCE ANALYSIS")
+        logger.info("STARTUP PERFORMANCE ANALYSIS")
         logger.info("=" * 60)
         logger.info(f"Total startup time: {summary['total_startup_time']:.2f}s")
         logger.info(f"Completed operations: {summary['completed_operations']}")
@@ -198,17 +198,17 @@ class StartupTracer:
             logger.info(f"Total measured time: {summary['total_measured_time']:.2f}s")
             logger.info(f"Average operation time: {summary['average_operation_time']:.2f}s")
             
-            logger.info("\n🐌 SLOWEST OPERATIONS:")
+            logger.info("\nSLOWEST OPERATIONS:")
             for i, op in enumerate(summary['slowest_operations'][:5], 1):
                 logger.info(f"  {i}. {op['name']}: {op['duration']:.2f}s ({op['percentage']:.1f}%)")
             
-            logger.info("\n📊 TOP-LEVEL OPERATIONS:")
+            logger.info("\nTOP-LEVEL OPERATIONS:")
             for op in summary['top_level_operations']:
                 logger.info(f"  • {op['name']}: {op['duration']:.2f}s ({op['percentage']:.1f}%)")
         
         # Check for performance issues
         if summary['total_startup_time'] > 10:
-            logger.warning(f"⚠️  Startup time ({summary['total_startup_time']:.2f}s) exceeds target of 10s")
+            logger.warning(f"WARNING: Startup time ({summary['total_startup_time']:.2f}s) exceeds target of 10s")
         
         logger.info("=" * 60)
     
@@ -216,10 +216,13 @@ class StartupTracer:
         """Save a detailed timing report to a JSON file.
         
         Args:
-            filepath: Optional path to save the report. If None, saves to startup_timing_report.json
+            filepath: Optional path to save the report. If None, saves to server/.logs/startup_timing_report.json
         """
         if filepath is None:
-            filepath = Path("startup_timing_report.json")
+            # Create logs directory if it doesn't exist
+            logs_dir = Path(__file__).parent / ".logs"
+            logs_dir.mkdir(exist_ok=True)
+            filepath = logs_dir / "startup_timing_report.json"
         
         summary = self.get_timing_summary()
         
@@ -243,7 +246,7 @@ class StartupTracer:
         try:
             with open(filepath, 'w') as f:
                 json.dump(report, f, indent=2, default=str)
-            logger.info(f"📄 Detailed timing report saved to: {filepath}")
+            logger.info(f"Detailed timing report saved to: {filepath}")
         except Exception as e:
             logger.error(f"Failed to save timing report: {e}")
 
