@@ -66,6 +66,7 @@ import psutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Generator, AsyncGenerator, Optional
+import platform
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -133,19 +134,61 @@ def kill_process_tree(pid: int) -> None:
         pass
 
 
-def wait_for_server_ready(port: int, timeout: int = 30) -> bool:
-    """Wait for server to be ready by checking HTTP endpoint."""
+def get_platform_timeout() -> int:
+    """Get platform-appropriate timeout for server startup.
+
+    Windows environments typically need more time for server startup due to:
+    - Slower process initialization
+    - Different process management overhead
+    - CI environment performance characteristics
+
+    This addresses issue #109 where Windows CI tests were failing due to
+    insufficient startup timeout (30s -> 60s for Windows).
+
+    Returns:
+        int: Timeout in seconds (60 for Windows, 30 for other platforms)
+    """
+    system = platform.system().lower()
+    if system == "windows":
+        return 60  # Longer timeout for Windows
+    return 30  # Default timeout for Unix-like systems
+
+
+def wait_for_server_ready(port: int, timeout: Optional[int] = None) -> bool:
+    """Wait for server to be ready by checking HTTP endpoint.
+
+    Args:
+        port: Port number to check
+        timeout: Timeout in seconds (uses platform-specific default if None)
+    """
+    if timeout is None:
+        timeout = get_platform_timeout()
+
     start_time = time.time()
+    last_error = None
+    attempt_count = 0
+
+    logging.info(f"Waiting for server on port {port} (timeout: {timeout}s, platform: {platform.system()})")
 
     while time.time() - start_time < timeout:
+        attempt_count += 1
         try:
             response = requests.get(f"http://localhost:{port}/", timeout=2)
             if response.status_code == 200:
+                elapsed = time.time() - start_time
+                logging.info(f"Server ready on port {port} after {elapsed:.2f}s ({attempt_count} attempts)")
                 return True
-        except requests.exceptions.RequestException:
-            pass
+        except requests.exceptions.RequestException as e:
+            last_error = str(e)
+            # Log every 10th attempt to avoid spam but provide progress indication
+            if attempt_count % 10 == 0:
+                elapsed = time.time() - start_time
+                logging.debug(f"Server not ready on port {port} after {elapsed:.2f}s (attempt {attempt_count}): {last_error}")
+
         time.sleep(0.5)
 
+    elapsed = time.time() - start_time
+    logging.error(f"Server failed to become ready on port {port} after {elapsed:.2f}s ({attempt_count} attempts). Last error: {last_error}")
     return False
 
 
@@ -223,15 +266,37 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
             f"stdout: {stdout}, stderr: {stderr}"
         )
 
-    # Wait for server to be ready
-    if not wait_for_server_ready(server_port, timeout=30):
+    # Wait for server to be ready with platform-specific timeout
+    platform_timeout = get_platform_timeout()
+    logging.info(f"Worker {worker_id}: Using {platform_timeout}s timeout for {platform.system()} platform")
+
+    if not wait_for_server_ready(server_port):
+        # Collect detailed diagnostics on failure
         try:
             stdout, stderr = process.communicate(timeout=2)
         except subprocess.TimeoutExpired:
             stdout, stderr = "Process still running", "Process still running"
+
+        # Additional diagnostic information
+        process_info = f"PID: {process.pid}, Poll: {process.poll()}"
+        platform_info = f"Platform: {platform.system()} {platform.release()}"
+
+        # Check if port is actually bound
+        port_status = "unknown"
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                result = s.connect_ex(('localhost', server_port))
+                port_status = "bound" if result == 0 else "not bound"
+        except Exception as e:
+            port_status = f"check failed: {e}"
+
         pytest.fail(
-            f"Worker {worker_id}: Server did not become ready within timeout on port {server_port}. "
-            f"stdout: {stdout}, stderr: {stderr}"
+            f"Worker {worker_id}: Server did not become ready within {platform_timeout}s timeout on port {server_port}.\n"
+            f"Process info: {process_info}\n"
+            f"Platform info: {platform_info}\n"
+            f"Port status: {port_status}\n"
+            f"stdout: {stdout}\n"
+            f"stderr: {stderr}"
         )
 
     logging.info(f"Worker {worker_id}: Server ready on port {server_port}")

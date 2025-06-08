@@ -9,9 +9,9 @@ from typing import Dict, Any, Optional, Union, List
 
 # Import startup tracing utilities
 from server.startup_tracer import (
-    time_operation, 
-    trace_startup_time, 
-    log_startup_summary, 
+    time_operation,
+    trace_startup_time,
+    log_startup_summary,
     save_startup_report,
     start_timing,
     finish_timing
@@ -358,6 +358,8 @@ def setup():
 @click.option('--port', default=None, type=int, help='Port to run the server on')
 @trace_startup_time("Main Server Startup")
 def main(port: Optional[int] = None) -> None:
+    import platform
+
     with time_operation("Complete Server Initialization"):
         # Run setup first (non-async)
         setup()
@@ -366,14 +368,22 @@ def main(port: Optional[int] = None) -> None:
         if port is None:
             port = int(os.environ.get('SERVER_PORT', 8000))
 
-        logging.info(f"Starting server on port {port}")
-        
+        # Log platform and startup information
+        platform_info = f"{platform.system()} {platform.release()}"
+        logging.info(f"Starting server on port {port} (Platform: {platform_info})")
+
         # Log startup summary before starting the server
         log_startup_summary()
         save_startup_report()
 
-    # Then run uvicorn directly without nested asyncio.run
-    uvicorn.run(starlette_app, host="0.0.0.0", port=port)
+    # Windows-specific optimizations
+    if platform.system().lower() == "windows":
+        logging.info("Applied Windows-specific server configuration")
+        # Use single worker on Windows to avoid process startup overhead
+        uvicorn.run(starlette_app, host="0.0.0.0", port=port, log_level="info", workers=1)
+    else:
+        # Default configuration for other platforms
+        uvicorn.run(starlette_app, host="0.0.0.0", port=port, log_level="info")
 
 
 if __name__ == "__main__":
