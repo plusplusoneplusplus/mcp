@@ -30,4 +30,4 @@ Write-Host "3. Preparing deployment package..."
 Write-Host "4. Deploying to $environment environment..."
 Write-Host "5. Running post-deployment checks..."
 
-Write-Host "`nDeployment completed successfully!" 
+Write-Host "`nDeployment completed successfully!"
