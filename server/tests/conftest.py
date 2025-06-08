@@ -74,6 +74,10 @@ from mcp.client.sse import sse_client
 # Configure pytest-asyncio
 pytest_plugins = ["pytest_asyncio"]
 
+# Set up logging for debugging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 
 def pytest_configure(config):
     """Add custom markers for tests"""
@@ -136,16 +140,22 @@ def kill_process_tree(pid: int) -> None:
 def wait_for_server_ready(port: int, timeout: int = 30) -> bool:
     """Wait for server to be ready by checking HTTP endpoint."""
     start_time = time.time()
+    logger.debug(f"Waiting for server on port {port} to be ready (timeout: {timeout}s)")
 
     while time.time() - start_time < timeout:
+        elapsed = time.time() - start_time
         try:
+            logger.debug(f"Attempting to connect to http://localhost:{port}/ (elapsed: {elapsed:.1f}s)")
             response = requests.get(f"http://localhost:{port}/", timeout=2)
+            logger.debug(f"Got response with status code: {response.status_code}")
             if response.status_code == 200:
+                logger.debug(f"Server ready on port {port} after {elapsed:.1f}s")
                 return True
-        except requests.exceptions.RequestException:
-            pass
+        except requests.exceptions.RequestException as e:
+            logger.debug(f"Connection attempt failed: {e}")
         time.sleep(0.5)
 
+    logger.error(f"Server on port {port} did not become ready within {timeout}s")
     return False
 
 
@@ -188,19 +198,24 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
     """
     worker_id = get_worker_id()
 
-    logging.info(f"Worker {worker_id} starting server on port {server_port}")
+    logger.debug(f"Worker {worker_id} starting server on port {server_port}")
 
     # Get the path to the server main.py
     server_path = Path(__file__).parent.parent / "main.py"
+    logger.debug(f"Server path: {server_path}")
 
     # Set environment variables for the server
     env = os.environ.copy()
     env['SERVER_PORT'] = str(server_port)
     env['PYTEST_WORKER_ID'] = worker_id
+    logger.debug(f"Environment variables: SERVER_PORT={server_port}, PYTEST_WORKER_ID={worker_id}")
 
     # Start the server process
+    cmd = ["uv", "run", str(server_path), "--port", str(server_port)]
+    logger.debug(f"Starting server with command: {' '.join(cmd)}")
+    
     process = subprocess.Popen(
-        ["uv", "run", str(server_path), "--port", str(server_port)],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -208,27 +223,39 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
         preexec_fn=os.setsid if hasattr(os, 'setsid') else None
     )
 
+    logger.debug(f"Server process started with PID: {process.pid}")
+
     # Store port and worker_id as attributes
     setattr(process, 'port', server_port)
     setattr(process, 'worker_id', worker_id)
 
     # Give the server time to start up
+    logger.debug("Waiting 3 seconds for server to start up...")
     time.sleep(3)
 
     # Check if process is still running
-    if process.poll() is not None:
+    poll_result = process.poll()
+    logger.debug(f"Process poll result after 3s: {poll_result}")
+    if poll_result is not None:
         stdout, stderr = process.communicate()
+        logger.error(f"Server process exited with code {poll_result}")
+        logger.error(f"stdout: {stdout}")
+        logger.error(f"stderr: {stderr}")
         pytest.fail(
             f"Worker {worker_id}: Server failed to start on port {server_port}. "
             f"stdout: {stdout}, stderr: {stderr}"
         )
 
+    logger.debug("Server process is still running, checking readiness...")
     # Wait for server to be ready
     if not wait_for_server_ready(server_port, timeout=30):
         try:
             stdout, stderr = process.communicate(timeout=2)
         except subprocess.TimeoutExpired:
             stdout, stderr = "Process still running", "Process still running"
+        logger.error(f"Server readiness check failed")
+        logger.error(f"stdout: {stdout}")
+        logger.error(f"stderr: {stderr}")
         pytest.fail(
             f"Worker {worker_id}: Server did not become ready within timeout on port {server_port}. "
             f"stdout: {stdout}, stderr: {stderr}"
