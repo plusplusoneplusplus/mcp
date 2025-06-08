@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable, Union
 from config.types import RepositoryInfo
+import shutil
 
 
 class EnvironmentManager:
@@ -452,6 +453,251 @@ class EnvironmentManager:
     def get_vector_store_path(self) -> str:
         """Get the vector store persistence path"""
         return self.get_setting("vector_store_path", ".vector_store")
+
+    # Configuration Management Methods for Web Interface
+    def get_all_configuration(self) -> Dict[str, Any]:
+        """Get all configuration settings for the web interface"""
+        # Ensure settings are synced
+        self._sync_repo_to_settings()
+
+        return {
+            "settings": dict(self.settings),
+            "azrepo_parameters": dict(self.azrepo_parameters),
+            "kusto_parameters": dict(self.kusto_parameters),
+            "additional_paths": dict(self.repository_info.additional_paths),
+            "git_roots": dict(self.repository_info.git_roots),
+            "default_settings": dict(self.DEFAULT_SETTINGS),
+            "path_settings": list(self.PATH_SETTINGS),
+            "env_mapping": dict(self.ENV_MAPPING)
+        }
+
+    def update_configuration(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+        """Update configuration settings and return result"""
+        try:
+            restart_required = False
+            updated_settings = []
+
+            # Update regular settings
+            if "settings" in updates:
+                for key, value in updates["settings"].items():
+                    if key in self.DEFAULT_SETTINGS:
+                        # Convert value to correct type
+                        _, target_type = self.DEFAULT_SETTINGS[key]
+                        if target_type == bool and isinstance(value, str):
+                            value = value.lower() in ('true', '1', 'yes', 'on')
+                        elif target_type in (int, float) and isinstance(value, str):
+                            value = target_type(value) if value else None
+
+                        old_value = self.settings.get(key)
+                        self.settings[key] = value
+                        updated_settings.append(key)
+
+                        # Check if restart is required for certain settings
+                        if key in ["vector_store_path", "browser_profile_path", "browser_type", "client_type"]:
+                            restart_required = True
+
+            # Update Azure DevOps parameters
+            if "azrepo_parameters" in updates:
+                for key, value in updates["azrepo_parameters"].items():
+                    self.azrepo_parameters[key] = value
+                    updated_settings.append(f"azrepo_{key}")
+
+            # Update Kusto parameters
+            if "kusto_parameters" in updates:
+                for key, value in updates["kusto_parameters"].items():
+                    self.kusto_parameters[key] = value
+                    updated_settings.append(f"kusto_{key}")
+
+            # Sync settings to repository info
+            self._sync_settings_to_repo()
+
+            return {
+                "success": True,
+                "updated_settings": updated_settings,
+                "restart_required": restart_required,
+                "message": f"Updated {len(updated_settings)} settings successfully"
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to update configuration: {str(e)}"
+            }
+
+    def reset_setting(self, setting_name: str) -> Dict[str, Any]:
+        """Reset a specific setting to its default value"""
+        try:
+            if setting_name.startswith("azrepo_"):
+                param_name = setting_name[7:]
+                if param_name in self.azrepo_parameters:
+                    del self.azrepo_parameters[param_name]
+                    return {"success": True, "message": f"Reset {setting_name} to default"}
+                else:
+                    return {"success": False, "error": f"Setting {setting_name} not found"}
+
+            elif setting_name.startswith("kusto_"):
+                param_name = setting_name[6:]
+                if param_name in self.kusto_parameters:
+                    del self.kusto_parameters[param_name]
+                    return {"success": True, "message": f"Reset {setting_name} to default"}
+                else:
+                    return {"success": False, "error": f"Setting {setting_name} not found"}
+
+            elif setting_name in self.DEFAULT_SETTINGS:
+                default_value, _ = self.DEFAULT_SETTINGS[setting_name]
+                self.settings[setting_name] = default_value
+                self._sync_settings_to_repo()
+                return {"success": True, "message": f"Reset {setting_name} to default value: {default_value}"}
+
+            else:
+                return {"success": False, "error": f"Unknown setting: {setting_name}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def get_env_file_content(self) -> Dict[str, Any]:
+        """Get the content of the .env file"""
+        try:
+            env_file_paths = []
+
+            # Check common .env file locations
+            if self.repository_info.git_root:
+                env_file_paths.append(Path(self.repository_info.git_root) / ".env")
+
+            env_file_paths.append(Path.cwd() / ".env")
+
+            # Try to find git root if not already set
+            if not self.repository_info.git_root:
+                git_root = self._get_git_root()
+                if git_root:
+                    env_file_paths.append(git_root / ".env")
+
+            # Find the first existing .env file
+            for env_path in env_file_paths:
+                if env_path.exists() and env_path.is_file():
+                    with open(env_path, 'r') as f:
+                        content = f.read()
+                    return {
+                        "success": True,
+                        "content": content,
+                        "file_path": str(env_path),
+                        "message": f"Loaded .env file from {env_path}"
+                    }
+
+            return {
+                "success": False,
+                "error": "No .env file found",
+                "content": "",
+                "file_path": None,
+                "message": "No .env file found in common locations"
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "content": "",
+                "file_path": None,
+                "message": f"Error reading .env file: {str(e)}"
+            }
+
+    def save_env_file_content(self, content: str) -> Dict[str, Any]:
+        """Save content to the .env file"""
+        try:
+            # Determine where to save the .env file
+            env_file_path = None
+
+            if self.repository_info.git_root:
+                env_file_path = Path(self.repository_info.git_root) / ".env"
+            else:
+                git_root = self._get_git_root()
+                if git_root:
+                    env_file_path = git_root / ".env"
+                else:
+                    env_file_path = Path.cwd() / ".env"
+
+            # Create backup if file exists
+            if env_file_path.exists():
+                backup_path = env_file_path.with_suffix('.env.backup')
+                shutil.copy2(env_file_path, backup_path)
+
+            # Save the new content
+            with open(env_file_path, 'w') as f:
+                f.write(content)
+
+            return {
+                "success": True,
+                "file_path": str(env_file_path),
+                "message": f"Saved .env file to {env_file_path}"
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Error saving .env file: {str(e)}"
+            }
+
+    def validate_env_content(self, content: str) -> Dict[str, Any]:
+        """Validate .env file content syntax"""
+        try:
+            errors = []
+            warnings = []
+            line_number = 0
+
+            for line in content.split('\n'):
+                line_number += 1
+                line = line.strip()
+
+                # Skip empty lines and comments
+                if not line or line.startswith('#'):
+                    continue
+
+                # Check for valid key=value format
+                if '=' not in line:
+                    errors.append(f"Line {line_number}: Missing '=' in '{line}'")
+                    continue
+
+                key, value = line.split('=', 1)
+                key = key.strip()
+
+                # Validate key format
+                if not key:
+                    errors.append(f"Line {line_number}: Empty key in '{line}'")
+                elif not key.replace('_', '').replace('-', '').isalnum():
+                    warnings.append(f"Line {line_number}: Key '{key}' contains special characters")
+
+                # Check for known settings
+                if key.upper() in self.ENV_MAPPING:
+                    setting_name = self.ENV_MAPPING[key.upper()]
+                    _, target_type = self.DEFAULT_SETTINGS[setting_name]
+
+                    # Validate type for boolean settings
+                    if target_type == bool and value.lower() not in ('true', 'false', '1', '0', 'yes', 'no', 'on', 'off'):
+                        warnings.append(f"Line {line_number}: Boolean setting '{key}' should be true/false, got '{value}'")
+
+                    # Validate numeric settings
+                    elif target_type in (int, float) and value:
+                        try:
+                            target_type(value)
+                        except ValueError:
+                            errors.append(f"Line {line_number}: {target_type.__name__} setting '{key}' has invalid value '{value}'")
+
+            return {
+                "success": len(errors) == 0,
+                "errors": errors,
+                "warnings": warnings,
+                "message": f"Validation complete: {len(errors)} errors, {len(warnings)} warnings"
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "errors": [f"Validation failed: {str(e)}"],
+                "warnings": [],
+                "message": f"Error validating .env content: {str(e)}"
+            }
 
 
 # Create singleton instance

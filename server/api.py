@@ -334,6 +334,115 @@ async def api_background_job_stats(request: Request):
     })
 
 
+# Configuration Management API Endpoints
+async def api_get_configuration(request: Request):
+    """Get all configuration settings."""
+    try:
+        config = env.get_all_configuration()
+        return JSONResponse(config)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+async def api_update_configuration(request: Request):
+    """Update configuration settings."""
+    try:
+        data = await request.json()
+        result = env.update_configuration(data)
+        status_code = 200 if result.get("success") else 500
+        return JSONResponse(result, status_code=status_code)
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e),
+            "message": f"Failed to update configuration: {str(e)}"
+        }, status_code=500)
+
+
+async def api_reset_setting(request: Request):
+    """Reset a specific setting to its default value."""
+    try:
+        setting_name = request.path_params.get("setting_name")
+        if not setting_name:
+            return JSONResponse({
+                "success": False,
+                "error": "Missing setting name"
+            }, status_code=400)
+
+        result = env.reset_setting(setting_name)
+        status_code = 200 if result.get("success") else 400
+        return JSONResponse(result, status_code=status_code)
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+
+async def api_get_env_file(request: Request):
+    """Get the content of the .env file."""
+    try:
+        result = env.get_env_file_content()
+        status_code = 200 if result.get("success") else 404
+        return JSONResponse(result, status_code=status_code)
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e),
+            "content": "",
+            "file_path": None,
+            "message": f"Error reading .env file: {str(e)}"
+        }, status_code=500)
+
+
+async def api_save_env_file(request: Request):
+    """Save content to the .env file."""
+    try:
+        data = await request.json()
+        content = data.get("content", "")
+        result = env.save_env_file_content(content)
+        status_code = 200 if result.get("success") else 500
+        return JSONResponse(result, status_code=status_code)
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e),
+            "message": f"Error saving .env file: {str(e)}"
+        }, status_code=500)
+
+
+async def api_validate_env_content(request: Request):
+    """Validate .env file content syntax."""
+    try:
+        data = await request.json()
+        content = data.get("content", "")
+        result = env.validate_env_content(content)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "errors": [f"Validation failed: {str(e)}"],
+            "warnings": [],
+            "message": f"Error validating .env content: {str(e)}"
+        }, status_code=500)
+
+
+async def api_reload_configuration(request: Request):
+    """Reload configuration from .env file and environment variables."""
+    try:
+        env.load()
+        return JSONResponse({
+            "success": True,
+            "message": "Configuration reloaded successfully"
+        })
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e),
+            "message": f"Error reloading configuration: {str(e)}"
+        }, status_code=500)
+
+
 api_routes = [
     Route("/api/import-knowledge", endpoint=api_import_knowledge, methods=["POST"]),
     Route("/api/collections", endpoint=api_list_collections, methods=["GET"]),
@@ -344,4 +453,12 @@ api_routes = [
     Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
     Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
     Route("/api/background-jobs/{token}/terminate", endpoint=api_terminate_background_job, methods=["POST"]),
+    # Configuration Management API endpoints
+    Route("/api/configuration", endpoint=api_get_configuration, methods=["GET"]),
+    Route("/api/configuration", endpoint=api_update_configuration, methods=["POST"]),
+    Route("/api/configuration/reset/{setting_name}", endpoint=api_reset_setting, methods=["POST"]),
+    Route("/api/configuration/env-file", endpoint=api_get_env_file, methods=["GET"]),
+    Route("/api/configuration/env-file", endpoint=api_save_env_file, methods=["POST"]),
+    Route("/api/configuration/validate-env", endpoint=api_validate_env_content, methods=["POST"]),
+    Route("/api/configuration/reload", endpoint=api_reload_configuration, methods=["POST"]),
 ]

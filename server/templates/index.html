@@ -275,6 +275,7 @@
             <button class="tab-btn" data-tab="query-tab">Query</button>
             <button class="tab-btn" data-tab="collections-tab">Collections</button>
             <button class="tab-btn" data-tab="jobs-tab">Background Jobs</button>
+            <button class="tab-btn" data-tab="config-tab">Configuration</button>
         </div>
         <div class="tab-content" id="collections-tab" style="display:none;">
             <div class="card">
@@ -432,6 +433,126 @@
                 </div>
             </div>
         </div>
+
+        <!-- Configuration Tab -->
+        <div class="tab-content" id="config-tab" style="display:none;">
+            <div class="card">
+                <h2>Configuration Management</h2>
+
+                <!-- Configuration Actions -->
+                <div class="config-actions" style="margin-bottom: 1.5em; display: flex; gap: 1em; flex-wrap: wrap;">
+                    <button id="reload-config"
+                        style="padding: 0.5em 1em; background: #0077cc; color: white; border: none; border-radius: 4px; cursor: pointer;">Reload
+                        Configuration</button>
+                    <button id="export-config"
+                        style="padding: 0.5em 1em; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Export
+                        Settings</button>
+                    <button id="import-config"
+                        style="padding: 0.5em 1em; background: #ffc107; color: black; border: none; border-radius: 4px; cursor: pointer;">Import
+                        Settings</button>
+                    <button id="reset-all-config"
+                        style="padding: 0.5em 1em; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">Reset
+                        All to Defaults</button>
+                </div>
+
+                <!-- Configuration Categories -->
+                <div class="config-categories">
+                    <div class="config-category" style="margin-bottom: 2em;">
+                        <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">Repository
+                            Settings</h3>
+                        <div class="config-group" id="repository-settings">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="config-category" style="margin-bottom: 2em;">
+                        <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">Tool History
+                            Settings</h3>
+                        <div class="config-group" id="tool-history-settings">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="config-category" style="margin-bottom: 2em;">
+                        <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">Azure DevOps
+                            Integration</h3>
+                        <div class="config-group" id="azrepo-settings">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="config-category" style="margin-bottom: 2em;">
+                        <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">Kusto
+                            Integration</h3>
+                        <div class="config-group" id="kusto-settings">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="config-category" style="margin-bottom: 2em;">
+                        <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">System Paths
+                        </h3>
+                        <div class="config-group" id="system-paths-settings">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="config-category" style="margin-bottom: 2em;">
+                        <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">Background
+                            Jobs</h3>
+                        <div class="config-group" id="background-jobs-settings">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <div class="config-category" style="margin-bottom: 2em;">
+                        <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">Browser
+                            Configuration</h3>
+                        <div class="config-group" id="browser-settings">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Environment File Management -->
+                <div class="env-file-section" style="margin-top: 2em;">
+                    <h3 style="color: #0077cc; border-bottom: 2px solid #eee; padding-bottom: 0.5em;">Environment File
+                        (.env)</h3>
+                    <div class="env-file-actions" style="margin-bottom: 1em; display: flex; gap: 1em; flex-wrap: wrap;">
+                        <button id="view-env-file"
+                            style="padding: 0.5em 1em; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">View
+                            .env File</button>
+                        <button id="edit-env-file"
+                            style="padding: 0.5em 1em; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">Edit
+                            .env File</button>
+                        <button id="backup-env-file"
+                            style="padding: 0.5em 1em; background: #fd7e14; color: white; border: none; border-radius: 4px; cursor: pointer;">Create
+                            Backup</button>
+                    </div>
+                    <div id="env-file-editor" style="display:none; margin-top: 1em;">
+                        <textarea id="env-file-content" rows="20"
+                            style="width:100%; font-family:monospace; border: 1px solid #ddd; border-radius: 4px; padding: 0.5em;"></textarea>
+                        <div class="env-file-controls"
+                            style="margin-top: 1em; display: flex; gap: 1em; flex-wrap: wrap;">
+                            <button id="save-env-file"
+                                style="padding: 0.5em 1em; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">Save
+                                Changes</button>
+                            <button id="cancel-env-edit"
+                                style="padding: 0.5em 1em; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                            <button id="validate-env-file"
+                                style="padding: 0.5em 1em; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">Validate
+                                Syntax</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Status -->
+                <div id="config-status" class="config-status"
+                    style="margin-top: 1.5em; padding: 1em; border-radius: 4px; display: none;">
+                    <!-- Status messages will appear here -->
+                </div>
+            </div>
+        </div>
     </div>
     <script>
         // --- Tab Switching ---
@@ -445,6 +566,11 @@
                 if (btn.dataset.tab === 'jobs-tab') {
                     loadBackgroundJobs();
                     if (jobsAutoRefresh) startJobsAutoRefresh();
+                }
+                if (btn.dataset.tab === 'config-tab') {
+                    if (Object.keys(currentConfig).length === 0) {
+                        loadConfiguration();
+                    }
                 }
             });
         });
@@ -970,6 +1096,423 @@
         // Make functions globally available
         window.terminateJob = terminateJob;
         window.showJobDetails = showJobDetails;
+
+        // --- Configuration Management ---
+        let currentConfig = {};
+        let originalEnvContent = '';
+
+        // Configuration setting descriptions
+        const settingDescriptions = {
+            'git_root': 'Path to the main git repository',
+            'project_name': 'Name of the current project',
+            'private_tool_root': 'Path to private tools directory',
+            'tool_history_enabled': 'Record tool invocations for debugging',
+            'tool_history_path': 'Directory to store tool invocation history',
+            'browser_profile_path': 'Path to browser profile directory',
+            'browser_type': 'Browser type (chrome, firefox, etc.)',
+            'client_type': 'Browser client type (playwright, selenium)',
+            'image_dir': 'Directory to store images',
+            'vector_store_path': 'Directory for vector store data',
+            'periodic_status_enabled': 'Enable periodic status reporting for background processes',
+            'periodic_status_interval': 'Interval between status reports in seconds',
+            'periodic_status_max_command_length': 'Maximum command length to display in status reports'
+        };
+
+        async function loadConfiguration() {
+            try {
+                const response = await fetch('/api/configuration');
+                const config = await response.json();
+                currentConfig = config;
+                populateConfigurationForm(config);
+                updateConfigStatus('Configuration loaded successfully', 'success');
+            } catch (error) {
+                updateConfigStatus('Error loading configuration: ' + error.message, 'error');
+            }
+        }
+
+        function populateConfigurationForm(config) {
+            // Clear all groups first
+            document.querySelectorAll('.config-group').forEach(group => group.innerHTML = '');
+
+            // Repository Settings
+            const repoGroup = document.getElementById('repository-settings');
+            ['git_root', 'project_name', 'private_tool_root'].forEach(setting => {
+                repoGroup.appendChild(createConfigItem(setting, config.settings[setting], 'settings'));
+            });
+
+            // Tool History Settings
+            const historyGroup = document.getElementById('tool-history-settings');
+            ['tool_history_enabled', 'tool_history_path'].forEach(setting => {
+                historyGroup.appendChild(createConfigItem(setting, config.settings[setting], 'settings'));
+            });
+
+            // Azure DevOps Settings
+            const azrepoGroup = document.getElementById('azrepo-settings');
+            Object.keys(config.azrepo_parameters || {}).forEach(key => {
+                azrepoGroup.appendChild(createConfigItem(`azrepo_${key}`, config.azrepo_parameters[key], 'azrepo_parameters'));
+            });
+            // Add common Azure DevOps settings if not present
+            ['org', 'project', 'repo', 'branch', 'area_path', 'iteration'].forEach(key => {
+                if (!config.azrepo_parameters || !config.azrepo_parameters[key]) {
+                    azrepoGroup.appendChild(createConfigItem(`azrepo_${key}`, '', 'azrepo_parameters'));
+                }
+            });
+
+            // Kusto Settings
+            const kustoGroup = document.getElementById('kusto-settings');
+            Object.keys(config.kusto_parameters || {}).forEach(key => {
+                kustoGroup.appendChild(createConfigItem(`kusto_${key}`, config.kusto_parameters[key], 'kusto_parameters'));
+            });
+            // Add common Kusto settings if not present
+            ['cluster_url', 'database', 'app_id', 'app_key', 'tenant_id'].forEach(key => {
+                if (!config.kusto_parameters || !config.kusto_parameters[key]) {
+                    kustoGroup.appendChild(createConfigItem(`kusto_${key}`, '', 'kusto_parameters'));
+                }
+            });
+
+            // System Paths
+            const pathsGroup = document.getElementById('system-paths-settings');
+            ['vector_store_path', 'image_dir'].forEach(setting => {
+                pathsGroup.appendChild(createConfigItem(setting, config.settings[setting], 'settings'));
+            });
+
+            // Background Jobs
+            const jobsGroup = document.getElementById('background-jobs-settings');
+            ['periodic_status_enabled', 'periodic_status_interval', 'periodic_status_max_command_length'].forEach(setting => {
+                jobsGroup.appendChild(createConfigItem(setting, config.settings[setting], 'settings'));
+            });
+
+            // Browser Configuration
+            const browserGroup = document.getElementById('browser-settings');
+            ['browser_type', 'client_type', 'browser_profile_path'].forEach(setting => {
+                browserGroup.appendChild(createConfigItem(setting, config.settings[setting], 'settings'));
+            });
+        }
+
+        function createConfigItem(settingName, value, category) {
+            const div = document.createElement('div');
+            div.className = 'config-item';
+            div.style.cssText = 'margin-bottom: 1em; display: flex; align-items: center; gap: 1em; flex-wrap: wrap;';
+
+            const displayName = settingName.replace(/_/g, ' ').replace(/^(azrepo|kusto) /, '').replace(/\b\w/g, l => l.toUpperCase());
+            const description = settingDescriptions[settingName] || settingDescriptions[settingName.replace(/^(azrepo|kusto)_/, '')] || 'Configuration setting';
+
+            // Determine input type based on setting name and value
+            let inputHtml;
+            const defaultValue = currentConfig.default_settings && currentConfig.default_settings[settingName.replace(/^(azrepo|kusto)_/, '')];
+            const isBoolean = typeof defaultValue === 'boolean' || typeof value === 'boolean';
+
+            if (isBoolean) {
+                const checked = value === true || value === 'true' ? 'checked' : '';
+                inputHtml = `<input type="checkbox" class="config-checkbox" data-setting="${settingName}" data-category="${category}" ${checked} style="margin-right: 0.5em;">`;
+            } else {
+                inputHtml = `<input type="text" class="config-input" data-setting="${settingName}" data-category="${category}" value="${value || ''}" style="flex: 1; min-width: 200px; padding: 0.3em; border: 1px solid #ddd; border-radius: 4px;">`;
+            }
+
+            div.innerHTML = `
+                <label style="min-width: 150px; font-weight: bold;">${displayName}:</label>
+                ${inputHtml}
+                <span class="config-help" style="color: #666; font-size: 0.9em; flex: 1; min-width: 200px;">${description}</span>
+                <button class="config-reset" data-setting="${settingName}" style="padding: 0.3em 0.8em; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Reset</button>
+            `;
+
+            return div;
+        }
+
+        async function saveConfiguration() {
+            const updatedConfig = collectConfigurationChanges();
+
+            try {
+                const response = await fetch('/api/configuration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updatedConfig)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    updateConfigStatus('Configuration saved successfully', 'success');
+                    if (result.restart_required) {
+                        updateConfigStatus('Some changes require server restart to take effect', 'warning');
+                    }
+                    loadConfiguration(); // Reload to show current state
+                } else {
+                    updateConfigStatus('Error saving configuration: ' + result.error, 'error');
+                }
+            } catch (error) {
+                updateConfigStatus('Error saving configuration: ' + error.message, 'error');
+            }
+        }
+
+        function collectConfigurationChanges() {
+            const changes = {
+                settings: {},
+                azrepo_parameters: {},
+                kusto_parameters: {}
+            };
+
+            // Collect all configuration inputs
+            document.querySelectorAll('.config-input, .config-checkbox').forEach(input => {
+                const setting = input.dataset.setting;
+                const category = input.dataset.category;
+                let value = input.type === 'checkbox' ? input.checked : input.value;
+
+                if (category === 'azrepo_parameters') {
+                    const key = setting.substring(7); // Remove 'azrepo_' prefix
+                    changes.azrepo_parameters[key] = value;
+                } else if (category === 'kusto_parameters') {
+                    const key = setting.substring(6); // Remove 'kusto_' prefix
+                    changes.kusto_parameters[key] = value;
+                } else {
+                    changes.settings[setting] = value;
+                }
+            });
+
+            return changes;
+        }
+
+        async function resetSetting(settingName) {
+            if (!confirm(`Reset ${settingName} to default value?`)) return;
+
+            try {
+                const response = await fetch(`/api/configuration/reset/${settingName}`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    updateConfigStatus(`${settingName} reset to default`, 'success');
+                    loadConfiguration(); // Reload to show updated value
+                } else {
+                    updateConfigStatus(`Error resetting ${settingName}: ` + result.error, 'error');
+                }
+            } catch (error) {
+                updateConfigStatus(`Error resetting ${settingName}: ` + error.message, 'error');
+            }
+        }
+
+        async function loadEnvFile() {
+            try {
+                const response = await fetch('/api/configuration/env-file');
+                const result = await response.json();
+
+                if (result.success) {
+                    originalEnvContent = result.content;
+                    document.getElementById('env-file-content').value = result.content;
+                    document.getElementById('env-file-editor').style.display = 'block';
+                    updateConfigStatus(`Loaded .env file from ${result.file_path}`, 'success');
+                } else {
+                    updateConfigStatus('Error loading .env file: ' + result.error, 'error');
+                }
+            } catch (error) {
+                updateConfigStatus('Error loading .env file: ' + error.message, 'error');
+            }
+        }
+
+        async function saveEnvFile() {
+            const content = document.getElementById('env-file-content').value;
+
+            try {
+                const response = await fetch('/api/configuration/env-file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    updateConfigStatus('.env file saved successfully', 'success');
+                    document.getElementById('env-file-editor').style.display = 'none';
+                    loadConfiguration(); // Reload configuration after env file change
+                } else {
+                    updateConfigStatus('Error saving .env file: ' + result.error, 'error');
+                }
+            } catch (error) {
+                updateConfigStatus('Error saving .env file: ' + error.message, 'error');
+            }
+        }
+
+        async function validateEnvFile() {
+            const content = document.getElementById('env-file-content').value;
+
+            try {
+                const response = await fetch('/api/configuration/validate-env', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    updateConfigStatus('Validation successful: No errors found', 'success');
+                } else {
+                    let message = 'Validation failed:\n';
+                    if (result.errors && result.errors.length > 0) {
+                        message += 'Errors:\n' + result.errors.join('\n') + '\n';
+                    }
+                    if (result.warnings && result.warnings.length > 0) {
+                        message += 'Warnings:\n' + result.warnings.join('\n');
+                    }
+                    updateConfigStatus(message, 'warning');
+                }
+            } catch (error) {
+                updateConfigStatus('Error validating .env file: ' + error.message, 'error');
+            }
+        }
+
+        function updateConfigStatus(message, type) {
+            const statusDiv = document.getElementById('config-status');
+            statusDiv.style.display = 'block';
+            statusDiv.className = `config-status ${type}`;
+
+            // Set background color based on type
+            switch (type) {
+                case 'success':
+                    statusDiv.style.backgroundColor = '#d4edda';
+                    statusDiv.style.color = '#155724';
+                    statusDiv.style.border = '1px solid #c3e6cb';
+                    break;
+                case 'error':
+                    statusDiv.style.backgroundColor = '#f8d7da';
+                    statusDiv.style.color = '#721c24';
+                    statusDiv.style.border = '1px solid #f5c6cb';
+                    break;
+                case 'warning':
+                    statusDiv.style.backgroundColor = '#fff3cd';
+                    statusDiv.style.color = '#856404';
+                    statusDiv.style.border = '1px solid #ffeaa7';
+                    break;
+                default:
+                    statusDiv.style.backgroundColor = '#cce7ff';
+                    statusDiv.style.color = '#004085';
+                    statusDiv.style.border = '1px solid #b3d7ff';
+            }
+
+            statusDiv.innerHTML = message.replace(/\n/g, '<br>');
+
+            // Auto-hide after 5 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Configuration event listeners
+        document.addEventListener('DOMContentLoaded', function () {
+            // Load configuration when config tab is first accessed
+            document.querySelector('[data-tab="config-tab"]').addEventListener('click', function () {
+                if (Object.keys(currentConfig).length === 0) {
+                    loadConfiguration();
+                }
+            });
+
+            // Configuration action buttons
+            document.getElementById('reload-config').addEventListener('click', async function () {
+                try {
+                    const response = await fetch('/api/configuration/reload', { method: 'POST' });
+                    const result = await response.json();
+                    if (result.success) {
+                        updateConfigStatus('Configuration reloaded successfully', 'success');
+                        loadConfiguration();
+                    } else {
+                        updateConfigStatus('Error reloading configuration: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    updateConfigStatus('Error reloading configuration: ' + error.message, 'error');
+                }
+            });
+
+            document.getElementById('export-config').addEventListener('click', function () {
+                const dataStr = JSON.stringify(currentConfig, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'mcp-configuration.json';
+                link.click();
+                URL.revokeObjectURL(url);
+                updateConfigStatus('Configuration exported successfully', 'success');
+            });
+
+            document.getElementById('import-config').addEventListener('click', function () {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = function (e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = function (e) {
+                            try {
+                                const config = JSON.parse(e.target.result);
+                                // Apply the imported configuration
+                                if (config.settings || config.azrepo_parameters || config.kusto_parameters) {
+                                    currentConfig = { ...currentConfig, ...config };
+                                    populateConfigurationForm(currentConfig);
+                                    updateConfigStatus('Configuration imported successfully', 'success');
+                                } else {
+                                    updateConfigStatus('Invalid configuration file format', 'error');
+                                }
+                            } catch (error) {
+                                updateConfigStatus('Error parsing configuration file: ' + error.message, 'error');
+                            }
+                        };
+                        reader.readAsText(file);
+                    }
+                };
+                input.click();
+            });
+
+            document.getElementById('reset-all-config').addEventListener('click', async function () {
+                if (!confirm('Are you sure you want to reset ALL settings to their default values? This cannot be undone.')) return;
+
+                try {
+                    // Reset all settings by calling the reset endpoint for each setting
+                    const promises = [];
+                    Object.keys(currentConfig.default_settings || {}).forEach(setting => {
+                        promises.push(fetch(`/api/configuration/reset/${setting}`, { method: 'POST' }));
+                    });
+
+                    await Promise.all(promises);
+                    updateConfigStatus('All settings reset to defaults', 'success');
+                    loadConfiguration();
+                } catch (error) {
+                    updateConfigStatus('Error resetting all settings: ' + error.message, 'error');
+                }
+            });
+
+            // Environment file buttons
+            document.getElementById('view-env-file').addEventListener('click', loadEnvFile);
+            document.getElementById('edit-env-file').addEventListener('click', loadEnvFile);
+            document.getElementById('save-env-file').addEventListener('click', saveEnvFile);
+            document.getElementById('validate-env-file').addEventListener('click', validateEnvFile);
+            document.getElementById('cancel-env-edit').addEventListener('click', function () {
+                document.getElementById('env-file-editor').style.display = 'none';
+                document.getElementById('env-file-content').value = originalEnvContent;
+            });
+
+            // Auto-save configuration on input change (debounced)
+            let saveTimeout;
+            document.addEventListener('change', function (e) {
+                if (e.target.classList.contains('config-input') || e.target.classList.contains('config-checkbox')) {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(saveConfiguration, 1000); // Save after 1 second of no changes
+                }
+            });
+
+            // Reset button event delegation
+            document.addEventListener('click', function (e) {
+                if (e.target.classList.contains('config-reset')) {
+                    const settingName = e.target.dataset.setting;
+                    resetSetting(settingName);
+                }
+            });
+        });
     </script>
 </body>
 
