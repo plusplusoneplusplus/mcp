@@ -535,9 +535,9 @@ class YamlToolBase(ToolInterface):
                     # Apply post-processing configuration
                     post_config = self._tool_data.get("post_processing", {})
                     
-                    # Apply security filtering if enabled
+                    # Apply security filtering if enabled (default: True for security)
                     security_config = post_config.get("security_filtering", {})
-                    if security_config.get("enabled", False):
+                    if security_config.get("enabled", True):
                         stdout_content = result.get("output", "")
                         stderr_content = result.get("error", "")
                         

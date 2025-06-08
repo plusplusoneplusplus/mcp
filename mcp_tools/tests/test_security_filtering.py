@@ -39,8 +39,8 @@ class TestSecurityFilteringConfiguration:
     """Test cases for security filtering configuration."""
 
     @pytest.mark.asyncio
-    async def test_security_filtering_disabled_by_default(self, mock_command_executor):
-        """Test that security filtering is disabled by default."""
+    async def test_security_filtering_enabled_by_default(self, mock_command_executor):
+        """Test that security filtering is enabled by default."""
         tool_data = {
             "type": "script",
             "scripts": {"darwin": "echo 'test'"},
@@ -62,10 +62,57 @@ class TestSecurityFilteringConfiguration:
             "return_code": 0
         }
 
+        # Mock the redact_secrets function to simulate redaction
+        def mock_redact_secrets(content):
+            redacted = content.replace("secret123", "[REDACTED]")
+            findings = [{"SecretType": "Password", "LineNumber": 1}] if "secret" in content else []
+            return redacted, findings
+
+        with patch('mcp_tools.yaml_tools.redact_secrets', side_effect=mock_redact_secrets):
+            with patch.object(tool, '_log_security_findings') as mock_log:
+                result = await tool._query_status({"token": "test-token"})
+                
+                # Check that secrets were redacted by default
+                result_text = result[0]["text"]
+                assert "[REDACTED]" in result_text
+                assert "secret123" not in result_text
+                
+                # Check that security findings were logged
+                mock_log.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_security_filtering_explicitly_disabled(self, mock_command_executor):
+        """Test that security filtering can be explicitly disabled."""
+        tool_data = {
+            "type": "script",
+            "scripts": {"darwin": "echo 'test'"},
+            "post_processing": {
+                "security_filtering": {
+                    "enabled": False
+                }
+            },
+            "inputSchema": {"type": "object", "properties": {}, "required": []}
+        }
+
+        tool = YamlToolBase(
+            tool_name="test_tool",
+            tool_data=tool_data,
+            command_executor=mock_command_executor
+        )
+
+        # Mock output with potential secrets
+        mock_command_executor.mock_results["test-token"] = {
+            "status": "completed",
+            "success": True,
+            "output": "DB_PASSWORD=secret123",
+            "error": "Debug info",
+            "return_code": 0
+        }
+
         with patch('mcp_tools.yaml_tools.redact_secrets') as mock_redact:
             result = await tool._query_status({"token": "test-token"})
             
-            # redact_secrets should not be called when security filtering is disabled
+            # redact_secrets should not be called when explicitly disabled
             mock_redact.assert_not_called()
             
             # Original content should be preserved

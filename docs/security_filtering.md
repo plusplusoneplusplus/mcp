@@ -9,7 +9,7 @@ The security filtering feature automatically detects and redacts sensitive infor
 - **Automatic Secret Detection**: Uses the existing secret scanner to detect passwords, API keys, tokens, and other sensitive data
 - **Configurable Filtering**: Choose to filter stdout, stderr, or both
 - **Security Logging**: Logs security alerts without exposing the actual secrets
-- **Backward Compatibility**: Disabled by default, existing tools continue to work unchanged
+- **Security by Default**: Enabled by default for maximum security protection
 - **Integration with Post-Processing**: Works seamlessly with existing output attachment controls
 
 ## Configuration
@@ -23,23 +23,33 @@ tools:
     scripts:
       darwin: bash /path/to/script.sh
     post_processing:
-      security_filtering:
-        enabled: true                    # Enable security filtering (default: false)
-        apply_to: ["stdout", "stderr"]   # Which outputs to filter (default: both)
-        log_findings: true               # Log security alerts (default: true)
+             security_filtering:
+         enabled: true                    # Enable security filtering (default: true)
+         apply_to: ["stdout", "stderr"]   # Which outputs to filter (default: both)
+         log_findings: true               # Log security alerts (default: true)
 ```
 
 ### Configuration Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `enabled` | boolean | `false` | Enable or disable security filtering |
+| `enabled` | boolean | `true` | Enable or disable security filtering |
 | `apply_to` | array | `["stdout", "stderr"]` | Which outputs to filter. Options: `"stdout"`, `"stderr"` |
 | `log_findings` | boolean | `true` | Whether to log security alerts when secrets are detected |
 
 ## Examples
 
-### Basic Security Filtering
+### Basic Security Filtering (Default Behavior)
+
+```yaml
+deploy_app:
+  type: script
+  scripts:
+    darwin: bash deploy.sh
+  # Security filtering is enabled by default - no configuration needed
+```
+
+### Explicitly Enable Security Filtering
 
 ```yaml
 deploy_app:
@@ -62,6 +72,18 @@ backup_database:
     security_filtering:
       enabled: true
       apply_to: ["stdout"]  # Only filter stdout, allow stderr for debugging
+```
+
+### Disable Security Filtering
+
+```yaml
+legacy_tool:
+  type: script
+  scripts:
+    darwin: bash legacy.sh
+  post_processing:
+    security_filtering:
+      enabled: false  # Explicitly disable security filtering
 ```
 
 ### Silent Security Filtering
@@ -185,12 +207,27 @@ python -m pytest tests/test_security_filtering.py -v
 
 ## Migration Guide
 
-Existing tools continue to work unchanged since security filtering is disabled by default. To enable security filtering:
+**Important**: Security filtering is now enabled by default for all script-based tools. This provides better security out of the box.
 
-1. Add the `security_filtering` section to your tool's `post_processing` configuration
-2. Set `enabled: true`
-3. Configure `apply_to` and `log_findings` as needed
-4. Test the tool to ensure it works as expected
+### For New Tools
+- Security filtering works automatically - no configuration needed
+- Scripts will have secrets automatically redacted from outputs
+- Security alerts will be logged when secrets are detected
+
+### For Existing Tools
+- Security filtering is now active by default
+- If you need to disable it for specific tools, add:
+  ```yaml
+  post_processing:
+    security_filtering:
+      enabled: false
+  ```
+- Test your tools to ensure expected behavior with security filtering enabled
+
+### Recommended Approach
+- Keep security filtering enabled for maximum protection
+- Only disable for tools that you're certain don't handle sensitive data
+- Review security logs to identify and improve tools that expose secrets
 
 ## Troubleshooting
 
