@@ -15,7 +15,7 @@ from mcp_tools.interfaces import ToolInterface, CommandExecutorInterface
 from mcp_tools.plugin import register_tool, registry
 from mcp_tools.dependency import injector
 from utils.secret_scanner import redact_secrets
-from mcp_tools.output_limiter import OutputLimiter
+from utils.output_processor import OutputLimiter
 
 # Configuration
 DEFAULT_WAIT_FOR_QUERY = True  # Default wait for task

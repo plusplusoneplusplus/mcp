@@ -1,7 +1,7 @@
 """Tests for output length management functionality."""
 
 import pytest
-from mcp_tools.output_limiter import OutputLimiter
+from utils.output_processor import OutputLimiter
 
 
 class TestOutputLimiter:
