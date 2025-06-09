@@ -220,6 +220,7 @@
                     <th>Token</th>
                     <th>Status</th>
                     <th>Command</th>
+                    <th>Start Time</th>
                     <th>Runtime</th>
                     <th>CPU %</th>
                     <th>Memory</th>
@@ -266,7 +267,7 @@
         } catch (error) {
             console.error('Error loading background jobs:', error);
             document.getElementById('jobs-table-body').innerHTML =
-                '<tr><td colspan="7" style="text-align:center;color:red;">Error loading jobs: ' + error.message + '</td></tr>';
+                '<tr><td colspan="8" style="text-align:center;color:red;">Error loading jobs: ' + error.message + '</td></tr>';
         }
     }
 
@@ -294,7 +295,7 @@
         });
 
         if (filteredJobs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#666;">No jobs found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No jobs found</td></tr>';
             return;
         }
 
@@ -317,6 +318,7 @@
             <td><code class="token" title="${job.token}">${job.token.substring(0, 8)}...</code></td>
             <td><span class="status-badge status-${job.status}">${job.status}</span></td>
             <td class="command" title="${job.command || 'N/A'}">${truncateCommand(job.command || 'N/A')}</td>
+            <td>${job.start_time ? new Date(job.start_time * 1000).toLocaleString() : 'N/A'}</td>
             <td>${runtime}</td>
             <td>${cpuPercent}${typeof cpuPercent === 'number' ? '%' : ''}</td>
             <td>${memoryMB}</td>
