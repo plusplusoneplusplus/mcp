@@ -9,12 +9,88 @@ import re
 def shannon_entropy(data: str) -> float:
     if not data:
         return 0.0
-    entropy = 0
+    entropy = 0.0
     length = len(data)
     for x in set(data):
         p_x = data.count(x) / length
         entropy -= p_x * math.log2(p_x)
     return entropy
+
+
+# Build-safe patterns that should NOT be detected as secrets
+BUILD_SAFE_PATTERNS = [
+    # File paths and libraries
+    r'^/[a-zA-Z0-9/_.-]+\.(so|dll|exe|jar|whl|framework|dylib)(\.\d+)*$',
+    r'^[a-zA-Z]:\\[a-zA-Z0-9\\/_. -]+\.(exe|dll|jar|whl)$',
+    r'^[a-zA-Z]:\\[a-zA-Z0-9\\/_. -]+\\[a-zA-Z0-9\\/_. -]+$',  # Windows paths
+    r'^target/[a-zA-Z0-9/_.-]+\.(exe|jar|whl)$',
+    r'^build/[a-zA-Z0-9/_.-]+\.(exe|jar|whl)$',
+
+    # Package files and version identifiers
+    r'^[a-zA-Z0-9._-]+-\d+\.\d+\.\d+.*\.(whl|jar|tar\.gz|tgz|zip)$',
+    r'^[a-zA-Z0-9._-]+@\d+\.\d+\.\d+$',
+    r'^[a-zA-Z0-9._-]+:\d+\.\d+\.\d+$',
+    r'^[a-zA-Z0-9._-]+-\d+\.\d+\.\d+(-[a-zA-Z0-9._-]+)*$',
+
+    # Checksums and hashes
+    r'^(sha256|sha1|md5):[a-f0-9]+$',
+    r'^[a-f0-9]{32}$',  # MD5
+    r'^[a-f0-9]{40}$',  # SHA1/Git commit
+    r'^[a-f0-9]{64}$',  # SHA256
+
+    # UUIDs
+    r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$',
+
+    # URLs and repository paths
+    r'^https?://[a-zA-Z0-9._/-]+$',
+    r'^git@[a-zA-Z0-9._-]+:[a-zA-Z0-9._/-]+\.git$',
+
+    # Docker and container identifiers
+    r'^[a-zA-Z0-9._/-]+:[a-zA-Z0-9._-]+$',  # Docker image tags
+    r'^(docker\.io/|registry\.hub\.docker\.com/)[a-zA-Z0-9._/-]+$',
+
+    # Build tool files
+    r'^(requirements|package-lock|Cargo|pom)\.(txt|json|toml|xml)$',
+
+    # Maven coordinates
+    r'^[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+:[a-zA-Z0-9._-]+$',
+
+    # Version control references
+    r'^(refs/heads/|origin/|tag: )[a-zA-Z0-9._/-]+$',
+
+    # Common build output patterns
+    r'^Successfully (built|tagged|installed) [a-zA-Z0-9._-]+$',
+    r'^(Downloading|Collecting|Building|Compiling|Linking) [a-zA-Z0-9._/-]+$',
+    r'^(FROM|COPY|RUN|EXPOSE) [a-zA-Z0-9._/: -]+$',
+]
+
+# Compile patterns for performance
+COMPILED_BUILD_SAFE_PATTERNS = [re.compile(pattern, re.IGNORECASE) for pattern in BUILD_SAFE_PATTERNS]
+
+
+def is_build_safe_pattern(s: str) -> bool:
+    """Check if a string matches any build-safe pattern."""
+    s = s.strip()
+    for pattern in COMPILED_BUILD_SAFE_PATTERNS:
+        if pattern.match(s):
+            return True
+    return False
+
+
+def has_build_context_keywords(line: str) -> bool:
+    """Check if the line contains build-related context keywords."""
+    build_keywords = [
+        'building', 'built', 'compile', 'compiling', 'linking', 'installing', 'installed',
+        'downloading', 'downloaded', 'collecting', 'successfully', 'checksum', 'digest',
+        'from central', 'maven', 'npm', 'pip', 'cargo', 'docker', 'image', 'tag',
+        'commit', 'branch', 'merge', 'refs/', 'origin/', 'target/', 'build/',
+        'requirements.txt', 'package.json', 'pom.xml', 'cargo.toml',
+        'container id', 'build id', 'session:', 'request id', 'trace id',
+        'from node', 'copy', 'run npm', 'expose', 'head is now', 'image id'
+    ]
+
+    line_lower = line.lower()
+    return any(keyword in line_lower for keyword in build_keywords)
 
 
 def is_password_like(s: str) -> bool:
@@ -56,8 +132,24 @@ def find_password_like_strings(raw_content: str) -> List[dict]:
 
 
 def is_password_like_loose(s: str) -> bool:
+    """
+    Improved password-like detection with build context awareness.
+
+    Reduces false positives by:
+    1. Checking against build-safe patterns first
+    2. Using balanced entropy and complexity thresholds
+    3. Adding context-aware exclusions for build artifacts
+    4. Maintaining detection of actual secrets
+    """
+    # Quick length check
     if len(s) < 12:
         return False
+
+    # Check if it matches any build-safe pattern
+    if is_build_safe_pattern(s):
+        return False
+
+    # Count character classes
     classes = 0
     if re.search(r"[A-Z]", s):
         classes += 1
@@ -67,16 +159,103 @@ def is_password_like_loose(s: str) -> bool:
         classes += 1
     if re.search(r"[^A-Za-z0-9]", s):
         classes += 1
-    if classes >= 2 or shannon_entropy(s) > 3.0:
-        return True
-    return False
+
+    # Calculate entropy
+    entropy = shannon_entropy(s)
+
+    # Use balanced thresholds: require either high complexity OR high entropy
+    # This allows detection of both complex passwords and high-entropy tokens
+    high_complexity = classes >= 3
+    high_entropy = entropy > 3.5
+    medium_entropy = entropy > 3.0
+
+    # Require either:
+    # 1. High complexity (3+ classes) AND medium entropy (3.0+), OR
+    # 2. High entropy (3.5+) regardless of complexity
+    if not (high_entropy or (high_complexity and medium_entropy)):
+        return False
+
+    # Additional checks for common non-secret patterns
+
+    # Skip if it's mostly repeating characters (but allow some repetition for real passwords)
+    if len(set(s)) < len(s) * 0.4:  # Less than 40% unique characters
+        return False
+
+    # Skip if it looks like a file path (even if not caught by patterns)
+    if '/' in s and (s.startswith('/') or '.' in s):
+        return False
+
+    # Skip if it looks like a Windows path
+    if '\\' in s and (':' in s or s.count('\\') >= 2):
+        return False
+
+    # Skip if it looks like a simple URL without credentials
+    if s.startswith(('http://', 'https://', 'ftp://')) and '://' in s and '@' not in s:
+        return False
+
+    # Skip git URLs without credentials
+    if s.startswith('git@') and ':' in s and '/' in s and not any(c in s for c in ['password', 'pwd', 'secret']):
+        return False
+
+    # Skip if it looks like a version identifier
+    if re.match(r'^[a-zA-Z0-9._-]+-\d+\.\d+', s):
+        return False
+
+    # Skip if it looks like a checksum
+    if ':' in s and re.match(r'^[a-zA-Z0-9]+:[a-f0-9]+$', s):
+        return False
+
+    # Skip if it looks like a git commit hash (40 hex chars)
+    if re.match(r'^[a-f0-9]{40}$', s):
+        return False
+
+    # Skip if it looks like a long container/build ID (all lowercase alphanumeric)
+    if len(s) > 30 and re.match(r'^[a-z0-9]+$', s):
+        return False
+
+    # Skip if it contains common file extensions
+    if any(ext in s.lower() for ext in ['.json', '.xml', '.txt', '.jar', '.exe', '.dll']):
+        return False
+
+    return True
 
 
 def find_custom_password_like_strings(raw_content: str) -> List[dict]:
     findings = []
     for i, line in enumerate(raw_content.splitlines(), 1):
+        # Skip lines with build context keywords
+        if has_build_context_keywords(line):
+            continue
+
+        # Skip lines that look like file paths
+        line_stripped = line.strip()
+        if (line_stripped.startswith('/') or
+            (len(line_stripped) > 3 and line_stripped[1:3] == ':\\') or
+            line_stripped.startswith('target/') or
+            line_stripped.startswith('build/')):
+            continue
+
         # Find any sequence of 12+ non-whitespace characters
         tokens = re.findall(r"\S{12,}", line)
+
+        # Also extract potential passwords from connection strings and environment variables
+        # Look for patterns like ://user:password@ or pwd=password or password=value  # pragma: allowlist secret
+        connection_patterns = [
+            r'://[^:]+:([^@]{12,})@',  # ://user:password@  # pragma: allowlist secret
+            r'pwd=([^;\s]{12,})',      # pwd=password
+            r'password=([^;\s&]{12,})', # password=value
+            r'passwd=([^;\s&]{12,})',   # passwd=value
+            r'API_KEY=([^;\s&]{12,})',  # API_KEY=value
+            r'SECRET=([^;\s&]{12,})',   # SECRET=value
+            r'TOKEN=([^;\s&]{12,})',    # TOKEN=value
+        ]
+
+        for pattern in connection_patterns:
+            matches = re.findall(pattern, line, re.IGNORECASE)
+            for match in matches:
+                if len(match) >= 12:
+                    tokens.append(match)
+
         for token in tokens:
             if is_password_like_loose(token):
                 findings.append(
