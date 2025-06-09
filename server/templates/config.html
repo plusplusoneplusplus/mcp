@@ -387,8 +387,10 @@
 
         // Determine input type based on setting name and value
         let inputHtml;
-        const defaultValue = currentConfig.default_settings && currentConfig.default_settings[settingName.replace(/^(azrepo|kusto)_/, '')];
-        const isBoolean = typeof defaultValue === 'boolean' || typeof value === 'boolean';
+        const defaultSetting = currentConfig.default_settings && currentConfig.default_settings[settingName.replace(/^(azrepo|kusto)_/, '')];
+        const defaultValue = defaultSetting ? defaultSetting.default_value : undefined;
+        const settingType = defaultSetting ? defaultSetting.type : undefined;
+        const isBoolean = settingType === 'bool' || typeof defaultValue === 'boolean' || typeof value === 'boolean';
 
         if (isBoolean) {
             const checked = value === true || value === 'true' ? 'checked' : '';
@@ -552,6 +554,24 @@
         }
     }
 
+    async function backupEnvFile() {
+        try {
+            const response = await fetch('/api/configuration/backup-env', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                updateConfigStatus(`Backup created successfully: ${result.backup_path}`, 'success');
+            } else {
+                updateConfigStatus('Error creating backup: ' + result.error, 'error');
+            }
+        } catch (error) {
+            updateConfigStatus('Error creating backup: ' + error.message, 'error');
+        }
+    }
+
     function updateConfigStatus(message, type) {
         const statusDiv = document.getElementById('config-status');
         statusDiv.style.display = 'block';
@@ -675,6 +695,7 @@
         document.getElementById('edit-env-file').addEventListener('click', loadEnvFile);
         document.getElementById('save-env-file').addEventListener('click', saveEnvFile);
         document.getElementById('validate-env-file').addEventListener('click', validateEnvFile);
+        document.getElementById('backup-env-file').addEventListener('click', backupEnvFile);
         document.getElementById('cancel-env-edit').addEventListener('click', function () {
             document.getElementById('env-file-editor').style.display = 'none';
             document.getElementById('env-file-content').value = originalEnvContent;
