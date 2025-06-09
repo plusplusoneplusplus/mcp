@@ -295,7 +295,7 @@ async def jobs(request: Request):
         "jobs.html", {"request": request, "current_page": "jobs"}
     )
 
-async def config(request: Request):
+async def config_page(request: Request):
     return templates.TemplateResponse(
         "config.html", {"request": request, "current_page": "config"}
     )
@@ -306,7 +306,7 @@ routes = [
     Route("/", endpoint=index, methods=["GET"]),
     Route("/knowledge", endpoint=knowledge, methods=["GET"]),
     Route("/jobs", endpoint=jobs, methods=["GET"]),
-    Route("/config", endpoint=config, methods=["GET"]),
+    Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
 ] + api_routes
