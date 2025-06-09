@@ -59,12 +59,7 @@ This ensures you're working from the latest stable code and prevents conflicts.
 ### 3. Implementation Phase
 
 **⚠️ FIRST STEP: Mark Issue as Work-in-Progress**
-- **Immediately after creating your branch and before making any code changes**, add a work-in-progress tag or label to the GitHub issue
-- This signals to other team members that the issue is actively being worked on
-- Common approaches:
-  - Add a "work-in-progress" or "WIP" label to the issue
-  - Comment on the issue stating you've started working on it (e.g., "🚧 Started working on this issue in branch `fix/issue-123-description`")
-  - If your project uses assignees, assign yourself to the issue
+- **Immediately after creating your branch and before making any code changes**, add a work-in-progress tag to the GitHub issue
 - This prevents duplicate work and improves team coordination
 
 **Code Changes:**
