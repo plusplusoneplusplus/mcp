@@ -540,6 +540,91 @@ class PluginRegistry:
         self.yaml_tool_names.update(tool_names)
         logger.debug(f"Added YAML tool names: {tool_names}")
 
+    def get_available_plugins(self) -> Dict[str, Dict[str, Any]]:
+        """Get metadata about all available plugins.
+
+        Returns:
+            Dictionary mapping plugin names to their metadata including
+            registration status, source, and enable/disable state
+        """
+        from mcp_tools.plugin_config import config
+        
+        available_plugins = {}
+        
+        # Add registered tools
+        for tool_name, tool_class in self.tools.items():
+            source = self.tool_sources.get(tool_name, "unknown")
+            available_plugins[tool_name] = {
+                "name": tool_name,
+                "class_name": tool_class.__name__,
+                "source": source,
+                "registered": True,
+                "enabled": config.is_plugin_enabled(tool_name),
+                "explicitly_configured": (
+                    tool_name in config.enabled_plugins or 
+                    tool_name in config.disabled_plugins
+                ),
+                "has_instance": tool_name in self.instances
+            }
+        
+        # Add YAML tool names that might not be registered yet
+        for tool_name in self.yaml_tool_names:
+            if tool_name not in available_plugins:
+                available_plugins[tool_name] = {
+                    "name": tool_name,
+                    "class_name": f"YamlTool_{tool_name}",
+                    "source": "yaml",
+                    "registered": False,
+                    "enabled": config.is_plugin_enabled(tool_name),
+                    "explicitly_configured": (
+                        tool_name in config.enabled_plugins or 
+                        tool_name in config.disabled_plugins
+                    ),
+                    "has_instance": False
+                }
+        
+        # Add explicitly configured plugins that might not be discovered yet
+        config_plugins = config.enabled_plugins.union(config.disabled_plugins)
+        for plugin_name in config_plugins:
+            if plugin_name not in available_plugins:
+                available_plugins[plugin_name] = {
+                    "name": plugin_name,
+                    "class_name": "Unknown",
+                    "source": "configuration",
+                    "registered": False,
+                    "enabled": config.is_plugin_enabled(plugin_name),
+                    "explicitly_configured": True,
+                    "has_instance": False
+                }
+        
+        return available_plugins
+
+    def get_enabled_plugins(self) -> Dict[str, Dict[str, Any]]:
+        """Get metadata about all enabled plugins.
+
+        Returns:
+            Dictionary mapping enabled plugin names to their metadata
+        """
+        all_plugins = self.get_available_plugins()
+        return {
+            name: metadata 
+            for name, metadata in all_plugins.items() 
+            if metadata["enabled"]
+        }
+
+    def get_disabled_plugins(self) -> Dict[str, Dict[str, Any]]:
+        """Get metadata about all disabled plugins.
+
+        Returns:
+            Dictionary mapping disabled plugin names to their metadata
+        """
+        all_plugins = self.get_available_plugins()
+        return {
+            name: metadata 
+            for name, metadata in all_plugins.items() 
+            if not metadata["enabled"]
+        }
+
 
 # Create singleton instance
 registry = PluginRegistry()
