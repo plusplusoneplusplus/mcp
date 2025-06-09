@@ -21,6 +21,13 @@ git checkout main && git pull origin main
 ```
 This ensures you're working from the latest stable code and prevents conflicts.
 
+**Environment Setup:**
+- Use existing virtual environment if available, otherwise create one with `uv venv`
+- Always use uv instead of python/pip for all package management and Python execution:
+  - Use `uv run` instead of `python`
+  - Use `uv add` instead of `pip install`
+  - Use `uv sync` to install dependencies from lock file
+
 ### 1. Issue Analysis Phase
 
 **Read and Understand the Issue:**
