@@ -147,11 +147,9 @@ class RateLimiter:
         self.enabled = config.enabled
         
         if self.enabled:
-            # Token bucket for burst control
-            self.token_bucket = TokenBucket(
-                capacity=config.burst_size,
-                refill_rate=config.requests_per_minute / 60.0  # Convert to per-second
-            )
+            # Per-user token buckets for burst control
+            self.token_buckets: Dict[str, TokenBucket] = {}
+            self.bucket_lock = asyncio.Lock()
             
             # Sliding window for overall rate limiting
             self.sliding_window = SlidingWindowRateLimiter(
@@ -162,6 +160,16 @@ class RateLimiter:
         logger.info(f"RateLimiter initialized: enabled={self.enabled}, "
                    f"requests_per_minute={config.requests_per_minute}, "
                    f"burst_size={config.burst_size}")
+    
+    async def _get_user_bucket(self, user_id: str) -> TokenBucket:
+        """Get or create token bucket for user"""
+        async with self.bucket_lock:
+            if user_id not in self.token_buckets:
+                self.token_buckets[user_id] = TokenBucket(
+                    capacity=self.config.burst_size,
+                    refill_rate=self.config.requests_per_minute / 60.0
+                )
+            return self.token_buckets[user_id]
     
     async def check_rate_limit(self, user_id: str) -> Tuple[bool, Optional[Dict]]:
         """
@@ -198,11 +206,12 @@ class RateLimiter:
             return False, error_info
         
         # Check token bucket for burst control
-        bucket_allowed = await self.token_bucket.consume(1)
+        user_bucket = await self._get_user_bucket(user_id)
+        bucket_allowed = await user_bucket.consume(1)
         
         if not bucket_allowed:
             # Calculate retry after based on refill rate
-            bucket_status = await self.token_bucket.get_status()
+            bucket_status = await user_bucket.get_status()
             tokens_needed = 1 - bucket_status["tokens"]
             retry_after = max(1, int(tokens_needed / bucket_status["refill_rate"]))
             
@@ -232,7 +241,8 @@ class RateLimiter:
             )
         
         window_status = await self.sliding_window.get_status(user_id)
-        bucket_status = await self.token_bucket.get_status()
+        user_bucket = await self._get_user_bucket(user_id)
+        bucket_status = await user_bucket.get_status()
         
         # Calculate window reset time
         window_reset_time = datetime.now(UTC)
@@ -254,11 +264,8 @@ class RateLimiter:
         self.enabled = config.enabled
         
         if self.enabled:
-            # Recreate token bucket with new config
-            self.token_bucket = TokenBucket(
-                capacity=config.burst_size,
-                refill_rate=config.requests_per_minute / 60.0
-            )
+            # Clear existing token buckets to apply new config
+            self.token_buckets.clear()
             
             # Update sliding window
             self.sliding_window.window_size = config.window_seconds
