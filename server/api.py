@@ -12,8 +12,13 @@ import shutil
 import base64
 import time
 import psutil
+import json
+import datetime
+import csv
+import io
+from typing import Dict, List, Any, Optional, Union
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 from starlette.routing import Route
 from utils.vector_store.markdown_segmenter import MarkdownSegmenter
 from utils.vector_store.vector_store import ChromaVectorStore
@@ -457,6 +462,544 @@ async def api_backup_env_file(request: Request):
         }, status_code=500)
 
 
+# Tool History API Helper Functions
+def get_tool_history_directory() -> Optional[Path]:
+    """Get the tool history directory path if history is enabled."""
+    if not env.is_tool_history_enabled():
+        return None
+
+    base_path = env.get_tool_history_path()
+    if not os.path.isabs(base_path):
+        current_dir = Path(__file__).resolve().parent
+        base_path = current_dir / base_path
+
+    history_dir = Path(base_path)
+    return history_dir if history_dir.exists() else None
+
+
+def parse_invocation_id(dir_name: str) -> Optional[Dict[str, Any]]:
+    """Parse invocation directory name to extract metadata."""
+    try:
+        # Format: YYYY-MM-DD_HH-MM-SS_microseconds_tool_name
+        parts = dir_name.split('_')
+        if len(parts) < 4:
+            return None
+
+        date_part = parts[0]
+        time_part = parts[1]
+        microseconds = parts[2]
+        tool_name = '_'.join(parts[3:])
+
+        timestamp_str = f"{date_part}_{time_part}_{microseconds}"
+        timestamp = datetime.datetime.strptime(timestamp_str, "%Y-%m-%d_%H-%M-%S_%f")
+
+        return {
+            "invocation_id": dir_name,
+            "timestamp": timestamp,
+            "tool": tool_name
+        }
+    except Exception:
+        return None
+
+
+def read_tool_history_record(invocation_dir: Path) -> Optional[Dict[str, Any]]:
+    """Read the record.jsonl file from an invocation directory."""
+    record_file = invocation_dir / "record.jsonl"
+    if not record_file.exists():
+        return None
+
+    try:
+        with open(record_file, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+            if content:
+                return json.loads(content)
+    except Exception:
+        pass
+
+    return None
+
+
+def get_tool_history_entries(
+    page: int = 1,
+    per_page: int = 50,
+    tool_filter: Optional[str] = None,
+    success_filter: Optional[bool] = None,
+    start_date: Optional[datetime.datetime] = None,
+    end_date: Optional[datetime.datetime] = None,
+    search: Optional[str] = None
+) -> Dict[str, Any]:
+    """Get tool history entries with filtering and pagination."""
+    history_dir = get_tool_history_directory()
+    if not history_dir:
+        return {
+            "success": False,
+            "error": "Tool history is disabled or directory not found",
+            "history": [],
+            "total": 0,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": 0
+        }
+
+    entries = []
+
+    # Get all invocation directories
+    for dir_path in history_dir.iterdir():
+        if not dir_path.is_dir():
+            continue
+
+        # Parse directory name
+        metadata = parse_invocation_id(dir_path.name)
+        if not metadata:
+            continue
+
+        # Read record file
+        record = read_tool_history_record(dir_path)
+        if not record:
+            continue
+
+        # Apply filters
+        if tool_filter and metadata["tool"] != tool_filter:
+            continue
+
+        if success_filter is not None and record.get("success") != success_filter:
+            continue
+
+        if start_date and metadata["timestamp"] < start_date:
+            continue
+
+        if end_date and metadata["timestamp"] > end_date:
+            continue
+
+        if search:
+            search_text = json.dumps({
+                "arguments": record.get("arguments", {}),
+                "result": record.get("result", {})
+            }).lower()
+            if search.lower() not in search_text:
+                continue
+
+        # Create entry
+        entry = {
+            "invocation_id": metadata["invocation_id"],
+            "timestamp": record.get("timestamp", metadata["timestamp"].isoformat()),
+            "tool": metadata["tool"],
+            "arguments": record.get("arguments", {}),
+            "result": record.get("result", {}),
+            "duration_ms": record.get("duration_ms", 0),
+            "success": record.get("success", True)
+        }
+
+        if "error" in record:
+            entry["error"] = record["error"]
+
+        entries.append(entry)
+
+    # Sort by timestamp (newest first)
+    entries.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    # Pagination
+    total = len(entries)
+    total_pages = (total + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_entries = entries[start_idx:end_idx]
+
+    return {
+        "success": True,
+        "history": paginated_entries,
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages
+    }
+
+
+def get_tool_history_stats() -> Dict[str, Any]:
+    """Get aggregated statistics about tool usage."""
+    history_dir = get_tool_history_directory()
+    if not history_dir:
+        return {
+            "success": False,
+            "error": "Tool history is disabled or directory not found"
+        }
+
+    total_invocations = 0
+    successful_invocations = 0
+    durations = []
+    tool_stats = {}
+
+    # Process all invocation directories
+    for dir_path in history_dir.iterdir():
+        if not dir_path.is_dir():
+            continue
+
+        metadata = parse_invocation_id(dir_path.name)
+        if not metadata:
+            continue
+
+        record = read_tool_history_record(dir_path)
+        if not record:
+            continue
+
+        total_invocations += 1
+        tool_name = metadata["tool"]
+        success = record.get("success", True)
+        duration = record.get("duration_ms", 0)
+
+        if success:
+            successful_invocations += 1
+
+        durations.append(duration)
+
+        # Per-tool statistics
+        if tool_name not in tool_stats:
+            tool_stats[tool_name] = {
+                "count": 0,
+                "success_count": 0,
+                "durations": []
+            }
+
+        tool_stats[tool_name]["count"] += 1
+        if success:
+            tool_stats[tool_name]["success_count"] += 1
+        tool_stats[tool_name]["durations"].append(duration)
+
+    # Calculate aggregated statistics
+    success_rate = successful_invocations / total_invocations if total_invocations > 0 else 0.0
+    avg_duration = sum(durations) / len(durations) if len(durations) > 0 else 0.0
+
+    # Calculate per-tool statistics
+    tools = {}
+    for tool_name, stats in tool_stats.items():
+        tool_durations = stats["durations"]
+        tools[tool_name] = {
+            "count": stats["count"],
+            "success_count": stats["success_count"],
+            "success_rate": stats["success_count"] / stats["count"] if stats["count"] > 0 else 0.0,
+            "avg_duration": sum(tool_durations) / len(tool_durations) if len(tool_durations) > 0 else 0.0
+        }
+
+    return {
+        "success": True,
+        "stats": {
+            "total_invocations": total_invocations,
+            "successful_invocations": successful_invocations,
+            "success_rate": success_rate,
+            "avg_duration": avg_duration,
+            "tools": tools
+        }
+    }
+
+
+# Tool History API Endpoints
+async def api_list_tool_history(request: Request):
+    """List tool execution history with pagination and filtering."""
+    try:
+        # Parse query parameters
+        page = int(request.query_params.get("page", 1))
+        per_page = min(int(request.query_params.get("per_page", 50)), 100)
+        tool_filter = request.query_params.get("tool")
+        success_param = request.query_params.get("success")
+        start_date_param = request.query_params.get("start_date")
+        end_date_param = request.query_params.get("end_date")
+        search = request.query_params.get("search")
+
+        # Parse success filter
+        success_filter = None
+        if success_param:
+            success_filter = success_param.lower() == "true"
+
+        # Parse date filters
+        start_date = None
+        end_date = None
+        if start_date_param:
+            try:
+                start_date = datetime.datetime.fromisoformat(start_date_param.replace('Z', '+00:00'))
+            except ValueError:
+                return JSONResponse(
+                    {"success": False, "error": "Invalid start_date format. Use ISO format."},
+                    status_code=400
+                )
+
+        if end_date_param:
+            try:
+                end_date = datetime.datetime.fromisoformat(end_date_param.replace('Z', '+00:00'))
+            except ValueError:
+                return JSONResponse(
+                    {"success": False, "error": "Invalid end_date format. Use ISO format."},
+                    status_code=400
+                )
+
+        # Get history entries
+        result = get_tool_history_entries(
+            page=page,
+            per_page=per_page,
+            tool_filter=tool_filter,
+            success_filter=success_filter,
+            start_date=start_date,
+            end_date=end_date,
+            search=search
+        )
+
+        status_code = 200 if result.get("success") else 404
+        return JSONResponse(result, status_code=status_code)
+
+    except ValueError as e:
+        return JSONResponse(
+            {"success": False, "error": f"Invalid parameter: {str(e)}"},
+            status_code=400
+        )
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+async def api_get_tool_history_detail(request: Request):
+    """Get detailed information for a specific tool invocation."""
+    try:
+        invocation_id = request.path_params.get("invocation_id")
+        if not invocation_id:
+            return JSONResponse(
+                {"success": False, "error": "Missing invocation_id"},
+                status_code=400
+            )
+
+        history_dir = get_tool_history_directory()
+        if not history_dir:
+            return JSONResponse(
+                {"success": False, "error": "Tool history is disabled or directory not found"},
+                status_code=404
+            )
+
+        invocation_dir = history_dir / invocation_id
+        if not invocation_dir.exists():
+            return JSONResponse(
+                {"success": False, "error": f"Invocation {invocation_id} not found"},
+                status_code=404
+            )
+
+        # Read the main record
+        record = read_tool_history_record(invocation_dir)
+        if not record:
+            return JSONResponse(
+                {"success": False, "error": f"No record found for invocation {invocation_id}"},
+                status_code=404
+            )
+
+        # Parse metadata from directory name
+        metadata = parse_invocation_id(invocation_id)
+
+        # Get additional files in the directory
+        additional_files = []
+        for file_path in invocation_dir.iterdir():
+            if file_path.name != "record.jsonl" and file_path.is_file():
+                try:
+                    # Try to read as text first
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    additional_files.append({
+                        "filename": file_path.name,
+                        "content": content,
+                        "type": "text"
+                    })
+                except UnicodeDecodeError:
+                    # If not text, provide file info only
+                    additional_files.append({
+                        "filename": file_path.name,
+                        "size": file_path.stat().st_size,
+                        "type": "binary"
+                    })
+
+        result = {
+            "success": True,
+            "invocation": {
+                "invocation_id": invocation_id,
+                "timestamp": record.get("timestamp"),
+                "tool": metadata["tool"] if metadata else "unknown",
+                "arguments": record.get("arguments", {}),
+                "result": record.get("result", {}),
+                "duration_ms": record.get("duration_ms", 0),
+                "success": record.get("success", True),
+                "additional_files": additional_files
+            }
+        }
+
+        if "error" in record:
+            result["invocation"]["error"] = record["error"]
+
+        return JSONResponse(result)
+
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+async def api_get_tool_history_stats(request: Request):
+    """Get aggregated statistics about tool usage."""
+    try:
+        result = get_tool_history_stats()
+        status_code = 200 if result.get("success") else 404
+        return JSONResponse(result, status_code=status_code)
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+async def api_clear_tool_history(request: Request):
+    """Clear tool execution history with confirmation."""
+    try:
+        data = await request.json()
+        confirm = data.get("confirm", False)
+
+        if not confirm:
+            return JSONResponse(
+                {"success": False, "error": "Confirmation required. Set 'confirm': true"},
+                status_code=400
+            )
+
+        history_dir = get_tool_history_directory()
+        if not history_dir:
+            return JSONResponse(
+                {"success": False, "error": "Tool history is disabled or directory not found"},
+                status_code=404
+            )
+
+        # Count entries before deletion
+        entry_count = 0
+        for dir_path in history_dir.iterdir():
+            if dir_path.is_dir():
+                entry_count += 1
+
+        # Remove all invocation directories
+        for dir_path in history_dir.iterdir():
+            if dir_path.is_dir():
+                shutil.rmtree(dir_path)
+
+        return JSONResponse({
+            "success": True,
+            "message": f"Cleared {entry_count} tool history entries"
+        })
+
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
+async def api_export_tool_history(request: Request):
+    """Export tool history data in multiple formats."""
+    try:
+        # Parse query parameters
+        format_param = request.query_params.get("format", "json").lower()
+        tool_filter = request.query_params.get("tool")
+        start_date_param = request.query_params.get("start_date")
+        end_date_param = request.query_params.get("end_date")
+
+        if format_param not in ["json", "csv"]:
+            return JSONResponse(
+                {"success": False, "error": "Invalid format. Supported: json, csv"},
+                status_code=400
+            )
+
+        # Parse date filters
+        start_date = None
+        end_date = None
+        if start_date_param:
+            try:
+                start_date = datetime.datetime.fromisoformat(start_date_param.replace('Z', '+00:00'))
+            except ValueError:
+                return JSONResponse(
+                    {"success": False, "error": "Invalid start_date format. Use ISO format."},
+                    status_code=400
+                )
+
+        if end_date_param:
+            try:
+                end_date = datetime.datetime.fromisoformat(end_date_param.replace('Z', '+00:00'))
+            except ValueError:
+                return JSONResponse(
+                    {"success": False, "error": "Invalid end_date format. Use ISO format."},
+                    status_code=400
+                )
+
+        # Get all entries (no pagination for export)
+        result = get_tool_history_entries(
+            page=1,
+            per_page=10000,  # Large number to get all entries
+            tool_filter=tool_filter,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        if not result.get("success"):
+            return JSONResponse(result, status_code=404)
+
+        entries = result["history"]
+
+        if format_param == "json":
+            # JSON export
+            export_data = {
+                "export_timestamp": datetime.datetime.now().isoformat(),
+                "total_entries": len(entries),
+                "filters": {
+                    "tool": tool_filter,
+                    "start_date": start_date_param,
+                    "end_date": end_date_param
+                },
+                "entries": entries
+            }
+
+            return JSONResponse(export_data)
+
+        elif format_param == "csv":
+            # CSV export
+            output = io.StringIO()
+            if entries:
+                fieldnames = ["invocation_id", "timestamp", "tool", "duration_ms", "success", "arguments", "result", "error"]
+                writer = csv.DictWriter(output, fieldnames=fieldnames)
+                writer.writeheader()
+
+                for entry in entries:
+                    csv_row = {
+                        "invocation_id": entry.get("invocation_id", ""),
+                        "timestamp": entry.get("timestamp", ""),
+                        "tool": entry.get("tool", ""),
+                        "duration_ms": entry.get("duration_ms", 0),
+                        "success": entry.get("success", True),
+                        "arguments": json.dumps(entry.get("arguments", {})),
+                        "result": json.dumps(entry.get("result", {})),
+                        "error": entry.get("error", "")
+                    }
+                    writer.writerow(csv_row)
+
+            csv_content = output.getvalue()
+            output.close()
+
+            # Return CSV as streaming response
+            def generate():
+                yield csv_content
+
+            return StreamingResponse(
+                generate(),
+                media_type="text/csv",
+                headers={"Content-Disposition": "attachment; filename=tool_history.csv"}
+            )
+
+    except Exception as e:
+        return JSONResponse(
+            {"success": False, "error": str(e)},
+            status_code=500
+        )
+
+
 api_routes = [
     Route("/api/import-knowledge", endpoint=api_import_knowledge, methods=["POST"]),
     Route("/api/collections", endpoint=api_list_collections, methods=["GET"]),
@@ -476,4 +1019,10 @@ api_routes = [
     Route("/api/configuration/validate-env", endpoint=api_validate_env_content, methods=["POST"]),
     Route("/api/configuration/reload", endpoint=api_reload_configuration, methods=["POST"]),
     Route("/api/configuration/backup-env", endpoint=api_backup_env_file, methods=["POST"]),
+    # Tool History API endpoints - specific routes first, then generic ones
+    Route("/api/tool-history", endpoint=api_list_tool_history, methods=["GET"]),
+    Route("/api/tool-history/stats", endpoint=api_get_tool_history_stats, methods=["GET"]),
+    Route("/api/tool-history/clear", endpoint=api_clear_tool_history, methods=["POST"]),
+    Route("/api/tool-history/export", endpoint=api_export_tool_history, methods=["GET"]),
+    Route("/api/tool-history/{invocation_id}", endpoint=api_get_tool_history_detail, methods=["GET"]),
 ]
