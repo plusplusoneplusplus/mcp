@@ -127,11 +127,15 @@ tools:
       windows: powershell -file {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.ps1
       darwin: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.sh
       linux: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.sh
-    # Post-processing configuration to control output attachment
+    # Post-processing configuration to control output attachment and security
     post_processing:
       attach_stdout: true              # Include stdout in output (default: true)
       attach_stderr: false             # Include stderr in output (default: true)
       stderr_on_failure_only: true    # Only include stderr if return_code != 0 (default: false)
+      security_filtering:
+        enabled: true                  # Enable security filtering for sensitive data
+        apply_to: ["stdout", "stderr"] # Filter both stdout and stderr (default: both)
+        log_findings: true             # Log security alerts (default: true)
     inputSchema:
       type: object
       properties:
@@ -198,6 +202,8 @@ tools:
           type: string
           description: Path to configuration file to validate
           default: "config.yaml"
+
+
         timeout:
           type: number
           description: Optional timeout in seconds
