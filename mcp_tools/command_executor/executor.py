@@ -13,6 +13,7 @@ import tempfile
 from datetime import datetime, UTC
 from pathlib import Path
 import traceback
+from collections import OrderedDict
 
 # Import the interface
 from mcp_tools.interfaces import CommandExecutorInterface
@@ -122,12 +123,18 @@ class CommandExecutor(CommandExecutorInterface):
         self.os_type = platform.system().lower()
         self.running_processes = {}
         self.process_tokens = {}  # Maps tokens to process IDs
-        self.completed_processes = {}  # Store results of completed processes
         self.temp_files = {}  # Maps PIDs to (stdout_file, stderr_file) tuples
         self.cleanup_lock = asyncio.Lock()  # Lock to protect temp file operations
 
+        # Memory management for completed processes - using OrderedDict for LRU behavior
+        self.completed_processes = OrderedDict()  # Store results of completed processes
+        self.completed_process_timestamps = {}  # Track completion timestamps for TTL
+
         # Periodic status reporting attributes
         self.status_reporter_task: Optional[asyncio.Task] = None
+        
+        # Background cleanup task
+        self.cleanup_task: Optional[asyncio.Task] = None
 
         # Load configuration from config manager
         env_manager.load()
@@ -141,6 +148,20 @@ class CommandExecutor(CommandExecutorInterface):
             "periodic_status_max_command_length", 60
         )
 
+        # Memory management settings with defaults
+        self.max_completed_processes = env_manager.get_setting(
+            "max_completed_processes", 100
+        )
+        self.completed_process_ttl = env_manager.get_setting(
+            "completed_process_ttl", 3600  # 1 hour default
+        )
+        self.auto_cleanup_enabled = env_manager.get_setting(
+            "auto_cleanup_enabled", True
+        )
+        self.cleanup_interval = env_manager.get_setting(
+            "cleanup_interval", 300  # 5 minutes default
+        )
+
         # Use specified temp dir or system default
         self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
 
@@ -150,8 +171,254 @@ class CommandExecutor(CommandExecutorInterface):
         _log_with_context(
             logging.INFO,
             "Initialized CommandExecutor",
-            {"temp_dir": self.temp_dir, "os_type": self.os_type},
+            {
+                "temp_dir": self.temp_dir, 
+                "os_type": self.os_type,
+                "max_completed_processes": self.max_completed_processes,
+                "completed_process_ttl": self.completed_process_ttl,
+                "auto_cleanup_enabled": self.auto_cleanup_enabled,
+                "cleanup_interval": self.cleanup_interval
+            },
         )
+
+        # Start cleanup task if enabled
+        if self.auto_cleanup_enabled:
+            self.start_cleanup_task()
+
+    def __del__(self):
+        """Cleanup when the CommandExecutor is destroyed."""
+        try:
+            self.stop_cleanup_task()
+        except Exception:
+            # Ignore errors during cleanup
+            pass
+
+    def _enforce_completed_process_limit(self) -> None:
+        """Enforce the maximum number of completed processes using LRU eviction.
+        
+        This method removes the oldest completed processes when the limit would be exceeded.
+        """
+        # Remove processes if we exceed the limit
+        while len(self.completed_processes) > self.max_completed_processes:
+            # Remove the oldest item (FIFO/LRU behavior with OrderedDict)
+            oldest_token, oldest_result = self.completed_processes.popitem(last=False)
+            
+            # Also remove from timestamps
+            if oldest_token in self.completed_process_timestamps:
+                del self.completed_process_timestamps[oldest_token]
+            
+            _log_with_context(
+                logging.DEBUG,
+                "Evicted oldest completed process due to limit",
+                {
+                    "evicted_token": oldest_token[:8],
+                    "current_count": len(self.completed_processes),
+                    "max_limit": self.max_completed_processes
+                }
+            )
+
+    def _cleanup_expired_processes(self) -> int:
+        """Clean up completed processes that have exceeded their TTL.
+        
+        Returns:
+            Number of processes cleaned up
+        """
+        if self.completed_process_ttl <= 0:
+            return 0
+            
+        current_time = time.time()
+        expired_tokens = []
+        
+        # Find expired processes
+        for token, timestamp in self.completed_process_timestamps.items():
+            if current_time - timestamp > self.completed_process_ttl:
+                expired_tokens.append(token)
+        
+        # Remove expired processes
+        cleanup_count = 0
+        for token in expired_tokens:
+            if token in self.completed_processes:
+                del self.completed_processes[token]
+                cleanup_count += 1
+            if token in self.completed_process_timestamps:
+                del self.completed_process_timestamps[token]
+        
+        if cleanup_count > 0:
+            _log_with_context(
+                logging.DEBUG,
+                "Cleaned up expired completed processes",
+                {
+                    "cleanup_count": cleanup_count,
+                    "ttl_seconds": self.completed_process_ttl,
+                    "remaining_count": len(self.completed_processes)
+                }
+            )
+        
+        return cleanup_count
+
+    async def _periodic_cleanup_task(self) -> None:
+        """Background task that periodically cleans up expired completed processes."""
+        try:
+            while True:
+                await asyncio.sleep(self.cleanup_interval)
+                
+                try:
+                    cleanup_count = self._cleanup_expired_processes()
+                    
+                    if cleanup_count > 0:
+                        _log_with_context(
+                            logging.INFO,
+                            "Periodic cleanup completed",
+                            {
+                                "cleaned_processes": cleanup_count,
+                                "remaining_processes": len(self.completed_processes)
+                            }
+                        )
+                        
+                except Exception as e:
+                    _log_with_context(
+                        logging.ERROR,
+                        "Error during periodic cleanup",
+                        {"error": str(e), "traceback": traceback.format_exc()}
+                    )
+
+        except asyncio.CancelledError:
+            _log_with_context(
+                logging.INFO,
+                "Periodic cleanup task cancelled",
+                {"cleanup_interval": self.cleanup_interval}
+            )
+            raise
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                "Error in periodic cleanup task",
+                {"error": str(e), "traceback": traceback.format_exc()}
+            )
+
+    def start_cleanup_task(self) -> None:
+        """Start the background cleanup task."""
+        if not self.auto_cleanup_enabled:
+            return
+            
+        # Stop existing task if running
+        self.stop_cleanup_task()
+        
+        # Only start task if there's a running event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # Start new cleanup task
+            self.cleanup_task = asyncio.create_task(self._periodic_cleanup_task())
+            
+            _log_with_context(
+                logging.INFO,
+                "Started background cleanup task",
+                {
+                    "cleanup_interval": self.cleanup_interval,
+                    "ttl_seconds": self.completed_process_ttl,
+                    "max_processes": self.max_completed_processes
+                }
+            )
+        except RuntimeError:
+            # No event loop running, defer task creation
+            _log_with_context(
+                logging.DEBUG,
+                "No event loop running, deferring cleanup task creation",
+                {"auto_cleanup_enabled": self.auto_cleanup_enabled}
+            )
+
+    def stop_cleanup_task(self) -> None:
+        """Stop the background cleanup task."""
+        if self.cleanup_task and not self.cleanup_task.done():
+            try:
+                self.cleanup_task.cancel()
+            except RuntimeError:
+                # Event loop might be closed, ignore the error
+                pass
+            self.cleanup_task = None
+            
+        _log_with_context(
+            logging.INFO,
+            "Stopped background cleanup task",
+            {}
+        )
+
+    def _ensure_cleanup_task_running(self) -> None:
+        """Ensure the cleanup task is running if auto cleanup is enabled."""
+        if (self.auto_cleanup_enabled and 
+            (self.cleanup_task is None or self.cleanup_task.done())):
+            try:
+                loop = asyncio.get_running_loop()
+                self.start_cleanup_task()
+            except RuntimeError:
+                # No event loop running, can't start task
+                pass
+
+    def cleanup_completed_processes(self, force_all: bool = False) -> Dict[str, Any]:
+        """Manually clean up completed processes.
+        
+        Args:
+            force_all: If True, remove all completed processes regardless of TTL
+            
+        Returns:
+            Dictionary with cleanup statistics
+        """
+        initial_count = len(self.completed_processes)
+        
+        if force_all:
+            # Clear all completed processes
+            self.completed_processes.clear()
+            self.completed_process_timestamps.clear()
+            cleanup_count = initial_count
+            
+            _log_with_context(
+                logging.INFO,
+                "Force cleaned all completed processes",
+                {"cleaned_count": cleanup_count}
+            )
+        else:
+            # Clean up expired processes only
+            cleanup_count = self._cleanup_expired_processes()
+            
+            # Also enforce the limit
+            self._enforce_completed_process_limit()
+        
+        return {
+            "initial_count": initial_count,
+            "cleaned_count": cleanup_count,
+            "remaining_count": len(self.completed_processes),
+            "force_all": force_all
+        }
+
+    def get_memory_stats(self) -> Dict[str, Any]:
+        """Get current memory usage statistics for completed processes.
+        
+        Returns:
+            Dictionary with memory statistics
+        """
+        current_time = time.time()
+        
+        # Calculate age statistics
+        ages = []
+        for timestamp in self.completed_process_timestamps.values():
+            ages.append(current_time - timestamp)
+        
+        stats = {
+            "completed_processes_count": len(self.completed_processes),
+            "max_completed_processes": self.max_completed_processes,
+            "completed_process_ttl": self.completed_process_ttl,
+            "auto_cleanup_enabled": self.auto_cleanup_enabled,
+            "cleanup_interval": self.cleanup_interval,
+        }
+        
+        if ages:
+            stats.update({
+                "oldest_process_age": max(ages),
+                "newest_process_age": min(ages),
+                "average_process_age": sum(ages) / len(ages)
+            })
+        
+        return stats
 
     def _create_temp_files(self, prefix: str = "cmd_") -> tuple:
         """Create temporary files for stdout and stderr
@@ -508,6 +775,9 @@ class CommandExecutor(CommandExecutorInterface):
         Returns:
             Dictionary with process token and initial status
         """
+        # Ensure cleanup task is running
+        self._ensure_cleanup_task_running()
+        
         # Create temporary files for output capture
         stdout_path, stderr_path, stdout_file, stderr_file = self._create_temp_files()
 
@@ -634,7 +904,10 @@ class CommandExecutor(CommandExecutorInterface):
         if token not in self.process_tokens:
             # Check if it's in completed processes
             if token in self.completed_processes:
-                return self.completed_processes[token]
+                # Move to end to mark as recently accessed (LRU behavior)
+                result = self.completed_processes[token]
+                self.completed_processes.move_to_end(token)
+                return result
 
             _log_with_context(
                 logging.WARNING, f"Process token not found: {token}", {"token": token}
@@ -1039,8 +1312,13 @@ class CommandExecutor(CommandExecutorInterface):
         if "terminated" in process_data and process_data["terminated"]:
             result["status"] = "terminated"
 
-        # Store in completed processes
+        # Enforce memory limits before adding new process
+        self._enforce_completed_process_limit()
+        
+        # Store in completed processes with timestamp
+        current_time = time.time()
         self.completed_processes[token] = result
+        self.completed_process_timestamps[token] = current_time
 
         _log_with_context(
             logging.INFO,
@@ -1051,6 +1329,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "returncode": returncode,
                 "stdout_length": len(stdout_content),
                 "stderr_length": len(stderr_content),
+                "completed_processes_count": len(self.completed_processes),
             },
         )
 
