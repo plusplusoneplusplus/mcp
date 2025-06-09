@@ -249,7 +249,16 @@ async def api_list_background_jobs(request: Request):
     # Running jobs
     for info in executor.list_running_processes():
         if not status_filter or status_filter == info.get("status"):
-            info["token"] = executor.running_processes[info["pid"]]["token"]
+            pid = info["pid"]
+            # Get the full token and start_time from running_processes
+            if pid in executor.running_processes:
+                process_data = executor.running_processes[pid]
+                info["token"] = process_data["token"]
+                info["start_time"] = process_data["start_time"]
+            else:
+                # Fallback if process data not found
+                info["token"] = executor.running_processes.get(pid, {}).get("token", "unknown")
+                info["start_time"] = None
             jobs.append(info)
 
     if include_completed:
@@ -258,6 +267,11 @@ async def api_list_background_jobs(request: Request):
             if not status_filter or status_filter == status:
                 job = result.copy()
                 job["token"] = token
+                # For completed jobs, calculate start_time from duration if available
+                if "duration" in job and "start_time" not in job:
+                    # If we have duration but no start_time, we can't calculate it accurately
+                    # since we don't know when it completed. Leave start_time as None.
+                    job["start_time"] = None
                 jobs.append(job)
 
     total_count = len(jobs)
