@@ -59,10 +59,10 @@ tools:
         max_stderr_length: 2000        # Maximum characters for stderr
         max_total_length: 6000         # Maximum combined length (applied after individual limits)
 
-        # Truncation strategy (default: "end")
+        # Truncation strategy (default: "start")
         # Available options:
+        #   "start" - Keep end, truncate beginning (good for final results, errors)
         #   "end" - Keep beginning, truncate end (good for logs, build output)
-        #   "start" - Keep end, truncate beginning (good for final results)
         #   "middle" - Keep beginning and end, truncate middle (preserves context)
         #   "smart" - Intelligent truncation preserving errors/warnings/stack traces
         truncate_strategy: "smart"
@@ -100,23 +100,23 @@ tools:
 
 # Usage examples for different scenarios:
 #
-# 1. For log analysis (preserve important messages):
+# 1. For final results/errors (default behavior):
+#    max_stdout_length: 1000
+#    # truncate_strategy: "start" (default - keeps end)
+#
+# 2. For log analysis (preserve important messages):
 #    truncate_strategy: "smart"
 #    preserve_last_lines: 20
 #
-# 2. For build tools (show start and recent output):
+# 3. For build tools (show start and recent output):
 #    truncate_strategy: "end"
 #    preserve_last_lines: 15
 #
-# 3. For test runners (show summary and results):
+# 4. For test runners (show summary and results):
 #    truncate_strategy: "middle"
 #    preserve_first_lines: 10
 #    preserve_last_lines: 20
 #
-# 4. For data processing (keep final results):
+# 5. For data processing with backup:
 #    truncate_strategy: "start"
 #    preserve_raw: true
-#
-# 5. For minimal setup (just limit length):
-#    max_stdout_length: 1000
-#    # (all other options use defaults)

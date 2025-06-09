@@ -77,7 +77,7 @@ class OutputLimiter:
         if len(text) <= max_length:
             return text
 
-        strategy = limits.get("truncate_strategy", "end")
+        strategy = limits.get("truncate_strategy", "start")
         message = limits.get("truncate_message", "\n... (truncated)")
 
         if strategy == "end":
