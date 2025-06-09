@@ -457,6 +457,122 @@ async def api_backup_env_file(request: Request):
         }, status_code=500)
 
 
+async def api_list_tool_history(request: Request):
+    """List recorded tool invocations."""
+    if not env.is_tool_history_enabled():
+        return JSONResponse({"success": False, "error": "History disabled"}, status_code=400)
+    history_path = Path(env.get_tool_history_path())
+    if not history_path.exists():
+        return JSONResponse({"success": True, "history": [], "total": 0})
+
+    entries = []
+    for d in sorted(history_path.iterdir(), reverse=True):
+        record_file = d / "record.jsonl"
+        if record_file.exists():
+            try:
+                with open(record_file, "r", encoding="utf-8") as f:
+                    first_line = f.readline()
+                    data = json.loads(first_line)
+                entries.append({
+                    "invocation_id": d.name,
+                    "timestamp": data.get("timestamp"),
+                    "tool": data.get("tool"),
+                    "arguments": data.get("arguments"),
+                    "result": data.get("result"),
+                    "duration_ms": data.get("duration_ms"),
+                    "success": data.get("success"),
+                })
+            except Exception:
+                continue
+
+    return JSONResponse({"success": True, "history": entries, "total": len(entries)})
+
+
+async def api_get_tool_history(request: Request):
+    """Get details for a specific invocation."""
+    invocation_id = request.path_params.get("invocation_id")
+    history_path = Path(env.get_tool_history_path()) / invocation_id
+    record_file = history_path / "record.jsonl"
+    if not record_file.exists():
+        return JSONResponse({"success": False, "error": "Not found"}, status_code=404)
+    records = []
+    with open(record_file, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                records.append(json.loads(line))
+            except Exception:
+                pass
+    return JSONResponse({"success": True, "records": records})
+
+
+async def api_tool_history_stats(request: Request):
+    """Return aggregate statistics for tool history."""
+    if not env.is_tool_history_enabled():
+        return JSONResponse({"success": False, "error": "History disabled"}, status_code=400)
+    history_path = Path(env.get_tool_history_path())
+    total = 0
+    success_count = 0
+    durations = []
+    if history_path.exists():
+        for d in history_path.iterdir():
+            record_file = d / "record.jsonl"
+            if record_file.exists():
+                with open(record_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            data = json.loads(line)
+                        except Exception:
+                            continue
+                        total += 1
+                        if data.get("success"):
+                            success_count += 1
+                        durations.append(data.get("duration_ms", 0.0))
+    avg_duration = sum(durations) / len(durations) if durations else 0.0
+    rate = success_count / total if total else 0.0
+    return JSONResponse({
+        "success": True,
+        "stats": {
+            "total_invocations": total,
+            "successful_invocations": success_count,
+            "success_rate": rate,
+            "avg_duration": avg_duration,
+        },
+    })
+
+
+async def api_clear_tool_history(request: Request):
+    """Clear all tool history after confirmation."""
+    data = await request.json()
+    if not data.get("confirm"):
+        return JSONResponse({"success": False, "error": "Confirmation required"}, status_code=400)
+    history_path = Path(env.get_tool_history_path())
+    if history_path.exists():
+        shutil.rmtree(history_path)
+    history_path.mkdir(parents=True, exist_ok=True)
+    return JSONResponse({"success": True})
+
+
+async def api_export_tool_history(request: Request):
+    """Export all tool history records as JSON."""
+    if not env.is_tool_history_enabled():
+        return JSONResponse({"success": False, "error": "History disabled"}, status_code=400)
+    history_path = Path(env.get_tool_history_path())
+    export = []
+    if history_path.exists():
+        for d in sorted(history_path.iterdir()):
+            record_file = d / "record.jsonl"
+            if record_file.exists():
+                with open(record_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            data = json.loads(line)
+                            data["invocation_id"] = d.name
+                            export.append(data)
+                        except Exception:
+                            pass
+    return JSONResponse({"success": True, "history": export})
+
+
 api_routes = [
     Route("/api/import-knowledge", endpoint=api_import_knowledge, methods=["POST"]),
     Route("/api/collections", endpoint=api_list_collections, methods=["GET"]),
@@ -467,6 +583,12 @@ api_routes = [
     Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
     Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
     Route("/api/background-jobs/{token}/terminate", endpoint=api_terminate_background_job, methods=["POST"]),
+    # Tool history API endpoints
+    Route("/api/tool-history", endpoint=api_list_tool_history, methods=["GET"]),
+    Route("/api/tool-history/{invocation_id}", endpoint=api_get_tool_history, methods=["GET"]),
+    Route("/api/tool-history/stats", endpoint=api_tool_history_stats, methods=["GET"]),
+    Route("/api/tool-history/clear", endpoint=api_clear_tool_history, methods=["POST"]),
+    Route("/api/tool-history/export", endpoint=api_export_tool_history, methods=["GET"]),
     # Configuration Management API endpoints
     Route("/api/configuration", endpoint=api_get_configuration, methods=["GET"]),
     Route("/api/configuration", endpoint=api_update_configuration, methods=["POST"]),
