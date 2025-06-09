@@ -51,6 +51,15 @@ This ensures you're working from the latest stable code and prevents conflicts.
 
 ### 3. Implementation Phase
 
+**⚠️ FIRST STEP: Mark Issue as Work-in-Progress**
+- **Immediately after creating your branch and before making any code changes**, add a work-in-progress tag or label to the GitHub issue
+- This signals to other team members that the issue is actively being worked on
+- Common approaches:
+  - Add a "work-in-progress" or "WIP" label to the issue
+  - Comment on the issue stating you've started working on it (e.g., "🚧 Started working on this issue in branch `fix/issue-123-description`")
+  - If your project uses assignees, assign yourself to the issue
+- This prevents duplicate work and improves team coordination
+
 **Code Changes:**
 - Implement the required changes following the project's coding standards
 - Write clean, well-documented code with appropriate comments
@@ -164,6 +173,9 @@ git checkout main && git pull origin main
 # Create and switch to feature branch
 git checkout -b fix/issue-123-description
 
+# IMPORTANT: Mark issue as work-in-progress BEFORE making code changes
+# (Add WIP label, comment on issue, or assign yourself via GitHub UI/API)
+
 # Make commits with editor context
 git commit -m "Fix issue #123: Update validation logic (Cursor)"
 git commit -m "Add tests for issue #123: Validation improvements (VSCode)"
@@ -206,6 +218,7 @@ When working through this workflow, provide updates at each major step:
 ## Implementation Progress
 - **Code Editor:** [Current editor being used]
 - **Branch Created:** `fix/issue-123-description`
+- **WIP Status:** [Issue marked as work-in-progress: Yes/No]
 - **Files Modified:** [List of files changed]
 - **Key Changes:** [Summary of main changes]
 - **Tests Added/Updated:** [Testing changes]
