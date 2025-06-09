@@ -9,6 +9,6 @@ alwaysApply: true
    - Use `uv remove` instead of `pip uninstall`
    - Use `uv sync` instead of `pip install -r requirements.txt`
    - Use `uv lock` to update dependencies
-   - Use `uv venv` for virtual environment creation
+   - Use existing virtual environment if available, otherwise use `uv venv` for virtual environment creation
 2. Do not generate readme markdown files unless I explicitly ask
 3. Do not generate example unless I explicitly ask
