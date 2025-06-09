@@ -1,0 +1,122 @@
+# Example tool demonstrating all output limiting configurations
+# This shows how to configure output limits for script-based tools in tools.yaml
+# Copy this example into your actual tools.yaml file and modify as needed
+
+tools:
+  # Comprehensive example showing all available output limiting options
+  example_output_limited_tool:
+    enabled: true
+    name: example_output_limited_tool
+    description: |
+      Example script tool demonstrating all output limiting configurations.
+      This tool shows how to configure output limits, truncation strategies,
+      line preservation, and raw output backup.
+      Use the token to query the status (tool/query_script_status).
+    type: script
+
+    # Default script (fallback if no OS-specific script found)
+    script: >
+      bash -c "echo 'Starting process...';
+      for i in {1..100}; do echo 'Processing item $i'; done;
+      echo 'Process complete';
+      echo 'Error: Something went wrong' >&2"
+
+    # OS-specific scripts
+    scripts:
+      windows: >
+        powershell -command "Write-Host 'Starting process...';
+        1..100 | ForEach-Object { Write-Host \"Processing item $_\" };
+        Write-Host 'Process complete';
+        Write-Error 'Error: Something went wrong'"
+      darwin: >
+        bash -c "echo 'Starting process...';
+        for i in {1..100}; do echo 'Processing item $i'; done;
+        echo 'Process complete';
+        echo 'Error: Something went wrong' >&2"
+      linux: >
+        bash -c "echo 'Starting process...';
+        for i in {1..100}; do echo 'Processing item $i'; done;
+        echo 'Process complete';
+        echo 'Error: Something went wrong' >&2"
+
+    # Post-processing configuration demonstrating all features
+    post_processing:
+      # Standard output attachment options (existing features)
+      attach_stdout: true              # Include stdout in output (default: true)
+      attach_stderr: true              # Include stderr in output (default: true)
+      stderr_on_failure_only: false   # Include stderr always, not just on failure (default: false)
+
+      # Security filtering (existing feature)
+      security_filtering:
+        enabled: true                  # Enable security filtering for sensitive data
+        apply_to: ["stdout", "stderr"] # Filter both stdout and stderr (default: both)
+        log_findings: true             # Log security alerts (default: true)
+
+      # NEW: Output length management - all options demonstrated
+      output_limits:
+        # Length limits (all optional, no limits if not specified)
+        max_stdout_length: 5000        # Maximum characters for stdout
+        max_stderr_length: 2000        # Maximum characters for stderr
+        max_total_length: 6000         # Maximum combined length (applied after individual limits)
+
+        # Truncation strategy (default: "end")
+        # Available options:
+        #   "end" - Keep beginning, truncate end (good for logs, build output)
+        #   "start" - Keep end, truncate beginning (good for final results)
+        #   "middle" - Keep beginning and end, truncate middle (preserves context)
+        #   "smart" - Intelligent truncation preserving errors/warnings/stack traces
+        truncate_strategy: "smart"
+
+        # Custom truncation message (default: "\n... (output truncated)")
+        truncate_message: "\n... (output truncated due to length limits - see configuration for details)"
+
+        # Line preservation options (work with all truncation strategies)
+        preserve_first_lines: 5        # Keep first N lines when truncating (default: 0)
+        preserve_last_lines: 10        # Keep last N lines when truncating (default: 0)
+
+        # Raw output preservation (default: false)
+        # When true, adds 'raw_stdout' and 'raw_stderr' fields with original untruncated content
+        preserve_raw: true
+
+    # Input schema for the tool
+    inputSchema:
+      type: object
+      properties:
+        items_to_process:
+          type: number
+          description: Number of items to process (affects output length)
+          default: 100
+          minimum: 1
+          maximum: 1000
+        include_errors:
+          type: boolean
+          description: Whether to include error messages in stderr
+          default: true
+        timeout:
+          type: number
+          description: Optional timeout in seconds
+          default: 60
+      required: []
+
+# Usage examples for different scenarios:
+#
+# 1. For log analysis (preserve important messages):
+#    truncate_strategy: "smart"
+#    preserve_last_lines: 20
+#
+# 2. For build tools (show start and recent output):
+#    truncate_strategy: "end"
+#    preserve_last_lines: 15
+#
+# 3. For test runners (show summary and results):
+#    truncate_strategy: "middle"
+#    preserve_first_lines: 10
+#    preserve_last_lines: 20
+#
+# 4. For data processing (keep final results):
+#    truncate_strategy: "start"
+#    preserve_raw: true
+#
+# 5. For minimal setup (just limit length):
+#    max_stdout_length: 1000
+#    # (all other options use defaults)
