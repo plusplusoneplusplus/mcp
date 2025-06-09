@@ -38,6 +38,11 @@ class PluginConfig:
         # Tool names to always exclude regardless of source
         self.excluded_tool_names = set()
 
+        # Plugin enable/disable configuration
+        self.enabled_plugins = set()  # Explicitly enabled plugins
+        self.disabled_plugins = set()  # Explicitly disabled plugins
+        self.plugin_enable_mode = "all"  # "all", "whitelist", "blacklist"
+
         # Load environment-based configuration
         self._load_from_env()
 
@@ -100,14 +105,46 @@ class PluginConfig:
                 self.plugin_roots = [default_plugin_root]
                 logger.info(f"Using default plugin root: {default_plugin_root}")
 
+        # Load plugin enable/disable configuration
+        self._load_plugin_config_from_env()
+
         # Log the configuration
         logger.debug(
             f"Plugin configuration loaded from environment: "
             f"register_code_tools={self.register_code_tools}, "
             f"register_yaml_tools={self.register_yaml_tools}, "
             f"yaml_overrides_code={self.yaml_overrides_code}, "
-            f"plugin_roots={self.plugin_roots}"
+            f"plugin_roots={self.plugin_roots}, "
+            f"plugin_enable_mode={self.plugin_enable_mode}"
         )
+
+    def _load_plugin_config_from_env(self):
+        """Load plugin enable/disable configuration from environment variables."""
+        # Get plugin enable mode
+        env_plugin_mode = os.environ.get("MCP_PLUGIN_MODE", "all").lower()
+        if env_plugin_mode in ("all", "whitelist", "blacklist"):
+            self.plugin_enable_mode = env_plugin_mode
+        else:
+            logger.warning(f"Invalid MCP_PLUGIN_MODE value: {env_plugin_mode}. Using 'all'")
+            self.plugin_enable_mode = "all"
+
+        # Get enabled plugins
+        env_enabled_plugins = os.environ.get("MCP_ENABLED_PLUGINS", "")
+        if env_enabled_plugins:
+            enabled_plugins = {
+                plugin.strip() for plugin in env_enabled_plugins.split(",") if plugin.strip()
+            }
+            self.enabled_plugins.update(enabled_plugins)
+            logger.info(f"Enabled plugins from environment: {self.enabled_plugins}")
+
+        # Get disabled plugins
+        env_disabled_plugins = os.environ.get("MCP_DISABLED_PLUGINS", "")
+        if env_disabled_plugins:
+            disabled_plugins = {
+                plugin.strip() for plugin in env_disabled_plugins.split(",") if plugin.strip()
+            }
+            self.disabled_plugins.update(disabled_plugins)
+            logger.info(f"Disabled plugins from environment: {self.disabled_plugins}")
 
     def should_register_tool_class(
         self, class_name: str, tool_name: str, yaml_tools: Set[str]
@@ -132,6 +169,11 @@ class PluginConfig:
             logger.debug(f"Skipping registration of excluded tool: {tool_name}")
             return False
 
+        # Check plugin enable/disable status
+        if not self.is_plugin_enabled(tool_name):
+            logger.debug(f"Skipping registration of disabled plugin: {tool_name}")
+            return False
+
         # Check if there's a YAML definition that should override this
         # Only apply this rule to non-YAML tools (classes not starting with YamlTool_)
         if (
@@ -145,6 +187,86 @@ class PluginConfig:
             return False
 
         return True
+
+    def is_plugin_enabled(self, plugin_name: str) -> bool:
+        """Check if a plugin is enabled based on the current configuration.
+
+        Args:
+            plugin_name: Name of the plugin to check
+
+        Returns:
+            True if the plugin should be enabled, False otherwise
+        """
+        # If plugin is explicitly disabled, return False
+        if plugin_name in self.disabled_plugins:
+            return False
+
+        # Handle different enable modes
+        if self.plugin_enable_mode == "all":
+            # All plugins are enabled by default unless explicitly disabled
+            return True
+        elif self.plugin_enable_mode == "whitelist":
+            # Only explicitly enabled plugins are allowed
+            return plugin_name in self.enabled_plugins
+        elif self.plugin_enable_mode == "blacklist":
+            # All plugins are enabled except those explicitly disabled
+            return plugin_name not in self.disabled_plugins
+        else:
+            # Default to all enabled for unknown modes
+            logger.warning(f"Unknown plugin enable mode: {self.plugin_enable_mode}")
+            return True
+
+    def enable_plugin(self, plugin_name: str) -> None:
+        """Enable a specific plugin.
+
+        Args:
+            plugin_name: Name of the plugin to enable
+        """
+        self.enabled_plugins.add(plugin_name)
+        # Remove from disabled set if present
+        self.disabled_plugins.discard(plugin_name)
+        logger.info(f"Plugin '{plugin_name}' has been enabled")
+
+    def disable_plugin(self, plugin_name: str) -> None:
+        """Disable a specific plugin.
+
+        Args:
+            plugin_name: Name of the plugin to disable
+        """
+        self.disabled_plugins.add(plugin_name)
+        # Remove from enabled set if present
+        self.enabled_plugins.discard(plugin_name)
+        logger.info(f"Plugin '{plugin_name}' has been disabled")
+
+    def get_available_plugins(self) -> Dict[str, Dict[str, Any]]:
+        """Get metadata about all available plugins.
+
+        Returns:
+            Dictionary mapping plugin names to their metadata
+        """
+        # Try to get comprehensive plugin information from the registry
+        try:
+            # Import here to avoid circular imports
+            from mcp_tools.plugin import registry
+            return registry.get_available_plugins()
+        except ImportError:
+            # Fallback to basic information about configured plugins
+            available_plugins = {}
+            
+            # Add information about explicitly configured plugins
+            all_configured_plugins = self.enabled_plugins.union(self.disabled_plugins)
+            
+            for plugin_name in all_configured_plugins:
+                available_plugins[plugin_name] = {
+                    "name": plugin_name,
+                    "enabled": self.is_plugin_enabled(plugin_name),
+                    "source": "configuration",
+                    "explicitly_configured": True,
+                    "registered": False,
+                    "has_instance": False
+                }
+            
+            return available_plugins
 
     def get_yaml_tool_paths(self) -> List[Path]:
         """Get the paths to look for YAML tool definitions.
