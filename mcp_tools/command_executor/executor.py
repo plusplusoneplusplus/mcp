@@ -150,16 +150,16 @@ class CommandExecutor(CommandExecutorInterface):
 
         # Memory management settings with defaults
         self.max_completed_processes = env_manager.get_setting(
-            "max_completed_processes", 100
+            "command_executor_max_completed_processes", 100
         )
         self.completed_process_ttl = env_manager.get_setting(
-            "completed_process_ttl", 3600  # 1 hour default
+            "command_executor_completed_process_ttl", 3600  # 1 hour default
         )
         self.auto_cleanup_enabled = env_manager.get_setting(
-            "auto_cleanup_enabled", True
+            "command_executor_auto_cleanup_enabled", True
         )
         self.cleanup_interval = env_manager.get_setting(
-            "cleanup_interval", 300  # 5 minutes default
+            "command_executor_cleanup_interval", 300  # 5 minutes default
         )
 
         # Use specified temp dir or system default

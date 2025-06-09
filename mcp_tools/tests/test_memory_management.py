@@ -28,10 +28,10 @@ class TestMemoryManagement:
             # Configure small limits for testing
             mock_env.load.return_value = None
             mock_env.get_setting.side_effect = lambda key, default: {
-                "max_completed_processes": 3,
-                "completed_process_ttl": 2,  # 2 seconds TTL
-                "auto_cleanup_enabled": False,  # Disable for manual testing
-                "cleanup_interval": 1,  # 1 second interval
+                "command_executor_max_completed_processes": 3,
+                "command_executor_completed_process_ttl": 2,  # 2 seconds TTL
+                "command_executor_auto_cleanup_enabled": False,  # Disable for manual testing
+                "command_executor_cleanup_interval": 1,  # 1 second interval
                 "periodic_status_enabled": False,
                 "periodic_status_interval": 30.0,
                 "periodic_status_max_command_length": 60,
@@ -49,10 +49,10 @@ class TestMemoryManagement:
         with patch('mcp_tools.command_executor.executor.env_manager') as mock_env:
             mock_env.load.return_value = None
             mock_env.get_setting.side_effect = lambda key, default: {
-                "max_completed_processes": 5,
-                "completed_process_ttl": 1,  # 1 second TTL
-                "auto_cleanup_enabled": True,
-                "cleanup_interval": 0.5,  # 0.5 second interval
+                "command_executor_max_completed_processes": 5,
+                "command_executor_completed_process_ttl": 1,  # 1 second TTL
+                "command_executor_auto_cleanup_enabled": True,
+                "command_executor_cleanup_interval": 0.5,  # 0.5 second interval
                 "periodic_status_enabled": False,
                 "periodic_status_interval": 30.0,
                 "periodic_status_max_command_length": 60,
