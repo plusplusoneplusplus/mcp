@@ -23,7 +23,8 @@ def get_tool_def() -> Tool:
 
 
 def handle_tool(arguments: dict):
-    if "session_id" not in arguments or "image_name" not in arguments:
+    if ("session_id" not in arguments or "image_name" not in arguments or
+        arguments.get("session_id") is None or arguments.get("image_name") is None):
         return [
             TextContent(
                 type="text", text="Error: session_id and image_name are required."
