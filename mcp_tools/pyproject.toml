@@ -24,6 +24,7 @@ dependencies = [
     "pytest>=8.4.0",
     "pytest-asyncio>=1.0.0",
     "pyyaml>=6.0.2",
+    "detect-secrets>=1.5.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -269,7 +269,9 @@ class TestYamlToolsComprehensiveCoverage:
                         "custom_param2": "value2"
                     },
                     "scripts": {
-                        "linux": "echo {custom_param1} {custom_param2}"
+                        "linux": "echo {custom_param1} {custom_param2}",
+                        "darwin": "echo {custom_param1} {custom_param2}",
+                        "windows": "echo {custom_param1} {custom_param2}"
                     }
                 }
             }
@@ -343,7 +345,9 @@ class TestYamlToolsComprehensiveCoverage:
                         "required": ["message"]
                     },
                     "scripts": {
-                        "linux": "echo '{message}'"
+                        "linux": "echo '{message}'",
+                        "darwin": "echo '{message}'",
+                        "windows": "echo {message}"
                     }
                 }
             }
@@ -465,7 +469,9 @@ class TestYamlToolsComprehensiveCoverage:
                         "required": ["action"]
                     },
                     "scripts": {
-                        "linux": "echo 'Workflow {action}: {data}'"
+                        "linux": "echo 'Workflow {action}: {data}'",
+                        "darwin": "echo 'Workflow {action}: {data}'",
+                        "windows": "echo Workflow {action}: {data}"
                     }
                 }
             }
@@ -546,7 +552,9 @@ class TestYamlToolsErrorScenarios:
                         "required": ["required_param"]
                     },
                     "scripts": {
-                        "linux": "echo '{required_param}'"
+                        "linux": "echo '{required_param}'",
+                        "darwin": "echo '{required_param}'",
+                        "windows": "echo {required_param}"
                     }
                 }
             }
