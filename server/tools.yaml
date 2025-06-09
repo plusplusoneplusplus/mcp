@@ -202,8 +202,6 @@ tools:
           type: string
           description: Path to configuration file to validate
           default: "config.yaml"
-
-
         timeout:
           type: number
           description: Optional timeout in seconds
