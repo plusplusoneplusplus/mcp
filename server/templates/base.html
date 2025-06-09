@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>{% block title %}MCP Knowledge Server{% endblock %}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #fafbfc;
+        }
+
+        /* Navigation Styles */
+        .navbar {
+            background: #fff;
+            border-bottom: 2px solid #eee;
+            padding: 1em 2em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .navbar h1 {
+            margin: 0;
+            color: #333;
+            font-size: 1.5em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1em;
+        }
+
+        .nav-link {
+            text-decoration: none;
+            color: #0077cc;
+            padding: 0.5em 1em;
+            border-radius: 4px;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+
+        .nav-link:hover {
+            background: #f0f8ff;
+        }
+
+        .nav-link.active {
+            background: #0077cc;
+            color: white;
+        }
+
+        .container {
+            width: 100vw;
+            margin: 0;
+            padding: 0;
+        }
+
+        .card {
+            background: #f8f8f8;
+            padding: 2em;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px #eee;
+            margin: 2em;
+            box-sizing: border-box;
+        }
+
+        label {
+            font-weight: bold;
+        }
+
+        /* Shared component styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: #fff;
+            margin: 5% auto;
+            padding: 2em;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        /* Button styles */
+        button {
+            padding: 0.5em 1em;
+            background: #0077cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        button:hover {
+            background: #005fa3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Form styles */
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            padding: 0.5em;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                gap: 1em;
+            }
+
+            .nav-links {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .card {
+                margin: 1em;
+                padding: 1em;
+            }
+        }
+    </style>
+    {% block extra_styles %}{% endblock %}
+</head>
+
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <h1>MCP Knowledge Server</h1>
+        <div class="nav-links">
+            <a href="/knowledge" class="nav-link {{ 'active' if current_page == 'knowledge' else '' }}">Knowledge</a>
+            <a href="/jobs" class="nav-link {{ 'active' if current_page == 'jobs' else '' }}">Background Jobs</a>
+            <a href="/config" class="nav-link {{ 'active' if current_page == 'config' else '' }}">Configuration</a>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Shared JavaScript -->
+    <script>
+        // Shared utility functions
+        function showStatus(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = message;
+                element.style.color = isError ? '#d9534f' : '#5cb85c';
+                element.style.display = 'block';
+            }
+        }
+
+        function clearStatus(elementId) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = '';
+                element.style.display = 'none';
+            }
+        }
+
+        // Modal utilities
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'block';
+            }
+        }
+
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Setup modal close handlers
+        document.addEventListener('DOMContentLoaded', function () {
+            // Close modals when clicking the X or outside the modal
+            document.querySelectorAll('.modal').forEach(modal => {
+                const closeBtn = modal.querySelector('.close');
+                if (closeBtn) {
+                    closeBtn.onclick = () => hideModal(modal.id);
+                }
+
+                modal.onclick = function (event) {
+                    if (event.target === modal) {
+                        hideModal(modal.id);
+                    }
+                };
+            });
+        });
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

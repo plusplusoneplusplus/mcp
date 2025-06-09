@@ -9,9 +9,9 @@ from typing import Dict, Any, Optional, Union, List
 
 # Import startup tracing utilities
 from server.startup_tracer import (
-    time_operation, 
-    trace_startup_time, 
-    log_startup_summary, 
+    time_operation,
+    trace_startup_time,
+    log_startup_summary,
     save_startup_report,
     start_timing,
     finish_timing
@@ -280,14 +280,33 @@ from server.api import PERSIST_DIR
 
 
 async def index(request: Request):
+    # Redirect to knowledge page as the main landing page
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/knowledge", status_code=302)
+
+# --- New Page Routes ---
+async def knowledge(request: Request):
     return templates.TemplateResponse(
-        "index.html", {"request": request, "import_path": PERSIST_DIR}
+        "knowledge.html", {"request": request, "import_path": PERSIST_DIR, "current_page": "knowledge"}
+    )
+
+async def jobs(request: Request):
+    return templates.TemplateResponse(
+        "jobs.html", {"request": request, "current_page": "jobs"}
+    )
+
+async def config_page(request: Request):
+    return templates.TemplateResponse(
+        "config.html", {"request": request, "current_page": "config"}
     )
 
 
 # --- Add routes ---
 routes = [
     Route("/", endpoint=index, methods=["GET"]),
+    Route("/knowledge", endpoint=knowledge, methods=["GET"]),
+    Route("/jobs", endpoint=jobs, methods=["GET"]),
+    Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
 ] + api_routes
@@ -367,7 +386,7 @@ def main(port: Optional[int] = None) -> None:
             port = int(os.environ.get('SERVER_PORT', 8000))
 
         logging.info(f"Starting server on port {port}")
-        
+
         # Log startup summary before starting the server
         log_startup_summary()
         save_startup_report()
