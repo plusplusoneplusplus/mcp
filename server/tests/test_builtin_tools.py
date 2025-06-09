@@ -131,7 +131,7 @@ class TestGetImageDir:
         
         mock_get_setting.assert_called_once_with("image_dir", None)
         assert isinstance(result, Path)
-        assert str(result) == "/path/to/images"
+        assert result == Path("/path/to/images")
 
     @patch('config.env.get_setting')
     def test_get_image_dir_missing_setting(self, mock_get_setting):
