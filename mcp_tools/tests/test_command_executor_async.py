@@ -429,23 +429,23 @@ class TestCommandExecutorAsync:
         # Check running processes
         running_processes = executor.list_running_processes()
         assert len(running_processes) == 1
-        
+
         process_info = running_processes[0]
         assert "token" in process_info
         assert "pid" in process_info
         assert "command" in process_info
         assert "runtime" in process_info
         assert "status" in process_info
-        
+
         # Token should be first 8 characters
         assert len(process_info["token"]) == 8
         assert process_info["command"] == cmd
         assert process_info["runtime"] >= 0
-        assert process_info["status"] in ["running", "sleeping"]
+        assert process_info["status"] in ["running", "sleeping", "disk-sleep"]
 
         # Wait for completion
         await executor.wait_for_process(token)
-        
+
         # Should be empty again
         running_processes = executor.list_running_processes()
         assert len(running_processes) == 0
@@ -463,15 +463,15 @@ class TestCommandExecutorAsync:
         """Test command truncation"""
         short_cmd = "echo hello"
         long_cmd = "echo " + "a" * 100
-        
+
         # Short command should not be truncated
         assert executor._truncate_command(short_cmd) == short_cmd
-        
+
         # Long command should be truncated
         truncated = executor._truncate_command(long_cmd, max_length=20)
         assert len(truncated) == 20
         assert truncated.endswith("...")
-        
+
         # Test with default max length
         truncated_default = executor._truncate_command(long_cmd)
         assert len(truncated_default) <= executor.status_reporter_max_command_length
@@ -484,7 +484,7 @@ class TestCommandExecutorAsync:
 
         # Start the reporter
         await executor.start_periodic_status_reporter(interval=1.0, enabled=True)
-        
+
         # Should be running now
         assert executor.status_reporter_task is not None
         assert not executor.status_reporter_task.done()
@@ -493,7 +493,7 @@ class TestCommandExecutorAsync:
 
         # Stop the reporter
         await executor.stop_periodic_status_reporter()
-        
+
         # Should be stopped
         assert executor.status_reporter_task is None
         assert not executor.status_reporter_enabled
@@ -501,7 +501,7 @@ class TestCommandExecutorAsync:
     async def test_periodic_status_reporter_disabled(self, executor):
         """Test that disabled reporter doesn't start"""
         await executor.start_periodic_status_reporter(interval=1.0, enabled=False)
-        
+
         # Should not be running
         assert executor.status_reporter_task is None
         assert not executor.status_reporter_enabled
@@ -511,24 +511,24 @@ class TestCommandExecutorAsync:
         # Start first reporter
         await executor.start_periodic_status_reporter(interval=1.0, enabled=True)
         first_task = executor.status_reporter_task
-        
+
         # Start second reporter (should stop first one)
         await executor.start_periodic_status_reporter(interval=2.0, enabled=True)
         second_task = executor.status_reporter_task
-        
+
         # Should be different tasks
         assert first_task != second_task
         assert first_task.done()  # First task should be cancelled
         assert not second_task.done()  # Second task should be running
         assert executor.status_reporter_interval == 2.0
-        
+
         # Clean up
         await executor.stop_periodic_status_reporter()
 
     async def test_print_status_report_no_processes(self, executor, capsys):
         """Test printing status report with no running processes"""
         executor._print_status_report()
-        
+
         captured = capsys.readouterr()
         assert "Background Jobs Status (0 running)" in captured.out
         assert "No background processes currently running" in captured.out
@@ -543,13 +543,13 @@ class TestCommandExecutorAsync:
 
         response = await executor.execute_async(cmd)
         token = response["token"]
-        
+
         # Give it a moment to start
         await asyncio.sleep(0.1)
-        
+
         # Print status report
         executor._print_status_report()
-        
+
         captured = capsys.readouterr()
         assert "Background Jobs Status (1 running)" in captured.out
         assert token[:8] in captured.out  # Token should be in output
@@ -557,7 +557,7 @@ class TestCommandExecutorAsync:
         assert "Runtime:" in captured.out
         assert "CPU:" in captured.out
         assert "Memory:" in captured.out
-        
+
         # Clean up
         await executor.wait_for_process(token)
 
@@ -565,7 +565,7 @@ class TestCommandExecutorAsync:
         """Test full integration of periodic status reporter"""
         # Start reporter with short interval
         await executor.start_periodic_status_reporter(interval=0.5, enabled=True)
-        
+
         # Start a process
         if platform.system().lower() == "windows":
             cmd = "ping -n 2 127.0.0.1"
@@ -574,14 +574,14 @@ class TestCommandExecutorAsync:
 
         response = await executor.execute_async(cmd)
         token = response["token"]
-        
+
         # Wait for at least one status report
         await asyncio.sleep(0.7)
-        
+
         # Should have printed status
         captured = capsys.readouterr()
         assert "Background Jobs Status" in captured.out
-        
+
         # Clean up
         await executor.stop_periodic_status_reporter()
         await executor.wait_for_process(token)
@@ -592,14 +592,14 @@ class TestCommandExecutorAsync:
         assert hasattr(executor, 'status_reporter_enabled')
         assert hasattr(executor, 'status_reporter_interval')
         assert hasattr(executor, 'status_reporter_max_command_length')
-        
+
         # Test that values are reasonable defaults
         assert isinstance(executor.status_reporter_enabled, bool)
         assert isinstance(executor.status_reporter_interval, float)
         assert executor.status_reporter_interval > 0
         assert isinstance(executor.status_reporter_max_command_length, int)
         assert executor.status_reporter_max_command_length > 0
-        
+
         # Test default values match config manager defaults
         from config import env_manager
         env_manager.load()
