@@ -144,6 +144,9 @@ class CommandExecutor(CommandExecutorInterface):
         
         # Background cleanup task
         self.cleanup_task: Optional[asyncio.Task] = None
+        
+        # Background tasks for rate limiting and concurrency
+        self.background_tasks: List[asyncio.Task] = []
 
         # Load configuration from config manager
         env_manager.load()
@@ -256,10 +259,17 @@ class CommandExecutor(CommandExecutorInterface):
         """Start background tasks for rate limiting, concurrency, and resource monitoring."""
         try:
             loop = asyncio.get_running_loop()
+            
+            # Clear any existing tasks
+            self._cancel_background_tasks()
+            
             # Start concurrency manager queue processor
-            asyncio.create_task(self.concurrency_manager.start_queue_processor())
+            task1 = asyncio.create_task(self.concurrency_manager.start_queue_processor())
+            self.background_tasks.append(task1)
+            
             # Start resource monitoring
-            asyncio.create_task(self.resource_monitor.start_monitoring())
+            task2 = asyncio.create_task(self.resource_monitor.start_monitoring())
+            self.background_tasks.append(task2)
             
             _log_with_context(
                 logging.INFO,
@@ -274,24 +284,31 @@ class CommandExecutor(CommandExecutorInterface):
                 {}
             )
 
+    def _cancel_background_tasks(self) -> None:
+        """Cancel all background tasks."""
+        for task in self.background_tasks:
+            if not task.done():
+                task.cancel()
+        self.background_tasks.clear()
+        
+        # Also cancel cleanup task if it exists
+        if self.cleanup_task and not self.cleanup_task.done():
+            self.cleanup_task.cancel()
+            self.cleanup_task = None
+
     def _stop_background_tasks(self) -> None:
         """Stop background tasks."""
         try:
-            # Check if there's a running event loop
-            try:
-                loop = asyncio.get_running_loop()
-                # Stop concurrency manager
-                asyncio.create_task(self.concurrency_manager.stop_queue_processor())
-                # Stop resource monitor
-                asyncio.create_task(self.resource_monitor.stop_monitoring())
-            except RuntimeError:
-                # No event loop running, can't stop async tasks
-                _log_with_context(
-                    logging.DEBUG,
-                    "No event loop running, skipping async task cleanup",
-                    {}
-                )
-                return
+            # Cancel all background tasks
+            self._cancel_background_tasks()
+            
+            # Stop concurrency manager (synchronous call)
+            if hasattr(self, 'concurrency_manager'):
+                self.concurrency_manager.queue_processor_running = False
+            
+            # Stop resource monitor (synchronous call)
+            if hasattr(self, 'resource_monitor'):
+                self.resource_monitor.monitoring_enabled = False
             
             _log_with_context(
                 logging.INFO,
