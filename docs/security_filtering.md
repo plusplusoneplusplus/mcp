@@ -9,7 +9,7 @@ The security filtering feature automatically detects and redacts sensitive infor
 - **Automatic Secret Detection**: Uses the existing secret scanner to detect passwords, API keys, tokens, and other sensitive data
 - **Configurable Filtering**: Choose to filter stdout, stderr, or both
 - **Security Logging**: Logs security alerts without exposing the actual secrets
-- **Security by Default**: Enabled by default for maximum security protection
+- **Opt-in Security**: Disabled by default to reduce false positives, can be enabled when needed
 - **Integration with Post-Processing**: Works seamlessly with existing output attachment controls
 
 ## Configuration
@@ -33,7 +33,7 @@ tools:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `enabled` | boolean | `true` | Enable or disable security filtering |
+| `enabled` | boolean | `false` | Enable or disable security filtering |
 | `apply_to` | array | `["stdout", "stderr"]` | Which outputs to filter. Options: `"stdout"`, `"stderr"` |
 | `log_findings` | boolean | `true` | Whether to log security alerts when secrets are detected |
 
@@ -46,10 +46,10 @@ deploy_app:
   type: script
   scripts:
     darwin: bash deploy.sh
-  # Security filtering is enabled by default - no configuration needed
+  # Security filtering is disabled by default - no configuration needed for basic commands
 ```
 
-### Explicitly Enable Security Filtering
+### Enable Security Filtering for Sensitive Operations
 
 ```yaml
 deploy_app:
@@ -58,7 +58,7 @@ deploy_app:
     darwin: bash deploy.sh
   post_processing:
     security_filtering:
-      enabled: true
+      enabled: true  # Enable for deployment scripts that may handle secrets
 ```
 
 ### Filter Only Standard Output
@@ -74,16 +74,17 @@ backup_database:
       apply_to: ["stdout"]  # Only filter stdout, allow stderr for debugging
 ```
 
-### Disable Security Filtering
+### Explicitly Disable Security Filtering (Default Behavior)
 
 ```yaml
 legacy_tool:
   type: script
   scripts:
     darwin: bash legacy.sh
+  # Security filtering is disabled by default, but can be explicitly set
   post_processing:
     security_filtering:
-      enabled: false  # Explicitly disable security filtering
+      enabled: false  # Explicitly disable (same as default behavior)
 ```
 
 ### Silent Security Filtering
@@ -207,27 +208,23 @@ python -m pytest tests/test_security_filtering.py -v
 
 ## Migration Guide
 
-**Important**: Security filtering is now enabled by default for all script-based tools. This provides better security out of the box.
+**Important**: Security filtering is now disabled by default for all script-based tools. This reduces false positives while maintaining the option to enable security filtering when needed.
 
 ### For New Tools
-- Security filtering works automatically - no configuration needed
-- Scripts will have secrets automatically redacted from outputs
-- Security alerts will be logged when secrets are detected
+- Security filtering is disabled by default - no configuration needed for basic commands
+- Enable security filtering for tools that handle sensitive data by adding configuration
+- Scripts will only have secrets redacted when explicitly enabled
 
 ### For Existing Tools
-- Security filtering is now active by default
-- If you need to disable it for specific tools, add:
-  ```yaml
-  post_processing:
-    security_filtering:
-      enabled: false
-  ```
-- Test your tools to ensure expected behavior with security filtering enabled
+- Security filtering is now disabled by default
+- Tools with explicit `security_filtering.enabled: true` will continue to work as before
+- Tools with explicit `security_filtering.enabled: false` will continue to work as before
+- Tools without security filtering configuration will now default to disabled
 
 ### Recommended Approach
-- Keep security filtering enabled for maximum protection
-- Only disable for tools that you're certain don't handle sensitive data
-- Review security logs to identify and improve tools that expose secrets
+- Enable security filtering for tools that handle sensitive operations (deployments, database operations, configuration management)
+- Keep security filtering disabled for general-purpose commands to avoid false positives
+- Review and enable security filtering on a per-tool basis based on the sensitivity of the operations
 
 ## Troubleshooting
 

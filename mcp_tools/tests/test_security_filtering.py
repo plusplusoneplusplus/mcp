@@ -39,8 +39,8 @@ class TestSecurityFilteringConfiguration:
     """Test cases for security filtering configuration."""
 
     @pytest.mark.asyncio
-    async def test_security_filtering_enabled_by_default(self, mock_command_executor):
-        """Test that security filtering is enabled by default."""
+    async def test_security_filtering_disabled_by_default(self, mock_command_executor):
+        """Test that security filtering is disabled by default."""
         tool_data = {
             "type": "script",
             "scripts": {"darwin": "echo 'test'"},
@@ -62,23 +62,15 @@ class TestSecurityFilteringConfiguration:
             "return_code": 0
         }
 
-        # Mock the redact_secrets function to simulate redaction
-        def mock_redact_secrets(content):
-            redacted = content.replace("secret123", "[REDACTED]")
-            findings = [{"SecretType": "Password", "LineNumber": 1}] if "secret" in content else []
-            return redacted, findings
-
-        with patch('mcp_tools.yaml_tools.redact_secrets', side_effect=mock_redact_secrets):
-            with patch.object(tool, '_log_security_findings') as mock_log:
-                result = await tool._query_status({"token": "test-token"})
-                
-                # Check that secrets were redacted by default
-                result_text = result[0]["text"]
-                assert "[REDACTED]" in result_text
-                assert "secret123" not in result_text
-                
-                # Check that security findings were logged
-                mock_log.assert_called()
+        with patch('mcp_tools.yaml_tools.redact_secrets') as mock_redact:
+            result = await tool._query_status({"token": "test-token"})
+            
+            # redact_secrets should not be called when disabled by default
+            mock_redact.assert_not_called()
+            
+            # Original content should be preserved by default
+            result_text = result[0]["text"]
+            assert "DB_PASSWORD=secret123" in result_text
 
     @pytest.mark.asyncio
     async def test_security_filtering_explicitly_disabled(self, mock_command_executor):
