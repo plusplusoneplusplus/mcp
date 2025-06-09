@@ -57,33 +57,71 @@ with time_operation("Dependency Resolution"):
 all_tool_instances = list(injector.get_all_instances().values())
 active_tool_instances = list(injector.get_filtered_instances().values())
 
-# Log information about registered and active tools
+# Log information about registered and active tools with enhanced plugin visibility
+logging.info("=" * 60)
+logging.info("🔧 TOOL REGISTRATION AND ACTIVATION SUMMARY")
+logging.info("=" * 60)
 logging.info(
-    f"Registered {len(all_tool_instances)} total tools, {len(active_tool_instances)} active tools"
+    f"📊 Registered {len(all_tool_instances)} total tools, {len(active_tool_instances)} active tools"
 )
 
-# Log tool sources
+# Log tool sources with plugin information
 tool_sources = registry.get_tool_sources()
 code_tools = [name for name, source in tool_sources.items() if source == "code"]
 yaml_tools = [name for name, source in tool_sources.items() if source == "yaml"]
 active_tools = [tool.name for tool in active_tool_instances]
 inactive_tools = [name for name in tool_sources.keys() if name not in active_tools]
 
+# Get plugin loading summary for enhanced visibility
+plugin_summary = registry.get_plugin_loading_summary()
+
 logging.info(
-    f"Code tools ({len(code_tools)}): {', '.join(code_tools) if code_tools else 'None'}"
+    f"🔧 Code tools ({len(code_tools)}): {', '.join(code_tools) if code_tools else 'None'}"
 )
 logging.info(
-    f"YAML tools ({len(yaml_tools)}): {', '.join(yaml_tools) if yaml_tools else 'None'}"
+    f"📄 YAML tools ({len(yaml_tools)}): {', '.join(yaml_tools) if yaml_tools else 'None'}"
 )
 logging.info(
-    f"Active tools ({len(active_tools)}): {', '.join(active_tools) if active_tools else 'None'}"
+    f"✅ Active tools ({len(active_tools)}): {', '.join(active_tools) if active_tools else 'None'}"
 )
 logging.info(
-    f"Inactive tools ({len(inactive_tools)}): {', '.join(inactive_tools) if inactive_tools else 'None'}"
+    f"⏸️  Inactive tools ({len(inactive_tools)}): {', '.join(inactive_tools) if inactive_tools else 'None'}"
 )
 
+# Enhanced plugin source information
+if plugin_summary.get("plugin_groups"):
+    logging.info(f"📁 Tools by plugin source:")
+    for plugin_source, tools in plugin_summary["plugin_groups"].items():
+        if tools:
+            active_in_source = [tool for tool in tools if tool in active_tools]
+            inactive_in_source = [tool for tool in tools if tool not in active_tools]
+            logging.info(f"  • {plugin_source}:")
+            if active_in_source:
+                logging.info(f"    ✅ Active: {', '.join(active_in_source)}")
+            if inactive_in_source:
+                logging.info(f"    ⏸️  Inactive: {', '.join(inactive_in_source)}")
+
+# Plugin root directories information
+from mcp_tools.plugin_config import config
+plugin_roots = config.get_plugin_roots()
+if plugin_roots:
+    logging.info(f"📂 Plugin root directories:")
+    for plugin_root in plugin_roots:
+        logging.info(f"  • {plugin_root}")
+
+# Discovered plugin directories
+if plugin_summary.get("discovered_plugin_paths"):
+    logging.info(f"🔌 Discovered plugin directories:")
+    for plugin_path in plugin_summary["discovered_plugin_paths"]:
+        logging.info(f"  • {plugin_path}")
+
+logging.info(f"📋 Active tool details:")
 for tool in active_tool_instances:
-    logging.info(f"  - {tool.name}: {tool.description}")
+    source = tool_sources.get(tool.name, "unknown")
+    source_icon = "🔧" if source == "code" else "📄" if source == "yaml" else "❓"
+    logging.info(f"  {source_icon} {tool.name}: {tool.description}")
+
+logging.info("=" * 60)
 
 
 # Tool history recording functions

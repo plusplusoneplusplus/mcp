@@ -396,65 +396,215 @@ class PluginRegistry:
             )
             return
 
-        logger.info(f"Discovering plugins in directory: {plugin_dir}")
+        # Plugin Directory Discovery Logging
+        logger.info(f"🔍 Scanning plugin directory: {plugin_dir}")
 
         # Check if the directory contains Python files or subdirectories
         plugin_items = list(plugin_dir.iterdir())
+        
+        # Find plugin directories (subdirectories with __init__.py)
+        plugin_subdirs = [
+            item for item in plugin_items 
+            if item.is_dir() and (item / "__init__.py").exists()
+        ]
+        
+        if plugin_subdirs:
+            plugin_names = [item.name for item in plugin_subdirs]
+            logger.info(f"📁 Found plugin directories: {', '.join(plugin_names)}")
+        else:
+            logger.info(f"📁 No plugin directories found in: {plugin_dir}")
+            return
 
-        for item in plugin_items:
-            # Handle plugin subdirectories
-            if item.is_dir() and (item / "__init__.py").exists():
-                try:
-                    plugin_name = item.name
+        # Track plugin loading statistics
+        plugins_discovered = 0
+        plugins_loaded = 0
+        plugins_failed = 0
+        plugin_details = []
 
-                    # Add parent directory to sys.path if not already there
-                    parent_dir = str(plugin_dir.resolve())
-                    if parent_dir not in sys.path:
-                        sys.path.insert(0, parent_dir)
-                        logger.debug(f"Added to sys.path: {parent_dir}")
+        for item in plugin_subdirs:
+            plugins_discovered += 1
+            plugin_start_time = time.time()
+            
+            try:
+                plugin_name = item.name
 
-                    # Skip if already processed
-                    if plugin_name in self.discovered_paths:
-                        logger.debug(
-                            f"Skipping already processed plugin: {plugin_name}"
-                        )
-                        continue
+                # Add parent directory to sys.path if not already there
+                parent_dir = str(plugin_dir.resolve())
+                if parent_dir not in sys.path:
+                    sys.path.insert(0, parent_dir)
+                    logger.debug(f"Added to sys.path: {parent_dir}")
 
-                    # Add to discovered paths to avoid reprocessing
-                    self.discovered_paths.add(plugin_name)
+                # Skip if already processed
+                if plugin_name in self.discovered_paths:
+                    logger.debug(
+                        f"Skipping already processed plugin: {plugin_name}"
+                    )
+                    continue
 
-                    # Look for all files ending with tool.py
-                    tool_files = list(item.glob("*tool.py"))
-                    if tool_files:
-                        for tool_file in tool_files:
-                            try:
-                                # Extract module name from filename (e.g., "repo_tool.py" -> "repo_tool")
-                                module_name = tool_file.stem
+                # Add to discovered paths to avoid reprocessing
+                self.discovered_paths.add(plugin_name)
 
-                                # Import the module directly using importlib
-                                spec = importlib.util.spec_from_file_location(
-                                    f"{plugin_name}.{module_name}", str(tool_file)
-                                )
-                                if spec and spec.loader:
-                                    module = importlib.util.module_from_spec(spec)
-                                    sys.modules[spec.name] = module
-                                    spec.loader.exec_module(module)
+                # Look for all files ending with tool.py
+                tool_files = list(item.glob("*tool.py"))
+                
+                # Individual Plugin Loading Logs
+                logger.info(f"🔌 Loading plugin: {plugin_name}")
+                
+                if tool_files:
+                    logger.info(f"  📄 Found tool modules: {', '.join([f.name for f in tool_files])}")
+                    
+                    loaded_tools = []
+                    for tool_file in tool_files:
+                        try:
+                            # Extract module name from filename (e.g., "repo_tool.py" -> "repo_tool")
+                            module_name = tool_file.stem
 
-                                    # Scan for tools in the module
-                                    self._scan_module_for_tools(module)
-                                    logger.info(
-                                        f"Successfully loaded plugin tool module: {plugin_name}.{module_name}"
-                                    )
+                            # Import the module directly using importlib
+                            spec = importlib.util.spec_from_file_location(
+                                f"{plugin_name}.{module_name}", str(tool_file)
+                            )
+                            if spec and spec.loader:
+                                module = importlib.util.module_from_spec(spec)
+                                sys.modules[spec.name] = module
+                                spec.loader.exec_module(module)
+
+                                # Scan for tools in the module
+                                tools_before = len(self.tools)
+                                self._scan_module_for_tools(module)
+                                tools_after = len(self.tools)
+                                tools_added = tools_after - tools_before
+                                
+                                if tools_added > 0:
+                                    loaded_tools.append(module_name)
+                                    logger.info(f"  ✅ Successfully loaded: {module_name} ({tools_added} tools)")
                                 else:
-                                    logger.error(
-                                        f"Failed to create spec for {tool_file}"
-                                    )
-                            except Exception as e:
-                                logger.error(
-                                    f"Error importing tool module from {tool_file}: {e}"
-                                )
-                except Exception as e:
-                    logger.error(f"Error loading plugin {item.name}: {e}")
+                                    logger.info(f"  ⚠️  No tools found in: {module_name}")
+                            else:
+                                logger.error(f"  ❌ Failed to create spec for {tool_file}")
+                        except Exception as e:
+                            logger.error(f"  ❌ Error importing tool module from {tool_file}: {e}")
+                    
+                    if loaded_tools:
+                        plugins_loaded += 1
+                        plugin_duration = time.time() - plugin_start_time
+                        logger.info(f"  ⏱️  Plugin loaded in {plugin_duration:.3f}s")
+                        plugin_details.append({
+                            "name": plugin_name,
+                            "status": "success",
+                            "duration": plugin_duration,
+                            "tool_modules": loaded_tools,
+                            "source_path": str(item)
+                        })
+                    else:
+                        plugins_failed += 1
+                        plugin_details.append({
+                            "name": plugin_name,
+                            "status": "failed",
+                            "duration": time.time() - plugin_start_time,
+                            "error": "No tools successfully loaded",
+                            "source_path": str(item)
+                        })
+                else:
+                    logger.info(f"  📄 No tool modules found (*tool.py)")
+                    plugins_failed += 1
+                    plugin_details.append({
+                        "name": plugin_name,
+                        "status": "failed",
+                        "duration": time.time() - plugin_start_time,
+                        "error": "No tool modules found",
+                        "source_path": str(item)
+                    })
+                    
+            except Exception as e:
+                plugins_failed += 1
+                plugin_duration = time.time() - plugin_start_time
+                logger.error(f"🔌 Error loading plugin {item.name}: {e}")
+                plugin_details.append({
+                    "name": item.name,
+                    "status": "failed", 
+                    "duration": plugin_duration,
+                    "error": str(e),
+                    "source_path": str(item)
+                })
+
+        # Plugin Loading Summary for this directory
+        logger.info(f"📊 Plugin directory summary for {plugin_dir}:")
+        logger.info(f"  • Total plugins discovered: {plugins_discovered}")
+        logger.info(f"  • Successfully loaded: {plugins_loaded}")
+        logger.info(f"  • Failed to load: {plugins_failed}")
+        
+        if plugin_details:
+            logger.info(f"  • Plugin details:")
+            for detail in plugin_details:
+                status_icon = "✅" if detail["status"] == "success" else "❌"
+                logger.info(f"    {status_icon} {detail['name']}: {detail['status']} ({detail['duration']:.3f}s)")
+                if detail["status"] == "success" and "tool_modules" in detail:
+                    logger.info(f"      └─ Modules: {', '.join(detail['tool_modules'])}")
+                elif detail["status"] == "failed" and "error" in detail:
+                    logger.info(f"      └─ Error: {detail['error']}")
+
+    def _log_plugin_discovery_start(self, plugin_dir: Path):
+        """Log the start of plugin discovery for a directory.
+        
+        Args:
+            plugin_dir: Path to the plugin directory being scanned
+        """
+        logger.info(f"🔍 Scanning plugin directory: {plugin_dir}")
+
+    def _log_plugin_loaded(self, plugin_name: str, tool_files: List[Path], duration: float):
+        """Log successful plugin loading with timing information.
+        
+        Args:
+            plugin_name: Name of the loaded plugin
+            tool_files: List of tool files that were processed
+            duration: Time taken to load the plugin in seconds
+        """
+        logger.info(f"🔌 Loading plugin: {plugin_name} ({duration:.2f}s)")
+        for tool_file in tool_files:
+            logger.info(f"  📄 Found tool module: {tool_file.name}")
+
+    def _log_plugin_failed(self, plugin_name: str, error: str, duration: float):
+        """Log failed plugin loading with error details.
+        
+        Args:
+            plugin_name: Name of the plugin that failed to load
+            error: Error message describing the failure
+            duration: Time taken before failure in seconds
+        """
+        logger.error(f"🔌 Failed to load plugin: {plugin_name} ({duration:.2f}s)")
+        logger.error(f"  ❌ Error: {error}")
+
+    def get_plugin_loading_summary(self) -> Dict[str, Any]:
+        """Get a comprehensive summary of plugin loading results.
+        
+        Returns:
+            Dictionary containing plugin loading statistics and details
+        """
+        tool_sources = self.get_tool_sources()
+        
+        # Group tools by source directory (approximate)
+        plugin_groups = {}
+        for tool_name, source in tool_sources.items():
+            if source == "code":
+                # Try to determine plugin source from discovered paths
+                plugin_source = "mcp_tools"  # Default for built-in tools
+                for discovered_path in self.discovered_paths:
+                    if discovered_path in tool_name.lower():
+                        plugin_source = discovered_path
+                        break
+                
+                if plugin_source not in plugin_groups:
+                    plugin_groups[plugin_source] = []
+                plugin_groups[plugin_source].append(tool_name)
+        
+        return {
+            "total_tools_registered": len(self.tools),
+            "code_tools": len([s for s in tool_sources.values() if s == "code"]),
+            "yaml_tools": len([s for s in tool_sources.values() if s == "yaml"]),
+            "plugin_groups": plugin_groups,
+            "discovered_plugin_paths": list(self.discovered_paths),
+            "tool_sources": tool_sources
+        }
 
     def get_all_tools(self) -> List[Type[ToolInterface]]:
         """Get all registered tool classes.
@@ -664,13 +814,13 @@ def discover_and_register_tools():
     successful_tools = []
     failed_tools = []
 
-    logger.info("Starting comprehensive tool discovery and registration")
+    logger.info("🚀 Starting comprehensive tool discovery and registration")
 
     # Load YAML tools first if enabled
     if config.register_yaml_tools:
         try:
             with time_plugin_operation("YAML Tools Discovery"):
-                logger.info("Attempting to discover YAML tools...")
+                logger.info("🔍 Attempting to discover YAML tools...")
                 # Use a dynamic import to avoid circular imports
                 yaml_tools_module = importlib.import_module("mcp_tools.yaml_tools")
 
@@ -680,13 +830,13 @@ def discover_and_register_tools():
                     if get_yaml_names:
                         yaml_tool_names = get_yaml_names()
                         registry.add_yaml_tool_names(yaml_tool_names)
-                        logger.info(f"Found {len(yaml_tool_names)} YAML tool names")
+                        logger.info(f"📄 Found {len(yaml_tool_names)} YAML tool names")
                     else:
                         logger.warning(
-                            "get_yaml_tool_names function not found in yaml_tools module"
+                            "⚠️  get_yaml_tool_names function not found in yaml_tools module"
                         )
                 except Exception as e:
-                    logger.error(f"Error getting YAML tool names: {e}")
+                    logger.error(f"❌ Error getting YAML tool names: {e}")
                     failed_tools.append(f"YAML tool names discovery: {str(e)}")
 
                 # Register YAML tools with error handling
@@ -701,83 +851,113 @@ def discover_and_register_tools():
                                 [f"YAML:{cls.__name__}" for cls in yaml_tool_classes]
                             )
                             logger.info(
-                                f"Successfully registered {len(yaml_tool_classes)} YAML tools"
+                                f"✅ Successfully registered {len(yaml_tool_classes)} YAML tools"
                             )
                         else:
-                            logger.info("No YAML tools were registered")
+                            logger.info("📄 No YAML tools were registered")
                     else:
                         logger.warning(
-                            "discover_and_register_yaml_tools function not found"
+                            "⚠️  discover_and_register_yaml_tools function not found"
                         )
                 except Exception as e:
-                    logger.error(f"Error registering YAML tools: {e}")
+                    logger.error(f"❌ Error registering YAML tools: {e}")
                     failed_tools.append(f"YAML tools registration: {str(e)}")
         except ImportError as e:
-            logger.error(f"Could not import YAML tools module: {e}")
+            logger.error(f"❌ Could not import YAML tools module: {e}")
             failed_tools.append(f"YAML tools module import: {str(e)}")
         except Exception as e:
-            logger.error(f"Unexpected error loading YAML tools: {e}")
+            logger.error(f"❌ Unexpected error loading YAML tools: {e}")
             failed_tools.append(f"YAML tools general error: {str(e)}")
     else:
-        logger.info("YAML tool registration is disabled")
+        logger.info("📄 YAML tool registration is disabled")
 
     # Then discover code-based tools if enabled
     if config.register_code_tools:
         with time_plugin_operation("Code-based Tools Discovery"):
-            logger.info("Attempting to discover code-based tools...")
+            logger.info("🔍 Attempting to discover code-based tools...")
 
             # Discover tools in the mcp_tools package with error handling
             try:
                 with time_plugin_operation("mcp_tools Package Discovery"):
+                    logger.info("🔍 Scanning mcp_tools package...")
                     registry.discover_tools("mcp_tools")
-                    logger.info("Successfully completed mcp_tools package discovery")
+                    logger.info("✅ Successfully completed mcp_tools package discovery")
             except Exception as e:
-                logger.error(f"Error discovering tools in mcp_tools package: {e}")
+                logger.error(f"❌ Error discovering tools in mcp_tools package: {e}")
                 failed_tools.append(f"mcp_tools package discovery: {str(e)}")
 
             # Discover tools in plugin root directories with error handling
             try:
                 plugin_roots = config.get_plugin_roots()
-                logger.info(f"Discovering tools in {len(plugin_roots)} plugin directories")
+                logger.info(f"🔍 Discovering tools in {len(plugin_roots)} plugin root directories")
+                
+                # Log plugin root directories being scanned
+                for i, plugin_root in enumerate(plugin_roots, 1):
+                    logger.info(f"  📁 Plugin root {i}: {plugin_root}")
 
                 with time_plugin_operation("Plugin Directories Discovery"):
                     for plugin_dir in plugin_roots:
                         try:
                             registry.discover_plugin_directory(plugin_dir)
                             logger.debug(
-                                f"Successfully processed plugin directory: {plugin_dir}"
+                                f"✅ Successfully processed plugin directory: {plugin_dir}"
                             )
                         except Exception as e:
                             logger.error(
-                                f"Error discovering tools in plugin directory {plugin_dir}: {e}"
+                                f"❌ Error discovering tools in plugin directory {plugin_dir}: {e}"
                             )
                             failed_tools.append(f"Plugin directory {plugin_dir}: {str(e)}")
             except Exception as e:
                 logger.error(
-                    f"Error getting plugin roots or processing plugin directories: {e}"
+                    f"❌ Error getting plugin roots or processing plugin directories: {e}"
                 )
                 failed_tools.append(f"Plugin directories discovery: {str(e)}")
     else:
-        logger.info("Code tool registration is disabled")
+        logger.info("🔧 Code tool registration is disabled")
 
-    # Collect summary information with error handling
+    # Generate comprehensive plugin loading summary
     try:
         tool_count = len(registry.tools)
         tool_sources = registry.get_tool_sources()
         yaml_count = sum(1 for source in tool_sources.values() if source == "yaml")
         code_count = sum(1 for source in tool_sources.values() if source == "code")
+        
+        # Get plugin loading summary
+        plugin_summary = registry.get_plugin_loading_summary()
 
-        logger.info(f"Tool discovery summary:")
-        logger.info(f"  - Total tools registered: {tool_count}")
-        logger.info(f"  - YAML tools: {yaml_count}")
-        logger.info(f"  - Code tools: {code_count}")
-        logger.info(f"  - Successfully processed: {len(successful_tools)}")
-        logger.info(f"  - Failed components: {len(failed_tools)}")
+        # Comprehensive Plugin Loading Summary
+        logger.info("=" * 60)
+        logger.info("📊 COMPREHENSIVE PLUGIN LOADING SUMMARY")
+        logger.info("=" * 60)
+        logger.info(f"🔧 Total tools registered: {tool_count}")
+        logger.info(f"📄 YAML tools: {yaml_count}")
+        logger.info(f"🔧 Code tools: {code_count}")
+        logger.info(f"✅ Successfully processed components: {len(successful_tools)}")
+        logger.info(f"❌ Failed components: {len(failed_tools)}")
+        
+        # Plugin source breakdown
+        if plugin_summary.get("plugin_groups"):
+            logger.info(f"📁 Plugin sources:")
+            for plugin_source, tools in plugin_summary["plugin_groups"].items():
+                logger.info(f"  • {plugin_source}: {', '.join(tools) if tools else 'None'}")
+        
+        # Plugin root directories
+        plugin_roots = config.get_plugin_roots()
+        if plugin_roots:
+            logger.info(f"📂 Plugin root directories scanned:")
+            for plugin_root in plugin_roots:
+                logger.info(f"  • {plugin_root}")
+        
+        # Discovered plugin paths
+        if plugin_summary.get("discovered_plugin_paths"):
+            logger.info(f"🔌 Discovered plugin directories:")
+            for plugin_path in plugin_summary["discovered_plugin_paths"]:
+                logger.info(f"  • {plugin_path}")
 
         if failed_tools:
-            logger.warning("Failed tool discovery components:")
+            logger.warning("⚠️  Failed tool discovery components:")
             for failed_item in failed_tools:
-                logger.warning(f"  - {failed_item}")
+                logger.warning(f"  ❌ {failed_item}")
 
         logger.debug(f"Registered tool names: {list(registry.tools.keys())}")
         logger.debug(
@@ -786,7 +966,10 @@ def discover_and_register_tools():
         logger.debug(
             f"Tool details: {[(name, source) for name, source in tool_sources.items()]}"
         )
+        
+        logger.info("=" * 60)
+        
     except Exception as e:
-        logger.error(f"Error generating tool discovery summary: {e}")
+        logger.error(f"❌ Error generating tool discovery summary: {e}")
 
-    logger.info("Tool discovery and registration completed")
+    logger.info("🎉 Tool discovery and registration completed")
