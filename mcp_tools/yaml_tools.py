@@ -15,6 +15,7 @@ from mcp_tools.interfaces import ToolInterface, CommandExecutorInterface
 from mcp_tools.plugin import register_tool, registry
 from mcp_tools.dependency import injector
 from utils.secret_scanner import redact_secrets
+from mcp_tools.output_limiter import OutputLimiter
 
 # Configuration
 DEFAULT_WAIT_FOR_QUERY = True  # Default wait for task
@@ -69,6 +70,9 @@ class YamlToolBase(ToolInterface):
                 self._command_executor = None
         else:
             self._command_executor = command_executor
+
+        # Initialize output limiter
+        self._output_limiter = OutputLimiter()
 
     @property
     def name(self) -> str:
@@ -306,7 +310,7 @@ class YamlToolBase(ToolInterface):
             Tuple of (filtered_stdout, filtered_stderr)
         """
         apply_to = config.get("apply_to", ["stdout", "stderr"])
-        
+
         filtered_stdout = stdout
         filtered_stderr = stderr
         all_findings = []
@@ -339,7 +343,7 @@ class YamlToolBase(ToolInterface):
         for finding in findings:
             secret_type = finding.get("SecretType", "Unknown")
             line_num = finding.get("LineNumber", 0)
-            
+
             if secret_type not in secret_types:
                 secret_types[secret_type] = []
             secret_types[secret_type].append(line_num)
@@ -534,22 +538,27 @@ class YamlToolBase(ToolInterface):
                 if result.get("status") == "completed":
                     # Apply post-processing configuration
                     post_config = self._tool_data.get("post_processing", {})
-                    
+
                     # Apply security filtering if enabled (default: True for security)
                     security_config = post_config.get("security_filtering", {})
                     if security_config.get("enabled", True):
                         stdout_content = result.get("output", "")
                         stderr_content = result.get("error", "")
-                        
+
                         filtered_stdout, filtered_stderr = self._apply_security_filtering(
                             stdout_content, stderr_content, security_config
                         )
-                        
+
                         # Update result with filtered content
                         result = result.copy()
                         result["output"] = filtered_stdout
                         result["error"] = filtered_stderr
-                    
+
+                    # Apply output length limits if configured
+                    output_limits = post_config.get("output_limits", {})
+                    if output_limits:
+                        result = self._output_limiter.apply_output_limits(result, output_limits)
+
                     processed_result = self._apply_output_attachment_config(result, post_config)
 
                     return [
