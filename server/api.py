@@ -443,6 +443,20 @@ async def api_reload_configuration(request: Request):
         }, status_code=500)
 
 
+async def api_backup_env_file(request: Request):
+    """Create a backup of the .env file with timestamp."""
+    try:
+        result = env.backup_env_file()
+        status_code = 200 if result.get("success") else 404
+        return JSONResponse(result, status_code=status_code)
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": str(e),
+            "message": f"Error creating backup: {str(e)}"
+        }, status_code=500)
+
+
 api_routes = [
     Route("/api/import-knowledge", endpoint=api_import_knowledge, methods=["POST"]),
     Route("/api/collections", endpoint=api_list_collections, methods=["GET"]),
@@ -461,4 +475,5 @@ api_routes = [
     Route("/api/configuration/env-file", endpoint=api_save_env_file, methods=["POST"]),
     Route("/api/configuration/validate-env", endpoint=api_validate_env_content, methods=["POST"]),
     Route("/api/configuration/reload", endpoint=api_reload_configuration, methods=["POST"]),
+    Route("/api/configuration/backup-env", endpoint=api_backup_env_file, methods=["POST"]),
 ]

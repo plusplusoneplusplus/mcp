@@ -460,13 +460,21 @@ class EnvironmentManager:
         # Ensure settings are synced
         self._sync_repo_to_settings()
 
+        # Convert DEFAULT_SETTINGS to JSON-serializable format
+        default_settings_serializable = {}
+        for key, (default_value, type_class) in self.DEFAULT_SETTINGS.items():
+            default_settings_serializable[key] = {
+                "default_value": default_value,
+                "type": type_class.__name__
+            }
+
         return {
             "settings": dict(self.settings),
             "azrepo_parameters": dict(self.azrepo_parameters),
             "kusto_parameters": dict(self.kusto_parameters),
             "additional_paths": dict(self.repository_info.additional_paths),
             "git_roots": dict(self.repository_info.git_roots),
-            "default_settings": dict(self.DEFAULT_SETTINGS),
+            "default_settings": default_settings_serializable,
             "path_settings": list(self.PATH_SETTINGS),
             "env_mapping": dict(self.ENV_MAPPING)
         }
@@ -697,6 +705,50 @@ class EnvironmentManager:
                 "errors": [f"Validation failed: {str(e)}"],
                 "warnings": [],
                 "message": f"Error validating .env content: {str(e)}"
+            }
+
+    def backup_env_file(self) -> Dict[str, Any]:
+        """Create a backup of the .env file with timestamp"""
+        try:
+            import datetime
+
+            # Find the current .env file
+            env_file_path = None
+
+            if self.repository_info.git_root:
+                env_file_path = Path(self.repository_info.git_root) / ".env"
+            else:
+                git_root = self._get_git_root()
+                if git_root:
+                    env_file_path = git_root / ".env"
+                else:
+                    env_file_path = Path.cwd() / ".env"
+
+            if not env_file_path.exists():
+                return {
+                    "success": False,
+                    "error": "No .env file found to backup",
+                    "message": "No .env file found in common locations"
+                }
+
+            # Create backup with timestamp
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_path = env_file_path.with_suffix(f'.env.backup_{timestamp}')
+
+            shutil.copy2(env_file_path, backup_path)
+
+            return {
+                "success": True,
+                "backup_path": str(backup_path),
+                "original_path": str(env_file_path),
+                "message": f"Backup created: {backup_path}"
+            }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Error creating backup: {str(e)}"
             }
 
 
