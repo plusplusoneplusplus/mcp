@@ -31,6 +31,7 @@ dependencies = [
     "starlette>=0.37.0", # ASGI framework
     "httpx>=0.26.0", # HTTP client
     "httpx-sse>=0.4.0", # SSE client for httpx
+    "aiohttp>=3.8.0", # Async HTTP client for Azure DevOps REST API
     # LLM clients
     "openai>=1.14.3", # OpenAI Python SDK
     # graphrag
