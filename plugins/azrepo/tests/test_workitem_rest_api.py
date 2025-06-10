@@ -94,9 +94,9 @@ class TestRestApiAuthentication:
                 "iteration": "Sprint 1",
                 "bearer_token": "test-bearer-token-123"
             }
-            
+
             headers = workitem_tool_with_token._get_auth_headers()
-            
+
             assert "Authorization" in headers
             assert headers["Authorization"].startswith("Bearer ")
             assert headers["Content-Type"] == "application/json-patch+json"
@@ -117,9 +117,9 @@ class TestRestApiConfiguration:
         # Set bearer token but clear organization
         workitem_tool_no_token.bearer_token = "test-token"
         workitem_tool_no_token.default_organization = None
-        
+
         result = await workitem_tool_no_token.create_work_item(title="Test Work Item")
-        
+
         assert result["success"] is False
         assert "Organization is required" in result["error"]
 
@@ -130,9 +130,9 @@ class TestRestApiConfiguration:
         workitem_tool_no_token.bearer_token = "test-token"
         workitem_tool_no_token.default_organization = "testorg"
         workitem_tool_no_token.default_project = None
-        
+
         result = await workitem_tool_no_token.create_work_item(title="Test Work Item")
-        
+
         assert result["success"] is False
         assert "Project is required" in result["error"]
 
@@ -147,7 +147,7 @@ class TestRestApiConfiguration:
             }
 
             tool = AzureWorkItemTool(command_executor=mock_executor)
-            
+
             assert tool.bearer_token == "test-token-456"
             assert tool.default_organization == "testorg"
             assert tool.default_project == "test-project"
@@ -163,7 +163,7 @@ class TestRestApiConfiguration:
             }
 
             tool = AzureWorkItemTool(command_executor=mock_executor)
-            
+
             assert tool.bearer_token is None
             assert tool.default_organization == "testorg"
             assert tool.default_project == "test-project"
@@ -178,26 +178,46 @@ class TestRestApiUrlConstruction:
         org = workitem_tool_with_token._get_param_with_default("custom-org", workitem_tool_with_token.default_organization)
         proj = workitem_tool_with_token._get_param_with_default("custom-project", workitem_tool_with_token.default_project)
         work_item_type = "Bug"
-        
-        expected_url = f"https://dev.azure.com/{org}/{proj}/_apis/wit/workitems/${work_item_type}?api-version=7.1"
-        
-        # This tests the URL pattern that would be used
-        assert "custom-org" in expected_url
-        assert "custom-project" in expected_url
-        assert "Bug" in expected_url
-        assert "api-version=7.1" in expected_url
+
+        url = workitem_tool_with_token._build_api_url(
+            org,
+            proj,
+            f"wit/workitems/${work_item_type}?api-version=7.1",
+        )
+
+        assert url.startswith("https://dev.azure.com/custom-org")
+        assert "/custom-project/_apis/wit/workitems/$Bug" in url
+        assert url.endswith("api-version=7.1")
 
     def test_url_construction_with_defaults(self, workitem_tool_with_token):
         """Test URL construction using default values."""
         org = workitem_tool_with_token._get_param_with_default(None, workitem_tool_with_token.default_organization)
         proj = workitem_tool_with_token._get_param_with_default(None, workitem_tool_with_token.default_project)
         work_item_type = "Task"
-        
-        expected_url = f"https://dev.azure.com/{org}/{proj}/_apis/wit/workitems/${work_item_type}?api-version=7.1"
-        
-        assert "testorg" in expected_url
-        assert "test-project" in expected_url
-        assert "Task" in expected_url
+
+        url = workitem_tool_with_token._build_api_url(
+            org,
+            proj,
+            f"wit/workitems/${work_item_type}?api-version=7.1",
+        )
+
+        assert url.startswith("https://dev.azure.com/testorg")
+        assert "/test-project/_apis/wit/workitems/$Task" in url
+        assert url.endswith("api-version=7.1")
+
+    def test_url_construction_full_org_url(self, workitem_tool_with_token):
+        """Organization parameter can be a full URL."""
+        org = "https://custom.dev.azure.com/myorg"
+        proj = "MyProject"
+
+        url = workitem_tool_with_token._build_api_url(
+            org,
+            proj,
+            "wit/workitems/$Task?api-version=7.1",
+        )
+
+        assert url.startswith("https://custom.dev.azure.com/myorg")
+        assert "/MyProject/_apis/wit/workitems/$Task" in url
 
 
 class TestRestApiPatchDocument:
@@ -206,7 +226,7 @@ class TestRestApiPatchDocument:
     def test_patch_document_minimal(self, workitem_tool_with_token):
         """Test patch document construction with minimal fields."""
         title = "Test Work Item"
-        
+
         # This simulates the patch document construction logic
         patch_document = [
             {
@@ -215,7 +235,7 @@ class TestRestApiPatchDocument:
                 "value": title
             }
         ]
-        
+
         # Add area and iteration from defaults
         if workitem_tool_with_token.default_area_path:
             patch_document.append({
@@ -223,17 +243,17 @@ class TestRestApiPatchDocument:
                 "path": "/fields/System.AreaPath",
                 "value": workitem_tool_with_token.default_area_path
             })
-        
+
         if workitem_tool_with_token.default_iteration_path:
             patch_document.append({
                 "op": "add",
                 "path": "/fields/System.IterationPath",
                 "value": workitem_tool_with_token.default_iteration_path
             })
-        
+
         # Verify patch document structure
         assert len(patch_document) == 3  # title, area, iteration
-        
+
         title_patch = next(p for p in patch_document if p["path"] == "/fields/System.Title")
         assert title_patch["op"] == "add"
         assert title_patch["value"] == "Test Work Item"
@@ -242,7 +262,7 @@ class TestRestApiPatchDocument:
         """Test patch document construction with description."""
         title = "Test Work Item"
         description = "Test description"
-        
+
         patch_document = [
             {
                 "op": "add",
@@ -255,7 +275,7 @@ class TestRestApiPatchDocument:
                 "value": description
             }
         ]
-        
+
         # Verify description is included
         desc_patch = next(p for p in patch_document if p["path"] == "/fields/System.Description")
         assert desc_patch["op"] == "add"
@@ -272,7 +292,7 @@ class TestExecuteToolValidation:
             "operation": "create"
             # Missing title
         })
-        
+
         assert result["success"] is False
         assert "title is required for create operation" in result["error"]
 
@@ -282,7 +302,7 @@ class TestExecuteToolValidation:
         result = await workitem_tool_with_token.execute_tool({
             "operation": "unknown_operation"
         })
-        
+
         assert result["success"] is False
         assert "Unknown operation: unknown_operation" in result["error"]
 
@@ -301,18 +321,18 @@ class TestRestApiWorkItemCreation:
                 "iteration": "Sprint 1",
                 "bearer_token": "test-bearer-token-123"
             }
-            
+
             # Use the working mock approach
             mock_response = MagicMock()
             mock_response.status = 200
             mock_response.text = AsyncMock(return_value=json.dumps(mock_rest_api_response))
-            
+
             mock_session = MagicMock()
             mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
             mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
-            
+
             with patch("aiohttp.ClientSession", return_value=mock_session):
                 result = await workitem_tool_with_token.create_work_item(title="Test Work Item")
 
@@ -330,7 +350,7 @@ class TestRestApiWorkItemCreation:
                 "iteration": "Sprint 1",
                 "bearer_token": "test-bearer-token-123"
             }
-            
+
             error_response = {
                 "message": "Access denied",
                 "typeKey": "UnauthorizedRequestException"
@@ -339,13 +359,13 @@ class TestRestApiWorkItemCreation:
             mock_response = MagicMock()
             mock_response.status = 401
             mock_response.text = AsyncMock(return_value=json.dumps(error_response))
-            
+
             mock_session = MagicMock()
             mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
             mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
-            
+
             with patch("aiohttp.ClientSession", return_value=mock_session):
                 result = await workitem_tool_with_token.create_work_item(title="Test Work Item")
 
@@ -368,17 +388,17 @@ class TestExecuteToolRestApi:
                 "iteration": "Sprint 1",
                 "bearer_token": "test-bearer-token-123"
             }
-            
+
             mock_response = MagicMock()
             mock_response.status = 200
             mock_response.text = AsyncMock(return_value=json.dumps(mock_rest_api_response))
-            
+
             mock_session = MagicMock()
             mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
             mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
             mock_session.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session.__aexit__ = AsyncMock(return_value=None)
-            
+
             with patch("aiohttp.ClientSession", return_value=mock_session):
                 result = await workitem_tool_with_token.execute_tool({
                     "operation": "create",
@@ -388,4 +408,4 @@ class TestExecuteToolRestApi:
                 })
 
                 assert result["success"] is True
-                assert "data" in result 
+                assert "data" in result
