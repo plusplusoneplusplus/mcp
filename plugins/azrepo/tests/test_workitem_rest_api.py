@@ -86,12 +86,21 @@ class TestRestApiAuthentication:
 
     def test_get_auth_headers_with_token(self, workitem_tool_with_token):
         """Test authentication headers generation with bearer token."""
-        headers = workitem_tool_with_token._get_auth_headers()
-        
-        assert "Authorization" in headers
-        assert headers["Authorization"].startswith("Bearer ")
-        assert headers["Content-Type"] == "application/json-patch+json"
-        assert headers["Accept"] == "application/json"
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "area_path": "TestArea\\SubArea",
+                "iteration": "Sprint 1",
+                "bearer_token": "test-bearer-token-123"
+            }
+            
+            headers = workitem_tool_with_token._get_auth_headers()
+            
+            assert "Authorization" in headers
+            assert headers["Authorization"].startswith("Bearer ")
+            assert headers["Content-Type"] == "application/json-patch+json"
+            assert headers["Accept"] == "application/json"
 
     def test_get_auth_headers_without_token(self, workitem_tool_no_token):
         """Test authentication headers generation without bearer token."""
@@ -284,47 +293,65 @@ class TestRestApiWorkItemCreation:
     @pytest.mark.asyncio
     async def test_create_work_item_rest_api_success(self, workitem_tool_with_token, mock_rest_api_response):
         """Test successful work item creation via REST API."""
-        # Use the working mock approach
-        mock_response = MagicMock()
-        mock_response.status = 200
-        mock_response.text = AsyncMock(return_value=json.dumps(mock_rest_api_response))
-        
-        mock_session = MagicMock()
-        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=None)
-        
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await workitem_tool_with_token.create_work_item(title="Test Work Item")
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "area_path": "TestArea\\SubArea",
+                "iteration": "Sprint 1",
+                "bearer_token": "test-bearer-token-123"
+            }
+            
+            # Use the working mock approach
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.text = AsyncMock(return_value=json.dumps(mock_rest_api_response))
+            
+            mock_session = MagicMock()
+            mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+            
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.create_work_item(title="Test Work Item")
 
-            assert result["success"] is True
-            assert "data" in result
+                assert result["success"] is True
+                assert "data" in result
 
     @pytest.mark.asyncio
     async def test_create_work_item_rest_api_http_error(self, workitem_tool_with_token):
         """Test work item creation with HTTP error response."""
-        error_response = {
-            "message": "Access denied",
-            "typeKey": "UnauthorizedRequestException"
-        }
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "area_path": "TestArea\\SubArea",
+                "iteration": "Sprint 1",
+                "bearer_token": "test-bearer-token-123"
+            }
+            
+            error_response = {
+                "message": "Access denied",
+                "typeKey": "UnauthorizedRequestException"
+            }
 
-        mock_response = MagicMock()
-        mock_response.status = 401
-        mock_response.text = AsyncMock(return_value=json.dumps(error_response))
-        
-        mock_session = MagicMock()
-        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=None)
-        
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await workitem_tool_with_token.create_work_item(title="Test Work Item")
+            mock_response = MagicMock()
+            mock_response.status = 401
+            mock_response.text = AsyncMock(return_value=json.dumps(error_response))
+            
+            mock_session = MagicMock()
+            mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+            
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.create_work_item(title="Test Work Item")
 
-            # Verify error handling
-            assert result["success"] is False
-            assert "HTTP 401" in result["error"]
+                # Verify error handling
+                assert result["success"] is False
+                assert "HTTP 401" in result["error"]
 
 
 class TestExecuteToolRestApi:
@@ -333,23 +360,32 @@ class TestExecuteToolRestApi:
     @pytest.mark.asyncio
     async def test_execute_tool_create_rest_api(self, workitem_tool_with_token, mock_rest_api_response):
         """Test execute_tool create operation via REST API."""
-        mock_response = MagicMock()
-        mock_response.status = 200
-        mock_response.text = AsyncMock(return_value=json.dumps(mock_rest_api_response))
-        
-        mock_session = MagicMock()
-        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=None)
-        
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await workitem_tool_with_token.execute_tool({
-                "operation": "create",
-                "title": "Test Work Item",
-                "description": "Test description",
-                "work_item_type": "User Story"
-            })
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "area_path": "TestArea\\SubArea",
+                "iteration": "Sprint 1",
+                "bearer_token": "test-bearer-token-123"
+            }
+            
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.text = AsyncMock(return_value=json.dumps(mock_rest_api_response))
+            
+            mock_session = MagicMock()
+            mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+            
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.execute_tool({
+                    "operation": "create",
+                    "title": "Test Work Item",
+                    "description": "Test description",
+                    "work_item_type": "User Story"
+                })
 
-            assert result["success"] is True
-            assert "data" in result 
+                assert result["success"] is True
+                assert "data" in result 

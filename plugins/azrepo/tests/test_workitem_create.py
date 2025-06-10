@@ -66,33 +66,47 @@ def mock_executor():
 @pytest.fixture
 def workitem_tool(mock_executor):
     """Create AzureWorkItemTool instance with mocked executor."""
-    with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
-        # Mock environment manager
-        mock_env_manager.load.return_value = None
-        mock_env_manager.get_azrepo_parameters.return_value = {
-            "org": "testorg",
-            "project": "test-project",
-            "area_path": "TestArea\\SubArea",
-            "iteration": "Sprint 1",
-            "bearer_token": "test-bearer-token-123"
-        }
+    # Use a persistent patch that lasts for the entire test
+    patcher = patch("plugins.azrepo.workitem_tool.env_manager")
+    mock_env_manager = patcher.start()
+    
+    # Mock environment manager
+    mock_env_manager.load.return_value = None
+    mock_env_manager.get_azrepo_parameters.return_value = {
+        "org": "testorg",
+        "project": "test-project",
+        "area_path": "TestArea\\SubArea",
+        "iteration": "Sprint 1",
+        "bearer_token": "test-bearer-token-123"
+    }
 
-        tool = AzureWorkItemTool(command_executor=mock_executor)
-        return tool
+    tool = AzureWorkItemTool(command_executor=mock_executor)
+    
+    yield tool
+    
+    # Clean up the patch
+    patcher.stop()
 
 
 @pytest.fixture
 def workitem_tool_no_defaults(mock_executor):
     """Create AzureWorkItemTool instance with no defaults."""
-    with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
-        # Mock environment manager with no defaults
-        mock_env_manager.load.return_value = None
-        mock_env_manager.get_azrepo_parameters.return_value = {
-            "bearer_token": "test-bearer-token-123"  # Still need bearer token
-        }
+    # Use a persistent patch that lasts for the entire test
+    patcher = patch("plugins.azrepo.workitem_tool.env_manager")
+    mock_env_manager = patcher.start()
+    
+    # Mock environment manager with no defaults
+    mock_env_manager.load.return_value = None
+    mock_env_manager.get_azrepo_parameters.return_value = {
+        "bearer_token": "test-bearer-token-123"  # Still need bearer token
+    }
 
-        tool = AzureWorkItemTool(command_executor=mock_executor)
-        return tool
+    tool = AzureWorkItemTool(command_executor=mock_executor)
+    
+    yield tool
+    
+    # Clean up the patch
+    patcher.stop()
 
 
 class TestCreateWorkItem:
@@ -402,7 +416,13 @@ class TestAuthenticationHeaders:
 
     def test_get_auth_headers_without_token(self, workitem_tool):
         """Test authentication headers without bearer token."""
-        workitem_tool.bearer_token = None
-        
-        with pytest.raises(ValueError, match="Bearer token not configured"):
-            workitem_tool._get_auth_headers() 
+        # Mock the environment manager to return no bearer token
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project"
+                # No bearer_token or bearer_token_command
+            }
+            
+            with pytest.raises(ValueError, match="Bearer token not configured"):
+                workitem_tool._get_auth_headers() 

@@ -88,54 +88,7 @@ class EnvironmentManager:
                     p = server_root / p
                 self.settings[key] = str(p.resolve())
 
-    def _execute_bearer_token_command(self, command: str) -> Optional[str]:
-        """Execute a command and extract the accessToken from JSON output.
-        
-        Args:
-            command: The command to execute
-            
-        Returns:
-            The access token if found, None otherwise
-        """
-        try:
-            self.logger.debug(f"Executing bearer token command: {command}")
-            
-            # Execute the command
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=30  # 30 second timeout
-            )
-            
-            if result.returncode != 0:
-                self.logger.error(f"Bearer token command failed with return code {result.returncode}: {result.stderr}")
-                return None
-                
-            # Parse JSON output
-            try:
-                json_output = json.loads(result.stdout)
-                access_token = json_output.get("accessToken")
-                
-                if access_token:
-                    self.logger.debug("Successfully extracted access token from command output")
-                    return access_token
-                else:
-                    self.logger.warning("No 'accessToken' property found in command output JSON")
-                    return None
-                    
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Failed to parse command output as JSON: {e}")
-                self.logger.debug(f"Command output was: {result.stdout}")
-                return None
-                
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Bearer token command timed out after 30 seconds: {command}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Error executing bearer token command: {e}")
-            return None
+
 
     def _sync_settings_to_repo(self):
         """Sync settings to repository info object"""
@@ -472,22 +425,9 @@ class EnvironmentManager:
         return self.get_setting("private_tool_root")
 
     def get_azrepo_parameters(self) -> Dict[str, Any]:
-        """Get Azure repo parameters with dynamic bearer token resolution"""
-        # Make a copy to avoid modifying the original
-        params = dict(self.azrepo_parameters)
-        
-        # Check if we have a bearer token command but no direct bearer token
-        if "bearer_token_command" in params and "bearer_token" not in params:
-            command = params["bearer_token_command"]
-            if command:
-                token = self._execute_bearer_token_command(command)
-                if token:
-                    params["bearer_token"] = token
-                    self.logger.debug("Successfully loaded bearer token from command")
-                else:
-                    self.logger.warning("Failed to load bearer token from command")
-        
-        return params
+        """Get Azure repo parameters"""
+        # Return a copy to avoid modifying the original
+        return dict(self.azrepo_parameters)
 
     def get_azrepo_parameter(self, name: str, default: Any = None) -> Any:
         """Get a specific Azure repo parameter"""
