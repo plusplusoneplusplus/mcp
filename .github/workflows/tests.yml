@@ -84,7 +84,7 @@ jobs:
         run: |
           source .venv/bin/activate
           chmod +x ./scripts/run_tests.sh
-          ./scripts/run_tests.sh
+          ./scripts/run_tests.sh -p 4
 
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
@@ -92,7 +92,7 @@ jobs:
         run: |
           source .venv/Scripts/activate
           chmod +x ./scripts/run_tests.sh
-          ./scripts/run_tests.sh
+          ./scripts/run_tests.sh -p 4
 
       - name: Cleanup Temporary Files (Unix)
         if: always() && runner.os != 'Windows'
