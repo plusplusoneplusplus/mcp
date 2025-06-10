@@ -338,12 +338,18 @@ async def config_page(request: Request):
         "config.html", {"request": request, "current_page": "config"}
     )
 
+async def tool_history_page(request: Request):
+    return templates.TemplateResponse(
+        "tool_history.html", {"request": request, "current_page": "tool_history"}
+    )
+
 
 # --- Add routes ---
 routes = [
     Route("/", endpoint=index, methods=["GET"]),
     Route("/knowledge", endpoint=knowledge, methods=["GET"]),
     Route("/jobs", endpoint=jobs, methods=["GET"]),
+    Route("/tool-history", endpoint=tool_history_page, methods=["GET"]),
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
