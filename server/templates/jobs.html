@@ -61,12 +61,35 @@
         background: #005fa3;
     }
 
+    /* Section Headers */
+    .jobs-section {
+        margin-bottom: 2em;
+    }
+
+    .jobs-section h3 {
+        margin: 0 0 1em 0;
+        padding: 0.5em 0;
+        border-bottom: 2px solid #0077cc;
+        color: #333;
+        font-size: 1.3em;
+    }
+
+    .jobs-section h3.active-jobs {
+        color: #28a745;
+        border-bottom-color: #28a745;
+    }
+
+    .jobs-section h3.job-history {
+        color: #6c757d;
+        border-bottom-color: #6c757d;
+    }
+
     .jobs-table-container {
         overflow-x: auto;
         margin-bottom: 1em;
     }
 
-    #jobs-table {
+    .jobs-table {
         width: 100%;
         border-collapse: collapse;
         background: #fff;
@@ -75,21 +98,29 @@
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     }
 
-    #jobs-table th,
-    #jobs-table td {
+    .jobs-table th,
+    .jobs-table td {
         padding: 0.75em;
         text-align: left;
         border-bottom: 1px solid #eee;
     }
 
-    #jobs-table th {
+    .jobs-table th {
         background: #f8f9fa;
         font-weight: bold;
         color: #333;
     }
 
-    #jobs-table tr:hover {
+    .jobs-table tr:hover {
         background: #f8f9fa;
+    }
+
+    /* Empty state styling */
+    .empty-state {
+        text-align: center;
+        padding: 2em;
+        color: #666;
+        font-style: italic;
     }
 
     .status-badge {
@@ -161,6 +192,22 @@
     .btn-terminate:hover {
         background: #c82333;
     }
+
+    /* Sorting controls for history table */
+    .history-controls {
+        display: flex;
+        gap: 1em;
+        margin-bottom: 1em;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .history-controls select {
+        padding: 0.4em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
 </style>
 {% endblock %}
 
@@ -196,41 +243,75 @@
         </div>
     </div>
 
-    <!-- Controls -->
+    <!-- Global Controls -->
     <div class="jobs-controls">
-        <label for="status-filter">Filter by status:</label>
-        <select id="status-filter">
-            <option value="all">All</option>
-            <option value="running">Running</option>
-            <option value="completed">Completed</option>
-            <option value="failed">Failed</option>
-            <option value="terminated">Terminated</option>
-        </select>
-
         <input type="text" id="job-search" placeholder="Search by command or token..." />
         <button id="refresh-jobs">Refresh</button>
         <label><input type="checkbox" id="auto-refresh" checked> Auto-refresh</label>
     </div>
 
-    <!-- Jobs Table -->
-    <div class="jobs-table-container">
-        <table id="jobs-table">
-            <thead>
-                <tr>
-                    <th>Token</th>
-                    <th>Status</th>
-                    <th>Command</th>
-                    <th>Start Time</th>
-                    <th>Runtime</th>
-                    <th>CPU %</th>
-                    <th>Memory</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="jobs-table-body">
-                <!-- Populated by JavaScript -->
-            </tbody>
-        </table>
+    <!-- Active Jobs Section -->
+    <div class="jobs-section">
+        <h3 class="active-jobs">Active Jobs</h3>
+        <div class="jobs-table-container">
+            <table id="active-jobs-table" class="jobs-table">
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Status</th>
+                        <th>Command</th>
+                        <th>Start Time</th>
+                        <th>Runtime</th>
+                        <th>CPU %</th>
+                        <th>Memory</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="active-jobs-table-body">
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Job History Section -->
+    <div class="jobs-section">
+        <h3 class="job-history">Job History</h3>
+        <div class="history-controls">
+            <label for="history-status-filter">Filter by status:</label>
+            <select id="history-status-filter">
+                <option value="all">All</option>
+                <option value="completed">Completed</option>
+                <option value="failed">Failed</option>
+                <option value="terminated">Terminated</option>
+            </select>
+
+            <label for="history-sort">Sort by:</label>
+            <select id="history-sort">
+                <option value="start_time_desc">Newest First</option>
+                <option value="start_time_asc">Oldest First</option>
+                <option value="duration_desc">Longest Duration</option>
+                <option value="duration_asc">Shortest Duration</option>
+            </select>
+        </div>
+        <div class="jobs-table-container">
+            <table id="history-jobs-table" class="jobs-table">
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Status</th>
+                        <th>Command</th>
+                        <th>Start Time</th>
+                        <th>Duration</th>
+                        <th>Exit Code</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="history-jobs-table-body">
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- Job Details Modal -->
@@ -263,11 +344,14 @@
             const statsData = await statsResponse.json();
 
             updateJobsDashboard(jobsData, statsData);
-            updateJobsTable(jobsData.jobs || []);
+            updateActiveJobsTable(jobsData.jobs || []);
+            updateHistoryJobsTable(jobsData.jobs || []);
         } catch (error) {
             console.error('Error loading background jobs:', error);
-            document.getElementById('jobs-table-body').innerHTML =
-                '<tr><td colspan="8" style="text-align:center;color:red;">Error loading jobs: ' + error.message + '</td></tr>';
+            document.getElementById('active-jobs-table-body').innerHTML =
+                '<tr><td colspan="8" class="empty-state">Error loading jobs: ' + error.message + '</td></tr>';
+            document.getElementById('history-jobs-table-body').innerHTML =
+                '<tr><td colspan="7" class="empty-state">Error loading jobs: ' + error.message + '</td></tr>';
         }
     }
 
@@ -280,33 +364,76 @@
         document.getElementById('memory-usage').textContent = Math.round(statsData.system_load?.memory_usage || 0) + '%';
     }
 
-    function updateJobsTable(jobs) {
-        const tbody = document.getElementById('jobs-table-body');
-        const statusFilter = document.getElementById('status-filter').value;
+    function updateActiveJobsTable(jobs) {
+        const tbody = document.getElementById('active-jobs-table-body');
         const searchTerm = document.getElementById('job-search').value.toLowerCase();
 
-        // Filter jobs
-        let filteredJobs = jobs.filter(job => {
-            const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+        // Filter for running jobs only
+        let activeJobs = jobs.filter(job => {
+            const isRunning = job.status === 'running';
             const matchesSearch = !searchTerm ||
                 job.token.toLowerCase().includes(searchTerm) ||
                 (job.command && job.command.toLowerCase().includes(searchTerm));
-            return matchesStatus && matchesSearch;
+            return isRunning && matchesSearch;
         });
 
-        if (filteredJobs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#666;">No jobs found</td></tr>';
+        if (activeJobs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No active jobs</td></tr>';
             return;
         }
 
         tbody.innerHTML = '';
-        filteredJobs.forEach(job => {
-            const row = createJobRow(job);
+        activeJobs.forEach(job => {
+            const row = createActiveJobRow(job);
             tbody.appendChild(row);
         });
     }
 
-    function createJobRow(job) {
+    function updateHistoryJobsTable(jobs) {
+        const tbody = document.getElementById('history-jobs-table-body');
+        const searchTerm = document.getElementById('job-search').value.toLowerCase();
+        const statusFilter = document.getElementById('history-status-filter').value;
+        const sortBy = document.getElementById('history-sort').value;
+
+        // Filter for completed jobs only
+        let historyJobs = jobs.filter(job => {
+            const isCompleted = job.status !== 'running';
+            const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+            const matchesSearch = !searchTerm ||
+                job.token.toLowerCase().includes(searchTerm) ||
+                (job.command && job.command.toLowerCase().includes(searchTerm));
+            return isCompleted && matchesStatus && matchesSearch;
+        });
+
+        // Sort jobs
+        historyJobs.sort((a, b) => {
+            switch (sortBy) {
+                case 'start_time_desc':
+                    return (b.start_time || 0) - (a.start_time || 0);
+                case 'start_time_asc':
+                    return (a.start_time || 0) - (b.start_time || 0);
+                case 'duration_desc':
+                    return (b.duration || 0) - (a.duration || 0);
+                case 'duration_asc':
+                    return (a.duration || 0) - (b.duration || 0);
+                default:
+                    return (b.start_time || 0) - (a.start_time || 0);
+            }
+        });
+
+        if (historyJobs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No completed jobs found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        historyJobs.forEach(job => {
+            const row = createHistoryJobRow(job);
+            tbody.appendChild(row);
+        });
+    }
+
+    function createActiveJobRow(job) {
         const row = document.createElement('tr');
         row.className = `job-row job-${job.status}`;
 
@@ -324,7 +451,29 @@
             <td>${memoryMB}</td>
             <td>
                 <button class="job-action-btn btn-details" onclick="showJobDetails('${job.token}')">Details</button>
-                ${job.status === 'running' ? `<button class="job-action-btn btn-terminate" onclick="terminateJob('${job.token}')">Terminate</button>` : ''}
+                <button class="job-action-btn btn-terminate" onclick="terminateJob('${job.token}')">Terminate</button>
+            </td>
+        `;
+
+        return row;
+    }
+
+    function createHistoryJobRow(job) {
+        const row = document.createElement('tr');
+        row.className = `job-row job-${job.status}`;
+
+        const duration = job.duration ? formatDuration(job.duration) : 'N/A';
+        const exitCode = job.return_code !== undefined ? job.return_code : 'N/A';
+
+        row.innerHTML = `
+            <td><code class="token" title="${job.token}">${job.token.substring(0, 8)}...</code></td>
+            <td><span class="status-badge status-${job.status}">${job.status}</span></td>
+            <td class="command" title="${job.command || 'N/A'}">${truncateCommand(job.command || 'N/A')}</td>
+            <td>${job.start_time ? new Date(job.start_time * 1000).toLocaleString() : 'N/A'}</td>
+            <td>${duration}</td>
+            <td>${exitCode}</td>
+            <td>
+                <button class="job-action-btn btn-details" onclick="showJobDetails('${job.token}')">Details</button>
             </td>
         `;
 
@@ -425,7 +574,7 @@
                 <p><strong>End Time:</strong> ${endTime}</p>
                 <p><strong>Duration:</strong> ${job.duration ? formatDuration(job.duration) : 'N/A'}</p>
                 <p><strong>PID:</strong> ${job.pid || 'N/A'}</p>
-                <p><strong>Exit Code:</strong> ${job.exit_code !== undefined ? job.exit_code : 'N/A'}</p>
+                <p><strong>Exit Code:</strong> ${job.return_code !== undefined ? job.return_code : 'N/A'}</p>
             </div>
 
             ${job.output ? `
@@ -464,16 +613,25 @@
         }
     });
 
-    document.getElementById('status-filter').addEventListener('change', function () {
-        const tbody = document.getElementById('jobs-table-body');
-        if (tbody.children.length > 0) {
+    document.getElementById('job-search').addEventListener('input', function () {
+        // Refresh both tables when search changes
+        const activeBody = document.getElementById('active-jobs-table-body');
+        const historyBody = document.getElementById('history-jobs-table-body');
+        if (activeBody.children.length > 0 || historyBody.children.length > 0) {
             loadBackgroundJobs();
         }
     });
 
-    document.getElementById('job-search').addEventListener('input', function () {
-        const tbody = document.getElementById('jobs-table-body');
-        if (tbody.children.length > 0) {
+    document.getElementById('history-status-filter').addEventListener('change', function () {
+        const historyBody = document.getElementById('history-jobs-table-body');
+        if (historyBody.children.length > 0) {
+            loadBackgroundJobs();
+        }
+    });
+
+    document.getElementById('history-sort').addEventListener('change', function () {
+        const historyBody = document.getElementById('history-jobs-table-body');
+        if (historyBody.children.length > 0) {
             loadBackgroundJobs();
         }
     });
