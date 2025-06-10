@@ -3,10 +3,6 @@
 import logging
 import json
 import aiohttp
-import base64
-import subprocess
-import getpass
-import os
 from typing import Dict, Any, List, Optional, Union
 
 # Import the required interfaces and decorators
@@ -15,6 +11,14 @@ from mcp_tools.plugin import register_tool
 
 # Import configuration manager
 from config import env_manager
+
+# Import shared Azure REST API utilities
+from .azure_rest_utils import (
+    get_current_username,
+    get_auth_headers,
+    build_api_url,
+    process_rest_response,
+)
 
 # Import markdown to HTML conversion utility
 from utils.markdown_to_html import detect_and_convert_markdown
@@ -278,128 +282,7 @@ class AzureWorkItemTool(ToolInterface):
         """
         return param_value if param_value is not None else default_value
 
-    def _get_current_username(self) -> Optional[str]:
-        """Get the current username in a cross-platform way.
-
-        Returns:
-            The current username, or None if unable to determine
-        """
-        try:
-            # Try getpass.getuser() first (works on most platforms)
-            return getpass.getuser()
-        except Exception:
-            try:
-                # Fallback to environment variables
-                username = os.environ.get("USER") or os.environ.get("USERNAME")
-                if username:
-                    return username
-            except Exception:
-                pass
-
-            # Return None if unable to determine username
-            self.logger.warning("Unable to determine current username")
-            return None
-
-    def _execute_bearer_token_command(self, command: str) -> Optional[str]:
-        """Execute a command and extract the accessToken from JSON output.
-
-        Args:
-            command: The command to execute
-
-        Returns:
-            The access token if found, None otherwise
-        """
-        try:
-            self.logger.debug(f"Executing bearer token command: {command}")
-
-            # Execute the command
-            result = subprocess.run(
-                command,
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=30  # 30 second timeout
-            )
-
-            if result.returncode != 0:
-                self.logger.error(f"Bearer token command failed with return code {result.returncode}: {result.stderr}")
-                return None
-
-            # Parse JSON output
-            try:
-                json_output = json.loads(result.stdout)
-                access_token = json_output.get("accessToken")
-
-                if access_token:
-                    self.logger.debug("Successfully extracted access token from command output")
-                    return access_token
-                else:
-                    self.logger.warning("No 'accessToken' property found in command output JSON")
-                    return None
-
-            except json.JSONDecodeError as e:
-                self.logger.error(f"Failed to parse command output as JSON: {e}")
-                self.logger.debug(f"Command output was: {result.stdout}")
-                return None
-
-        except subprocess.TimeoutExpired:
-            self.logger.error(f"Bearer token command timed out after 30 seconds: {command}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Error executing bearer token command: {e}")
-            return None
-
-    def _get_auth_headers(self, content_type: str = "application/json-patch+json") -> Dict[str, str]:
-        """Get authentication headers for REST API calls.
-
-        Args:
-            content_type: Content-Type header value (defaults to json-patch for PATCH operations)
-
-        Returns:
-            Dictionary with authorization headers
-        """
-        bearer_token = None
-
-        # Always get fresh Azure repo parameters from environment manager
-        # This ensures we get the latest configuration, including any mocked values in tests
-        azrepo_params = env_manager.get_azrepo_parameters()
-
-        # Try bearer token command first (takes precedence over static token)
-        bearer_token_command = azrepo_params.get("bearer_token_command")
-        if bearer_token_command:
-            bearer_token = self._execute_bearer_token_command(bearer_token_command)
-
-        # If no token from command, fall back to static token from environment
-        if not bearer_token:
-            bearer_token = azrepo_params.get("bearer_token")
-
-        # If still no token from environment, fall back to instance bearer_token (set during initialization)
-        if not bearer_token:
-            bearer_token = self.bearer_token
-
-        if not bearer_token:
-            raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN or AZREPO_BEARER_TOKEN_COMMAND environment variable.")
-
-        # For Azure DevOps REST API, use the bearer token directly
-        return {
-            "Authorization": f"Bearer {bearer_token}",
-            "Content-Type": content_type,
-            "Accept": "application/json"
-        }
-
-    def _build_api_url(self, organization: str, project: str, endpoint: str) -> str:
-        """Build complete Azure DevOps REST API URL.
-
-        This helper handles organization parameters that may be supplied either
-        as a plain organization name (e.g. ``mycompany``) or a full URL
-        (e.g. ``https://dev.azure.com/mycompany`` or a custom host).
-        """
-        if organization.startswith(("http://", "https://")):
-            base_url = organization.rstrip("/")
-        else:
-            base_url = f"https://dev.azure.com/{organization}"
-
-        return f"{base_url}/{project}/_apis/{endpoint}"
+    # Moved to azure_rest_utils.py
 
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
@@ -488,10 +371,10 @@ class AzureWorkItemTool(ToolInterface):
             if query_params:
                 endpoint += "?" + "&".join(query_params)
 
-            url = self._build_api_url(org, proj, endpoint)
+            url = build_api_url(org, proj, endpoint)
 
             # Get authentication headers (use application/json for GET requests)
-            headers = self._get_auth_headers(content_type="application/json")
+            headers = get_auth_headers(content_type="application/json")
 
             self.logger.debug(f"Getting work item via REST API: {url}")
 
@@ -574,7 +457,7 @@ class AzureWorkItemTool(ToolInterface):
                 return {"success": False, "error": "Project is required"}
 
             # Construct the REST API URL using organization name or URL
-            url = self._build_api_url(
+            url = build_api_url(
                 org,
                 proj,
                 f"wit/workitems/${work_item_type}?api-version=7.1",
@@ -620,7 +503,7 @@ class AzureWorkItemTool(ToolInterface):
             # Check both parameter and instance configuration for auto-assignment
             should_auto_assign = auto_assign_to_current_user and self.auto_assign_to_current_user
             if should_auto_assign and assigned_to == "current":
-                current_user = self._get_current_username()
+                current_user = get_current_username()
                 if current_user:
                     assignee = current_user
                     self.logger.debug(f"Auto-assigning work item to current user: {current_user}")
@@ -638,7 +521,7 @@ class AzureWorkItemTool(ToolInterface):
                 })
 
             # Get authentication headers
-            headers = self._get_auth_headers()
+            headers = get_auth_headers(content_type="application/json-patch+json")
 
             self.logger.debug(f"Creating work item via REST API: {url}")
             self.logger.debug(f"Patch document: {json.dumps(patch_document, indent=2)}")
@@ -706,7 +589,7 @@ class AzureWorkItemTool(ToolInterface):
                 return {"success": False, "error": "Project is required"}
 
             # Construct the REST API URL for updating work item
-            url = self._build_api_url(
+            url = build_api_url(
                 org,
                 proj,
                 f"wit/workitems/{work_item_id}?api-version=7.1",
@@ -734,7 +617,7 @@ class AzureWorkItemTool(ToolInterface):
                 })
 
             # Get authentication headers (use PATCH method)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers(content_type="application/json-patch+json")
 
             self.logger.debug(f"Updating work item via REST API: {url}")
             self.logger.debug(f"Patch document: {json.dumps(patch_document, indent=2)}")
