@@ -213,6 +213,7 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
     env['GIT_ROOT'] = str(Path(__file__).parent.parent.parent)
     env['PROJECT_NAME'] = 'mcp_test'
     env['PRIVATE_TOOL_ROOT'] = str(Path(__file__).parent.parent.parent)
+    env['MCP_YAML_TOOL_PATHS'] = str(Path(__file__).parent.parent)
     env['TOOL_HISTORY_ENABLED'] = 'true'
     env['TOOL_HISTORY_PATH'] = '.history'
     env['IMAGE_DIR'] = '.images'

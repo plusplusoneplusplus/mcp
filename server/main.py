@@ -218,6 +218,12 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
     if tool and invocation_dir:
         tool.diagnostic_dir = str(invocation_dir)
     if not tool:
+        # Debug: Log available tools when tool is not found
+        available_tools = list(injector.get_all_instances().keys())
+        filtered_tools = list(injector.get_filtered_instances().keys())
+        logging.error(f"Tool '{name}' not found. Available tools: {available_tools}")
+        logging.error(f"Filtered tools: {filtered_tools}")
+
         error_msg = f"Error: Tool '{name}' not found."
         record_tool_invocation(
             name, arguments, error_msg, 0, False, error_msg, invocation_dir
