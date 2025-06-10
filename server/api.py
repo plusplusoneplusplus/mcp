@@ -267,10 +267,9 @@ async def api_list_background_jobs(request: Request):
             if not status_filter or status_filter == status:
                 job = result.copy()
                 job["token"] = token
-                # For completed jobs, calculate start_time from duration if available
-                if "duration" in job and "start_time" not in job:
-                    # If we have duration but no start_time, we can't calculate it accurately
-                    # since we don't know when it completed. Leave start_time as None.
+                # start_time should now be preserved in completed job results
+                # If not present, leave as None for backward compatibility
+                if "start_time" not in job:
                     job["start_time"] = None
                 jobs.append(job)
 
