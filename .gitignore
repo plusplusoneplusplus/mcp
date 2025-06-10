@@ -1,7 +1,10 @@
 venv
 .vectordb
 
-__pycache__
+__pycache__/
+*/__pycache__/
+*.pyc
+*.pyo
 
 # Python
 *.py[cod]
@@ -142,6 +145,11 @@ service-account*.json
 # API keys and tokens (common patterns)
 *api*key*
 *secret*
+# Exception: Allow secret scanner utility files
+!utils/secret_scanner/
+!utils/secret_scanner/**
+# But still ignore __pycache__ in secret scanner
+utils/secret_scanner/**/__pycache__/
 *token*
 *password*
 *credential*

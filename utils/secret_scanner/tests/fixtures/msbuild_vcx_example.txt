@@ -1,0 +1,126 @@
+Microsoft (R) Build Engine version 17.8.3+195e7f5a3 for .NET Framework
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Building the projects in this solution one at a time. To enable parallel build, please add the "/m" switch.
+Build started 1/15/2024 2:30:45 PM.
+Project "C:\Projects\MyApp\MyApp.sln" on node 1 (default targets).
+ValidateSolutionConfiguration:
+  Building solution configuration "Release|x64".
+Project "C:\Projects\MyApp\MyApp.sln" on node 1 (default targets) is building "C:\Projects\MyApp\MyApp.vcxproj" on node 2 (default targets).
+PrepareForBuild:
+  Creating directory "C:\Projects\MyApp\x64\Release\".
+  Creating directory "C:\Projects\MyApp\x64\Release\MyApp.tlog\".
+InitializeBuildStatus:
+  Creating "C:\Projects\MyApp\x64\Release\MyApp.tlog\unsuccessfulbuild" because "AlwaysCreate" was specified.
+ClCompile:
+  C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.38.33130\bin\HostX64\x64\cl.exe /c /IC:\vcpkg\installed\x64-windows\include /Zi /nologo /W3 /WX- /diagnostics:column /sdl /O2 /Oi /GL /D WIN32 /D NDEBUG /D _CONSOLE /D _UNICODE /D UNICODE /Gm- /EHsc /MD /GS /Gy /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"C:\Projects\MyApp\x64\Release\\" /Fd"C:\Projects\MyApp\x64\Release\vc143.pdb" /external:W3 /Gd /TP /FC /errorReport:prompt main.cpp utils.cpp
+  main.cpp
+  utils.cpp
+  Generating Code...
+ResourceCompile:
+  C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\rc.exe /D NDEBUG /l"0x0409" /nologo /fo"C:\Projects\MyApp\x64\Release\MyApp.res" MyApp.rc
+Link:
+  C:\Program Files\Microsoft Visual Studio\2022\Professional\VC\Tools\MSVC\14.38.33130\bin\HostX64\x64\link.exe /ERRORREPORT:PROMPT /OUT:"C:\Projects\MyApp\x64\Release\MyApp.exe" /INCREMENTAL:NO /NOLOGO /LIBPATH:C:\vcpkg\installed\x64-windows\lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:\Projects\MyApp\x64\Release\MyApp.pdb" /SUBSYSTEM:CONSOLE /OPT:REF /OPT:ICF /LTCG:incremental /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:\Projects\MyApp\x64\Release\MyApp.lib" /MACHINE:X64 "C:\Projects\MyApp\x64\Release\main.obj" "C:\Projects\MyApp\x64\Release\utils.obj" "C:\Projects\MyApp\x64\Release\MyApp.res"
+  Generating code
+  Finished generating code
+  MyApp.vcxproj -> C:\Projects\MyApp\x64\Release\MyApp.exe
+FinalizeBuildStatus:
+  Deleting file "C:\Projects\MyApp\x64\Release\MyApp.tlog\unsuccessfulbuild".
+  Touching "C:\Projects\MyApp\x64\Release\MyApp.tlog\MyApp.lastbuildstate".
+Done Building Project "C:\Projects\MyApp\MyApp.vcxproj" (default targets).
+Done Building Project "C:\Projects\MyApp\MyApp.sln" (default targets).
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:12.34
+
+Additional build information:
+- Build configuration: Release|x64
+- Platform toolset: v143
+- Windows SDK version: 10.0.22621.0
+- Target framework: Native C++
+- Output directory: C:\Projects\MyApp\x64\Release\
+- Intermediate directory: C:\Projects\MyApp\x64\Release\
+- Primary output: C:\Projects\MyApp\x64\Release\MyApp.exe
+- Program database: C:\Projects\MyApp\x64\Release\MyApp.pdb
+- Import library: C:\Projects\MyApp\x64\Release\MyApp.lib
+
+Compiler settings:
+- Optimization: Maximum Optimization (Favor Speed) (/O2)
+- Inline Function Expansion: Any Suitable (/Ob2)
+- Enable Intrinsic Functions: Yes (/Oi)
+- Whole Program Optimization: Yes (/GL)
+- Runtime Library: Multi-threaded DLL (/MD)
+- Security Check: Enable Security Checks (/GS)
+- Enable Function-Level Linking: Yes (/Gy)
+- Floating Point Model: Precise (/fp:precise)
+- Exception Handling: Yes with SEH Exceptions (/EHsc)
+- Buffer Security Check: Yes (/GS)
+- Control Flow Guard: No
+
+Linker settings:
+- Generate Debug Info: Yes (/DEBUG)
+- Enable COMDAT Folding: Yes (/OPT:ICF)
+- References: Yes (/OPT:REF)
+- Link Time Code Generation: Use Link Time Code Generation (/LTCG)
+- SubSystem: Console (/SUBSYSTEM:CONSOLE)
+- Target Machine: x64 (/MACHINE:X64)
+- Data Execution Prevention (DEP): Yes (/NXCOMPAT)
+- Randomized Base Address (ASLR): Yes (/DYNAMICBASE)
+
+Dependencies resolved:
+- kernel32.lib (system library)
+- user32.lib (system library)
+- gdi32.lib (system library)
+- winspool.lib (system library)
+- comdlg32.lib (system library)
+- advapi32.lib (system library)
+- shell32.lib (system library)
+- ole32.lib (system library)
+- oleaut32.lib (system library)
+- uuid.lib (system library)
+- odbc32.lib (system library)
+- odbccp32.lib (system library)
+
+Build artifacts:
+- MyApp.exe (executable): 1,234,567 bytes
+- MyApp.pdb (debug symbols): 2,345,678 bytes
+- MyApp.lib (import library): 12,345 bytes
+- MyApp.res (resources): 4,567 bytes
+- vc143.pdb (compiler database): 567,890 bytes
+
+Build environment:
+- Visual Studio version: 17.8.3
+- MSVC version: 14.38.33130
+- Windows SDK: 10.0.22621.0
+- vcpkg root: C:\vcpkg
+- Build machine: BUILDSERVER01
+- Build user: BuildAgent
+- Build timestamp: 2024-01-15T14:30:45.123Z
+- Build session ID: build-session-20240115-143045-abc123
+- Build request ID: req-456789-def012
+- Commit hash: a1b2c3d4e5f6789012345678901234567890abcd
+- Branch: refs/heads/main
+- Repository: https://github.com/company/myapp.git
+
+Performance metrics:
+- Total build time: 12.34 seconds
+- Compilation time: 8.45 seconds
+- Linking time: 2.89 seconds
+- Resource compilation time: 0.67 seconds
+- Other tasks time: 0.33 seconds
+- CPU usage: 85%
+- Memory usage: 1.2 GB
+- Disk I/O: 456 MB read, 123 MB written
+- Network I/O: 0 bytes (offline build)
+
+File checksums:
+- main.cpp: sha256:1a2b3c4d5e6f7890123456789012345678901234567890123456789012345678
+- utils.cpp: sha256:2b3c4d5e6f7890123456789012345678901234567890123456789012345678ab
+- MyApp.rc: sha256:3c4d5e6f7890123456789012345678901234567890123456789012345678abcd
+- MyApp.exe: sha256:4d5e6f7890123456789012345678901234567890123456789012345678abcdef
+- MyApp.pdb: sha256:5e6f7890123456789012345678901234567890123456789012345678abcdef01
+
+Build completed successfully at 2024-01-15T14:30:57.456Z 
