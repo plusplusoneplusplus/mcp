@@ -314,7 +314,7 @@ class AzurePullRequestTool(ToolInterface):
         Returns:
             Default prefix in format 'auto-pr/<username>/' or 'auto-pr' if username unavailable
         """
-        username = get_current_username()
+        username = self._get_current_username()
         if username:
             return f"auto-pr/{username}/"
         else:
@@ -818,3 +818,28 @@ class AzurePullRequestTool(ToolInterface):
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}
+
+    # Backward compatibility methods for tests
+    def _get_current_username(self) -> Optional[str]:
+        """Backward compatibility method for tests."""
+        # Convert potential bytes to string if needed
+        username = get_current_username()
+        if isinstance(username, bytes):
+            return username.decode("utf-8")
+        return username
+
+    def _get_auth_headers(self, content_type: str = "application/json") -> Dict[str, str]:
+        """Backward compatibility method for tests."""
+        return get_auth_headers(content_type=content_type)
+
+    def _build_api_url(self, organization: Optional[str] = None, project: Optional[str] = None, endpoint: str = "") -> str:
+        """Backward compatibility method for tests."""
+        org = organization or self.default_organization
+        if not org:
+            raise ValueError("Organization must be provided")
+
+        proj = project or self.default_project
+        if not proj:
+            raise ValueError("Project must be provided")
+
+        return build_api_url(org, proj, endpoint)

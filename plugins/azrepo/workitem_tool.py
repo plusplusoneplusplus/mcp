@@ -717,7 +717,7 @@ class AzureWorkItemTool(ToolInterface):
     def _get_current_username(self) -> Optional[str]:
         """Backward compatibility method for tests."""
         return get_current_username()
-    
+
     def _get_auth_headers(self, content_type: str = "application/json-patch+json") -> Dict[str, str]:
         """Backward compatibility method for tests."""
         # If tests are using instance bearer_token, we need to inject it into the azrepo_params
@@ -734,16 +734,16 @@ class AzureWorkItemTool(ToolInterface):
         else:
             # Normal flow
             return get_auth_headers(content_type=content_type)
-    
+
     def _build_api_url(
-        self, work_item_type: str = "Task", organization: Optional[str] = None, project: Optional[str] = None
+        self, organization: Optional[str] = None, project: Optional[str] = None, endpoint: Optional[str] = None
     ) -> str:
         """Build the Azure DevOps API URL for work item operations.
 
         Args:
-            work_item_type: Type of work item (Task, Bug, etc.)
             organization: Azure DevOps organization
             project: Azure DevOps project
+            endpoint: API endpoint path
 
         Returns:
             Complete API URL
@@ -759,5 +759,8 @@ class AzureWorkItemTool(ToolInterface):
         if not proj:
             raise ValueError("Project must be provided")
 
-        endpoint = f"wit/workitems/${work_item_type}?api-version={API_VERSION}"
+        # If no endpoint is provided, use default for creating work item
+        if endpoint is None:
+            endpoint = f"wit/workitems/$Task?api-version={API_VERSION}"
+
         return build_api_url(org, proj, endpoint)
