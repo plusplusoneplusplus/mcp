@@ -89,7 +89,7 @@ class TestRestApiAuthentication:
         headers = workitem_tool_with_token._get_auth_headers()
         
         assert "Authorization" in headers
-        assert headers["Authorization"].startswith("Basic ")
+        assert headers["Authorization"].startswith("Bearer ")
         assert headers["Content-Type"] == "application/json-patch+json"
         assert headers["Accept"] == "application/json"
 

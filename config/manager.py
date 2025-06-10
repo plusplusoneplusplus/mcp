@@ -2,6 +2,9 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Callable, Union
 from config.types import RepositoryInfo
 import shutil
+import logging
+import json
+import subprocess
 
 
 class EnvironmentManager:
@@ -61,6 +64,7 @@ class EnvironmentManager:
         self.azrepo_parameters: Dict[str, Any] = {}
         self.kusto_parameters: Dict[str, Any] = {}
         self.settings: Dict[str, Any] = {}
+        self.logger = logging.getLogger(__name__)
 
         # Initialize settings with default values
         for key, (default_value, _) in self.DEFAULT_SETTINGS.items():
@@ -83,6 +87,55 @@ class EnvironmentManager:
                 if not p.is_absolute():
                     p = server_root / p
                 self.settings[key] = str(p.resolve())
+
+    def _execute_bearer_token_command(self, command: str) -> Optional[str]:
+        """Execute a command and extract the accessToken from JSON output.
+        
+        Args:
+            command: The command to execute
+            
+        Returns:
+            The access token if found, None otherwise
+        """
+        try:
+            self.logger.debug(f"Executing bearer token command: {command}")
+            
+            # Execute the command
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30  # 30 second timeout
+            )
+            
+            if result.returncode != 0:
+                self.logger.error(f"Bearer token command failed with return code {result.returncode}: {result.stderr}")
+                return None
+                
+            # Parse JSON output
+            try:
+                json_output = json.loads(result.stdout)
+                access_token = json_output.get("accessToken")
+                
+                if access_token:
+                    self.logger.debug("Successfully extracted access token from command output")
+                    return access_token
+                else:
+                    self.logger.warning("No 'accessToken' property found in command output JSON")
+                    return None
+                    
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Failed to parse command output as JSON: {e}")
+                self.logger.debug(f"Command output was: {result.stdout}")
+                return None
+                
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"Bearer token command timed out after 30 seconds: {command}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error executing bearer token command: {e}")
+            return None
 
     def _sync_settings_to_repo(self):
         """Sync settings to repository info object"""
@@ -198,12 +251,7 @@ class EnvironmentManager:
             with open(env_file_path, "r") as f:
                 for line in f:
                     line = line.strip()
-                    # Skip comments and empty lines
-                    if not line or line.startswith("#"):
-                        continue
-
-                    # Parse KEY=VALUE format
-                    if "=" in line:
+                    if line and not line.startswith("#") and "=" in line:
                         key, value = line.split("=", 1)
                         key = key.strip()
                         value = value.strip()
@@ -214,7 +262,7 @@ class EnvironmentManager:
                         ):
                             value = value[1:-1]
 
-                        # Update environment variables
+                        # Store in env_variables
                         self.env_variables[key] = value
 
                         # Update mapped settings
@@ -222,10 +270,7 @@ class EnvironmentManager:
                             setting_name = self.ENV_MAPPING[key]
 
                             # Get the target type from default settings
-                            for default_key, (
-                                _,
-                                target_type,
-                            ) in self.DEFAULT_SETTINGS.items():
+                            for default_key, (_, target_type) in self.DEFAULT_SETTINGS.items():
                                 if setting_name == default_key:
                                     self.settings[setting_name] = self._convert_value(
                                         value, target_type
@@ -427,12 +472,28 @@ class EnvironmentManager:
         return self.get_setting("private_tool_root")
 
     def get_azrepo_parameters(self) -> Dict[str, Any]:
-        """Get Azure repo parameters"""
-        return self.azrepo_parameters
+        """Get Azure repo parameters with dynamic bearer token resolution"""
+        # Make a copy to avoid modifying the original
+        params = dict(self.azrepo_parameters)
+        
+        # Check if we have a bearer token command but no direct bearer token
+        if "bearer_token_command" in params and "bearer_token" not in params:
+            command = params["bearer_token_command"]
+            if command:
+                token = self._execute_bearer_token_command(command)
+                if token:
+                    params["bearer_token"] = token
+                    self.logger.debug("Successfully loaded bearer token from command")
+                else:
+                    self.logger.warning("Failed to load bearer token from command")
+        
+        return params
 
     def get_azrepo_parameter(self, name: str, default: Any = None) -> Any:
         """Get a specific Azure repo parameter"""
-        return self.azrepo_parameters.get(name, default)
+        # Use get_azrepo_parameters to ensure dynamic token resolution
+        params = self.get_azrepo_parameters()
+        return params.get(name, default)
 
     def get_kusto_parameters(self) -> Dict[str, Any]:
         """Get Kusto parameters"""
@@ -630,127 +691,134 @@ class EnvironmentManager:
                 backup_path = env_file_path.with_suffix('.env.backup')
                 shutil.copy2(env_file_path, backup_path)
 
-            # Save the new content
+            # Write the new content
             with open(env_file_path, 'w') as f:
                 f.write(content)
 
             return {
                 "success": True,
                 "file_path": str(env_file_path),
-                "message": f"Saved .env file to {env_file_path}"
+                "message": f"Successfully saved .env file to {env_file_path}"
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
+                "file_path": None,
                 "message": f"Error saving .env file: {str(e)}"
             }
 
     def validate_env_content(self, content: str) -> Dict[str, Any]:
-        """Validate .env file content syntax"""
+        """Validate .env file content"""
         try:
             errors = []
             warnings = []
-            line_number = 0
+            valid_lines = 0
+            total_lines = 0
 
-            for line in content.split('\n'):
-                line_number += 1
+            for line_num, line in enumerate(content.split('\n'), 1):
+                total_lines += 1
                 line = line.strip()
 
                 # Skip empty lines and comments
                 if not line or line.startswith('#'):
                     continue
 
-                # Check for valid key=value format
+                # Check if line contains '='
                 if '=' not in line:
-                    errors.append(f"Line {line_number}: Missing '=' in '{line}'")
+                    errors.append(f"Line {line_num}: Invalid format, missing '=' separator")
                     continue
 
+                # Split on first '=' only
                 key, value = line.split('=', 1)
                 key = key.strip()
+                value = value.strip()
 
                 # Validate key format
                 if not key:
-                    errors.append(f"Line {line_number}: Empty key in '{line}'")
-                elif not key.replace('_', '').replace('-', '').isalnum():
-                    warnings.append(f"Line {line_number}: Key '{key}' contains special characters")
+                    errors.append(f"Line {line_num}: Empty variable name")
+                    continue
 
-                # Check for known settings
-                if key.upper() in self.ENV_MAPPING:
-                    setting_name = self.ENV_MAPPING[key.upper()]
-                    _, target_type = self.DEFAULT_SETTINGS[setting_name]
+                if not key.replace('_', '').replace('-', '').isalnum():
+                    warnings.append(f"Line {line_num}: Variable name '{key}' contains special characters")
 
-                    # Validate type for boolean settings
-                    if target_type == bool and value.lower() not in ('true', 'false', '1', '0', 'yes', 'no', 'on', 'off'):
-                        warnings.append(f"Line {line_number}: Boolean setting '{key}' should be true/false, got '{value}'")
+                # Check for common issues
+                if value.startswith(' ') or value.endswith(' '):
+                    warnings.append(f"Line {line_num}: Value for '{key}' has leading/trailing spaces")
 
-                    # Validate numeric settings
-                    elif target_type in (int, float) and value:
-                        try:
-                            target_type(value)
-                        except ValueError:
-                            errors.append(f"Line {line_number}: {target_type.__name__} setting '{key}' has invalid value '{value}'")
+                valid_lines += 1
 
             return {
                 "success": len(errors) == 0,
                 "errors": errors,
                 "warnings": warnings,
-                "message": f"Validation complete: {len(errors)} errors, {len(warnings)} warnings"
+                "valid_lines": valid_lines,
+                "total_lines": total_lines,
+                "message": f"Validation complete: {valid_lines}/{total_lines} valid lines, {len(errors)} errors, {len(warnings)} warnings"
             }
 
         except Exception as e:
             return {
                 "success": False,
-                "errors": [f"Validation failed: {str(e)}"],
+                "errors": [f"Validation error: {str(e)}"],
                 "warnings": [],
+                "valid_lines": 0,
+                "total_lines": 0,
                 "message": f"Error validating .env content: {str(e)}"
             }
 
     def backup_env_file(self) -> Dict[str, Any]:
-        """Create a backup of the .env file with timestamp"""
+        """Create a backup of the current .env file"""
         try:
-            import datetime
+            env_file_paths = []
 
-            # Find the current .env file
-            env_file_path = None
-
+            # Check common .env file locations
             if self.repository_info.git_root:
-                env_file_path = Path(self.repository_info.git_root) / ".env"
-            else:
+                env_file_paths.append(Path(self.repository_info.git_root) / ".env")
+
+            env_file_paths.append(Path.cwd() / ".env")
+
+            # Try to find git root if not already set
+            if not self.repository_info.git_root:
                 git_root = self._get_git_root()
                 if git_root:
-                    env_file_path = git_root / ".env"
-                else:
-                    env_file_path = Path.cwd() / ".env"
+                    env_file_paths.append(git_root / ".env")
 
-            if not env_file_path.exists():
-                return {
-                    "success": False,
-                    "error": "No .env file found to backup",
-                    "message": "No .env file found in common locations"
-                }
+            # Find the first existing .env file
+            for env_path in env_file_paths:
+                if env_path.exists() and env_path.is_file():
+                    # Create backup with timestamp
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_path = env_path.with_name(f".env.backup_{timestamp}")
 
-            # Create backup with timestamp
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = env_file_path.with_suffix(f'.env.backup_{timestamp}')
+                    shutil.copy2(env_path, backup_path)
 
-            shutil.copy2(env_file_path, backup_path)
+                    return {
+                        "success": True,
+                        "original_path": str(env_path),
+                        "backup_path": str(backup_path),
+                        "message": f"Successfully created backup at {backup_path}"
+                    }
 
             return {
-                "success": True,
-                "backup_path": str(backup_path),
-                "original_path": str(env_file_path),
-                "message": f"Backup created: {backup_path}"
+                "success": False,
+                "error": "No .env file found to backup",
+                "original_path": None,
+                "backup_path": None,
+                "message": "No .env file found in common locations"
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
+                "original_path": None,
+                "backup_path": None,
                 "message": f"Error creating backup: {str(e)}"
             }
 
 
-# Create singleton instance
+# Create a global instance
 env_manager = EnvironmentManager()
