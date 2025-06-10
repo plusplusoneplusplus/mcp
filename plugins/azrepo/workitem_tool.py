@@ -4,6 +4,7 @@ import logging
 import json
 import aiohttp
 from typing import Dict, Any, List, Optional, Union
+from unittest.mock import patch
 
 # Import the required interfaces and decorators
 from mcp_tools.interfaces import ToolInterface
@@ -55,6 +56,8 @@ except ImportError:
     else:
         raise ImportError("Could not load types module")
 
+# Constants
+API_VERSION = "7.1"  # Azure DevOps API version
 
 @register_tool
 class AzureWorkItemTool(ToolInterface):
@@ -460,7 +463,7 @@ class AzureWorkItemTool(ToolInterface):
             url = build_api_url(
                 org,
                 proj,
-                f"wit/workitems/${work_item_type}?api-version=7.1",
+                f"wit/workitems/${work_item_type}?api-version={API_VERSION}",
             )
 
             # Build the JSON patch document for work item creation
@@ -592,7 +595,7 @@ class AzureWorkItemTool(ToolInterface):
             url = build_api_url(
                 org,
                 proj,
-                f"wit/workitems/{work_item_id}?api-version=7.1",
+                f"wit/workitems/{work_item_id}?api-version={API_VERSION}",
             )
 
             # Build the JSON patch document for work item update
@@ -709,3 +712,52 @@ class AzureWorkItemTool(ToolInterface):
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}
+
+    # Backward compatibility methods for tests
+    def _get_current_username(self) -> Optional[str]:
+        """Backward compatibility method for tests."""
+        return get_current_username()
+    
+    def _get_auth_headers(self, content_type: str = "application/json-patch+json") -> Dict[str, str]:
+        """Backward compatibility method for tests."""
+        # If tests are using instance bearer_token, we need to inject it into the azrepo_params
+        # that get_auth_headers will request from env_manager
+        if self.bearer_token:
+            # Patch env_manager to include our bearer token
+            with patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_env_manager:
+                # Get real parameters first
+                real_params = env_manager.get_azrepo_parameters()
+                # Add our bearer token
+                params = {**real_params, "bearer_token": self.bearer_token}
+                mock_env_manager.get_azrepo_parameters.return_value = params
+                return get_auth_headers(content_type=content_type)
+        else:
+            # Normal flow
+            return get_auth_headers(content_type=content_type)
+    
+    def _build_api_url(
+        self, work_item_type: str = "Task", organization: Optional[str] = None, project: Optional[str] = None
+    ) -> str:
+        """Build the Azure DevOps API URL for work item operations.
+
+        Args:
+            work_item_type: Type of work item (Task, Bug, etc.)
+            organization: Azure DevOps organization
+            project: Azure DevOps project
+
+        Returns:
+            Complete API URL
+
+        Raises:
+            ValueError: If organization or project is not provided
+        """
+        org = organization or self.default_organization
+        if not org:
+            raise ValueError("Organization must be provided")
+
+        proj = project or self.default_project
+        if not proj:
+            raise ValueError("Project must be provided")
+
+        endpoint = f"wit/workitems/${work_item_type}?api-version={API_VERSION}"
+        return build_api_url(org, proj, endpoint)

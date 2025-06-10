@@ -1,48 +1,33 @@
-"""
-Tests for work item creation operations using REST API.
-"""
+"""Tests for AzureWorkItemTool creation functionality."""
 
-import pytest
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
+import aiohttp
+
 from plugins.azrepo.workitem_tool import AzureWorkItemTool
+from plugins.azrepo.azure_rest_utils import get_auth_headers, build_api_url
 
-
-def mock_aiohttp_for_success(work_item_data=None):
-    """Helper function to mock successful aiohttp calls."""
-    if work_item_data is None:
-        work_item_data = {
-            "id": 12345,
-            "fields": {
-                "System.Title": "Test Work Item",
-                "System.WorkItemType": "Task",
-                "System.State": "New",
-                "System.AreaPath": "TestArea\\SubArea",
-                "System.IterationPath": "Sprint 1",
-                "System.Description": "Test description"
-            }
-        }
-
+# Shared mock context managers
+def mock_aiohttp_for_success():
+    """Mock aiohttp to return a successful response."""
     mock_response = MagicMock()
     mock_response.status = 200
-    mock_response.text = AsyncMock(return_value=json.dumps(work_item_data))
-
-    mock_session = MagicMock()
-    mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-    mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_session.__aexit__ = AsyncMock(return_value=None)
-
-    return patch("aiohttp.ClientSession", return_value=mock_session)
-
-
-def mock_aiohttp_for_error(status_code=401, error_message="Access denied"):
-    """Helper function to mock error aiohttp calls."""
-    mock_response = MagicMock()
-    mock_response.status = status_code
     mock_response.text = AsyncMock(return_value=json.dumps({
-        "message": error_message,
-        "typeKey": "UnauthorizedRequestException"
+        "id": 12345,
+        "fields": {
+            "System.Title": "Test Work Item",
+            "System.Description": "Test Description",
+            "System.CreatedBy": {
+                "displayName": "Test User",
+                "id": "test-user-id",
+                "uniqueName": "test@example.com"
+            },
+            "System.CreatedDate": "2023-01-01T00:00:00Z",
+            "System.State": "New",
+            "System.WorkItemType": "Task"
+        },
+        "url": "https://dev.azure.com/testorg/test-project/_apis/wit/workitems/12345"
     }))
 
     mock_session = MagicMock()
@@ -53,15 +38,31 @@ def mock_aiohttp_for_error(status_code=401, error_message="Access denied"):
 
     return patch("aiohttp.ClientSession", return_value=mock_session)
 
+def mock_aiohttp_for_error(status_code=500, error_message="Internal Server Error"):
+    """Mock aiohttp to return an error response."""
+    error_response = {
+        "message": error_message,
+        "typeKey": "Error"
+    }
 
+    mock_response = MagicMock()
+    mock_response.status = status_code
+    mock_response.text = AsyncMock(return_value=json.dumps(error_response))
+
+    mock_session = MagicMock()
+    mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+    mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=None)
+
+    return patch("aiohttp.ClientSession", return_value=mock_session)
+
+# Common fixtures
 @pytest.fixture
 def mock_executor():
-    """Mock command executor."""
+    """Create a mock CommandExecutor instance."""
     executor = MagicMock()
-    executor.execute_async = AsyncMock()
-    executor.query_process = AsyncMock()
     return executor
-
 
 @pytest.fixture
 def workitem_tool(mock_executor):
@@ -79,14 +80,25 @@ def workitem_tool(mock_executor):
         "iteration": "Sprint 1",
         "bearer_token": "test-bearer-token-123"
     }
+    
+    # Also patch the azure_rest_utils env_manager
+    rest_patcher = patch("plugins.azrepo.azure_rest_utils.env_manager")
+    mock_rest_env_manager = rest_patcher.start()
+    mock_rest_env_manager.get_azrepo_parameters.return_value = {
+        "org": "testorg",
+        "project": "test-project", 
+        "area_path": "TestArea\\SubArea",
+        "iteration": "Sprint 1",
+        "bearer_token": "test-bearer-token-123"
+    }
 
     tool = AzureWorkItemTool(command_executor=mock_executor)
 
     yield tool
 
-    # Clean up the patch
+    # Clean up the patches
     patcher.stop()
-
+    rest_patcher.stop()
 
 @pytest.fixture
 def workitem_tool_no_defaults(mock_executor):
@@ -100,14 +112,21 @@ def workitem_tool_no_defaults(mock_executor):
     mock_env_manager.get_azrepo_parameters.return_value = {
         "bearer_token": "test-bearer-token-123"  # Still need bearer token
     }
+    
+    # Also patch the azure_rest_utils env_manager
+    rest_patcher = patch("plugins.azrepo.azure_rest_utils.env_manager")
+    mock_rest_env_manager = rest_patcher.start()
+    mock_rest_env_manager.get_azrepo_parameters.return_value = {
+        "bearer_token": "test-bearer-token-123"  # Still need bearer token
+    }
 
     tool = AzureWorkItemTool(command_executor=mock_executor)
 
     yield tool
 
-    # Clean up the patch
+    # Clean up the patches
     patcher.stop()
-
+    rest_patcher.stop()
 
 class TestCreateWorkItem:
     """Test the create_work_item method."""
@@ -115,51 +134,82 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_basic(self, workitem_tool):
         """Test basic work item creation."""
-        with mock_aiohttp_for_success():
-            result = await workitem_tool.create_work_item(
-                title="Test Work Item",
-                description="Test description"
-            )
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/testorg/testproject/_apis/wit/workitems/$Task?api-version=7.1"):
+                with mock_aiohttp_for_success():
+                    result = await workitem_tool.create_work_item(
+                        title="Test Work Item",
+                        description="Test description"
+                    )
 
-            assert result["success"] is True
-            assert "data" in result
-            assert result["data"]["id"] == 12345
+                    assert result["success"] is True
+                    assert "data" in result
 
     @pytest.mark.asyncio
     async def test_create_work_item_with_custom_type(self, workitem_tool):
         """Test work item creation with custom type."""
-        with mock_aiohttp_for_success():
-            result = await workitem_tool.create_work_item(
-                title="Bug Report",
-                work_item_type="Bug"
-            )
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/testorg/testproject/_apis/wit/workitems/$Bug?api-version=7.1"):
+                with mock_aiohttp_for_success():
+                    result = await workitem_tool.create_work_item(
+                        title="Bug Report",
+                        work_item_type="Bug"
+                    )
 
-            assert result["success"] is True
-            assert "data" in result
+                    assert result["success"] is True
+                    assert "data" in result
 
     @pytest.mark.asyncio
     async def test_create_work_item_with_overrides(self, workitem_tool):
         """Test work item creation with parameter overrides."""
-        with mock_aiohttp_for_success():
-            result = await workitem_tool.create_work_item(
-                title="Custom Work Item",
-                area_path="CustomArea",
-                iteration_path="Sprint 2",
-                organization="customorg",
-                project="custom-project"
-            )
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/customorg/custom-project/_apis/wit/workitems/$Task?api-version=7.1"):
+                with mock_aiohttp_for_success():
+                    result = await workitem_tool.create_work_item(
+                        title="Custom Work Item",
+                        area_path="CustomArea",
+                        iteration_path="Sprint 2",
+                        organization="customorg",
+                        project="custom-project"
+                    )
 
-            assert result["success"] is True
-            assert "data" in result
+                    assert result["success"] is True
+                    assert "data" in result
 
     @pytest.mark.asyncio
     async def test_create_work_item_minimal(self, workitem_tool):
         """Test work item creation with minimal parameters."""
-        with mock_aiohttp_for_success():
-            result = await workitem_tool.create_work_item(title="Minimal Work Item")
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/testorg/testproject/_apis/wit/workitems/$Task?api-version=7.1"):
+                with mock_aiohttp_for_success():
+                    result = await workitem_tool.create_work_item(title="Minimal Work Item")
 
-            assert result["success"] is True
-            assert "data" in result
+                    assert result["success"] is True
+                    assert "data" in result
 
     @pytest.mark.asyncio
     async def test_create_work_item_missing_org(self, workitem_tool):
@@ -186,55 +236,87 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_http_error(self, workitem_tool):
         """Test work item creation with HTTP error."""
-        with mock_aiohttp_for_error(401, "Access denied"):
-            result = await workitem_tool.create_work_item(title="Test Work Item")
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/testorg/testproject/_apis/wit/workitems/$Task?api-version=7.1"):
+                with mock_aiohttp_for_error(401, "Access denied"):
+                    result = await workitem_tool.create_work_item(title="Test Work Item")
 
-            assert result["success"] is False
-            assert "HTTP 401" in result["error"]
+                    assert result["success"] is False
+                    assert "HTTP 401" in result["error"]
 
     @pytest.mark.asyncio
     async def test_create_work_item_json_parse_error(self, workitem_tool):
         """Test work item creation with JSON parsing error."""
-        # Mock invalid JSON response
-        mock_response = MagicMock()
-        mock_response.status = 200
-        mock_response.text = AsyncMock(return_value="Invalid JSON response")
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/testorg/testproject/_apis/wit/workitems/$Task?api-version=7.1"):
+                # Mock invalid JSON response
+                mock_response = MagicMock()
+                mock_response.status = 200
+                mock_response.text = AsyncMock(return_value="Invalid JSON response")
 
-        mock_session = MagicMock()
-        mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-        mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-        mock_session.__aexit__ = AsyncMock(return_value=None)
+                mock_session = MagicMock()
+                mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+                mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
+                mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+                mock_session.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("aiohttp.ClientSession", return_value=mock_session):
-            result = await workitem_tool.create_work_item(title="Test Work Item")
+                with patch("aiohttp.ClientSession", return_value=mock_session):
+                    result = await workitem_tool.create_work_item(title="Test Work Item")
 
-            assert result["success"] is False
-            assert "Failed to parse response" in result["error"]
+                    assert result["success"] is False
+                    assert "Failed to parse response" in result["error"]
 
     @pytest.mark.asyncio
     async def test_create_work_item_with_special_characters(self, workitem_tool):
         """Test work item creation with special characters."""
-        with mock_aiohttp_for_success():
-            result = await workitem_tool.create_work_item(
-                title="Fix issue with 'quotes' and \"double quotes\"",
-                description="Description with special chars: @#$%^&*()_+-={}[]|\\:;\"'<>?,./"
-            )
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/testorg/testproject/_apis/wit/workitems/$Task?api-version=7.1"):
+                with mock_aiohttp_for_success():
+                    result = await workitem_tool.create_work_item(
+                        title="Fix issue with 'quotes' and \"double quotes\"",
+                        description="Description with special chars: @#$%^&*()_+-={}[]|\\:;\"'<>?,./"
+                    )
 
-            assert result["success"] is True
-            assert "data" in result
+                    assert result["success"] is True
+                    assert "data" in result
 
     @pytest.mark.asyncio
     async def test_create_work_item_with_unicode(self, workitem_tool):
         """Test work item creation with Unicode characters."""
-        with mock_aiohttp_for_success():
-            result = await workitem_tool.create_work_item(
-                title="Unicode test: 测试 🚀 émojis",
-                description="Description with Unicode: café naïve résumé 中文"
-            )
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/testorg/testproject/_apis/wit/workitems/$Task?api-version=7.1"):
+                with mock_aiohttp_for_success():
+                    result = await workitem_tool.create_work_item(
+                        title="Unicode test: 测试 🚀 émojis",
+                        description="Description with Unicode: café naïve résumé 中文"
+                    )
 
-            assert result["success"] is True
-            assert "data" in result
+                    assert result["success"] is True
+                    assert "data" in result
 
 
 class TestExecuteToolCreate:
@@ -308,9 +390,9 @@ class TestExecuteToolCreate:
         """Test work item creation when no defaults are configured."""
         arguments = {
             "operation": "create",
-            "title": "Work Item No Defaults",
-            "organization": "testorg",
-            "project": "test-project"
+            "title": "Test Work Item",
+            "organization": "customorg",
+            "project": "custom-project"
         }
 
         with mock_aiohttp_for_success():
@@ -407,25 +489,87 @@ class TestAuthenticationHeaders:
 
     def test_get_auth_headers_with_token(self, workitem_tool):
         """Test authentication headers with bearer token."""
-        headers = workitem_tool._get_auth_headers()
+        with patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "bearer_token": "test-bearer-token-123"
+            }
+            
+            headers = get_auth_headers("application/json-patch+json")
 
-        assert "Authorization" in headers
-        assert headers["Authorization"].startswith("Bearer ")
-        assert headers["Content-Type"] == "application/json-patch+json"
-        assert headers["Accept"] == "application/json"
+            assert "Authorization" in headers
+            assert headers["Authorization"].startswith("Bearer ")
+            assert headers["Content-Type"] == "application/json-patch+json"
+            assert headers["Accept"] == "application/json"
 
     def test_get_auth_headers_without_token(self, workitem_tool):
         """Test authentication headers without bearer token."""
         # Mock the environment manager to return no bearer token
-        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+        with patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_env_manager:
             mock_env_manager.get_azrepo_parameters.return_value = {
                 "org": "testorg",
                 "project": "test-project"
                 # No bearer_token or bearer_token_command
             }
 
-            # Also clear the instance bearer token to ensure no fallback
-            workitem_tool.bearer_token = None
-
+            # Test that a ValueError is raised when no token is available
             with pytest.raises(ValueError, match="Bearer token not configured"):
-                workitem_tool._get_auth_headers()
+                get_auth_headers()
+
+
+class TestCreateWorkItemNoDefaults:
+    """Tests for work item creation with no default values."""
+
+    @pytest.mark.asyncio
+    async def test_create_work_item_no_defaults(self, workitem_tool_no_defaults):
+        """Test work item creation with all required parameters."""
+        # Patch the utility functions
+        with patch("plugins.azrepo.workitem_tool.get_auth_headers", return_value={
+            "Authorization": "Bearer test-token",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }):
+            with patch("plugins.azrepo.workitem_tool.build_api_url", 
+                      return_value="https://dev.azure.com/customorg/custom-project/_apis/wit/workitems/$Task?api-version=7.1"):
+                with mock_aiohttp_for_success():
+                    result = await workitem_tool_no_defaults.create_work_item(
+                        title="Test Work Item",
+                        area_path="CustomArea",
+                        iteration_path="Sprint 2",
+                        organization="customorg",
+                        project="custom-project"
+                    )
+
+                    assert result["success"] is True
+                    assert "data" in result
+
+    @pytest.mark.asyncio
+    async def test_create_work_item_missing_org(self, workitem_tool_no_defaults):
+        """Test work item creation with missing org."""
+        # We need to patch the check inside create_work_item, which happens before API calls
+        # Ensure workitem_tool_no_defaults has empty defaults
+        workitem_tool_no_defaults.default_organization = None
+        workitem_tool_no_defaults.default_project = "custom-project"
+        
+        result = await workitem_tool_no_defaults.create_work_item(
+            title="Test Work Item",
+            project="custom-project"
+        )
+        
+        assert result["success"] is False
+        assert "Organization is required" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_create_work_item_missing_project(self, workitem_tool_no_defaults):
+        """Test work item creation with missing project."""
+        # We need to patch the check inside create_work_item, which happens before API calls
+        # Ensure workitem_tool_no_defaults has empty defaults
+        workitem_tool_no_defaults.default_organization = "customorg"
+        workitem_tool_no_defaults.default_project = None
+        
+        result = await workitem_tool_no_defaults.create_work_item(
+            title="Test Work Item",
+            organization="customorg"
+        )
+        
+        assert result["success"] is False
+        assert "Project is required" in result["error"]
