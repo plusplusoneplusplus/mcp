@@ -28,6 +28,8 @@ This ensures you're working from the latest stable code and prevents conflicts.
   - Use `uv add` instead of `pip install`
   - Use `uv sync` to install dependencies from lock file
 
+**Repository Identification:** Run `git remote -v` to identify the correct repository owner and name before any GitHub operations.
+
 ### 1. Issue Analysis Phase
 
 **Read and Understand the Issue:**
@@ -172,6 +174,9 @@ Document the review process and results in your workflow output:
 # Start workflow - ensure you're on main and up to date
 git checkout main && git pull origin main
 
+# Verify repository information
+git remote -v
+
 # Create and switch to feature branch
 git checkout -b fix/issue-123-description
 
@@ -260,15 +265,16 @@ When working through this workflow, provide updates at each major step:
 
 ## Best Practices
 
-1. **Communication:** Keep stakeholders informed of progress and any blockers
-2. **Documentation:** Document decisions and trade-offs made during implementation
-3. **Testing:** Prioritize thorough testing to prevent regressions
-4. **Code Quality:** Maintain high code quality standards throughout
-5. **Pre-Submission Review:** Always perform automated code review before creating PRs
-6. **Quality Gates:** Never submit PRs with significant code quality issues
-7. **Git Hygiene:** Keep commit history clean and meaningful
-8. **Branch Management:** Always return to main branch after completion
-9. **Issue Tracking:** Ensure proper linking between issues, commits, and PRs
+1. **Repository Verification:** Always verify repository information before starting work
+2. **Communication:** Keep stakeholders informed of progress and any blockers
+3. **Documentation:** Document decisions and trade-offs made during implementation
+4. **Testing:** Prioritize thorough testing to prevent regressions
+5. **Code Quality:** Maintain high code quality standards throughout
+6. **Pre-Submission Review:** Always perform automated code review before creating PRs
+7. **Quality Gates:** Never submit PRs with significant code quality issues
+8. **Git Hygiene:** Keep commit history clean and meaningful
+9. **Branch Management:** Always return to main branch after completion
+10. **Issue Tracking:** Ensure proper linking between issues, commits, and PRs
 
 ## Error Handling
 
