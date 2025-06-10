@@ -66,6 +66,7 @@ import psutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Generator, AsyncGenerator, Optional
+import platform
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -110,6 +111,11 @@ def kill_process_tree(pid: int) -> None:
         parent = psutil.Process(pid)
         children = parent.children(recursive=True)
 
+        # On Windows, be more gentle with process termination
+        is_windows = platform.system() == "Windows"
+        terminate_timeout = 10 if is_windows else 5
+        kill_timeout = 5 if is_windows else 3
+
         # Terminate children first
         for child in children:
             try:
@@ -123,13 +129,21 @@ def kill_process_tree(pid: int) -> None:
         except psutil.NoSuchProcess:
             pass
 
-        # Wait for graceful termination
-        gone, alive = psutil.wait_procs(children + [parent], timeout=5)
+        # Wait for graceful termination with longer timeout on Windows
+        gone, alive = psutil.wait_procs(children + [parent], timeout=terminate_timeout)
 
         # Force kill any remaining processes
         for proc in alive:
             try:
-                proc.kill()
+                if is_windows:
+                    # On Windows, try terminate again before kill
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=kill_timeout)
+                    except psutil.TimeoutExpired:
+                        proc.kill()
+                else:
+                    proc.kill()
             except psutil.NoSuchProcess:
                 pass
 
@@ -196,9 +210,12 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
     - Provides the process object with port attribute
     - Ensures proper cleanup on test completion
     """
-    worker_id = get_worker_id()
+    import platform
 
-    logger.debug(f"Worker {worker_id} starting server on port {server_port}")
+    worker_id = get_worker_id()
+    is_windows = platform.system() == "Windows"
+
+    logger.debug(f"Worker {worker_id} starting server on port {server_port} (Windows: {is_windows})")
 
     # Get the path to the server main.py
     server_path = Path(__file__).parent.parent / "main.py"
@@ -235,14 +252,27 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
     cmd = ["uv", "run", str(server_path), "--port", str(server_port)]
     logger.debug(f"Starting server with command: {' '.join(cmd)}")
 
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env,
-        preexec_fn=os.setsid if hasattr(os, 'setsid') else None
-    )
+    # Windows-specific process creation options
+    if is_windows:
+        # On Windows, use different process group handling
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            creationflags=0x00000200  # CREATE_NEW_PROCESS_GROUP
+        )
+    else:
+        # On Unix, use process group
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            preexec_fn=os.setsid if hasattr(os, 'setsid') else None
+        )
 
     logger.debug(f"Server process started with PID: {process.pid}")
 
@@ -250,13 +280,14 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
     setattr(process, 'port', server_port)
     setattr(process, 'worker_id', worker_id)
 
-    # Give the server time to start up
-    logger.debug("Waiting 3 seconds for server to start up...")
-    time.sleep(3)
+    # Give the server more time to start up on Windows
+    startup_delay = 5 if is_windows else 3
+    logger.debug(f"Waiting {startup_delay} seconds for server to start up...")
+    time.sleep(startup_delay)
 
     # Check if process is still running
     poll_result = process.poll()
-    logger.debug(f"Process poll result after 3s: {poll_result}")
+    logger.debug(f"Process poll result after {startup_delay}s: {poll_result}")
     if poll_result is not None:
         stdout, stderr = process.communicate()
         logger.error(f"Server process exited with code {poll_result}")
@@ -268,8 +299,9 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
         )
 
     logger.debug("Server process is still running, checking readiness...")
-    # Wait for server to be ready
-    if not wait_for_server_ready(server_port, timeout=30):
+    # Wait for server to be ready with longer timeout on Windows
+    readiness_timeout = 45 if is_windows else 30
+    if not wait_for_server_ready(server_port, timeout=readiness_timeout):
         try:
             stdout, stderr = process.communicate(timeout=2)
         except subprocess.TimeoutExpired:
@@ -293,29 +325,40 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
         if process.poll() is None:
             kill_process_tree(process.pid)
 
+            # Windows needs more time for process cleanup
+            cleanup_timeout = 15 if is_windows else 10
             try:
-                process.wait(timeout=10)
+                process.wait(timeout=cleanup_timeout)
             except subprocess.TimeoutExpired:
                 logging.warning(f"Worker {worker_id}: Process did not terminate gracefully, force killing")
                 try:
-                    if hasattr(os, 'killpg'):
-                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                    if is_windows:
+                        # On Windows, use different signal handling
+                        process.terminate()
+                        try:
+                            process.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
                     else:
-                        process.kill()
-                    process.wait()
+                        if hasattr(os, 'killpg'):
+                            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                        else:
+                            process.kill()
+                        process.wait()
                 except (ProcessLookupError, OSError):
                     pass
 
-        # Verify port is freed
-        for i in range(10):
+        # Verify port is freed with more retries on Windows
+        max_retries = 20 if is_windows else 10
+        for i in range(max_retries):
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.bind(('localhost', server_port))
                     break
             except OSError:
-                if i == 9:
+                if i == max_retries - 1:
                     logging.warning(f"Worker {worker_id}: Port {server_port} still in use after cleanup")
-                time.sleep(0.1)
+                time.sleep(0.2 if is_windows else 0.1)
 
     except Exception as cleanup_error:
         logging.error(f"Worker {worker_id}: Error during cleanup: {cleanup_error}")
@@ -330,21 +373,38 @@ async def create_mcp_client(server_url: str, worker_id: str = "test"):
 
     This is an async context manager that can be used in tests to create client sessions.
     """
-    logging.info(f"Worker {worker_id}: Connecting MCP client to {server_url}")
+    import asyncio
+    import platform
+
+    is_windows = platform.system() == "Windows"
+    logging.info(f"Worker {worker_id}: Connecting MCP client to {server_url} (Windows: {is_windows})")
 
     session = None
     try:
-        # Create SSE client and session
-        async with sse_client(server_url) as (read, write):
-            async with ClientSession(read, write) as session:
-                # Initialize the session
-                await session.initialize()
+        # Add timeout for connection establishment, longer on Windows
+        connection_timeout = 30 if is_windows else 15
 
-                logging.info(f"Worker {worker_id}: MCP client session initialized")
+        # Create SSE client and session with timeout
+        async with asyncio.timeout(connection_timeout):
+            async with sse_client(server_url) as (read, write):
+                async with ClientSession(read, write) as session:
+                    # Initialize the session with timeout
+                    init_timeout = 20 if is_windows else 10
+                    await asyncio.wait_for(session.initialize(), timeout=init_timeout)
 
-                yield session
+                    logging.info(f"Worker {worker_id}: MCP client session initialized")
+
+                    yield session
+    except asyncio.TimeoutError as e:
+        error_msg = f"Worker {worker_id}: MCP client connection/initialization timed out"
+        if is_windows:
+            error_msg += " (Windows platform - this may indicate a platform-specific issue)"
+        logging.error(error_msg)
+        raise RuntimeError(error_msg) from e
     except Exception as e:
         logging.error(f"Worker {worker_id}: Error in MCP client session: {e}")
+        if is_windows:
+            logging.debug(f"Windows-specific error details: {repr(e)}")
         raise
     finally:
         logging.info(f"Worker {worker_id}: MCP client session cleanup completed")
