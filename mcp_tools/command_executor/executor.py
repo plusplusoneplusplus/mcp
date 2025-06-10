@@ -22,6 +22,15 @@ from mcp_tools.plugin import register_tool
 # Import config manager
 from config import env_manager
 
+# Import new rate limiting and concurrency control components
+from .types import (
+    ExecutorConfig, RateLimitConfig, ConcurrencyConfig, ResourceLimitConfig,
+    RateLimitError, ConcurrencyLimitError, QueueStatus, RateLimitStatus, UserLimits
+)
+from .rate_limiter import RateLimiter
+from .concurrency_manager import ConcurrencyManager, QueuedRequest
+from .resource_monitor import ResourceMonitor
+
 g_config_sleep_when_running = True
 
 # Create logger with the module name
@@ -119,7 +128,7 @@ class CommandExecutor(CommandExecutorInterface):
 
         return self.execute(command, timeout)
 
-    def __init__(self, temp_dir: Optional[str] = None):
+    def __init__(self, temp_dir: Optional[str] = None, config: Optional[ExecutorConfig] = None):
         self.os_type = platform.system().lower()
         self.running_processes = {}
         self.process_tokens = {}  # Maps tokens to process IDs
@@ -135,6 +144,9 @@ class CommandExecutor(CommandExecutorInterface):
         
         # Background cleanup task
         self.cleanup_task: Optional[asyncio.Task] = None
+        
+        # Background tasks for rate limiting and concurrency
+        self.background_tasks: List[asyncio.Task] = []
 
         # Load configuration from config manager
         env_manager.load()
@@ -168,30 +180,147 @@ class CommandExecutor(CommandExecutorInterface):
         # Ensure temp directory exists
         os.makedirs(self.temp_dir, exist_ok=True)
 
+        # Initialize rate limiting and concurrency control configuration
+        if config is None:
+            # Load from environment or use defaults
+            rate_limit_config = RateLimitConfig(
+                requests_per_minute=env_manager.get_setting("rate_limit_requests_per_minute", 60),
+                burst_size=env_manager.get_setting("rate_limit_burst_size", 10),
+                window_seconds=env_manager.get_setting("rate_limit_window_seconds", 60),
+                enabled=env_manager.get_setting("rate_limit_enabled", True)
+            )
+            
+            concurrency_config = ConcurrencyConfig(
+                max_concurrent_processes=env_manager.get_setting("max_concurrent_processes", 10),
+                max_processes_per_user=env_manager.get_setting("max_processes_per_user", 5),
+                process_queue_size=env_manager.get_setting("process_queue_size", 50),
+                enabled=env_manager.get_setting("concurrency_control_enabled", True)
+            )
+            
+            resource_config = ResourceLimitConfig(
+                max_memory_per_process_mb=env_manager.get_setting("max_memory_per_process_mb", 512),
+                max_cpu_time_seconds=env_manager.get_setting("max_cpu_time_seconds", 300),
+                max_execution_time_seconds=env_manager.get_setting("max_execution_time_seconds", 600),
+                enabled=env_manager.get_setting("resource_limits_enabled", True)
+            )
+            
+            self.config = ExecutorConfig(
+                rate_limit=rate_limit_config,
+                concurrency=concurrency_config,
+                resource_limits=resource_config
+            )
+        else:
+            self.config = config
+
+        # Initialize rate limiter
+        self.rate_limiter = RateLimiter(self.config.rate_limit)
+        
+        # Initialize concurrency manager
+        self.concurrency_manager = ConcurrencyManager(self.config.concurrency)
+        
+        # Initialize resource monitor
+        self.resource_monitor = ResourceMonitor(self.config.resource_limits)
+
         _log_with_context(
             logging.INFO,
-            "Initialized CommandExecutor",
+            "Initialized CommandExecutor with rate limiting and concurrency control",
             {
                 "temp_dir": self.temp_dir, 
                 "os_type": self.os_type,
                 "max_completed_processes": self.max_completed_processes,
                 "completed_process_ttl": self.completed_process_ttl,
                 "auto_cleanup_enabled": self.auto_cleanup_enabled,
-                "cleanup_interval": self.cleanup_interval
+                "cleanup_interval": self.cleanup_interval,
+                "rate_limit_enabled": self.config.rate_limit.enabled,
+                "concurrency_control_enabled": self.config.concurrency.enabled,
+                "resource_limits_enabled": self.config.resource_limits.enabled,
+                "max_concurrent_processes": self.config.concurrency.max_concurrent_processes,
+                "rate_limit_per_minute": self.config.rate_limit.requests_per_minute
             },
         )
 
         # Start cleanup task if enabled
         if self.auto_cleanup_enabled:
             self.start_cleanup_task()
+            
+        # Start background tasks
+        self._start_background_tasks()
 
     def __del__(self):
         """Cleanup when the CommandExecutor is destroyed."""
         try:
             self.stop_cleanup_task()
+            self._stop_background_tasks()
         except Exception:
             # Ignore errors during cleanup
             pass
+
+    def _start_background_tasks(self) -> None:
+        """Start background tasks for rate limiting, concurrency, and resource monitoring."""
+        try:
+            loop = asyncio.get_running_loop()
+            
+            # Clear any existing tasks
+            self._cancel_background_tasks()
+            
+            # Start concurrency manager queue processor
+            task1 = asyncio.create_task(self.concurrency_manager.start_queue_processor())
+            self.background_tasks.append(task1)
+            
+            # Start resource monitoring
+            task2 = asyncio.create_task(self.resource_monitor.start_monitoring())
+            self.background_tasks.append(task2)
+            
+            _log_with_context(
+                logging.INFO,
+                "Started background tasks for rate limiting and concurrency control",
+                {}
+            )
+        except RuntimeError:
+            # No event loop running, defer task creation
+            _log_with_context(
+                logging.DEBUG,
+                "No event loop running, deferring background task creation",
+                {}
+            )
+
+    def _cancel_background_tasks(self) -> None:
+        """Cancel all background tasks."""
+        for task in self.background_tasks:
+            if not task.done():
+                task.cancel()
+        self.background_tasks.clear()
+        
+        # Also cancel cleanup task if it exists
+        if self.cleanup_task and not self.cleanup_task.done():
+            self.cleanup_task.cancel()
+            self.cleanup_task = None
+
+    def _stop_background_tasks(self) -> None:
+        """Stop background tasks."""
+        try:
+            # Cancel all background tasks
+            self._cancel_background_tasks()
+            
+            # Stop concurrency manager (synchronous call)
+            if hasattr(self, 'concurrency_manager'):
+                self.concurrency_manager.queue_processor_running = False
+            
+            # Stop resource monitor (synchronous call)
+            if hasattr(self, 'resource_monitor'):
+                self.resource_monitor.monitoring_enabled = False
+            
+            _log_with_context(
+                logging.INFO,
+                "Stopped background tasks",
+                {}
+            )
+        except Exception as e:
+            _log_with_context(
+                logging.WARNING,
+                "Error stopping background tasks",
+                {"error": str(e)}
+            )
 
     def _enforce_completed_process_limit(self) -> None:
         """Enforce the maximum number of completed processes using LRU eviction.
@@ -764,20 +893,88 @@ class CommandExecutor(CommandExecutorInterface):
             await self.wait_for_process(token, timeout=5, from_monitor=True)
 
     async def execute_async(
-        self, command: str, timeout: Optional[float] = None
+        self, command: str, timeout: Optional[float] = None, user_id: str = "default"
     ) -> Dict[str, Any]:
-        """Execute a command asynchronously
+        """Execute a command asynchronously with rate limiting and concurrency control
 
         Args:
             command: The command to execute
             timeout: Optional timeout in seconds (for process completion)
+            user_id: User identifier for rate limiting and concurrency control
 
         Returns:
-            Dictionary with process token and initial status
+            Dictionary with process token and initial status, or error information
         """
         # Ensure cleanup task is running
         self._ensure_cleanup_task_running()
         
+        # Check rate limits first
+        rate_limit_allowed, rate_limit_error = await self.rate_limiter.check_rate_limit(user_id)
+        if not rate_limit_allowed:
+            _log_with_context(
+                logging.WARNING,
+                f"Rate limit exceeded for user {user_id}",
+                {"user_id": user_id, "command": command[:50]}
+            )
+            return rate_limit_error
+        
+        # Check concurrency limits
+        concurrency_allowed, concurrency_error = await self.concurrency_manager.check_concurrency_limit(user_id)
+        if not concurrency_allowed:
+            # If concurrency limit exceeded but can be queued
+            if concurrency_error.get("queue_position") is not None:
+                _log_with_context(
+                    logging.INFO,
+                    f"Queueing command for user {user_id}",
+                    {"user_id": user_id, "command": command[:50], "queue_position": concurrency_error["queue_position"]}
+                )
+                
+                try:
+                    # Queue the request
+                    queued_request = await self.concurrency_manager.queue_request(command, user_id, timeout)
+                    
+                    # Wait for the request to be dequeued
+                    dequeued_request = await queued_request.future
+                    
+                    # Now execute the command
+                    return await self._execute_async_internal(dequeued_request.command, dequeued_request.timeout, dequeued_request.user_id)
+                    
+                except Exception as e:
+                    _log_with_context(
+                        logging.ERROR,
+                        f"Error queueing command",
+                        {"user_id": user_id, "command": command[:50], "error": str(e)}
+                    )
+                    return {
+                        "token": "error",
+                        "status": "error", 
+                        "error": f"Error queueing command: {str(e)}"
+                    }
+            else:
+                # Cannot be queued
+                _log_with_context(
+                    logging.WARNING,
+                    f"Concurrency limit exceeded for user {user_id}",
+                    {"user_id": user_id, "command": command[:50]}
+                )
+                return concurrency_error
+        
+        # Execute immediately
+        return await self._execute_async_internal(command, timeout, user_id)
+
+    async def _execute_async_internal(
+        self, command: str, timeout: Optional[float] = None, user_id: str = "default"
+    ) -> Dict[str, Any]:
+        """Internal method to execute a command asynchronously without rate/concurrency checks
+
+        Args:
+            command: The command to execute
+            timeout: Optional timeout in seconds (for process completion)
+            user_id: User identifier
+
+        Returns:
+            Dictionary with process token and initial status
+        """
         # Create temporary files for output capture
         stdout_path, stderr_path, stdout_file, stderr_file = self._create_temp_files()
 
@@ -788,7 +985,7 @@ class CommandExecutor(CommandExecutorInterface):
             _log_with_context(
                 logging.INFO,
                 f"Starting async command",
-                {"command": command, "token": token},
+                {"command": command, "token": token, "user_id": user_id},
             )
 
             # Prepare the command with output redirection
@@ -827,15 +1024,22 @@ class CommandExecutor(CommandExecutorInterface):
                 "token": token,
                 "start_time": time.time(),
                 "terminated": False,  # Initialize terminated flag
+                "user_id": user_id,  # Store user ID
             }
 
             # Store temp file locations for cleanup
             self.temp_files[pid] = (stdout_path, stderr_path)
 
+            # Register with concurrency manager
+            await self.concurrency_manager.register_process(token, user_id, command, pid)
+            
+            # Add to resource monitor
+            await self.resource_monitor.add_process(pid)
+
             _log_with_context(
                 logging.INFO,
                 f"Started async command",
-                {"command": command, "token": token, "pid": pid},
+                {"command": command, "token": token, "pid": pid, "user_id": user_id},
             )
 
             # Start a task to monitor the process if timeout is specified
@@ -853,6 +1057,7 @@ class CommandExecutor(CommandExecutorInterface):
                     "command": command,
                     "error": str(e),
                     "traceback": traceback.format_exc(),
+                    "user_id": user_id,
                 },
             )
 
@@ -1293,6 +1498,12 @@ class CommandExecutor(CommandExecutorInterface):
         del self.running_processes[pid]
         del self.process_tokens[token]
 
+        # Unregister from concurrency manager
+        await self.concurrency_manager.unregister_process(token)
+        
+        # Remove from resource monitor and get final stats
+        final_resource_stats = await self.resource_monitor.remove_process(pid)
+
         # Clean up temp files if not called from monitor
         if not from_monitor:
             await self._cleanup_temp_files(pid)
@@ -1307,6 +1518,10 @@ class CommandExecutor(CommandExecutorInterface):
             "pid": pid,
             "duration": time.time() - process_data.get("start_time", time.time()),
         }
+
+        # Add resource usage if available
+        if final_resource_stats:
+            result["resource_usage"] = final_resource_stats
 
         # If process was terminated, update status
         if "terminated" in process_data and process_data["terminated"]:
