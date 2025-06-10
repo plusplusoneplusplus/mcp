@@ -61,6 +61,25 @@ class AnotherDummyTool(ToolInterface):
         return {"success": True}
 
 
+class CaseSensitiveTool(ToolInterface):
+    """Tool for testing case sensitivity."""
+
+    @property
+    def name(self) -> str:
+        return "CaseSensitive_Tool"
+
+    @property
+    def description(self) -> str:
+        return "Tool for case sensitivity testing"
+
+    @property
+    def input_schema(self) -> dict:
+        return {"type": "object", "properties": {}}
+
+    async def execute_tool(self, arguments: dict) -> any:
+        return {"success": True}
+
+
 def test_excluded_tool_single(monkeypatch):
     """Tools listed in MCP_EXCLUDED_TOOL_NAMES are not registered."""
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
@@ -83,6 +102,191 @@ def test_excluded_tool_integration(monkeypatch):
     registry.clear()
     registry.register_tool(DummyTool, source="code")
     assert "dummy_tool" not in registry.tools
+
+
+# Additional comprehensive tests for MCP_EXCLUDED_TOOL_NAMES
+
+def test_excluded_tool_names_empty_string(monkeypatch):
+    """Empty MCP_EXCLUDED_TOOL_NAMES should not exclude any tools."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == set()
+    assert cfg.should_register_tool_class("DummyTool", "dummy_tool", set())
+
+
+def test_excluded_tool_names_whitespace_only(monkeypatch):
+    """MCP_EXCLUDED_TOOL_NAMES with only whitespace should not exclude any tools."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "   ")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == set()
+    assert cfg.should_register_tool_class("DummyTool", "dummy_tool", set())
+
+
+def test_excluded_tool_names_empty_comma_separated(monkeypatch):
+    """Empty values in comma-separated list should be ignored."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "tool_a,,tool_b, ,tool_c")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == {"tool_a", "tool_b", "tool_c"}
+
+
+def test_excluded_tool_names_single_comma(monkeypatch):
+    """Single comma should not create empty exclusions."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", ",")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == set()
+
+
+def test_excluded_tool_names_trailing_comma(monkeypatch):
+    """Trailing comma should not create empty exclusions."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "tool_a,tool_b,")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == {"tool_a", "tool_b"}
+
+
+def test_excluded_tool_names_leading_comma(monkeypatch):
+    """Leading comma should not create empty exclusions."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", ",tool_a,tool_b")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == {"tool_a", "tool_b"}
+
+
+def test_excluded_tool_names_case_sensitivity(monkeypatch):
+    """Tool exclusion should be case-sensitive."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "CaseSensitive_Tool")
+    cfg = PluginConfig()
+    
+    # Exact match should be excluded
+    assert not cfg.should_register_tool_class("CaseSensitiveTool", "CaseSensitive_Tool", set())
+    
+    # Different case should not be excluded
+    assert cfg.should_register_tool_class("CaseSensitiveTool", "casesensitive_tool", set())
+    assert cfg.should_register_tool_class("CaseSensitiveTool", "CASESENSITIVE_TOOL", set())
+
+
+def test_excluded_tool_names_non_existent_tools(monkeypatch):
+    """Excluding non-existent tools should not cause errors."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "non_existent_tool,another_fake_tool")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == {"non_existent_tool", "another_fake_tool"}
+    
+    # Real tools should still work normally
+    assert cfg.should_register_tool_class("DummyTool", "dummy_tool", set())
+
+
+def test_excluded_tool_names_special_characters(monkeypatch):
+    """Tool names with special characters should be handled correctly."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "tool-with-dashes,tool_with_underscores,tool.with.dots")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == {"tool-with-dashes", "tool_with_underscores", "tool.with.dots"}
+
+
+def test_excluded_tool_names_unicode_characters(monkeypatch):
+    """Tool names with unicode characters should be handled correctly."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "tool_with_émojis,tool_with_中文")
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == {"tool_with_émojis", "tool_with_中文"}
+
+
+def test_excluded_tool_names_very_long_list(monkeypatch):
+    """Very long lists of excluded tools should be handled correctly."""
+    # Create a list of 100 tool names
+    tool_names = [f"tool_{i}" for i in range(100)]
+    excluded_tools_str = ",".join(tool_names)
+    
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", excluded_tools_str)
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == set(tool_names)
+    assert len(cfg.excluded_tool_names) == 100
+
+
+def test_excluded_tool_names_integration_multiple_tools(monkeypatch):
+    """Multiple tools should be properly excluded from registry."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool,another_dummy_tool")
+    config._load_from_env()
+    registry.clear()
+    
+    # Try to register both tools
+    result1 = registry.register_tool(DummyTool, source="code")
+    result2 = registry.register_tool(AnotherDummyTool, source="code")
+    
+    # Both should be excluded
+    assert result1 is None
+    assert result2 is None
+    assert "dummy_tool" not in registry.tools
+    assert "another_dummy_tool" not in registry.tools
+
+
+def test_excluded_tool_names_integration_partial_exclusion(monkeypatch):
+    """Only specified tools should be excluded, others should be registered."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
+    config._load_from_env()
+    registry.clear()
+    
+    # Try to register both tools
+    result1 = registry.register_tool(DummyTool, source="code")
+    result2 = registry.register_tool(AnotherDummyTool, source="code")
+    
+    # Only dummy_tool should be excluded
+    assert result1 is None
+    assert result2 is not None
+    assert "dummy_tool" not in registry.tools
+    assert "another_dummy_tool" in registry.tools
+
+
+def test_excluded_tool_names_with_yaml_tools(monkeypatch):
+    """Exclusion should work with YAML tools as well."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
+    cfg = PluginConfig()
+    
+    # Test with YAML tools set (simulating YAML override scenario)
+    yaml_tools = {"dummy_tool", "other_yaml_tool"}
+    
+    # Tool should be excluded regardless of YAML presence
+    assert not cfg.should_register_tool_class("DummyTool", "dummy_tool", yaml_tools)
+    
+    # Other tools should work normally
+    assert cfg.should_register_tool_class("AnotherTool", "other_tool", yaml_tools)
+
+
+def test_excluded_tool_names_precedence_over_yaml_override(monkeypatch):
+    """Exclusion should take precedence over YAML override logic."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
+    cfg = PluginConfig()
+    cfg.yaml_overrides_code = True
+    
+    yaml_tools = {"dummy_tool"}  # Tool exists in YAML
+    
+    # Tool should be excluded even though YAML override would normally apply
+    assert not cfg.should_register_tool_class("DummyTool", "dummy_tool", yaml_tools)
+
+
+def test_excluded_tool_names_with_base_class_exclusion(monkeypatch):
+    """Tool exclusion should work alongside base class exclusion."""
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
+    monkeypatch.setenv("MCP_EXCLUDED_BASE_CLASSES", "AnotherDummyTool")
+    cfg = PluginConfig()
+    
+    # Both exclusion mechanisms should work
+    assert not cfg.should_register_tool_class("DummyTool", "dummy_tool", set())  # Excluded by name
+    assert not cfg.should_register_tool_class("AnotherDummyTool", "another_tool", set())  # Excluded by class
+
+
+def test_excluded_tool_names_environment_reload(monkeypatch):
+    """Configuration should properly reload when environment changes."""
+    # Start with no exclusions
+    cfg = PluginConfig()
+    assert cfg.excluded_tool_names == set()
+    
+    # Set exclusions and reload
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
+    cfg._load_from_env()
+    assert cfg.excluded_tool_names == {"dummy_tool"}
+    
+    # Change exclusions and reload again (need to clear first since _load_from_env updates)
+    cfg.excluded_tool_names.clear()  # Clear existing exclusions
+    monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "another_tool,third_tool")
+    cfg._load_from_env()
+    assert cfg.excluded_tool_names == {"another_tool", "third_tool"}
 
 
 # New tests for plugin enable/disable functionality
