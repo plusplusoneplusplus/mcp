@@ -2,6 +2,8 @@
 
 import logging
 import json
+import aiohttp
+import base64
 from typing import Dict, Any, List, Optional, Union
 
 # Import the required interfaces and decorators
@@ -59,6 +61,7 @@ class AzureWorkItemTool(ToolInterface):
         - AZREPO_PROJECT: Default project name/ID
         - AZREPO_AREA_PATH: Default area path for new work items
         - AZREPO_ITERATION: Default iteration path for new work items
+        - AZREPO_BEARER_TOKEN: Bearer token for REST API authentication
 
     Example:
         # Get work item details
@@ -182,6 +185,7 @@ class AzureWorkItemTool(ToolInterface):
         self.default_project: Optional[str] = None
         self.default_area_path: Optional[str] = None
         self.default_iteration_path: Optional[str] = None
+        self.bearer_token: Optional[str] = None
 
         # Load configuration defaults
         self._load_config()
@@ -200,11 +204,12 @@ class AzureWorkItemTool(ToolInterface):
             self.default_project = azrepo_params.get("project")
             self.default_area_path = azrepo_params.get("area_path")
             self.default_iteration_path = azrepo_params.get("iteration")
+            self.bearer_token = azrepo_params.get("bearer_token")
 
             self.logger.debug(
                 f"Loaded Azure work item configuration: org={self.default_organization}, "
                 f"project={self.default_project}, area_path={self.default_area_path}, "
-                f"iteration={self.default_iteration_path}"
+                f"iteration={self.default_iteration_path}, bearer_token={'***' if self.bearer_token else None}"
             )
 
         except Exception as e:
@@ -214,6 +219,7 @@ class AzureWorkItemTool(ToolInterface):
             self.default_project = None
             self.default_area_path = None
             self.default_iteration_path = None
+            self.bearer_token = None
 
     def _get_param_with_default(
         self, param_value: Optional[str], default_value: Optional[str]
@@ -228,6 +234,25 @@ class AzureWorkItemTool(ToolInterface):
             The parameter value to use (explicit value takes precedence)
         """
         return param_value if param_value is not None else default_value
+
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """Get authentication headers for REST API calls.
+
+        Returns:
+            Dictionary with authorization headers
+        """
+        if not self.bearer_token:
+            raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN environment variable.")
+        
+        # For Azure DevOps REST API, we can use the bearer token directly
+        # or encode it as Basic auth with empty username
+        credentials = base64.b64encode(f":{self.bearer_token}".encode()).decode()
+        
+        return {
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/json-patch+json",
+            "Accept": "application/json"
+        }
 
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
@@ -317,7 +342,7 @@ class AzureWorkItemTool(ToolInterface):
         organization: Optional[str] = None,
         project: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Create a new work item.
+        """Create a new work item using Azure DevOps REST API.
 
         Args:
             title: Title of the work item
@@ -331,27 +356,88 @@ class AzureWorkItemTool(ToolInterface):
         Returns:
             Dictionary with success status and created work item details
         """
-        command = f"boards work-item create --type '{work_item_type}' --title '{title}'"
+        try:
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
+            area = self._get_param_with_default(area_path, self.default_area_path)
+            iteration = self._get_param_with_default(iteration_path, self.default_iteration_path)
 
-        # Use configured defaults for core parameters
-        org = self._get_param_with_default(organization, self.default_organization)
-        proj = self._get_param_with_default(project, self.default_project)
-        area = self._get_param_with_default(area_path, self.default_area_path)
-        iteration = self._get_param_with_default(iteration_path, self.default_iteration_path)
+            if not org:
+                return {"success": False, "error": "Organization is required"}
+            if not proj:
+                return {"success": False, "error": "Project is required"}
 
-        # Add optional parameters
-        if org:
-            command += f" --org {org}"
-        if proj:
-            command += f" --project {proj}"
-        if description:
-            command += f" --description '{description}'"
-        if area:
-            command += f" --area '{area}'"
-        if iteration:
-            command += f" --iteration '{iteration}'"
+            # Construct the REST API URL
+            # Format: https://dev.azure.com/{organization}/{project}/_apis/wit/workitems/${type}?api-version=7.1
+            url = f"https://dev.azure.com/{org}/{proj}/_apis/wit/workitems/${work_item_type}?api-version=7.1"
 
-        return await self._run_az_command(command)
+            # Build the JSON patch document for work item creation
+            patch_document = [
+                {
+                    "op": "add",
+                    "path": "/fields/System.Title",
+                    "value": title
+                }
+            ]
+
+            # Add description if provided
+            if description:
+                patch_document.append({
+                    "op": "add",
+                    "path": "/fields/System.Description",
+                    "value": description
+                })
+
+            # Add area path if provided
+            if area:
+                patch_document.append({
+                    "op": "add",
+                    "path": "/fields/System.AreaPath",
+                    "value": area
+                })
+
+            # Add iteration path if provided
+            if iteration:
+                patch_document.append({
+                    "op": "add",
+                    "path": "/fields/System.IterationPath",
+                    "value": iteration
+                })
+
+            # Get authentication headers
+            headers = self._get_auth_headers()
+
+            self.logger.debug(f"Creating work item via REST API: {url}")
+            self.logger.debug(f"Patch document: {json.dumps(patch_document, indent=2)}")
+
+            # Make the REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=patch_document, headers=headers) as response:
+                    response_text = await response.text()
+                    
+                    if response.status == 200:
+                        try:
+                            work_item_data = json.loads(response_text)
+                            return {"success": True, "data": work_item_data}
+                        except json.JSONDecodeError as e:
+                            self.logger.error(f"Failed to parse work item response: {e}")
+                            return {
+                                "success": False,
+                                "error": f"Failed to parse response: {e}",
+                                "raw_output": response_text
+                            }
+                    else:
+                        self.logger.error(f"Work item creation failed with status {response.status}: {response_text}")
+                        return {
+                            "success": False,
+                            "error": f"HTTP {response.status}: {response_text}",
+                            "raw_output": response_text
+                        }
+
+        except Exception as e:
+            self.logger.error(f"Error creating work item: {e}")
+            return {"success": False, "error": str(e)}
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments."""
