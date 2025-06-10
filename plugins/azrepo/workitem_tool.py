@@ -303,18 +303,23 @@ class AzureWorkItemTool(ToolInterface):
         Returns:
             Dictionary with authorization headers
         """
-        # Get Azure repo parameters from environment manager
-        azrepo_params = env_manager.get_azrepo_parameters()
         bearer_token = None
 
-        # Try bearer token command first (takes precedence over static token)
-        bearer_token_command = azrepo_params.get("bearer_token_command")
-        if bearer_token_command:
-            bearer_token = self._execute_bearer_token_command(bearer_token_command)
+        # First try to use the instance bearer_token (set during initialization)
+        if self.bearer_token:
+            bearer_token = self.bearer_token
+        else:
+            # Get Azure repo parameters from environment manager
+            azrepo_params = env_manager.get_azrepo_parameters()
 
-        # If no token from command, fall back to static token
-        if not bearer_token:
-            bearer_token = azrepo_params.get("bearer_token")
+            # Try bearer token command first (takes precedence over static token)
+            bearer_token_command = azrepo_params.get("bearer_token_command")
+            if bearer_token_command:
+                bearer_token = self._execute_bearer_token_command(bearer_token_command)
+
+            # If no token from command, fall back to static token
+            if not bearer_token:
+                bearer_token = azrepo_params.get("bearer_token")
 
         if not bearer_token:
             raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN or AZREPO_BEARER_TOKEN_COMMAND environment variable.")
