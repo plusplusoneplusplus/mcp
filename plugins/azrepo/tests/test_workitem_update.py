@@ -4,6 +4,8 @@ import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from plugins.azrepo.workitem_tool import AzureWorkItemTool
+import plugins.azrepo.azure_rest_utils
+from plugins.azrepo.tests.helpers import patch_azure_utils_env_manager
 
 
 def mock_aiohttp_for_update_success(work_item_data=None):
@@ -67,7 +69,7 @@ def mock_aiohttp_for_update_error(status_code=404, error_message="Work item not 
 
 @pytest.fixture
 def mock_executor():
-    """Mock command executor."""
+    """Create a mock command executor."""
     executor = MagicMock()
     executor.execute_async = AsyncMock()
     executor.query_process = AsyncMock()
@@ -76,27 +78,26 @@ def mock_executor():
 
 @pytest.fixture
 def workitem_tool(mock_executor):
-    """Create AzureWorkItemTool instance with mocked executor."""
-    # Use a persistent patch that lasts for the entire test
-    patcher = patch("plugins.azrepo.workitem_tool.env_manager")
-    mock_env_manager = patcher.start()
+    """Create AzureWorkItemTool instance with bearer token configured."""
+    with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+        # Mock environment settings
+        mock_env_manager.load.return_value = None
+        mock_env_manager.get_azrepo_parameters.return_value = {
+            "org": "testorg",
+            "project": "test-project",
+            "bearer_token": "test-bearer-token-123"
+        }
 
-    # Mock environment manager
-    mock_env_manager.load.return_value = None
-    mock_env_manager.get_azrepo_parameters.return_value = {
-        "org": "testorg",
-        "project": "test-project",
-        "area_path": "TestArea\\SubArea",
-        "iteration": "Sprint 1",
-        "bearer_token": "test-bearer-token-123"
-    }
+        # Also patch the azure_rest_utils env_manager
+        with patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_rest_env_manager:
+            mock_rest_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "bearer_token": "test-bearer-token-123"
+            }
 
-    tool = AzureWorkItemTool(command_executor=mock_executor)
-
-    yield tool
-
-    # Clean up the patch
-    patcher.stop()
+            tool = AzureWorkItemTool(command_executor=mock_executor)
+            yield tool
 
 
 @pytest.fixture
@@ -686,5 +687,9 @@ class TestUpdateAuthHeaders:
         with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
             mock_env_manager.get_azrepo_parameters.return_value = {}
 
-            with pytest.raises(ValueError, match="Bearer token not configured"):
-                workitem_tool._get_auth_headers()
+            # Also patch the azure_rest_utils env_manager
+            with patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_rest_env_manager:
+                mock_rest_env_manager.get_azrepo_parameters.return_value = {}
+
+                with pytest.raises(ValueError, match="Bearer token not configured"):
+                    workitem_tool._get_auth_headers()

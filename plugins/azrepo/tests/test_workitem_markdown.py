@@ -6,6 +6,8 @@ import pytest
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 from plugins.azrepo.workitem_tool import AzureWorkItemTool
+import plugins.azrepo.azure_rest_utils
+from plugins.azrepo.tests.helpers import patch_azure_utils_env_manager
 
 
 def mock_aiohttp_for_success(work_item_data=None):
@@ -59,16 +61,38 @@ def workitem_tool(mock_executor):
             "bearer_token": "test-bearer-token-123"
         }
 
-        tool = AzureWorkItemTool(command_executor=mock_executor)
-        return tool
+        with patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_rest_env_manager:
+            # Also mock the azure_rest_utils env_manager with the same values
+            mock_rest_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "area_path": "TestArea\\SubArea",
+                "iteration": "Sprint 1",
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            tool = AzureWorkItemTool(command_executor=mock_executor)
+            return tool
 
 
 class TestMarkdownConversion:
     """Test markdown conversion in work item creation."""
 
     @pytest.mark.asyncio
-    async def test_create_work_item_with_markdown_description(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_create_work_item_with_markdown_description(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test work item creation with markdown description."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         markdown_description = """# Bug Report
 
 ## Description
@@ -96,8 +120,20 @@ Error message appears: `Invalid credentials`
             assert "data" in result
 
     @pytest.mark.asyncio
-    async def test_create_work_item_with_plain_text_description(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_create_work_item_with_plain_text_description(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test work item creation with plain text description."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         plain_description = "This is a simple plain text description without any markdown formatting."
 
         with mock_aiohttp_for_success():
@@ -110,8 +146,20 @@ Error message appears: `Invalid credentials`
             assert "data" in result
 
     @pytest.mark.asyncio
-    async def test_create_work_item_with_mixed_markdown(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_create_work_item_with_mixed_markdown(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test work item creation with mixed markdown content."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         mixed_description = """## Feature Request
 
 ### Overview
@@ -148,8 +196,20 @@ def login():
             assert "data" in result
 
     @pytest.mark.asyncio
-    async def test_create_work_item_no_description(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_create_work_item_no_description(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test work item creation without description."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         with mock_aiohttp_for_success():
             result = await workitem_tool.create_work_item(
                 title="Task Without Description"
@@ -159,8 +219,20 @@ def login():
             assert "data" in result
 
     @pytest.mark.asyncio
-    async def test_create_work_item_empty_description(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_create_work_item_empty_description(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test work item creation with empty description."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         with mock_aiohttp_for_success():
             result = await workitem_tool.create_work_item(
                 title="Task With Empty Description",
@@ -171,8 +243,20 @@ def login():
             assert "data" in result
 
     @pytest.mark.asyncio
-    async def test_execute_tool_with_markdown_description(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_execute_tool_with_markdown_description(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test execute_tool with markdown description."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         markdown_description = """# Task Description
 
 This task involves:
@@ -201,8 +285,20 @@ npm test
             assert "data" in result
 
     @pytest.mark.asyncio
-    async def test_markdown_with_special_characters(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_markdown_with_special_characters(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test markdown conversion with special characters."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         special_description = """# Test with Special Characters
 
 ## Code Examples
@@ -235,8 +331,20 @@ console.log(message);
             assert "data" in result
 
     @pytest.mark.asyncio
-    async def test_markdown_table_conversion(self, workitem_tool):
+    @patch_azure_utils_env_manager
+    async def test_markdown_table_conversion(self, mock_env_manager, mock_rest_env_manager, workitem_tool):
         """Test markdown table conversion."""
+        # Configure both mocks to return the same values
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123"
+        }
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
         table_description = """# Test Results
 
 ## Summary Table

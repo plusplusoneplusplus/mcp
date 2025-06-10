@@ -2,10 +2,9 @@
 
 import logging
 import json
-import getpass
-import os
 import pandas as pd
 import uuid
+import os
 from typing import Dict, Any, List, Optional, Union
 
 import git
@@ -16,6 +15,14 @@ from mcp_tools.plugin import register_tool
 
 # Import configuration manager
 from config import env_manager
+
+# Import shared Azure REST API utilities
+from .azure_rest_utils import (
+    get_current_username,
+    get_auth_headers,
+    build_api_url,
+    process_rest_response,
+)
 
 # Import types from the plugin
 try:
@@ -299,27 +306,7 @@ class AzurePullRequestTool(ToolInterface):
         """
         return param_value if param_value is not None else default_value
 
-    def _get_current_username(self) -> Optional[str]:
-        """Get the current username in a cross-platform way.
-
-        Returns:
-            The current username, or None if unable to determine
-        """
-        try:
-            # Try getpass.getuser() first (works on most platforms)
-            return getpass.getuser()
-        except Exception:
-            try:
-                # Fallback to environment variables
-                username = os.environ.get("USER") or os.environ.get("USERNAME")
-                if username:
-                    return username
-            except Exception:
-                pass
-
-            # Return None if unable to determine username
-            self.logger.warning("Unable to determine current username")
-            return None
+    # Moved to azure_rest_utils.py
 
     def _get_default_pr_branch_prefix(self) -> str:
         """Get the default PR branch prefix including username.
@@ -831,3 +818,28 @@ class AzurePullRequestTool(ToolInterface):
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}
+
+    # Backward compatibility methods for tests
+    def _get_current_username(self) -> Optional[str]:
+        """Backward compatibility method for tests."""
+        # Convert potential bytes to string if needed
+        username = get_current_username()
+        if isinstance(username, bytes):
+            return username.decode("utf-8")
+        return username
+
+    def _get_auth_headers(self, content_type: str = "application/json") -> Dict[str, str]:
+        """Backward compatibility method for tests."""
+        return get_auth_headers(content_type=content_type)
+
+    def _build_api_url(self, organization: Optional[str] = None, project: Optional[str] = None, endpoint: str = "") -> str:
+        """Backward compatibility method for tests."""
+        org = organization or self.default_organization
+        if not org:
+            raise ValueError("Organization must be provided")
+
+        proj = project or self.default_project
+        if not proj:
+            raise ValueError("Project must be provided")
+
+        return build_api_url(org, proj, endpoint)
