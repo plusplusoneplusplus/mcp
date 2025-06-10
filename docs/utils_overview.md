@@ -32,6 +32,24 @@ This document provides a high-level overview of the utilities available in the `
 
 ---
 
+## Markdown to HTML (`markdown_to_html`)
+
+**Functionality:**
+- Converts Markdown content to HTML format using the fast Mistune parser.
+- Automatically detects if content is markdown and converts only when needed.
+- Supports all standard markdown features: headers, lists, code blocks, tables, links, etc.
+
+**Usage:**
+- Main functions:
+  - `markdown_to_html(markdown_text)` - Direct conversion
+  - `detect_and_convert_markdown(text)` - Smart detection and conversion
+  - `is_markdown_content(text)` - Detection only
+- Input: Markdown or plain text string.
+- Output: HTML-formatted string (or original text if not markdown).
+- Used by the Azure DevOps work item tool to automatically convert markdown descriptions to HTML.
+
+---
+
 ## OCR Extractor (`ocr_extractor`)
 
 **Functionality:**

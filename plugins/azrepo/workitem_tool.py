@@ -14,6 +14,9 @@ from mcp_tools.plugin import register_tool
 # Import configuration manager
 from config import env_manager
 
+# Import markdown to HTML conversion utility
+from utils.markdown_to_html import detect_and_convert_markdown
+
 # Import types from the plugin
 try:
     from .types import (
@@ -54,6 +57,10 @@ class AzureWorkItemTool(ToolInterface):
     work item properties. It automatically loads default configuration
     values from the environment while allowing parameter overrides for
     specific operations.
+
+    Features:
+    - Automatic markdown to HTML conversion for work item descriptions
+    - Support for all standard Azure DevOps work item types
 
     Configuration:
         The tool automatically loads default values from environment variables
@@ -116,7 +123,7 @@ class AzureWorkItemTool(ToolInterface):
                 },
                 "description": {
                     "type": "string",
-                    "description": "Description of the work item (optional for create operation)",
+                    "description": "Description of the work item (optional for create operation). Supports markdown format - will be automatically converted to HTML for Azure DevOps.",
                     "nullable": True,
                 },
                 "work_item_type": {
@@ -422,7 +429,7 @@ class AzureWorkItemTool(ToolInterface):
 
         Args:
             title: Title of the work item
-            description: Description of the work item
+            description: Description of the work item (supports markdown - will be automatically converted to HTML)
             work_item_type: Type of work item (Bug, Task, User Story, etc.)
             area_path: Area path for the work item (uses configured default if not provided)
             iteration_path: Iteration path for the work item (uses configured default if not provided)
@@ -460,12 +467,14 @@ class AzureWorkItemTool(ToolInterface):
                 }
             ]
 
-            # Add description if provided
+            # Add description if provided (convert markdown to HTML if needed)
             if description:
+                # Detect if description is markdown and convert to HTML
+                html_description = detect_and_convert_markdown(description)
                 patch_document.append({
                     "op": "add",
                     "path": "/fields/System.Description",
-                    "value": description
+                    "value": html_description
                 })
 
             # Add area path if provided

@@ -168,12 +168,32 @@ Create a new work item.
 
 **Parameters:**
 - `title` (required): Title of the work item
-- `description` (optional): Description of the work item
+- `description` (optional): Description of the work item. **Supports markdown format** - will be automatically converted to HTML for Azure DevOps
 - `work_item_type` (optional): Type of work item (Bug, Task, User Story, etc.) - defaults to "Task"
 - `area_path` (optional): Area path for the work item (uses configured default if not provided)
 - `iteration_path` (optional): Iteration path for the work item (uses configured default if not provided)
 - `organization` (optional): Azure DevOps organization URL (uses configured default if not provided)
 - `project` (optional): Name or ID of the project (uses configured default if not provided)
+
+**Markdown Support:**
+The `description` parameter supports full markdown syntax including:
+- Headers (`# ## ###`)
+- Bold and italic text (`**bold**`, `*italic*`)
+- Lists (ordered and unordered)
+- Code blocks and inline code
+- Links and images
+- Tables
+- Blockquotes
+- Horizontal rules
+
+Example with markdown description:
+```json
+{
+  "operation": "create",
+  "title": "Bug Report",
+  "description": "# Login Issue\n\n## Description\nThe login functionality is **not working** properly.\n\n## Steps to Reproduce\n1. Navigate to login page\n2. Enter credentials\n3. Click login\n\n```bash\n# Error in console\nError: Invalid credentials\n```"
+}
+```
 
 ## Dependencies
 
