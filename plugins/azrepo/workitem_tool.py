@@ -244,12 +244,9 @@ class AzureWorkItemTool(ToolInterface):
         if not self.bearer_token:
             raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN environment variable.")
         
-        # For Azure DevOps REST API, we can use the bearer token directly
-        # or encode it as Basic auth with empty username
-        credentials = base64.b64encode(f":{self.bearer_token}".encode()).decode()
-        
+        # For Azure DevOps REST API, use the bearer token directly
         return {
-            "Authorization": f"Basic {credentials}",
+            "Authorization": f"Bearer {self.bearer_token}",
             "Content-Type": "application/json-patch+json",
             "Accept": "application/json"
         }
