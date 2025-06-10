@@ -1,0 +1,114 @@
+Test Authoring and Execution Framework v10.57.200731002-0
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+StartGroup: MyTestModule.dll
+  StartTest: MyTestModule::BasicTest::TestMethod1
+    Test metadata:
+      TestId: {12345678-1234-5678-9012-123456789012}
+      Priority: 1
+      Owner: TestTeam
+      Category: Basic
+      Timeout: 30000
+    Test passed
+  EndTest: MyTestModule::BasicTest::TestMethod1
+  
+  StartTest: MyTestModule::BasicTest::TestMethod2
+    Test metadata:
+      TestId: {23456789-2345-6789-0123-234567890123}
+      Priority: 1
+      Owner: TestTeam
+      Category: Basic
+      Timeout: 30000
+    Test passed
+  EndTest: MyTestModule::BasicTest::TestMethod2
+  
+  StartTest: MyTestModule::AdvancedTest::ComplexTestMethod
+    Test metadata:
+      TestId: {34567890-3456-7890-1234-345678901234}
+      Priority: 2
+      Owner: TestTeam
+      Category: Advanced
+      Timeout: 60000
+    Algorithm: AES-256-CBC
+    Key length: 256 bits
+    Block size: 128 bits
+    Test vector: 0x1234567890ABCDEF1234567890ABCDEF
+    Expected hash: SHA256:a1b2c3d4e5f6789012345678901234567890abcdef123456789012345678901234
+    Test passed
+  EndTest: MyTestModule::AdvancedTest::ComplexTestMethod
+  
+  StartTest: MyTestModule::FileTest::ReadWriteTest
+    Test metadata:
+      TestId: {45678901-4567-8901-2345-456789012345}
+      Priority: 1
+      Owner: TestTeam
+      Category: FileIO
+      Timeout: 30000
+    Test file: C:\TestData\sample.txt
+    File size: 1024 bytes
+    Checksum: MD5:d41d8cd98f00b204e9800998ecf8427e
+    Test passed
+  EndTest: MyTestModule::FileTest::ReadWriteTest
+  
+  StartTest: MyTestModule::NetworkTest::ConnectivityTest
+    Test metadata:
+      TestId: {56789012-5678-9012-3456-567890123456}
+      Priority: 2
+      Owner: TestTeam
+      Category: Network
+      Timeout: 45000
+    Target server: testserver.example.com
+    Port: 443
+    Protocol: HTTPS
+    Response time: 125ms
+    Test passed
+  EndTest: MyTestModule::NetworkTest::ConnectivityTest
+  
+EndGroup: MyTestModule.dll
+
+Summary:
+  Total:   5
+  Passed:  5
+  Failed:  0
+  Blocked: 0
+  Not Run: 0
+
+Test execution completed successfully.
+Execution time: 00:00:15.456
+Log file: C:\TestResults\MyTestModule_20240115_143045.wtl
+Result file: C:\TestResults\MyTestModule_20240115_143045.xml
+HTML report: C:\TestResults\MyTestModule_20240115_143045.html
+
+Test environment:
+- OS: Windows 11 Pro (Build 22621)
+- Architecture: x64
+- .NET Framework: 4.8.1
+- Test framework: TAEF v10.57.200731002-0
+- Test runner: te.exe
+- Working directory: C:\TestProjects\MyTestModule
+- Test binary: C:\TestProjects\MyTestModule\bin\Release\MyTestModule.dll
+- Test configuration: Release
+- Test platform: x64
+
+Performance metrics:
+- Total execution time: 15.456 seconds
+- Setup time: 2.123 seconds
+- Test execution time: 12.234 seconds
+- Cleanup time: 1.099 seconds
+- Memory usage: 45.6 MB
+- CPU usage: 12%
+
+Test artifacts:
+- Log file size: 12.3 KB
+- Result file size: 8.7 KB
+- HTML report size: 156.2 KB
+- Screenshot count: 0
+- Video recording: None
+
+Build information:
+- Build number: 20240115.1
+- Commit hash: a1b2c3d4e5f6789012345678901234567890abcd
+- Branch: refs/heads/main
+- Repository: https://github.com/company/mytestmodule.git
+- Build agent: TestAgent-01
+- Build timestamp: 2024-01-15T14:30:45.123Z 

@@ -62,6 +62,30 @@ BUILD_SAFE_PATTERNS = [
     r'^Successfully (built|tagged|installed) [a-zA-Z0-9._-]+$',
     r'^(Downloading|Collecting|Building|Compiling|Linking) [a-zA-Z0-9._/-]+$',
     r'^(FROM|COPY|RUN|EXPOSE) [a-zA-Z0-9._/: -]+$',
+
+    # MSBuild and Visual Studio specific patterns
+    r'^[a-zA-Z0-9._-]+\.vcxproj$',  # Visual Studio project files
+    r'^[a-zA-Z0-9._-]+\.sln$',      # Visual Studio solution files
+    r'^[a-zA-Z0-9._-]+\.lib$',      # Library files
+    r'^[a-zA-Z0-9._-]+\.pdb$',      # Program database files
+    r'^[a-zA-Z0-9._-]+\.res$',      # Resource files
+    r'^[a-zA-Z0-9._-]+\.obj$',      # Object files
+    r'^[a-zA-Z0-9._-]+\.tlog$',     # Build log files
+    r'^vc\d+\.pdb$',                # Visual C++ compiler database
+    r'^\d+\.\d+\.\d+\+[a-f0-9]+$', # Version numbers with commit hash
+    r'^build-session-\d{8}-\d{6}-[a-z0-9]+$',  # Build session IDs
+    r'^req-[a-z0-9]+-[a-z0-9]+$',  # Request IDs
+
+    # MSBuild task names and build steps
+    r'^[A-Z][a-zA-Z]+:$',          # MSBuild task names ending with colon
+    r'^"[A-Z][a-zA-Z]+"$',         # Quoted MSBuild task names
+    r'^\([A-Z/_]+\)$',             # Compiler/linker flags in parentheses
+    r'^/[A-Z]+:[A-Z0-9_]+$',       # Compiler flags like /MACHINE:X64
+
+    # Windows system libraries
+    r'^[a-z0-9]+\.lib$',           # System library files
+    r'^Multi-threaded$',           # Runtime library names
+    r'^Optimization:$',            # Build setting labels
 ]
 
 # Compile patterns for performance
@@ -86,7 +110,25 @@ def has_build_context_keywords(line: str) -> bool:
         'commit', 'branch', 'merge', 'refs/', 'origin/', 'target/', 'build/',
         'requirements.txt', 'package.json', 'pom.xml', 'cargo.toml',
         'container id', 'build id', 'session:', 'request id', 'trace id',
-        'from node', 'copy', 'run npm', 'expose', 'head is now', 'image id'
+        'from node', 'copy', 'run npm', 'expose', 'head is now', 'image id',
+        # MSBuild and Visual Studio specific keywords
+        'msbuild', 'visual studio', 'vcxproj', 'solution', 'project', 'clcompile',
+        'link:', 'resourcecompile', 'preparefor', 'initialize', 'finalize',
+        'validate', 'configuration', 'platform toolset', 'windows sdk',
+        'msvc', 'cl.exe', 'link.exe', 'rc.exe', 'generating code', 'finished generating',
+        'creating directory', 'deleting file', 'touching', 'because', 'was specified',
+        'build engine', 'copyright', 'microsoft corporation', 'all rights reserved',
+        'build started', 'build succeeded', 'warning(s)', 'error(s)', 'time elapsed',
+        'optimization', 'runtime library', 'security check', 'function-level linking',
+        'floating point', 'exception handling', 'buffer security', 'control flow',
+        'generate debug', 'comdat folding', 'references', 'link time code',
+        'subsystem', 'target machine', 'data execution', 'randomized base',
+        'dependencies resolved', 'system library', 'build artifacts',
+        'executable', 'debug symbols', 'import library', 'resources',
+        'compiler database', 'build environment', 'build machine', 'build user',
+        'build timestamp', 'build session', 'build request', 'performance metrics',
+        'compilation time', 'linking time', 'resource compilation', 'cpu usage',
+        'memory usage', 'disk i/o', 'network i/o', 'file checksums'
     ]
 
     line_lower = line.lower()
@@ -214,7 +256,29 @@ def is_password_like_loose(s: str) -> bool:
         return False
 
     # Skip if it contains common file extensions
-    if any(ext in s.lower() for ext in ['.json', '.xml', '.txt', '.jar', '.exe', '.dll']):
+    if any(ext in s.lower() for ext in ['.json', '.xml', '.txt', '.jar', '.exe', '.dll', '.lib', '.pdb', '.obj', '.res', '.vcxproj', '.sln']):
+        return False
+
+    # Skip MSBuild task names and build steps
+    if s.endswith(':') and len(s) > 12 and s[:-1].isalpha():
+        return False
+
+    # Skip quoted strings that look like build task names
+    if s.startswith('"') and s.endswith('"') and len(s) > 12:
+        inner = s[1:-1]
+        if inner.isalpha() or inner.replace(' ', '').isalpha():
+            return False
+
+    # Skip compiler/linker flags in parentheses
+    if s.startswith('(') and s.endswith(')') and '/' in s:
+        return False
+
+    # Skip system library names
+    if s.lower().endswith('.lib') and len(s) < 20:
+        return False
+
+    # Skip common build setting labels
+    if s.endswith(':') and any(word in s.lower() for word in ['optimization', 'library', 'security', 'linking', 'point', 'handling', 'debug', 'folding', 'machine', 'execution', 'base']):
         return False
 
     return True
