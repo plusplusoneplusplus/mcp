@@ -119,6 +119,7 @@ tools:
     description: |
       Deploy the application asynchronously and return a token for tracking.
       Use the token to query the status (tool/query_script_status).
+      This tool includes concurrency control to prevent conflicting deployments.
     type: script
     # Default script path (optional, used as fallback if no OS-specific script is found)
     script: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.sh
@@ -127,6 +128,9 @@ tools:
       windows: powershell -file {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.ps1
       darwin: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.sh
       linux: bash {pwd}/../mcp_tools/tests/fixtures/scripts/test_deploy.sh
+    # Concurrency configuration to prevent conflicting deployments
+    concurrency:
+      max_concurrent: 1          # Only allow one deployment at a time
     # Post-processing configuration to control output attachment and security
     post_processing:
       attach_stdout: true              # Include stdout in output (default: true)
