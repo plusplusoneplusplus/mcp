@@ -5,6 +5,8 @@ import json
 import aiohttp
 import base64
 import subprocess
+import getpass
+import os
 from typing import Dict, Any, List, Optional, Union
 
 # Import the required interfaces and decorators
@@ -153,6 +155,18 @@ class AzureWorkItemTool(ToolInterface):
                     "description": "Iteration path for the work item (uses configured default if not provided)",
                     "nullable": True,
                 },
+                "assigned_to": {
+                    "type": "string",
+                    "description": "User to assign the work item to. Use 'current' to assign to current user, 'none' for unassigned, or specify a username/email. Defaults to current user if not specified.",
+                    "default": "current",
+                    "nullable": True,
+                },
+                "auto_assign_to_current_user": {
+                    "type": "boolean",
+                    "description": "Whether to automatically assign work items to the current user by default. Defaults to true.",
+                    "default": True,
+                    "nullable": True,
+                },
                 "organization": {
                     "type": "string",
                     "description": "Azure DevOps organization URL",
@@ -207,6 +221,8 @@ class AzureWorkItemTool(ToolInterface):
         self.default_area_path: Optional[str] = None
         self.default_iteration_path: Optional[str] = None
         self.bearer_token: Optional[str] = None
+        self.auto_assign_to_current_user: bool = True
+        self.default_assignee: Optional[str] = None
 
         # Load configuration defaults
         self._load_config()
@@ -227,10 +243,16 @@ class AzureWorkItemTool(ToolInterface):
             self.default_iteration_path = azrepo_params.get("iteration")
             self.bearer_token = azrepo_params.get("bearer_token")
 
+            # Load assignment preferences
+            self.auto_assign_to_current_user = azrepo_params.get("auto_assign_to_current_user", True)
+            self.default_assignee = azrepo_params.get("default_assignee")
+
             self.logger.debug(
                 f"Loaded Azure work item configuration: org={self.default_organization}, "
                 f"project={self.default_project}, area_path={self.default_area_path}, "
-                f"iteration={self.default_iteration_path}, bearer_token={'***' if self.bearer_token else None}"
+                f"iteration={self.default_iteration_path}, bearer_token={'***' if self.bearer_token else None}, "
+                f"auto_assign_to_current_user={self.auto_assign_to_current_user}, "
+                f"default_assignee={self.default_assignee}"
             )
 
         except Exception as e:
@@ -255,6 +277,28 @@ class AzureWorkItemTool(ToolInterface):
             The parameter value to use (explicit value takes precedence)
         """
         return param_value if param_value is not None else default_value
+
+    def _get_current_username(self) -> Optional[str]:
+        """Get the current username in a cross-platform way.
+
+        Returns:
+            The current username, or None if unable to determine
+        """
+        try:
+            # Try getpass.getuser() first (works on most platforms)
+            return getpass.getuser()
+        except Exception:
+            try:
+                # Fallback to environment variables
+                username = os.environ.get("USER") or os.environ.get("USERNAME")
+                if username:
+                    return username
+            except Exception:
+                pass
+
+            # Return None if unable to determine username
+            self.logger.warning("Unable to determine current username")
+            return None
 
     def _execute_bearer_token_command(self, command: str) -> Optional[str]:
         """Execute a command and extract the accessToken from JSON output.
@@ -493,6 +537,8 @@ class AzureWorkItemTool(ToolInterface):
         work_item_type: str = "Task",
         area_path: Optional[str] = None,
         iteration_path: Optional[str] = None,
+        assigned_to: Optional[str] = "current",
+        auto_assign_to_current_user: bool = True,
         organization: Optional[str] = None,
         project: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -504,6 +550,11 @@ class AzureWorkItemTool(ToolInterface):
             work_item_type: Type of work item (Bug, Task, User Story, etc.)
             area_path: Area path for the work item (uses configured default if not provided)
             iteration_path: Iteration path for the work item (uses configured default if not provided)
+            assigned_to: User to assign work item to. Special values:
+                - "current": Assign to current user (default)
+                - "none" or None: Leave unassigned
+                - Any other string: Assign to specified user
+            auto_assign_to_current_user: Whether to auto-assign to current user by default
             organization: Azure DevOps organization URL (uses configured default if not provided)
             project: Azure DevOps project name/ID (uses configured default if not provided)
 
@@ -562,6 +613,28 @@ class AzureWorkItemTool(ToolInterface):
                     "op": "add",
                     "path": "/fields/System.IterationPath",
                     "value": iteration
+                })
+
+            # Handle assignment logic
+            assignee = None
+            # Check both parameter and instance configuration for auto-assignment
+            should_auto_assign = auto_assign_to_current_user and self.auto_assign_to_current_user
+            if should_auto_assign and assigned_to == "current":
+                current_user = self._get_current_username()
+                if current_user:
+                    assignee = current_user
+                    self.logger.debug(f"Auto-assigning work item to current user: {current_user}")
+                else:
+                    self.logger.warning("Could not determine current user for auto-assignment")
+            elif assigned_to and assigned_to not in ["current", "none"]:
+                assignee = assigned_to
+
+            # Add assignment to patch document if assignee is determined
+            if assignee:
+                patch_document.append({
+                    "op": "add",
+                    "path": "/fields/System.AssignedTo",
+                    "value": assignee
                 })
 
             # Get authentication headers
@@ -729,6 +802,8 @@ class AzureWorkItemTool(ToolInterface):
                 work_item_type=arguments.get("work_item_type", "Task"),
                 area_path=arguments.get("area_path"),
                 iteration_path=arguments.get("iteration_path"),
+                assigned_to=arguments.get("assigned_to", "current"),
+                auto_assign_to_current_user=arguments.get("auto_assign_to_current_user", True),
                 organization=arguments.get("organization"),
                 project=arguments.get("project"),
             )

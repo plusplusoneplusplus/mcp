@@ -118,7 +118,7 @@ class TestBearerTokenCommandIntegration:
 
                 # Check the patch document
                 patch_document = post_call_args[1]["json"]
-                assert len(patch_document) == 4  # title, description, area_path, iteration
+                assert len(patch_document) == 5  # title, description, area_path, iteration, assigned_to
 
                 # Verify patch document contents
                 title_patch = next(p for p in patch_document if p["path"] == "/fields/System.Title")
@@ -128,6 +128,12 @@ class TestBearerTokenCommandIntegration:
                 description_patch = next(p for p in patch_document if p["path"] == "/fields/System.Description")
                 assert description_patch["op"] == "add"
                 assert description_patch["value"] == "Add OAuth2 authentication to the application"
+
+                # Verify the auto-assignment field is included
+                assigned_to_patch = next(p for p in patch_document if p["path"] == "/fields/System.AssignedTo")
+                assert assigned_to_patch["op"] == "add"
+                # The value should be the current user (in CI environment, this is typically "runner")
+                assert assigned_to_patch["value"] is not None
 
     @patch("plugins.azrepo.workitem_tool.subprocess.run")
     def test_bearer_token_command_failure_graceful_handling(self, mock_subprocess_run):
