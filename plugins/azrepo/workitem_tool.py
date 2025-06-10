@@ -4,6 +4,7 @@ import logging
 import json
 import aiohttp
 import base64
+import subprocess
 from typing import Dict, Any, List, Optional, Union
 
 # Import the required interfaces and decorators
@@ -237,18 +238,80 @@ class AzureWorkItemTool(ToolInterface):
         """
         return param_value if param_value is not None else default_value
 
+    def _execute_bearer_token_command(self, command: str) -> Optional[str]:
+        """Execute a command and extract the accessToken from JSON output.
+        
+        Args:
+            command: The command to execute
+            
+        Returns:
+            The access token if found, None otherwise
+        """
+        try:
+            self.logger.debug(f"Executing bearer token command: {command}")
+            
+            # Execute the command
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30  # 30 second timeout
+            )
+            
+            if result.returncode != 0:
+                self.logger.error(f"Bearer token command failed with return code {result.returncode}: {result.stderr}")
+                return None
+                
+            # Parse JSON output
+            try:
+                json_output = json.loads(result.stdout)
+                access_token = json_output.get("accessToken")
+                
+                if access_token:
+                    self.logger.debug("Successfully extracted access token from command output")
+                    return access_token
+                else:
+                    self.logger.warning("No 'accessToken' property found in command output JSON")
+                    return None
+                    
+            except json.JSONDecodeError as e:
+                self.logger.error(f"Failed to parse command output as JSON: {e}")
+                self.logger.debug(f"Command output was: {result.stdout}")
+                return None
+                
+        except subprocess.TimeoutExpired:
+            self.logger.error(f"Bearer token command timed out after 30 seconds: {command}")
+            return None
+        except Exception as e:
+            self.logger.error(f"Error executing bearer token command: {e}")
+            return None
+
     def _get_auth_headers(self) -> Dict[str, str]:
         """Get authentication headers for REST API calls.
 
         Returns:
             Dictionary with authorization headers
         """
-        if not self.bearer_token:
+        # Get Azure repo parameters from environment manager
+        azrepo_params = env_manager.get_azrepo_parameters()
+        bearer_token = None
+        
+        # Try bearer token command first (takes precedence over static token)
+        bearer_token_command = azrepo_params.get("bearer_token_command")
+        if bearer_token_command:
+            bearer_token = self._execute_bearer_token_command(bearer_token_command)
+        
+        # If no token from command, fall back to static token
+        if not bearer_token:
+            bearer_token = azrepo_params.get("bearer_token")
+        
+        if not bearer_token:
             raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN or AZREPO_BEARER_TOKEN_COMMAND environment variable.")
         
         # For Azure DevOps REST API, use the bearer token directly
         return {
-            "Authorization": f"Bearer {self.bearer_token}",
+            "Authorization": f"Bearer {bearer_token}",
             "Content-Type": "application/json-patch+json",
             "Accept": "application/json"
         }
