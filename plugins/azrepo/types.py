@@ -139,3 +139,12 @@ class WorkItemCreateResponse(BaseModel):
     data: Optional[WorkItem] = None
     error: Optional[str] = None
     raw_output: Optional[str] = None
+
+
+class WorkItemUpdateResponse(BaseModel):
+    """Response from update work item operation"""
+
+    success: bool
+    data: Optional[WorkItem] = None
+    error: Optional[str] = None
+    raw_output: Optional[str] = None
