@@ -314,7 +314,7 @@ async def handle_sse(request):
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 # --- Main Web Page ---
-from server.api import PERSIST_DIR
+from server.api.base import PERSIST_DIR
 
 
 async def index(request: Request):

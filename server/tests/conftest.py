@@ -208,12 +208,32 @@ def mcp_server(server_port: int) -> Generator[subprocess.Popen, None, None]:
     env = os.environ.copy()
     env['SERVER_PORT'] = str(server_port)
     env['PYTEST_WORKER_ID'] = worker_id
+
+    # Set required environment variables for tests
+    env['GIT_ROOT'] = str(Path(__file__).parent.parent.parent)
+    env['PROJECT_NAME'] = 'mcp_test'
+    env['PRIVATE_TOOL_ROOT'] = str(Path(__file__).parent.parent.parent)
+    env['TOOL_HISTORY_ENABLED'] = 'true'
+    env['TOOL_HISTORY_PATH'] = '.history'
+    env['IMAGE_DIR'] = '.images'
+    env['VECTOR_STORE_PATH'] = '.vector_store'
+    env['BROWSER_TYPE'] = 'chrome'
+    env['CLIENT_TYPE'] = 'playwright'
+    env['BROWSER_PROFILE_PATH'] = '.browserprofile'
+    env['PERIODIC_STATUS_ENABLED'] = 'false'
+    env['PERIODIC_STATUS_INTERVAL'] = '30.0'
+    env['PERIODIC_STATUS_MAX_COMMAND_LENGTH'] = '60'
+    env['COMMAND_EXECUTOR_MAX_COMPLETED_PROCESSES'] = '100'
+    env['COMMAND_EXECUTOR_COMPLETED_PROCESS_TTL'] = '3600'
+    env['COMMAND_EXECUTOR_AUTO_CLEANUP_ENABLED'] = 'true'
+    env['COMMAND_EXECUTOR_CLEANUP_INTERVAL'] = '300'
+
     logger.debug(f"Environment variables: SERVER_PORT={server_port}, PYTEST_WORKER_ID={worker_id}")
 
     # Start the server process
     cmd = ["uv", "run", str(server_path), "--port", str(server_port)]
     logger.debug(f"Starting server with command: {' '.join(cmd)}")
-    
+
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
