@@ -158,10 +158,32 @@ process_parallel_results() {
     echo ""
 }
 
-# Parse optional test pattern argument, parallel flag, and max parallel jobs
-TEST_PATTERN="$1"
-PARALLEL_MODE="$2"
-MAX_PARALLEL_JOBS="${3:-4}"  # Default to 4 parallel jobs
+# Parse arguments - handle different orders and combinations
+TEST_PATTERN=""
+PARALLEL_MODE=""
+MAX_PARALLEL_JOBS="4"
+
+# Parse all arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --parallel|-p)
+            PARALLEL_MODE="--parallel"
+            shift
+            # Check if next argument is a number (max jobs)
+            if [[ $1 =~ ^[0-9]+$ ]]; then
+                MAX_PARALLEL_JOBS="$1"
+                shift
+            fi
+            ;;
+        *)
+            # If it's not a flag and we don't have a test pattern yet, use it as test pattern
+            if [[ -z "$TEST_PATTERN" ]]; then
+                TEST_PATTERN="$1"
+            fi
+            shift
+            ;;
+    esac
+done
 
 # Check if parallel mode is requested
 if [[ "$PARALLEL_MODE" == "--parallel" || "$PARALLEL_MODE" == "-p" ]]; then
