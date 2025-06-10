@@ -145,6 +145,18 @@ wheels = [
 ]
 
 [[package]]
+name = "azure-devops"
+version = "7.1.0b4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "msrest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e1/f9/495982345252dc7a15ac632e038be1f975ca0d2f25abfe8f8d908569141d/azure-devops-7.1.0b4.tar.gz", hash = "sha256:f04ba939112579f3d530cfecc044a74ef9e9339ba23c9ee1ece248241f07ff85", size = 1336261, upload_time = "2023-11-20T14:38:06.019Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/30/067b9aba3cb146f4334afb737eb86c4f66e2b645fbca770377253550a9b3/azure_devops-7.1.0b4-py3-none-any.whl", hash = "sha256:f827e9fbc7c77bc6f2aaee46e5717514e9fe7d676c87624eccd0ca640b54f122", size = 1554711, upload_time = "2023-11-20T14:38:02.811Z" },
+]
+
+[[package]]
 name = "azure-identity"
 version = "1.21.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2155,6 +2167,7 @@ name = "mcp-cs"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "azure-devops" },
     { name = "azure-identity" },
     { name = "azure-kusto-data" },
     { name = "beautifulsoup4" },
@@ -2206,6 +2219,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "azure-devops", specifier = ">=7.1.0b4" },
     { name = "azure-identity", specifier = ">=1.15.0" },
     { name = "azure-kusto-data", specifier = ">=5.0.0" },
     { name = "beautifulsoup4", specifier = ">=4.12.0" },
@@ -2400,6 +2414,22 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/40/631c238f1f338eb09f4acb0f34ab5862c4e9d7eda11c1b685471a4c5ea37/msgpack-1.1.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:b4c01941fd2ff87c2a934ee6055bda4ed353a7846b8d4f341c428109e9fcde8c", size = 399082, upload_time = "2024-09-10T04:25:18.398Z" },
     { url = "https://files.pythonhosted.org/packages/e9/1b/fa8a952be252a1555ed39f97c06778e3aeb9123aa4cccc0fd2acd0b4e315/msgpack-1.1.0-cp313-cp313-win32.whl", hash = "sha256:7c9a35ce2c2573bada929e0b7b3576de647b0defbd25f5139dcdaba0ae35a4cc", size = 69037, upload_time = "2024-09-10T04:24:52.798Z" },
     { url = "https://files.pythonhosted.org/packages/b6/bc/8bd826dd03e022153bfa1766dcdec4976d6c818865ed54223d71f07862b3/msgpack-1.1.0-cp313-cp313-win_amd64.whl", hash = "sha256:bce7d9e614a04d0883af0b3d4d501171fbfca038f12c77fa838d9f198147a23f", size = 75140, upload_time = "2024-09-10T04:24:31.288Z" },
+]
+
+[[package]]
+name = "msrest"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-core" },
+    { name = "certifi" },
+    { name = "isodate" },
+    { name = "requests" },
+    { name = "requests-oauthlib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/68/77/8397c8fb8fc257d8ea0fa66f8068e073278c65f05acb17dcb22a02bfdc42/msrest-0.7.1.zip", hash = "sha256:6e7661f46f3afd88b75667b7187a92829924446c7ea1d169be8c4bb7eeb788b9", size = 175332, upload_time = "2022-06-13T22:41:25.111Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/cf/f2966a2638144491f8696c27320d5219f48a072715075d168b31d3237720/msrest-0.7.1-py3-none-any.whl", hash = "sha256:21120a810e1233e5e6cc7fe40b474eeb4ec6f757a15d7cf86702c369f9567c32", size = 85384, upload_time = "2022-06-13T22:41:22.42Z" },
 ]
 
 [[package]]

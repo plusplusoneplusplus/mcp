@@ -182,6 +182,7 @@ class AzureWorkItemTool(ToolInterface):
         self.default_project: Optional[str] = None
         self.default_area_path: Optional[str] = None
         self.default_iteration_path: Optional[str] = None
+        self.default_pat: Optional[str] = None
 
         # Load configuration defaults
         self._load_config()
@@ -200,11 +201,12 @@ class AzureWorkItemTool(ToolInterface):
             self.default_project = azrepo_params.get("project")
             self.default_area_path = azrepo_params.get("area_path")
             self.default_iteration_path = azrepo_params.get("iteration")
+            self.default_pat = azrepo_params.get("pat")
 
             self.logger.debug(
                 f"Loaded Azure work item configuration: org={self.default_organization}, "
                 f"project={self.default_project}, area_path={self.default_area_path}, "
-                f"iteration={self.default_iteration_path}"
+                f"iteration={self.default_iteration_path}, pat={'***' if self.default_pat else None}"
             )
 
         except Exception as e:
@@ -214,6 +216,7 @@ class AzureWorkItemTool(ToolInterface):
             self.default_project = None
             self.default_area_path = None
             self.default_iteration_path = None
+            self.default_pat = None
 
     def _get_param_with_default(
         self, param_value: Optional[str], default_value: Optional[str]
@@ -352,6 +355,161 @@ class AzureWorkItemTool(ToolInterface):
             command += f" --iteration '{iteration}'"
 
         return await self._run_az_command(command)
+
+    async def create_work_item_sdk(
+        self,
+        title: str,
+        description: Optional[str] = None,
+        work_item_type: str = "Task",
+        area_path: Optional[str] = None,
+        iteration_path: Optional[str] = None,
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Create a new work item using Azure DevOps Python SDK.
+
+        This is a proof of concept implementation that demonstrates work item creation
+        using the Azure DevOps Python SDK instead of CLI commands.
+
+        Args:
+            title: Title of the work item
+            description: Description of the work item
+            work_item_type: Type of work item (Bug, Task, User Story, etc.)
+            area_path: Area path for the work item (uses configured default if not provided)
+            iteration_path: Iteration path for the work item (uses configured default if not provided)
+            organization: Azure DevOps organization URL (uses configured default if not provided)
+            project: Azure DevOps project name/ID (uses configured default if not provided)
+
+        Returns:
+            Dictionary with success status and created work item details
+        """
+        try:
+            # Import Azure DevOps SDK components
+            from azure.devops.connection import Connection
+            from azure.devops.v7_1.work_item_tracking.models import JsonPatchOperation
+            from msrest.authentication import BasicAuthentication
+
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
+            area = self._get_param_with_default(area_path, self.default_area_path)
+            iteration = self._get_param_with_default(iteration_path, self.default_iteration_path)
+
+            # Validate required parameters
+            if not org:
+                return {
+                    "success": False,
+                    "error": "Organization URL is required. Set AZREPO_ORG environment variable or provide organization parameter."
+                }
+
+            if not proj:
+                return {
+                    "success": False,
+                    "error": "Project name is required. Set AZREPO_PROJECT environment variable or provide project parameter."
+                }
+
+            # Get PAT from configuration
+            azrepo_params = env_manager.get_azrepo_parameters()
+            pat = azrepo_params.get("pat")
+
+            if not pat:
+                return {
+                    "success": False,
+                    "error": "Personal Access Token (PAT) is required for SDK authentication. Set AZREPO_PAT environment variable."
+                }
+
+            # Ensure organization URL is properly formatted
+            if not org.startswith("https://"):
+                org = f"https://dev.azure.com/{org}"
+
+            self.logger.debug(f"Creating work item using SDK: org={org}, project={proj}, type={work_item_type}")
+
+            # Create authentication and connection
+            credentials = BasicAuthentication('', pat)
+            connection = Connection(base_url=org, creds=credentials)
+
+            # Get work item tracking client
+            wit_client = connection.clients.get_work_item_tracking_client()
+
+            # Prepare work item data using JsonPatchOperation
+            work_item_data = [
+                JsonPatchOperation(
+                    op="add",
+                    path="/fields/System.Title",
+                    value=title
+                )
+            ]
+
+            # Add description if provided
+            if description:
+                work_item_data.append(
+                    JsonPatchOperation(
+                        op="add",
+                        path="/fields/System.Description",
+                        value=description
+                    )
+                )
+
+            # Add area path if provided
+            if area:
+                work_item_data.append(
+                    JsonPatchOperation(
+                        op="add",
+                        path="/fields/System.AreaPath",
+                        value=area
+                    )
+                )
+
+            # Add iteration path if provided
+            if iteration:
+                work_item_data.append(
+                    JsonPatchOperation(
+                        op="add",
+                        path="/fields/System.IterationPath",
+                        value=iteration
+                    )
+                )
+
+            # Create the work item
+            work_item = wit_client.create_work_item(
+                document=work_item_data,
+                project=proj,
+                type=work_item_type
+            )
+
+            self.logger.info(f"Successfully created work item {work_item.id} using SDK")
+
+            # Convert work item to dictionary format similar to CLI output
+            work_item_dict = {
+                "id": work_item.id,
+                "url": work_item.url,
+                "fields": {}
+            }
+
+            # Extract fields from the work item
+            if hasattr(work_item, 'fields') and work_item.fields:
+                for field_name, field_value in work_item.fields.items():
+                    work_item_dict["fields"][field_name] = field_value
+
+            return {
+                "success": True,
+                "data": work_item_dict,
+                "method": "sdk"  # Indicate this was created using SDK
+            }
+
+        except ImportError as e:
+            self.logger.error(f"Azure DevOps SDK not available: {e}")
+            return {
+                "success": False,
+                "error": f"Azure DevOps SDK not available: {e}. Please install azure-devops package."
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to create work item using SDK: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to create work item using SDK: {str(e)}"
+            }
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments."""
