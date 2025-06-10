@@ -1,96 +1,91 @@
 # Azure DevOps REST API Utilities
 
-This module provides shared utilities for interacting with the Azure DevOps REST API across different tools in the Azure DevOps plugin.
+This module provides shared utilities for interacting with the Azure DevOps REST API across different tools and components.
 
-## Features
+## Overview
 
-- Authentication and authorization header generation
-- URL building for REST API endpoints
-- Standardized response processing and error handling
-- Helper utilities for common operations (username detection, token acquisition)
+The `azure_rest_utils.py` module contains common functionality that was previously duplicated in different tools like `workitem_tool.py` and `pr_tool.py`. By centralizing these utilities, we achieve:
 
-## Usage
+1. **Reduced code duplication** - Common functionality is defined in one place
+2. **Consistent behavior** - Authentication, URL building, and error handling follow the same patterns everywhere
+3. **Easier maintenance** - Bug fixes and improvements can be made in one place
+4. **Better testability** - Core utilities can be tested independently
 
-Import the shared utilities in your Azure DevOps tool:
+## Included Utilities
 
-```python
-from .azure_rest_utils import (
-    get_current_username,
-    get_auth_headers,
-    build_api_url,
-    process_rest_response,
-)
-```
+### Authentication
 
-### Authentication Headers
+- `get_auth_headers(content_type: str = "application/json") -> Dict[str, str]`
+  - Generates proper authentication headers for Azure DevOps REST API requests
+  - Handles both static bearer tokens and dynamic token retrieval via commands
+  - Automatically reads configuration from environment variables
 
-Generate standard authentication headers for REST API calls:
+### URL Building
 
-```python
-# Default headers for GET requests (application/json)
-headers = get_auth_headers()
-
-# Custom content type for PATCH operations
-headers = get_auth_headers(content_type="application/json-patch+json")
-```
-
-### API URL Building
-
-Create properly formatted Azure DevOps REST API URLs:
-
-```python
-# Using organization name
-url = build_api_url("myorg", "myproject", "wit/workitems/123")
-
-# Using full organization URL
-url = build_api_url("https://dev.azure.com/myorg", "myproject", "wit/workitems/123")
-
-# Using custom host
-url = build_api_url("https://custom.example.com/myorg", "myproject", "wit/workitems/123")
-```
+- `build_api_url(organization: str, project: str, endpoint: str) -> str`
+  - Constructs complete Azure DevOps REST API URLs
+  - Handles both organization names and full URLs
+  - Formats URLs consistently for all API calls
 
 ### Response Processing
 
-Process API responses with standardized error handling:
+- `process_rest_response(response_text: str, status_code: int) -> Dict[str, Any]`
+  - Standardizes REST API response handling
+  - Provides consistent error formatting
+  - Simplifies JSON parsing with proper error handling
 
-```python
-async with aiohttp.ClientSession() as session:
-    async with session.get(url, headers=headers) as response:
-        response_text = await response.text()
-        result = process_rest_response(response_text, response.status)
-        
-        if result["success"]:
-            # Handle successful response
-            data = result["data"]
-        else:
-            # Handle error
-            error_message = result["error"]
-```
+### Helper Utilities
 
-### Other Utilities
+- `get_current_username() -> Optional[str]`
+  - Cross-platform detection of current username
+  - Used for auto-assignment features
+  - Falls back to environment variables when needed
 
-Get the current username (for auto-assignment features):
+- `execute_bearer_token_command(command: str) -> Optional[str]`
+  - Executes commands that output bearer tokens (e.g., `az account get-access-token`)
+  - Parses JSON output to extract access tokens
+  - Provides secure error handling and logging
 
-```python
-username = get_current_username()
-if username:
-    # Assign to current user
-    patch_document.append({
-        "op": "add",
-        "path": "/fields/System.AssignedTo",
-        "value": username
-    })
-```
+## Migrating Existing Code
 
-## Configuration
+When migrating existing code to use these shared utilities:
 
-The utilities use the `env_manager` to retrieve Azure DevOps configuration:
+1. Replace direct REST API header creation with `get_auth_headers()`
+2. Replace URL construction with `build_api_url()`
+3. Consider using `process_rest_response()` for consistent response handling
 
-- `AZREPO_ORG`: Default organization URL
-- `AZREPO_PROJECT`: Default project name/ID
-- `AZREPO_BEARER_TOKEN`: Bearer token for REST API authentication (static)
-- `AZREPO_BEARER_TOKEN_COMMAND`: Command to get bearer token dynamically (should output JSON with "accessToken" property)
+## Backward Compatibility
+
+For backward compatibility with existing tests, wrapper methods have been added to the original classes:
+
+- `_get_auth_headers()` - Delegates to the shared utility
+- `_get_current_username()` - Delegates to the shared utility
+- `_build_api_url()` - Delegates to the shared utility
+
+These methods maintain the original interface while using the shared implementations.
 
 ## Testing
 
-Unit tests for the shared utilities are provided in `tests/test_rest_utils.py`. 
+The shared utilities are tested in `test_rest_utils.py`, which includes:
+
+- Unit tests for each utility function
+- Integration tests for combinations of utilities
+- Mock tests for command execution and environment handling
+
+## Configuration
+
+All utilities use the standard Azure DevOps configuration values from `env_manager`, including:
+
+- `org` - Azure DevOps organization name or URL
+- `project` - Azure DevOps project name
+- `bearer_token` - Static bearer token for authentication
+- `bearer_token_command` - Command to execute for dynamic token retrieval
+
+## Future Improvements
+
+Potential future improvements to the shared utilities:
+
+1. Add support for additional authentication methods
+2. Implement retry logic for transient API failures
+3. Add caching for frequently used responses
+4. Create higher-level API helpers for common operations 
