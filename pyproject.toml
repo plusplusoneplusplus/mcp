@@ -74,6 +74,7 @@ dependencies = [
     "pre-commit>=4.2.0",
     # Git operations
     "GitPython>=3.1.40", # Python Git library
+    "pydantic>=2.11.3",
 ]
 
 [project.optional-dependencies]

@@ -173,7 +173,7 @@ def process_rest_response(response_text: str, status_code: int) -> Dict[str, Any
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse successful response as JSON: {e}")
                 return {
-                    "success": False, 
+                    "success": False,
                     "error": f"Failed to parse response: {e}",
                     "raw_output": response_text
                 }
@@ -197,4 +197,4 @@ def process_rest_response(response_text: str, status_code: int) -> Dict[str, Any
             "success": False,
             "error": f"Error processing response: {str(e)}",
             "raw_output": response_text
-        } 
+        }
