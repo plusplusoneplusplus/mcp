@@ -1,0 +1,892 @@
+{% extends "base.html" %}
+
+{% block title %}Tool History - MCP Knowledge Server{% endblock %}
+
+{% block extra_styles %}
+<style>
+    /* Tool History Specific Styles */
+    .stats-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1em;
+        margin-bottom: 2em;
+    }
+
+    .stat-card {
+        background: #fff;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        border-left: 4px solid #0077cc;
+    }
+
+    .stat-card h3 {
+        margin: 0 0 0.5em 0;
+        color: #666;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+        font-size: 2em;
+        font-weight: bold;
+        color: #333;
+        display: block;
+    }
+
+    .stat-value.loading {
+        color: #999;
+        font-size: 1.2em;
+    }
+
+    /* Filter Controls */
+    .history-filters {
+        background: #fff;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2em;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1em;
+        align-items: end;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+    }
+
+    .filter-group label {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 0.25em;
+    }
+
+    .filter-actions {
+        display: flex;
+        gap: 0.5em;
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+    }
+
+    /* History Table */
+    .history-table-container {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 1em;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .history-table th {
+        background: #f8f9fa;
+        font-weight: 600;
+        color: #333;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .history-table tbody tr:hover {
+        background: #f8f9fa;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 0.25em 0.75em;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .status-success {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-failure {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .duration-badge {
+        background: #e9ecef;
+        color: #495057;
+        padding: 0.25em 0.5em;
+        border-radius: 4px;
+        font-size: 0.8em;
+        font-family: monospace;
+    }
+
+    .action-button {
+        background: #0077cc;
+        color: white;
+        border: none;
+        padding: 0.5em 1em;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        transition: background 0.2s;
+    }
+
+    .action-button:hover {
+        background: #005fa3;
+    }
+
+    /* Pagination */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1em;
+        padding: 1.5em;
+        background: #fff;
+        border-top: 1px solid #eee;
+    }
+
+    .pagination button {
+        padding: 0.5em 1em;
+        border: 1px solid #ddd;
+        background: #fff;
+        color: #333;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .pagination button:hover:not(:disabled) {
+        background: #f8f9fa;
+    }
+
+    .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .pagination .current-page {
+        background: #0077cc;
+        color: white;
+        border-color: #0077cc;
+    }
+
+    /* Detail Modal */
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1em;
+        padding-bottom: 1em;
+        border-bottom: 1px solid #eee;
+    }
+
+    .modal-header h2 {
+        margin: 0;
+        color: #333;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5em;
+        cursor: pointer;
+        color: #999;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-close:hover {
+        color: #333;
+    }
+
+    .execution-detail {
+        display: grid;
+        gap: 1em;
+    }
+
+    .detail-section {
+        background: #f8f9fa;
+        padding: 1em;
+        border-radius: 4px;
+        border-left: 3px solid #0077cc;
+    }
+
+    .detail-section h4 {
+        margin: 0 0 0.5em 0;
+        color: #333;
+        font-size: 0.9em;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .detail-content {
+        background: #fff;
+        padding: 1em;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        font-family: monospace;
+        font-size: 0.9em;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+    }
+
+    /* Loading States */
+    .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #0077cc;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .loading-message {
+        text-align: center;
+        padding: 2em;
+        color: #666;
+    }
+
+    .error-message {
+        text-align: center;
+        padding: 2em;
+        color: #d9534f;
+        background: #f8d7da;
+        border-radius: 4px;
+        margin: 1em 0;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3em;
+        color: #666;
+    }
+
+    .empty-state h3 {
+        margin-bottom: 0.5em;
+        color: #999;
+    }
+
+    /* Export Controls */
+    .export-controls {
+        display: flex;
+        gap: 0.5em;
+        align-items: center;
+    }
+
+    .export-button {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 0.5em 1em;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: background 0.2s;
+    }
+
+    .export-button:hover {
+        background: #218838;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .stats-overview {
+            grid-template-columns: 1fr;
+        }
+
+        .history-filters {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-actions {
+            grid-column: 1;
+            justify-content: stretch;
+        }
+
+        .filter-actions button {
+            flex: 1;
+        }
+
+        .history-table-container {
+            overflow-x: auto;
+        }
+
+        .history-table {
+            min-width: 600px;
+        }
+
+        .pagination {
+            flex-wrap: wrap;
+            gap: 0.5em;
+        }
+
+        .export-controls {
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .export-button {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h1>Tool Execution History</h1>
+    <p>View and analyze tool execution history, performance metrics, and debug failed executions.</p>
+
+    <!-- Statistics Dashboard -->
+    <div class="stats-overview">
+        <div class="stat-card">
+            <h3>Total Executions</h3>
+            <span class="stat-value loading" id="total-executions">Loading...</span>
+        </div>
+        <div class="stat-card">
+            <h3>Success Rate</h3>
+            <span class="stat-value loading" id="success-rate">Loading...</span>
+        </div>
+        <div class="stat-card">
+            <h3>Average Duration</h3>
+            <span class="stat-value loading" id="avg-duration">Loading...</span>
+        </div>
+        <div class="stat-card">
+            <h3>Most Used Tool</h3>
+            <span class="stat-value loading" id="most-used-tool">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Filter Controls -->
+    <div class="history-filters">
+        <div class="filter-group">
+            <label for="search-input">Search</label>
+            <input type="text" id="search-input" placeholder="Search executions...">
+        </div>
+        <div class="filter-group">
+            <label for="tool-filter">Tool</label>
+            <select id="tool-filter">
+                <option value="">All Tools</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="success-filter">Status</label>
+            <select id="success-filter">
+                <option value="">All Status</option>
+                <option value="true">Success Only</option>
+                <option value="false">Failures Only</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="start-date">Start Date</label>
+            <input type="date" id="start-date">
+        </div>
+        <div class="filter-group">
+            <label for="end-date">End Date</label>
+            <input type="date" id="end-date">
+        </div>
+        <div class="filter-actions">
+            <button id="apply-filters" class="action-button">Apply Filters</button>
+            <button id="clear-filters" class="action-button" style="background: #6c757d;">Clear</button>
+            <div class="export-controls">
+                <button id="export-json" class="export-button">Export JSON</button>
+                <button id="export-csv" class="export-button">Export CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Table -->
+    <div class="history-table-container">
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Tool</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="history-tbody">
+                <tr>
+                    <td colspan="5" class="loading-message">
+                        <div class="loading-spinner"></div>
+                        Loading tool history...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="pagination">
+            <button id="prev-page" disabled>Previous</button>
+            <span id="page-info">Page 1 of 1</span>
+            <button id="next-page" disabled>Next</button>
+        </div>
+    </div>
+</div>
+
+<!-- Execution Detail Modal -->
+<div id="execution-detail-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Execution Details</h2>
+            <button class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="execution-details" class="execution-detail">
+                <div class="loading-message">
+                    <div class="loading-spinner"></div>
+                    Loading execution details...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Global state
+    let currentPage = 1;
+    let totalPages = 1;
+    let currentFilters = {};
+    let availableTools = [];
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function () {
+        loadStatistics();
+        loadToolHistory();
+        setupEventListeners();
+    });
+
+    // Event Listeners
+    function setupEventListeners() {
+        // Filter controls
+        document.getElementById('apply-filters').addEventListener('click', applyFilters);
+        document.getElementById('clear-filters').addEventListener('click', clearFilters);
+
+        // Pagination
+        document.getElementById('prev-page').addEventListener('click', () => changePage(currentPage - 1));
+        document.getElementById('next-page').addEventListener('click', () => changePage(currentPage + 1));
+
+        // Export buttons
+        document.getElementById('export-json').addEventListener('click', () => exportHistory('json'));
+        document.getElementById('export-csv').addEventListener('click', () => exportHistory('csv'));
+
+        // Search on Enter key
+        document.getElementById('search-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                applyFilters();
+            }
+        });
+    }
+
+    // Load Statistics
+    async function loadStatistics() {
+        try {
+            const response = await fetch('/api/tool-history/stats');
+            const data = await response.json();
+
+            if (data.success && data.stats) {
+                const stats = data.stats;
+
+                // Update stat cards
+                document.getElementById('total-executions').textContent = stats.total_invocations || 0;
+                document.getElementById('total-executions').classList.remove('loading');
+
+                const successRate = ((stats.success_rate || 0) * 100).toFixed(1) + '%';
+                document.getElementById('success-rate').textContent = successRate;
+                document.getElementById('success-rate').classList.remove('loading');
+
+                const avgDuration = formatDuration(stats.avg_duration || 0);
+                document.getElementById('avg-duration').textContent = avgDuration;
+                document.getElementById('avg-duration').classList.remove('loading');
+
+                // Find most used tool
+                const tools = stats.tools || {};
+                const mostUsedTool = Object.keys(tools).reduce((a, b) =>
+                    (tools[a]?.count || 0) > (tools[b]?.count || 0) ? a : b, 'None');
+                document.getElementById('most-used-tool').textContent = mostUsedTool;
+                document.getElementById('most-used-tool').classList.remove('loading');
+
+                // Populate tool filter
+                availableTools = Object.keys(tools).sort();
+                populateToolFilter();
+            } else {
+                showStatsError(data.error || 'Failed to load statistics');
+            }
+        } catch (error) {
+            console.error('Error loading statistics:', error);
+            showStatsError('Failed to load statistics');
+        }
+    }
+
+    function showStatsError(message) {
+        ['total-executions', 'success-rate', 'avg-duration', 'most-used-tool'].forEach(id => {
+            const element = document.getElementById(id);
+            element.textContent = 'Error';
+            element.classList.remove('loading');
+            element.style.color = '#d9534f';
+        });
+    }
+
+    function populateToolFilter() {
+        const toolFilter = document.getElementById('tool-filter');
+        // Clear existing options except "All Tools"
+        toolFilter.innerHTML = '<option value="">All Tools</option>';
+
+        availableTools.forEach(tool => {
+            const option = document.createElement('option');
+            option.value = tool;
+            option.textContent = tool;
+            toolFilter.appendChild(option);
+        });
+    }
+
+    // Load Tool History
+    async function loadToolHistory(page = 1, filters = {}) {
+        try {
+            showLoading();
+
+            const params = new URLSearchParams({
+                page: page.toString(),
+                per_page: '20'
+            });
+
+            // Add filters
+            Object.keys(filters).forEach(key => {
+                if (filters[key] !== null && filters[key] !== '') {
+                    params.append(key, filters[key]);
+                }
+            });
+
+            const response = await fetch(`/api/tool-history?${params}`);
+            const data = await response.json();
+
+            if (data.success) {
+                displayHistory(data.history || []);
+                updatePagination(data.page, data.total_pages);
+                currentPage = data.page;
+                totalPages = data.total_pages;
+            } else {
+                showError(data.error || 'Failed to load tool history');
+            }
+        } catch (error) {
+            console.error('Error loading tool history:', error);
+            showError('Failed to load tool history');
+        }
+    }
+
+    function showLoading() {
+        const tbody = document.getElementById('history-tbody');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="loading-message">
+                    <div class="loading-spinner"></div>
+                    Loading tool history...
+                </td>
+            </tr>
+        `;
+    }
+
+    function showError(message) {
+        const tbody = document.getElementById('history-tbody');
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="error-message">
+                    Error: ${message}
+                </td>
+            </tr>
+        `;
+    }
+
+    function displayHistory(history) {
+        const tbody = document.getElementById('history-tbody');
+
+        if (history.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="empty-state">
+                        <h3>No tool executions found</h3>
+                        <p>No tool executions match your current filters.</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = history.map(execution => `
+            <tr>
+                <td>${formatTimestamp(execution.timestamp)}</td>
+                <td><strong>${execution.tool}</strong></td>
+                <td>
+                    <span class="status-badge ${execution.success ? 'status-success' : 'status-failure'}">
+                        ${execution.success ? '✅ Success' : '❌ Failed'}
+                    </span>
+                </td>
+                <td>
+                    <span class="duration-badge">${formatDuration(execution.duration_ms)}</span>
+                </td>
+                <td>
+                    <button class="action-button" onclick="showExecutionDetail('${execution.invocation_id}')">
+                        View Details
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function updatePagination(page, totalPages) {
+        document.getElementById('page-info').textContent = `Page ${page} of ${totalPages}`;
+        document.getElementById('prev-page').disabled = page <= 1;
+        document.getElementById('next-page').disabled = page >= totalPages;
+    }
+
+    // Pagination
+    function changePage(page) {
+        if (page >= 1 && page <= totalPages) {
+            loadToolHistory(page, currentFilters);
+        }
+    }
+
+    // Filtering
+    function applyFilters() {
+        const filters = {
+            search: document.getElementById('search-input').value.trim(),
+            tool: document.getElementById('tool-filter').value,
+            success: document.getElementById('success-filter').value,
+            start_date: document.getElementById('start-date').value,
+            end_date: document.getElementById('end-date').value
+        };
+
+        // Remove empty filters
+        Object.keys(filters).forEach(key => {
+            if (filters[key] === '' || filters[key] === null) {
+                delete filters[key];
+            }
+        });
+
+        currentFilters = filters;
+        currentPage = 1;
+        loadToolHistory(1, filters);
+    }
+
+    function clearFilters() {
+        document.getElementById('search-input').value = '';
+        document.getElementById('tool-filter').value = '';
+        document.getElementById('success-filter').value = '';
+        document.getElementById('start-date').value = '';
+        document.getElementById('end-date').value = '';
+
+        currentFilters = {};
+        currentPage = 1;
+        loadToolHistory(1, {});
+    }
+
+    // Execution Detail Modal
+    async function showExecutionDetail(invocationId) {
+        try {
+            showModal('execution-detail-modal');
+
+            // Show loading state
+            document.getElementById('execution-details').innerHTML = `
+                <div class="loading-message">
+                    <div class="loading-spinner"></div>
+                    Loading execution details...
+                </div>
+            `;
+
+            const response = await fetch(`/api/tool-history/${invocationId}`);
+            const data = await response.json();
+
+            if (data.success && data.invocation) {
+                displayExecutionDetail(data.invocation);
+            } else {
+                document.getElementById('execution-details').innerHTML = `
+                    <div class="error-message">
+                        Error: ${data.error || 'Failed to load execution details'}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading execution details:', error);
+            document.getElementById('execution-details').innerHTML = `
+                <div class="error-message">
+                    Error: Failed to load execution details
+                </div>
+            `;
+        }
+    }
+
+    function displayExecutionDetail(execution) {
+        const detailsContainer = document.getElementById('execution-details');
+
+        let html = `
+            <div class="detail-section">
+                <h4>Basic Information</h4>
+                <div class="detail-content">
+Invocation ID: ${execution.invocation_id}
+Tool: ${execution.tool}
+Timestamp: ${formatTimestamp(execution.timestamp)}
+Duration: ${formatDuration(execution.duration_ms)}
+Status: ${execution.success ? 'Success' : 'Failed'}
+                </div>
+            </div>
+        `;
+
+        if (execution.arguments && Object.keys(execution.arguments).length > 0) {
+            html += `
+                <div class="detail-section">
+                    <h4>Arguments</h4>
+                    <div class="detail-content">${JSON.stringify(execution.arguments, null, 2)}</div>
+                </div>
+            `;
+        }
+
+        if (execution.result) {
+            html += `
+                <div class="detail-section">
+                    <h4>Result</h4>
+                    <div class="detail-content">${JSON.stringify(execution.result, null, 2)}</div>
+                </div>
+            `;
+        }
+
+        if (execution.error) {
+            html += `
+                <div class="detail-section">
+                    <h4>Error</h4>
+                    <div class="detail-content" style="color: #d9534f;">${execution.error}</div>
+                </div>
+            `;
+        }
+
+        if (execution.additional_files && execution.additional_files.length > 0) {
+            html += `
+                <div class="detail-section">
+                    <h4>Additional Files</h4>
+                    <div class="detail-content">
+            `;
+
+            execution.additional_files.forEach(file => {
+                if (file.type === 'text') {
+                    html += `
+<strong>${file.filename}:</strong>
+${file.content}
+
+`;
+                } else {
+                    html += `<strong>${file.filename}:</strong> Binary file (${file.size} bytes)\n`;
+                }
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+
+        detailsContainer.innerHTML = html;
+    }
+
+    // Export Functionality
+    async function exportHistory(format) {
+        try {
+            const params = new URLSearchParams({
+                format: format
+            });
+
+            // Add current filters
+            Object.keys(currentFilters).forEach(key => {
+                if (currentFilters[key] !== null && currentFilters[key] !== '') {
+                    params.append(key, currentFilters[key]);
+                }
+            });
+
+            const response = await fetch(`/api/tool-history/export?${params}`);
+
+            if (format === 'csv') {
+                // Handle CSV download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'tool_history.csv';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } else {
+                // Handle JSON download
+                const data = await response.json();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'tool_history.json';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            }
+
+            showStatus('export-status', `Successfully exported tool history as ${format.toUpperCase()}`, false);
+        } catch (error) {
+            console.error('Error exporting history:', error);
+            showStatus('export-status', 'Failed to export tool history', true);
+        }
+    }
+
+    // Utility Functions
+    function formatTimestamp(timestamp) {
+        const date = new Date(timestamp);
+        return date.toLocaleString();
+    }
+
+    function formatDuration(durationMs) {
+        if (durationMs < 1000) {
+            return `${Math.round(durationMs)}ms`;
+        } else if (durationMs < 60000) {
+            return `${(durationMs / 1000).toFixed(1)}s`;
+        } else {
+            const minutes = Math.floor(durationMs / 60000);
+            const seconds = ((durationMs % 60000) / 1000).toFixed(1);
+            return `${minutes}m ${seconds}s`;
+        }
+    }
+</script>
+{% endblock %}
