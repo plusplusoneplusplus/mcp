@@ -431,8 +431,7 @@ class AzureWorkItemTool(ToolInterface):
                 return {"success": False, "error": "Project is required"}
 
             # Construct the REST API URL
-            # Format: https://dev.azure.com/{organization}/{project}/_apis/wit/workitems/${type}?api-version=7.1
-            url = f"https://dev.azure.com/{org}/{proj}/_apis/wit/workitems/${work_item_type}?api-version=7.1"
+            url = f"{org}/{proj}/_apis/wit/workitems/${work_item_type}?api-version=7.1"
 
             # Build the JSON patch document for work item creation
             patch_document = [
