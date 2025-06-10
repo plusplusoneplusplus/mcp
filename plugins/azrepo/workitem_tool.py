@@ -61,7 +61,9 @@ class AzureWorkItemTool(ToolInterface):
         - AZREPO_PROJECT: Default project name/ID
         - AZREPO_AREA_PATH: Default area path for new work items
         - AZREPO_ITERATION: Default iteration path for new work items
-        - AZREPO_BEARER_TOKEN: Bearer token for REST API authentication
+        - AZREPO_BEARER_TOKEN: Bearer token for REST API authentication (static)
+        - AZREPO_BEARER_TOKEN_COMMAND: Command to get bearer token dynamically
+          (should output JSON with "accessToken" property)
 
     Example:
         # Get work item details
@@ -242,7 +244,7 @@ class AzureWorkItemTool(ToolInterface):
             Dictionary with authorization headers
         """
         if not self.bearer_token:
-            raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN environment variable.")
+            raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN or AZREPO_BEARER_TOKEN_COMMAND environment variable.")
         
         # For Azure DevOps REST API, use the bearer token directly
         return {
