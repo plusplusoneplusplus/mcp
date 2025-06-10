@@ -224,21 +224,26 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         logging.error(f"Tool '{name}' not found. Available tools: {available_tools}")
         logging.error(f"Filtered tools: {filtered_tools}")
 
-        error_msg = f"Error: Tool '{name}' not found."
+        error_msg = f"Tool '{name}' not found."
         record_tool_invocation(
             name, arguments, error_msg, 0, False, error_msg, invocation_dir
         )
-        return [TextContent(type="text", text=error_msg)]
+        # Raise an exception instead of returning TextContent to ensure proper error handling
+        # This will result in a JSON-RPC error response with proper error semantics
+        raise ValueError(f"Tool '{name}' not found. Available tools: {', '.join(available_tools)}")
+
     tool_sources = registry.get_tool_sources()
     source = tool_sources.get(name, "unknown")
     if not config.is_source_enabled(source):
         error_msg = (
-            f"Error: Tool '{name}' is disabled. Source '{source}' is not active."
+            f"Tool '{name}' is disabled. Source '{source}' is not active."
         )
         record_tool_invocation(
             name, arguments, error_msg, 0, False, error_msg, invocation_dir
         )
-        return [TextContent(type="text", text=error_msg)]
+        # Raise an exception for disabled tools as well
+        raise ValueError(f"Tool '{name}' is disabled. Source '{source}' is not active.")
+
     start_time = time.time()
     result = None
     success = True
@@ -254,14 +259,14 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         elif isinstance(result, list) and all(
             hasattr(item, "type") and hasattr(item, "text") for item in result
         ):
-            text_content = [
-                TextContent(
-                    type=item.type,
-                    text=item.text,
-                    annotations=getattr(item, "annotations", None),
-                )
-                for item in result
-            ]
+            text_content = []
+            for item in result:
+                # Create TextContent with proper type annotations
+                content_kwargs = {"type": item.type, "text": item.text}
+                annotations = getattr(item, "annotations", None)
+                if annotations is not None:
+                    content_kwargs["annotations"] = annotations
+                text_content.append(TextContent(**content_kwargs))
         elif isinstance(result, dict):
             text = format_result_as_text(result)
             text_content = [TextContent(type="text", text=text)]
@@ -279,7 +284,9 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         record_tool_invocation(
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
-        return [TextContent(type="text", text=error_msg)]
+        # Re-raise the exception to ensure proper error handling by the MCP framework
+        # This ensures that tool execution errors are properly propagated as JSON-RPC errors
+        raise
 
 
 def format_result_as_text(result: dict) -> str:

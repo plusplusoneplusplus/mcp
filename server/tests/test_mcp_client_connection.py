@@ -89,26 +89,40 @@ class TestMCPClientConnection:
 
         async with create_mcp_client(server_url, worker_id) as session:
             # Try to call a non-existent tool
-            # The MCP protocol may handle this differently than expected
+            # The MCP protocol should handle this gracefully with proper error semantics
             try:
                 result = await session.call_tool("non_existent_tool", {})
-                # If no exception is raised, check if the result indicates an error
+
+                # Enhanced result validation with better debugging
+                logging.info(f"Tool call result type: {type(result)}")
+                logging.info(f"Tool call result: {result}")
+
+                # Check if result indicates an error (preferred method)
                 if hasattr(result, 'isError') and result.isError:
-                    logging.info("Non-existent tool call returned error result as expected")
-                elif hasattr(result, 'content'):
-                    # Check if the content indicates an error
-                    error_indicators = ['error', 'not found', 'unknown', 'invalid']
+                    logging.info("✅ Non-existent tool call returned proper error result with isError=True")
+                    return
+
+                # Fallback: Check if the content indicates an error
+                if hasattr(result, 'content'):
+                    error_indicators = ['error', 'not found', 'unknown', 'invalid', 'does not exist']
                     content_text = str(result.content).lower()
+
+                    logging.info(f"Content text for analysis: {content_text}")
+
                     if any(indicator in content_text for indicator in error_indicators):
-                        logging.info("Non-existent tool call returned error content as expected")
+                        logging.info(f"✅ Non-existent tool call returned error content as expected: {content_text}")
+                        return
                     else:
-                        pytest.fail(f"Expected error for non-existent tool, but got: {result.content}")
+                        pytest.fail(f"❌ Expected error for non-existent tool, but got: {result.content}")
                 else:
-                    pytest.fail(f"Expected error for non-existent tool, but got successful result: {result}")
+                    pytest.fail(f"❌ Expected error for non-existent tool, but got successful result: {result}")
+
             except Exception as e:
-                # If an exception is raised, that's also acceptable
-                logging.info(f"Non-existent tool call raised exception as expected: {type(e).__name__}: {e}")
-                assert True  # Test passes if exception is raised
+                # If an exception is raised, that's also acceptable behavior
+                logging.info(f"✅ Non-existent tool call raised exception as expected: {type(e).__name__}: {e}")
+                logging.debug(f"Exception details: {repr(e)}")
+                # Test passes if exception is raised - this is expected behavior
+                return
 
     @pytest.mark.asyncio
     async def test_mcp_protocol_handshake(self, mcp_client_info):
