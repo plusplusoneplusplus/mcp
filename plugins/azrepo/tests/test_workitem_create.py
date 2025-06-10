@@ -22,17 +22,17 @@ def mock_aiohttp_for_success(work_item_data=None):
                 "System.Description": "Test description"
             }
         }
-    
+
     mock_response = MagicMock()
     mock_response.status = 200
     mock_response.text = AsyncMock(return_value=json.dumps(work_item_data))
-    
+
     mock_session = MagicMock()
     mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
     mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock(return_value=None)
-    
+
     return patch("aiohttp.ClientSession", return_value=mock_session)
 
 
@@ -44,13 +44,13 @@ def mock_aiohttp_for_error(status_code=401, error_message="Access denied"):
         "message": error_message,
         "typeKey": "UnauthorizedRequestException"
     }))
-    
+
     mock_session = MagicMock()
     mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
     mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock(return_value=None)
-    
+
     return patch("aiohttp.ClientSession", return_value=mock_session)
 
 
@@ -69,7 +69,7 @@ def workitem_tool(mock_executor):
     # Use a persistent patch that lasts for the entire test
     patcher = patch("plugins.azrepo.workitem_tool.env_manager")
     mock_env_manager = patcher.start()
-    
+
     # Mock environment manager
     mock_env_manager.load.return_value = None
     mock_env_manager.get_azrepo_parameters.return_value = {
@@ -81,9 +81,9 @@ def workitem_tool(mock_executor):
     }
 
     tool = AzureWorkItemTool(command_executor=mock_executor)
-    
+
     yield tool
-    
+
     # Clean up the patch
     patcher.stop()
 
@@ -94,7 +94,7 @@ def workitem_tool_no_defaults(mock_executor):
     # Use a persistent patch that lasts for the entire test
     patcher = patch("plugins.azrepo.workitem_tool.env_manager")
     mock_env_manager = patcher.start()
-    
+
     # Mock environment manager with no defaults
     mock_env_manager.load.return_value = None
     mock_env_manager.get_azrepo_parameters.return_value = {
@@ -102,9 +102,9 @@ def workitem_tool_no_defaults(mock_executor):
     }
 
     tool = AzureWorkItemTool(command_executor=mock_executor)
-    
+
     yield tool
-    
+
     # Clean up the patch
     patcher.stop()
 
@@ -166,7 +166,7 @@ class TestCreateWorkItem:
         """Test work item creation with missing organization."""
         # Clear the organization
         workitem_tool.default_organization = None
-        
+
         result = await workitem_tool.create_work_item(title="Test Work Item")
 
         assert result["success"] is False
@@ -177,7 +177,7 @@ class TestCreateWorkItem:
         """Test work item creation with missing project."""
         # Clear the project
         workitem_tool.default_project = None
-        
+
         result = await workitem_tool.create_work_item(title="Test Work Item")
 
         assert result["success"] is False
@@ -199,13 +199,13 @@ class TestCreateWorkItem:
         mock_response = MagicMock()
         mock_response.status = 200
         mock_response.text = AsyncMock(return_value="Invalid JSON response")
-        
+
         mock_session = MagicMock()
         mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
         mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
-        
+
         with patch("aiohttp.ClientSession", return_value=mock_session):
             result = await workitem_tool.create_work_item(title="Test Work Item")
 
@@ -408,7 +408,7 @@ class TestAuthenticationHeaders:
     def test_get_auth_headers_with_token(self, workitem_tool):
         """Test authentication headers with bearer token."""
         headers = workitem_tool._get_auth_headers()
-        
+
         assert "Authorization" in headers
         assert headers["Authorization"].startswith("Bearer ")
         assert headers["Content-Type"] == "application/json-patch+json"
@@ -423,6 +423,9 @@ class TestAuthenticationHeaders:
                 "project": "test-project"
                 # No bearer_token or bearer_token_command
             }
-            
+
+            # Also clear the instance bearer token to ensure no fallback
+            workitem_tool.bearer_token = None
+
             with pytest.raises(ValueError, match="Bearer token not configured"):
-                workitem_tool._get_auth_headers() 
+                workitem_tool._get_auth_headers()
