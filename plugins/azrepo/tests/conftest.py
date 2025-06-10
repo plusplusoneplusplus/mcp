@@ -3,7 +3,7 @@ Shared fixtures for Azure Repo Client tests.
 """
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 from ..repo_tool import AzureRepoClient
 from ..pr_tool import AzurePullRequestTool
@@ -11,27 +11,91 @@ from ..workitem_tool import AzureWorkItemTool
 
 
 @pytest.fixture
-def azure_repo_client():
+def mock_executor():
+    """Mock command executor."""
+    executor = MagicMock()
+    executor.execute_async = AsyncMock()
+    executor.query_process = AsyncMock()
+    return executor
+
+
+@pytest.fixture
+def azure_repo_client(mock_executor):
     """Create an AzureRepoClient instance for testing."""
-    # Mock the command executor to avoid registry dependency
-    mock_executor = MagicMock()
     return AzureRepoClient(command_executor=mock_executor)
 
 
 @pytest.fixture
-def azure_pr_tool():
+def azure_pr_tool(mock_executor):
     """Create an AzurePullRequestTool instance for testing."""
-    # Mock the command executor to avoid registry dependency
-    mock_executor = MagicMock()
     return AzurePullRequestTool(command_executor=mock_executor)
 
 
 @pytest.fixture
-def azure_workitem_tool():
-    """Create an AzureWorkItemTool instance for testing."""
-    # Mock the command executor to avoid registry dependency
-    mock_executor = MagicMock()
-    return AzureWorkItemTool(command_executor=mock_executor)
+def azure_workitem_tool(mock_executor):
+    """
+    Create an AzureWorkItemTool instance with mocked env_manager and default config.
+    """
+    with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager, \
+         patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_rest_env_manager:
+
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "area_path": "TestArea\\SubArea",
+            "iteration": "Sprint 1",
+            "bearer_token": "test-bearer-token-123",
+            "auto_assign_to_current_user": True,
+            "default_assignee": None
+        }
+
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
+        tool = AzureWorkItemTool(command_executor=mock_executor)
+        yield tool
+
+
+@pytest.fixture
+def azure_workitem_tool_no_defaults(mock_executor):
+    """
+    Create an AzureWorkItemTool instance with no default org/project config.
+    """
+    with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager, \
+         patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_rest_env_manager:
+
+        config = {
+            "bearer_token": "test-bearer-token-123",
+        }
+
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
+        tool = AzureWorkItemTool(command_executor=mock_executor)
+        yield tool
+
+
+@pytest.fixture
+def azure_workitem_tool_no_auto_assign(mock_executor):
+    """
+    Create an AzureWorkItemTool instance with auto-assignment disabled.
+    """
+    with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager, \
+         patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_rest_env_manager:
+
+        config = {
+            "org": "testorg",
+            "project": "test-project",
+            "bearer_token": "test-bearer-token-123",
+            "auto_assign_to_current_user": False,
+            "default_assignee": None
+        }
+
+        mock_env_manager.get_azrepo_parameters.return_value = config
+        mock_rest_env_manager.get_azrepo_parameters.return_value = config
+
+        tool = AzureWorkItemTool(command_executor=mock_executor)
+        yield tool
 
 
 @pytest.fixture
