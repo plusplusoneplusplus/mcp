@@ -16,7 +16,7 @@ class TestBearerTokenCommandIntegration:
     @pytest.mark.asyncio
     async def test_complete_workflow_with_bearer_token_command(self, mock_subprocess_run):
         """Test the complete workflow: environment config -> command execution -> work item creation."""
-        
+
         # Step 1: Mock the bearer token command execution
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -29,7 +29,7 @@ class TestBearerTokenCommandIntegration:
         })
         mock_result.stderr = ""
         mock_subprocess_run.return_value = mock_result
-        
+
         # Step 2: Mock environment manager to provide bearer token command configuration
         with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
             mock_env_manager.load.return_value = None
@@ -40,11 +40,11 @@ class TestBearerTokenCommandIntegration:
                 "iteration": "MyProject\\Sprint 1",
                 "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
             }
-            
+
             # Step 3: Create tool instance (simulates user creating the tool)
             mock_executor = MagicMock()
             tool = AzureWorkItemTool(command_executor=mock_executor)
-            
+
             # Step 4: Mock the REST API response for work item creation
             with patch("aiohttp.ClientSession") as mock_session_class:
                 mock_session = MagicMock()
@@ -69,15 +69,15 @@ class TestBearerTokenCommandIntegration:
                     },
                     "url": "https://dev.azure.com/mycompany/_apis/wit/workItems/12345"
                 }))
-                
+
                 mock_session.__aenter__ = AsyncMock(return_value=mock_session)
                 mock_session.__aexit__ = AsyncMock(return_value=None)
                 mock_session.post = MagicMock()
                 mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
                 mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-                
+
                 mock_session_class.return_value = mock_session
-                
+
                 # Step 5: Execute the tool (simulates user calling the tool)
                 result = await tool.execute_tool({
                     "operation": "create",
@@ -85,14 +85,14 @@ class TestBearerTokenCommandIntegration:
                     "description": "Add OAuth2 authentication to the application",
                     "work_item_type": "Task"
                 })
-                
+
                 # Step 6: Verify the complete workflow worked
-                
+
                 # Verify the result is successful
                 assert result["success"] is True
                 assert result["data"]["id"] == 12345
                 assert result["data"]["fields"]["System.Title"] == "Implement user authentication"
-                
+
                 # Verify the bearer token command was executed
                 mock_subprocess_run.assert_called_once()
                 call_args = mock_subprocess_run.call_args
@@ -101,30 +101,30 @@ class TestBearerTokenCommandIntegration:
                 assert call_args[1]["capture_output"] is True
                 assert call_args[1]["text"] is True
                 assert call_args[1]["timeout"] == 30
-                
+
                 # Verify the REST API was called with the correct token
                 mock_session.post.assert_called_once()
                 post_call_args = mock_session.post.call_args
-                
+
                 # Check the URL
                 expected_url = "https://dev.azure.com/mycompany/MyProject/_apis/wit/workitems/$Task?api-version=7.1"
                 assert post_call_args[0][0] == expected_url
-                
+
                 # Check the headers contain the bearer token
                 headers = post_call_args[1]["headers"]
                 assert headers["Authorization"] == "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6..."
                 assert headers["Content-Type"] == "application/json-patch+json"
                 assert headers["Accept"] == "application/json"
-                
+
                 # Check the patch document
                 patch_document = post_call_args[1]["json"]
                 assert len(patch_document) == 4  # title, description, area_path, iteration
-                
+
                 # Verify patch document contents
                 title_patch = next(p for p in patch_document if p["path"] == "/fields/System.Title")
                 assert title_patch["op"] == "add"
                 assert title_patch["value"] == "Implement user authentication"
-                
+
                 description_patch = next(p for p in patch_document if p["path"] == "/fields/System.Description")
                 assert description_patch["op"] == "add"
                 assert description_patch["value"] == "Add OAuth2 authentication to the application"
@@ -132,14 +132,14 @@ class TestBearerTokenCommandIntegration:
     @patch("plugins.azrepo.workitem_tool.subprocess.run")
     def test_bearer_token_command_failure_graceful_handling(self, mock_subprocess_run):
         """Test that bearer token command failures are handled gracefully."""
-        
+
         # Mock command failure
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = ""
         mock_result.stderr = "ERROR: Please run 'az login' to setup account."
         mock_subprocess_run.return_value = mock_result
-        
+
         # Mock environment manager
         with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
             mock_env_manager.load.return_value = None
@@ -148,21 +148,21 @@ class TestBearerTokenCommandIntegration:
                 "project": "MyProject",
                 "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
             }
-            
+
             # Create tool instance
             mock_executor = MagicMock()
             tool = AzureWorkItemTool(command_executor=mock_executor)
-            
+
             # Attempting to get auth headers should raise a clear error
             with pytest.raises(ValueError, match="Bearer token not configured"):
                 tool._get_auth_headers()
-            
+
             # Verify the command was attempted
             mock_subprocess_run.assert_called_once()
 
     def test_fallback_to_static_token_when_command_not_configured(self):
         """Test that static token is used when no command is configured."""
-        
+
         # Mock environment manager with static token
         with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
             mock_env_manager.load.return_value = None
@@ -172,14 +172,14 @@ class TestBearerTokenCommandIntegration:
                 "bearer_token": "static-token-12345"
                 # No bearer_token_command configured
             }
-            
+
             # Create tool instance
             mock_executor = MagicMock()
             tool = AzureWorkItemTool(command_executor=mock_executor)
-            
+
             # Get auth headers should use static token
             headers = tool._get_auth_headers()
-            
+
             assert headers["Authorization"] == "Bearer static-token-12345"
             assert headers["Content-Type"] == "application/json-patch+json"
             assert headers["Accept"] == "application/json"
@@ -187,14 +187,14 @@ class TestBearerTokenCommandIntegration:
     @patch("plugins.azrepo.workitem_tool.subprocess.run")
     def test_command_takes_precedence_when_both_configured(self, mock_subprocess_run):
         """Test that bearer token command takes precedence over static token when both are configured."""
-        
+
         # Mock successful command execution
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = '{"accessToken": "dynamic-token-from-command"}'
         mock_result.stderr = ""
         mock_subprocess_run.return_value = mock_result
-        
+
         # Mock environment manager with both static token and command
         with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
             mock_env_manager.load.return_value = None
@@ -204,15 +204,15 @@ class TestBearerTokenCommandIntegration:
                 "bearer_token": "static-token-12345",  # This should be ignored
                 "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
             }
-            
+
             # Create tool instance
             mock_executor = MagicMock()
             tool = AzureWorkItemTool(command_executor=mock_executor)
-            
+
             # Get auth headers should use dynamic token from command
             headers = tool._get_auth_headers()
-            
+
             assert headers["Authorization"] == "Bearer dynamic-token-from-command"
-            
+
             # Verify command was executed
-            mock_subprocess_run.assert_called_once() 
+            mock_subprocess_run.assert_called_once()

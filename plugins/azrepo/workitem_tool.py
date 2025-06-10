@@ -240,16 +240,16 @@ class AzureWorkItemTool(ToolInterface):
 
     def _execute_bearer_token_command(self, command: str) -> Optional[str]:
         """Execute a command and extract the accessToken from JSON output.
-        
+
         Args:
             command: The command to execute
-            
+
         Returns:
             The access token if found, None otherwise
         """
         try:
             self.logger.debug(f"Executing bearer token command: {command}")
-            
+
             # Execute the command
             result = subprocess.run(
                 command,
@@ -258,28 +258,28 @@ class AzureWorkItemTool(ToolInterface):
                 text=True,
                 timeout=30  # 30 second timeout
             )
-            
+
             if result.returncode != 0:
                 self.logger.error(f"Bearer token command failed with return code {result.returncode}: {result.stderr}")
                 return None
-                
+
             # Parse JSON output
             try:
                 json_output = json.loads(result.stdout)
                 access_token = json_output.get("accessToken")
-                
+
                 if access_token:
                     self.logger.debug("Successfully extracted access token from command output")
                     return access_token
                 else:
                     self.logger.warning("No 'accessToken' property found in command output JSON")
                     return None
-                    
+
             except json.JSONDecodeError as e:
                 self.logger.error(f"Failed to parse command output as JSON: {e}")
                 self.logger.debug(f"Command output was: {result.stdout}")
                 return None
-                
+
         except subprocess.TimeoutExpired:
             self.logger.error(f"Bearer token command timed out after 30 seconds: {command}")
             return None
@@ -296,25 +296,39 @@ class AzureWorkItemTool(ToolInterface):
         # Get Azure repo parameters from environment manager
         azrepo_params = env_manager.get_azrepo_parameters()
         bearer_token = None
-        
+
         # Try bearer token command first (takes precedence over static token)
         bearer_token_command = azrepo_params.get("bearer_token_command")
         if bearer_token_command:
             bearer_token = self._execute_bearer_token_command(bearer_token_command)
-        
+
         # If no token from command, fall back to static token
         if not bearer_token:
             bearer_token = azrepo_params.get("bearer_token")
-        
+
         if not bearer_token:
             raise ValueError("Bearer token not configured. Please set AZREPO_BEARER_TOKEN or AZREPO_BEARER_TOKEN_COMMAND environment variable.")
-        
+
         # For Azure DevOps REST API, use the bearer token directly
         return {
             "Authorization": f"Bearer {bearer_token}",
             "Content-Type": "application/json-patch+json",
             "Accept": "application/json"
         }
+
+    def _build_api_url(self, organization: str, project: str, endpoint: str) -> str:
+        """Build complete Azure DevOps REST API URL.
+
+        This helper handles organization parameters that may be supplied either
+        as a plain organization name (e.g. ``mycompany``) or a full URL
+        (e.g. ``https://dev.azure.com/mycompany`` or a custom host).
+        """
+        if organization.startswith(("http://", "https://")):
+            base_url = organization.rstrip("/")
+        else:
+            base_url = f"https://dev.azure.com/{organization}"
+
+        return f"{base_url}/{project}/_apis/{endpoint}"
 
     async def _run_az_command(
         self, command: str, timeout: Optional[float] = None
@@ -430,8 +444,12 @@ class AzureWorkItemTool(ToolInterface):
             if not proj:
                 return {"success": False, "error": "Project is required"}
 
-            # Construct the REST API URL
-            url = f"{org}/{proj}/_apis/wit/workitems/${work_item_type}?api-version=7.1"
+            # Construct the REST API URL using organization name or URL
+            url = self._build_api_url(
+                org,
+                proj,
+                f"wit/workitems/${work_item_type}?api-version=7.1",
+            )
 
             # Build the JSON patch document for work item creation
             patch_document = [
@@ -476,7 +494,7 @@ class AzureWorkItemTool(ToolInterface):
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=patch_document, headers=headers) as response:
                     response_text = await response.text()
-                    
+
                     if response.status == 200:
                         try:
                             work_item_data = json.loads(response_text)
