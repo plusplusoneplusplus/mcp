@@ -81,6 +81,43 @@ def mock_rest_api_response():
     }
 
 
+@pytest.fixture
+def mock_get_work_item_response():
+    """Mock successful REST API response for work item retrieval."""
+    return {
+        "id": 12345,
+        "rev": 2,
+        "fields": {
+            "System.AreaPath": "TestArea\\SubArea",
+            "System.TeamProject": "test-project",
+            "System.IterationPath": "Sprint 1",
+            "System.WorkItemType": "Task",
+            "System.State": "Active",
+            "System.Reason": "Implementation started",
+            "System.CreatedDate": "2024-01-15T10:30:00.000Z",
+            "System.ChangedDate": "2024-01-16T14:20:00.000Z",
+            "System.CreatedBy": {
+                "displayName": "Test User",
+                "id": "test-user-id",
+                "uniqueName": "test@example.com"
+            },
+            "System.ChangedBy": {
+                "displayName": "Test User",
+                "id": "test-user-id",
+                "uniqueName": "test@example.com"
+            },
+            "System.Title": "Test Work Item - Updated",
+            "System.Description": "Updated test description"
+        },
+        "_links": {
+            "self": {
+                "href": "https://dev.azure.com/testorg/_apis/wit/workItems/12345"
+            }
+        },
+        "url": "https://dev.azure.com/testorg/_apis/wit/workItems/12345"
+    }
+
+
 class TestRestApiAuthentication:
     """Test REST API authentication functionality."""
 
@@ -409,3 +446,230 @@ class TestExecuteToolRestApi:
 
                 assert result["success"] is True
                 assert "data" in result
+
+
+class TestRestApiWorkItemRetrieval:
+    """Test REST API work item retrieval functionality."""
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_rest_api_success(self, workitem_tool_with_token, mock_get_work_item_response):
+        """Test successful work item retrieval via REST API."""
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.text = AsyncMock(return_value=json.dumps(mock_get_work_item_response))
+
+            mock_session = MagicMock()
+            mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.get_work_item(work_item_id=12345)
+
+                assert result["success"] is True
+                assert "data" in result
+                assert result["data"]["id"] == 12345
+                assert result["data"]["fields"]["System.Title"] == "Test Work Item - Updated"
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_with_query_parameters(self, workitem_tool_with_token, mock_get_work_item_response):
+        """Test work item retrieval with query parameters."""
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.text = AsyncMock(return_value=json.dumps(mock_get_work_item_response))
+
+            mock_session = MagicMock()
+            mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.get_work_item(
+                    work_item_id=12345,
+                    as_of="2024-01-15",
+                    expand="all",
+                    fields="System.Id,System.Title"
+                )
+
+                assert result["success"] is True
+                assert "data" in result
+
+                # Verify that the session.get was called with the correct URL containing query parameters
+                mock_session.get.assert_called_once()
+                call_args = mock_session.get.call_args
+                url = call_args[0][0]
+                assert "asOf=2024-01-15" in url
+                assert "$expand=all" in url
+                assert "fields=System.Id,System.Title" in url
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_not_found(self, workitem_tool_with_token):
+        """Test work item retrieval with 404 not found response."""
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            error_response = {
+                "message": "Work item does not exist, or you do not have permissions to read it.",
+                "typeKey": "WorkItemDoesNotExistException"
+            }
+
+            mock_response = MagicMock()
+            mock_response.status = 404
+            mock_response.text = AsyncMock(return_value=json.dumps(error_response))
+
+            mock_session = MagicMock()
+            mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.get_work_item(work_item_id=99999)
+
+                assert result["success"] is False
+                assert "Work item 99999 not found" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_http_error(self, workitem_tool_with_token):
+        """Test work item retrieval with HTTP error response."""
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            error_response = {
+                "message": "Access denied",
+                "typeKey": "UnauthorizedRequestException"
+            }
+
+            mock_response = MagicMock()
+            mock_response.status = 401
+            mock_response.text = AsyncMock(return_value=json.dumps(error_response))
+
+            mock_session = MagicMock()
+            mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.get_work_item(work_item_id=12345)
+
+                assert result["success"] is False
+                assert "HTTP 401" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_missing_org(self, workitem_tool_no_token):
+        """Test work item retrieval with missing organization."""
+        workitem_tool_no_token.default_organization = None
+
+        result = await workitem_tool_no_token.get_work_item(work_item_id=12345)
+
+        assert result["success"] is False
+        assert "Organization is required" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_work_item_missing_project(self, workitem_tool_no_token):
+        """Test work item retrieval with missing project."""
+        workitem_tool_no_token.default_organization = "testorg"
+        workitem_tool_no_token.default_project = None
+
+        result = await workitem_tool_no_token.get_work_item(work_item_id=12345)
+
+        assert result["success"] is False
+        assert "Project is required" in result["error"]
+
+
+class TestExecuteToolGetWorkItem:
+    """Test execute_tool get work item operation."""
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_get_missing_work_item_id(self, workitem_tool_with_token):
+        """Test execute_tool get operation with missing work_item_id."""
+        result = await workitem_tool_with_token.execute_tool({
+            "operation": "get"
+            # Missing work_item_id
+        })
+
+        assert result["success"] is False
+        assert "work_item_id is required for get operation" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_get_rest_api(self, workitem_tool_with_token, mock_get_work_item_response):
+        """Test execute_tool get operation via REST API."""
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "org": "testorg",
+                "project": "test-project",
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            mock_response = MagicMock()
+            mock_response.status = 200
+            mock_response.text = AsyncMock(return_value=json.dumps(mock_get_work_item_response))
+
+            mock_session = MagicMock()
+            mock_session.get.return_value.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_session.get.return_value.__aexit__ = AsyncMock(return_value=None)
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+
+            with patch("aiohttp.ClientSession", return_value=mock_session):
+                result = await workitem_tool_with_token.execute_tool({
+                    "operation": "get",
+                    "work_item_id": 12345,
+                    "expand": "all",
+                    "fields": "System.Id,System.Title"
+                })
+
+                assert result["success"] is True
+                assert "data" in result
+                assert result["data"]["id"] == 12345
+
+
+class TestAuthHeadersContentType:
+    """Test authentication headers with different content types."""
+
+    def test_get_auth_headers_default_content_type(self, workitem_tool_with_token):
+        """Test authentication headers with default content type."""
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            headers = workitem_tool_with_token._get_auth_headers()
+
+            assert headers["Content-Type"] == "application/json-patch+json"
+
+    def test_get_auth_headers_custom_content_type(self, workitem_tool_with_token):
+        """Test authentication headers with custom content type."""
+        with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
+            mock_env_manager.get_azrepo_parameters.return_value = {
+                "bearer_token": "test-bearer-token-123"
+            }
+
+            headers = workitem_tool_with_token._get_auth_headers(content_type="application/json")
+
+            assert headers["Content-Type"] == "application/json"

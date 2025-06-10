@@ -294,8 +294,11 @@ class AzureWorkItemTool(ToolInterface):
             self.logger.error(f"Error executing bearer token command: {e}")
             return None
 
-    def _get_auth_headers(self) -> Dict[str, str]:
+    def _get_auth_headers(self, content_type: str = "application/json-patch+json") -> Dict[str, str]:
         """Get authentication headers for REST API calls.
+
+        Args:
+            content_type: Content-Type header value (defaults to json-patch for PATCH operations)
 
         Returns:
             Dictionary with authorization headers
@@ -319,7 +322,7 @@ class AzureWorkItemTool(ToolInterface):
         # For Azure DevOps REST API, use the bearer token directly
         return {
             "Authorization": f"Bearer {bearer_token}",
-            "Content-Type": "application/json-patch+json",
+            "Content-Type": content_type,
             "Accept": "application/json"
         }
 
@@ -384,12 +387,12 @@ class AzureWorkItemTool(ToolInterface):
         expand: Optional[str] = None,
         fields: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Get details of a specific work item.
+        """Get details of a specific work item using Azure DevOps REST API.
 
         Args:
             work_item_id: ID of the work item
             organization: Azure DevOps organization URL (uses configured default if not provided)
-            project: Azure DevOps project name/ID (accepted for compatibility but not used - work item IDs are globally unique within an organization)
+            project: Azure DevOps project name/ID (uses configured default if not provided)
             as_of: Work item details as of a particular date and time
             expand: The expand parameters for work item attributes (all, fields, links, none, relations)
             fields: Comma-separated list of requested fields
@@ -397,23 +400,74 @@ class AzureWorkItemTool(ToolInterface):
         Returns:
             Dictionary with success status and work item details
         """
-        command = f"boards work-item show --id {work_item_id}"
+        try:
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
 
-        # Use configured defaults for core parameters
-        org = self._get_param_with_default(organization, self.default_organization)
-        # Note: project parameter is not used for work item retrieval as work item IDs are globally unique within an organization
+            if not org:
+                return {"success": False, "error": "Organization is required"}
+            if not proj:
+                return {"success": False, "error": "Project is required"}
 
-        # Add optional parameters
-        if org:
-            command += f" --org {org}"
-        if as_of:
-            command += f" --as-of '{as_of}'"
-        if expand:
-            command += f" --expand {expand}"
-        if fields:
-            command += f" --fields {fields}"
+            # Construct the REST API URL
+            endpoint = f"wit/workitems/{work_item_id}"
 
-        return await self._run_az_command(command)
+            # Build query parameters
+            query_params = ["api-version=7.1"]
+
+            if as_of:
+                query_params.append(f"asOf={as_of}")
+            if expand:
+                query_params.append(f"$expand={expand}")
+            if fields:
+                query_params.append(f"fields={fields}")
+
+            # Add query parameters to endpoint
+            if query_params:
+                endpoint += "?" + "&".join(query_params)
+
+            url = self._build_api_url(org, proj, endpoint)
+
+            # Get authentication headers (use application/json for GET requests)
+            headers = self._get_auth_headers(content_type="application/json")
+
+            self.logger.debug(f"Getting work item via REST API: {url}")
+
+            # Make the REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            work_item_data = json.loads(response_text)
+                            return {"success": True, "data": work_item_data}
+                        except json.JSONDecodeError as e:
+                            self.logger.error(f"Failed to parse work item response: {e}")
+                            return {
+                                "success": False,
+                                "error": f"Failed to parse response: {e}",
+                                "raw_output": response_text
+                            }
+                    elif response.status == 404:
+                        self.logger.error(f"Work item {work_item_id} not found")
+                        return {
+                            "success": False,
+                            "error": f"Work item {work_item_id} not found",
+                            "raw_output": response_text
+                        }
+                    else:
+                        self.logger.error(f"Work item retrieval failed with status {response.status}: {response_text}")
+                        return {
+                            "success": False,
+                            "error": f"HTTP {response.status}: {response_text}",
+                            "raw_output": response_text
+                        }
+
+        except Exception as e:
+            self.logger.error(f"Error retrieving work item: {e}")
+            return {"success": False, "error": str(e)}
 
     async def create_work_item(
         self,
