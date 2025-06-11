@@ -20,6 +20,7 @@ class EnvironmentManager:
         "git_root",
         "private_tool_root",
         "tool_history_path",
+        "job_history_storage_path",
         "browser_profile_path",
         "image_dir",
         "vector_store_path",
@@ -45,6 +46,12 @@ class EnvironmentManager:
         "periodic_status_enabled": (False, bool),
         "periodic_status_interval": (30.0, float),
         "periodic_status_max_command_length": (60, int),
+        # Background job history persistence
+        "job_history_persistence_enabled": (False, bool),
+        "job_history_storage_backend": ("json", str),
+        "job_history_storage_path": (".job_history.json", str),
+        "job_history_max_entries": (1000, int),
+        "job_history_max_age_days": (30, int),
     }
 
     # Create mapping dynamically - each setting can be set via its uppercase env var

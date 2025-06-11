@@ -294,6 +294,18 @@ class TestEnvironmentManager(unittest.TestCase):
             self.assertIn(key.upper(), EnvironmentManager.ENV_MAPPING)
             self.assertEqual(EnvironmentManager.ENV_MAPPING[key.upper()], key)
 
+    def test_job_history_settings_exist(self):
+        """Ensure new job history settings are present with defaults."""
+        keys = [
+            "job_history_persistence_enabled",
+            "job_history_storage_backend",
+            "job_history_storage_path",
+            "job_history_max_entries",
+            "job_history_max_age_days",
+        ]
+        for k in keys:
+            self.assertIn(k, EnvironmentManager.DEFAULT_SETTINGS)
+
     def test_get_setting(self):
         """Test the get_setting method."""
         # Set values in settings

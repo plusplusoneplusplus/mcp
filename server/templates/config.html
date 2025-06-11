@@ -304,7 +304,12 @@
         'vector_store_path': 'Directory for vector store data',
         'periodic_status_enabled': 'Enable periodic status reporting for background processes',
         'periodic_status_interval': 'Interval between status reports in seconds',
-        'periodic_status_max_command_length': 'Maximum command length to display in status reports'
+        'periodic_status_max_command_length': 'Maximum command length to display in status reports',
+        'job_history_persistence_enabled': 'Enable persistent storage for completed job history',
+        'job_history_storage_backend': 'Storage backend for job history (json or sqlite)',
+        'job_history_storage_path': 'Path to store job history file or database',
+        'job_history_max_entries': 'Maximum number of job records to keep',
+        'job_history_max_age_days': 'Maximum age of completed jobs to retain in days'
     };
 
     async function loadConfiguration() {
@@ -367,7 +372,16 @@
 
         // Background Jobs
         const jobsGroup = document.getElementById('background-jobs-settings');
-        ['periodic_status_enabled', 'periodic_status_interval', 'periodic_status_max_command_length'].forEach(setting => {
+        [
+            'periodic_status_enabled',
+            'periodic_status_interval',
+            'periodic_status_max_command_length',
+            'job_history_persistence_enabled',
+            'job_history_storage_backend',
+            'job_history_storage_path',
+            'job_history_max_entries',
+            'job_history_max_age_days'
+        ].forEach(setting => {
             jobsGroup.appendChild(createConfigItem(setting, config.settings[setting], 'settings'));
         });
 

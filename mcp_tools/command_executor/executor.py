@@ -148,6 +148,23 @@ class CommandExecutor(CommandExecutorInterface):
             "periodic_status_max_command_length", 60
         )
 
+        # Job history persistence settings
+        self.job_history_persistence_enabled = env_manager.get_setting(
+            "job_history_persistence_enabled", False
+        )
+        self.job_history_storage_backend = env_manager.get_setting(
+            "job_history_storage_backend", "json"
+        )
+        self.job_history_storage_path = Path(
+            env_manager.get_setting("job_history_storage_path", ".job_history.json")
+        )
+        self.job_history_max_entries = env_manager.get_setting(
+            "job_history_max_entries", 1000
+        )
+        self.job_history_max_age_days = env_manager.get_setting(
+            "job_history_max_age_days", 30
+        )
+
         # Memory management settings with defaults
         self.max_completed_processes = env_manager.get_setting(
             "command_executor_max_completed_processes", 100
@@ -180,6 +197,9 @@ class CommandExecutor(CommandExecutorInterface):
                 "cleanup_interval": self.cleanup_interval
             },
         )
+
+        if self.job_history_persistence_enabled:
+            self._load_persisted_history()
 
         # Start cleanup task if enabled
         if self.auto_cleanup_enabled:
@@ -253,6 +273,7 @@ class CommandExecutor(CommandExecutorInterface):
                     "remaining_count": len(self.completed_processes)
                 }
             )
+            self._persist_completed_processes()
 
         return cleanup_count
 
@@ -274,6 +295,7 @@ class CommandExecutor(CommandExecutorInterface):
                                 "remaining_processes": len(self.completed_processes)
                             }
                         )
+                        self._persist_completed_processes()
 
                 except Exception as e:
                     _log_with_context(
@@ -383,6 +405,9 @@ class CommandExecutor(CommandExecutorInterface):
             # Also enforce the limit
             self._enforce_completed_process_limit()
 
+        if cleanup_count > 0:
+            self._persist_completed_processes()
+
         return {
             "initial_count": initial_count,
             "cleaned_count": cleanup_count,
@@ -485,6 +510,64 @@ class CommandExecutor(CommandExecutorInterface):
                 {"error": str(e), "path": file_path},
             )
             return f"[Error reading output: {str(e)}]"
+
+    def _persist_completed_processes(self) -> None:
+        """Persist completed processes to storage if enabled."""
+        if not self.job_history_persistence_enabled:
+            return
+
+        try:
+            self.job_history_storage_path.parent.mkdir(parents=True, exist_ok=True)
+            entries = []
+            now = time.time()
+            max_age = self.job_history_max_age_days * 86400
+            for token, result in self.completed_processes.items():
+                ts = self.completed_process_timestamps.get(token, now)
+                if self.job_history_max_age_days > 0 and now - ts > max_age:
+                    continue
+                entries.append({"token": token, "result": result, "timestamp": ts})
+
+            if self.job_history_max_entries > 0:
+                entries = entries[-self.job_history_max_entries :]
+            with open(self.job_history_storage_path, "w", encoding="utf-8") as f:
+                json.dump(entries, f)
+        except Exception as e:
+            _log_with_context(
+                logging.WARNING,
+                "Failed to persist job history",
+                {"error": str(e), "path": str(self.job_history_storage_path)},
+            )
+
+    def _load_persisted_history(self) -> None:
+        """Load persisted job history from storage."""
+        if not self.job_history_persistence_enabled:
+            return
+
+        try:
+            if self.job_history_storage_path.exists():
+                with open(self.job_history_storage_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                now = time.time()
+                max_age = self.job_history_max_age_days * 86400
+                for entry in data:
+                    token = entry.get("token")
+                    result = entry.get("result")
+                    timestamp = entry.get("timestamp", now)
+                    if not token or not result:
+                        continue
+                    if self.job_history_max_age_days > 0 and now - timestamp > max_age:
+                        continue
+                    self.completed_processes[token] = result
+                    self.completed_process_timestamps[token] = timestamp
+
+                self._enforce_completed_process_limit()
+                self._cleanup_expired_processes()
+        except Exception as e:
+            _log_with_context(
+                logging.WARNING,
+                "Failed to load persisted job history",
+                {"error": str(e), "path": str(self.job_history_storage_path)},
+            )
 
     async def _cleanup_temp_files(self, pid: int, from_monitor: bool = False) -> None:
         """Clean up temporary files associated with a process
@@ -1320,6 +1403,9 @@ class CommandExecutor(CommandExecutorInterface):
         current_time = time.time()
         self.completed_processes[token] = result
         self.completed_process_timestamps[token] = current_time
+
+        # Persist job history
+        self._persist_completed_processes()
 
         _log_with_context(
             logging.INFO,
