@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch
 
-from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response
+from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response, mock_azure_http_client
 
 
 class TestCreateWorkItem:
@@ -130,7 +130,7 @@ class TestExecuteToolCreate:
     @pytest.mark.asyncio
     async def test_execute_tool_create_success(self, azure_workitem_tool):
         """Test successful work item creation through execute_tool."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             arguments = {
                 "operation": "create",
                 "title": "Test Work Item",
