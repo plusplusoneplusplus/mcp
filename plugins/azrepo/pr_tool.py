@@ -799,38 +799,72 @@ class AzurePullRequestTool(ToolInterface):
         delete_source_branch: Optional[bool] = None,
         draft: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Update an existing pull request."""
-        command = f"repos pr update --id {pull_request_id}"
+        """Update an existing pull request using REST API."""
+        try:
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(None, self.default_project)
+            repo = self._get_param_with_default(None, self.default_repository)
 
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
 
-        # Add optional parameters
-        if title:
-            command += f' --title "{title}"'
-        if description:
-            # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split("\n")
-            for line in desc_lines:
-                command += f' --description "{line}"'
-        if status:
-            command += f" --status {status}"
-        if org:
-            command += f" --org {org}"
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}?api-version=7.1"
+            url = self._build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
 
-        # Add flags
-        if auto_complete is not None:
-            command += f" --auto-complete {'true' if auto_complete else 'false'}"
-        if squash is not None:
-            command += f" --squash {'true' if squash else 'false'}"
-        if delete_source_branch is not None:
-            command += (
-                f" --delete-source-branch {'true' if delete_source_branch else 'false'}"
-            )
-        if draft is not None:
-            command += f" --draft {'true' if draft else 'false'}"
+            # Build request body with only provided fields
+            request_body = {}
 
-        return await self._run_az_command(command)
+            if title is not None:
+                request_body["title"] = title
+            if description is not None:
+                request_body["description"] = description
+            if status is not None:
+                request_body["status"] = status
+            if draft is not None:
+                request_body["isDraft"] = draft
+
+            # Handle completion options
+            completion_options = {}
+            if squash is not None:
+                completion_options["squashMerge"] = squash
+            if delete_source_branch is not None:
+                completion_options["deleteSourceBranch"] = delete_source_branch
+
+            if completion_options:
+                request_body["completionOptions"] = completion_options
+
+            # Handle auto-complete
+            if auto_complete is not None:
+                if auto_complete:
+                    current_user = self._get_current_username()
+                    if current_user:
+                        request_body["autoCompleteSetBy"] = {"id": current_user}
+                else:
+                    request_body["autoCompleteSetBy"] = None
+
+            self.logger.debug(f"Updating PR {pull_request_id} with body: {request_body}")
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(url, json=request_body, headers=headers) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            pr_data = json.loads(response_text)
+                            return {"success": True, "data": pr_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def set_vote(
         self,
@@ -838,15 +872,64 @@ class AzurePullRequestTool(ToolInterface):
         vote: str,
         organization: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Set your vote on a pull request."""
-        command = f"repos pr set-vote --id {pull_request_id} --vote {vote}"
+        """Set your vote on a pull request using REST API."""
+        try:
+            # Vote mapping
+            VOTE_MAPPING = {
+                "approve": 10,
+                "approve-with-suggestions": 5,
+                "reset": 0,
+                "wait-for-author": -5,
+                "reject": -10
+            }
 
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-        if org:
-            command += f" --org {org}"
+            if vote not in VOTE_MAPPING:
+                return {"success": False, "error": f"Invalid vote value: {vote}. Must be one of: {list(VOTE_MAPPING.keys())}"}
 
-        return await self._run_az_command(command)
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(None, self.default_project)
+            repo = self._get_param_with_default(None, self.default_repository)
+
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
+
+            # Get current user ID for reviewer endpoint
+            current_user = self._get_current_username()
+            if not current_user:
+                return {"success": False, "error": "Unable to determine current user for voting"}
+
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/reviewers/{current_user}?api-version=7.1"
+            url = self._build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
+
+            # Build request body
+            request_body = {
+                "vote": VOTE_MAPPING[vote],
+                "isRequired": False
+            }
+
+            self.logger.debug(f"Setting vote {vote} ({VOTE_MAPPING[vote]}) on PR {pull_request_id} for user {current_user}")
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.put(url, json=request_body, headers=headers) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            reviewer_data = json.loads(response_text)
+                            return {"success": True, "data": reviewer_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Pull request {pull_request_id} not found or user not authorized"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def add_work_items(
         self,
@@ -854,19 +937,49 @@ class AzurePullRequestTool(ToolInterface):
         work_items: List[Union[int, str]],
         organization: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Add work items to a pull request."""
-        command = f"repos pr work-item add --id {pull_request_id}"
+        """Add work items to a pull request using REST API."""
+        try:
+            if not work_items:
+                return {"success": False, "error": "At least one work item ID is required"}
 
-        # Add work items
-        for item in work_items:
-            command += f" --work-items {item}"
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(None, self.default_project)
+            repo = self._get_param_with_default(None, self.default_repository)
 
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-        if org:
-            command += f" --org {org}"
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
 
-        return await self._run_az_command(command)
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}?api-version=7.1"
+            url = self._build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
+
+            # Build request body with work item references
+            request_body = {
+                "workItemRefs": [{"id": str(item)} for item in work_items]
+            }
+
+            self.logger.debug(f"Adding work items to PR {pull_request_id}: {work_items}")
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(url, json=request_body, headers=headers) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            pr_data = json.loads(response_text)
+                            return {"success": True, "data": pr_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments."""

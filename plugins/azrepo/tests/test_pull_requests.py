@@ -324,76 +324,207 @@ class TestCreatePullRequest:
 
 
 class TestUpdatePullRequest:
-    """Test the update_pull_request method."""
+    """Test the update_pull_request method using REST API."""
 
     @pytest.mark.asyncio
+    @patch("aiohttp.ClientSession.patch")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
     async def test_update_pull_request_basic(
-        self, azure_pr_tool, mock_command_success_response
+        self, mock_auth_headers, mock_patch, azure_pr_tool
     ):
-        """Test updating a pull request."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_command_success_response
-        )
+        """Test updating a pull request via REST API."""
+        # Setup mock response for aiohttp
+        mock_pr_data = {
+            "pullRequestId": 123,
+            "title": "New Title",
+            "description": "New description",
+            "status": "active"
+        }
+
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text.return_value = json.dumps(mock_pr_data)
+        mock_patch.return_value.__aenter__.return_value = mock_response
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
+
+        # Configure the tool with default values
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
 
         result = await azure_pr_tool.update_pull_request(
             123, title="New Title", description="New description"
         )
 
-        expected_command = (
-            'repos pr update --id 123 --title "New Title" '
-            '--description "New description"'
-        )
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-        assert result == mock_command_success_response
+        mock_patch.assert_called_once()
+        call_args, call_kwargs = mock_patch.call_args
+        assert "pullrequests/123" in call_args[0]
+
+        # Check the request body
+        request_body = call_kwargs["json"]
+        assert request_body["title"] == "New Title"
+        assert request_body["description"] == "New description"
+
+        assert result["success"] is True
+        assert result["data"]["pullRequestId"] == 123
 
     @pytest.mark.asyncio
+    @patch("aiohttp.ClientSession.patch")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_current_username")
     async def test_update_pull_request_with_flags(
-        self, azure_pr_tool, mock_command_success_response
+        self, mock_username, mock_auth_headers, mock_patch, azure_pr_tool
     ):
-        """Test updating a pull request with flags."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_command_success_response
-        )
+        """Test updating a pull request with completion options via REST API."""
+        # Setup mock response for aiohttp
+        mock_pr_data = {
+            "pullRequestId": 123,
+            "status": "active",
+            "autoCompleteSetBy": {"id": "test-user"}
+        }
+
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text.return_value = json.dumps(mock_pr_data)
+        mock_patch.return_value.__aenter__.return_value = mock_response
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
+        mock_username.return_value = "test-user"
+
+        # Configure the tool with default values
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
 
         result = await azure_pr_tool.update_pull_request(
             123, auto_complete=True, squash=False, delete_source_branch=True
         )
 
-        expected_command = (
-            "repos pr update --id 123 --auto-complete true "
-            "--squash false --delete-source-branch true"
-        )
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-        assert result == mock_command_success_response
+        mock_patch.assert_called_once()
+        call_args, call_kwargs = mock_patch.call_args
+        assert "pullrequests/123" in call_args[0]
+
+        # Check the request body
+        request_body = call_kwargs["json"]
+        assert request_body["autoCompleteSetBy"]["id"] == "test-user"
+        assert request_body["completionOptions"]["squashMerge"] is False
+        assert request_body["completionOptions"]["deleteSourceBranch"] is True
+
+        assert result["success"] is True
+        assert result["data"]["pullRequestId"] == 123
 
 
 class TestVotingAndReviewers:
-    """Test voting and reviewer operations."""
+    """Test voting and reviewer operations using REST API."""
 
     @pytest.mark.asyncio
-    async def test_set_vote(self, azure_pr_tool, mock_command_success_response):
-        """Test setting a vote on a pull request."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_command_success_response
-        )
+    @patch("aiohttp.ClientSession.put")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_current_username")
+    async def test_set_vote(self, mock_username, mock_auth_headers, mock_put, azure_pr_tool):
+        """Test setting a vote on a pull request via REST API."""
+        # Setup mock response for aiohttp
+        mock_reviewer_data = {
+            "id": "test-user",
+            "displayName": "Test User",
+            "vote": 10,
+            "isRequired": False
+        }
+
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text.return_value = json.dumps(mock_reviewer_data)
+        mock_put.return_value.__aenter__.return_value = mock_response
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
+        mock_username.return_value = "test-user"
+
+        # Configure the tool with default values
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
 
         result = await azure_pr_tool.set_vote(123, "approve")
 
-        azure_pr_tool._run_az_command.assert_called_once_with(
-            "repos pr set-vote --id 123 --vote approve"
-        )
-        assert result == mock_command_success_response
+        mock_put.assert_called_once()
+        call_args, call_kwargs = mock_put.call_args
+        assert "pullrequests/123/reviewers/test-user" in call_args[0]
+
+        # Check the request body
+        request_body = call_kwargs["json"]
+        assert request_body["vote"] == 10  # approve maps to 10
+        assert request_body["isRequired"] is False
+
+        assert result["success"] is True
+        assert result["data"]["vote"] == 10
 
     @pytest.mark.asyncio
-    async def test_add_work_items(self, azure_pr_tool, mock_command_success_response):
-        """Test adding work items to a pull request."""
-        azure_pr_tool._run_az_command = AsyncMock(
-            return_value=mock_command_success_response
-        )
+    @patch("aiohttp.ClientSession.put")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_current_username")
+    async def test_set_vote_invalid_value(self, mock_username, mock_auth_headers, mock_put, azure_pr_tool):
+        """Test setting an invalid vote value."""
+        mock_username.return_value = "test-user"
+
+        # Configure the tool with default values
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
+
+        result = await azure_pr_tool.set_vote(123, "invalid-vote")
+
+        # Should not make any HTTP calls for invalid vote
+        mock_put.assert_not_called()
+        assert result["success"] is False
+        assert "Invalid vote value" in result["error"]
+
+    @pytest.mark.asyncio
+    @patch("aiohttp.ClientSession.patch")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    async def test_add_work_items(self, mock_auth_headers, mock_patch, azure_pr_tool):
+        """Test adding work items to a pull request via REST API."""
+        # Setup mock response for aiohttp
+        mock_pr_data = {
+            "pullRequestId": 123,
+            "workItemRefs": [
+                {"id": "456"},
+                {"id": "789"}
+            ]
+        }
+
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.text.return_value = json.dumps(mock_pr_data)
+        mock_patch.return_value.__aenter__.return_value = mock_response
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
+
+        # Configure the tool with default values
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
 
         result = await azure_pr_tool.add_work_items(123, [456, 789])
 
-        azure_pr_tool._run_az_command.assert_called_once_with(
-            "repos pr work-item add --id 123 --work-items 456 --work-items 789"
-        )
-        assert result == mock_command_success_response
+        mock_patch.assert_called_once()
+        call_args, call_kwargs = mock_patch.call_args
+        assert "pullrequests/123" in call_args[0]
+
+        # Check the request body
+        request_body = call_kwargs["json"]
+        assert len(request_body["workItemRefs"]) == 2
+        assert request_body["workItemRefs"][0]["id"] == "456"
+        assert request_body["workItemRefs"][1]["id"] == "789"
+
+        assert result["success"] is True
+        assert result["data"]["pullRequestId"] == 123
+
+    @pytest.mark.asyncio
+    async def test_add_work_items_empty_list(self, azure_pr_tool):
+        """Test adding empty work items list."""
+        # Configure the tool with default values
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
+
+        result = await azure_pr_tool.add_work_items(123, [])
+
+        assert result["success"] is False
+        assert "At least one work item ID is required" in result["error"]
