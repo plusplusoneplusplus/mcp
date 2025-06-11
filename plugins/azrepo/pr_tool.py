@@ -154,7 +154,7 @@ class AzurePullRequestTool(ToolInterface):
                 },
                 "target_branch": {
                     "type": "string",
-                    "description": "Name of the target branch",
+                    "description": "Name of the target branch (default: 'main' or configured default branch for list operation, use null for all branches)",
                     "nullable": True,
                 },
                 "description": {
@@ -190,7 +190,7 @@ class AzurePullRequestTool(ToolInterface):
                 },
                 "status": {
                     "type": "string",
-                    "description": "Status filter or new status for update operations",
+                    "description": "Status filter or new status for update operations (default: 'active' for list operation, use null for all statuses)",
                     "nullable": True,
                 },
                 "creator": {
@@ -217,6 +217,11 @@ class AzurePullRequestTool(ToolInterface):
                 "skip": {
                     "type": "integer",
                     "description": "Number of PRs to skip",
+                    "nullable": True,
+                },
+                "exclude_drafts": {
+                    "type": "boolean",
+                    "description": "Exclude draft PRs from results (default: true)",
                     "nullable": True,
                 },
                 "draft": {
@@ -472,9 +477,10 @@ class AzurePullRequestTool(ToolInterface):
         organization: Optional[str] = None,
         creator: Optional[str] = "default",
         reviewer: Optional[str] = None,
-        status: Optional[str] = None,
+        status: Optional[str] = "active",
         source_branch: Optional[str] = None,
-        target_branch: Optional[str] = None,
+        target_branch: Optional[str] = "default",
+        exclude_drafts: bool = True,
         top: Optional[int] = None,
         skip: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -512,8 +518,13 @@ class AzurePullRequestTool(ToolInterface):
 
             # Build query parameters
             params: Dict[str, Union[str, int]] = {"api-version": "7.1"}
-            if status:
+
+            # Handle status parameter with new default behavior
+            if status == "active":
+                params["searchCriteria.status"] = "active"
+            elif status:
                 params["searchCriteria.status"] = status
+            # If status is None, don't add status filter (backward compatibility)
 
             # Handle creator parameter with default behavior
             if creator == "default":
@@ -530,8 +541,17 @@ class AzurePullRequestTool(ToolInterface):
                 params["searchCriteria.reviewerId"] = reviewer
             if source_branch:
                 params["searchCriteria.sourceRefName"] = f"refs/heads/{source_branch}"
-            if target_branch:
+
+            # Handle target_branch parameter with smart default
+            if target_branch == "default":
+                # Use configured default target branch or "main" as fallback
+                default_target = self.default_target_branch or "main"
+                params["searchCriteria.targetRefName"] = f"refs/heads/{default_target}"
+                self.logger.debug(f"Using default target branch: {default_target}")
+            elif target_branch:
                 params["searchCriteria.targetRefName"] = f"refs/heads/{target_branch}"
+            # If target_branch is None, don't add target branch filter (backward compatibility)
+
             if top:
                 params["$top"] = top
             if skip:
@@ -546,8 +566,15 @@ class AzurePullRequestTool(ToolInterface):
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
+                        prs = data.get("value", [])
+
+                        # Filter out draft PRs if exclude_drafts is True
+                        if exclude_drafts:
+                            prs = [pr for pr in prs if not pr.get("isDraft", False)]
+                            self.logger.debug(f"Filtered out draft PRs, {len(prs)} PRs remaining")
+
                         # Convert to DataFrame and return CSV
-                        df = self.convert_pr_to_df(data.get("value", []))
+                        df = self.convert_pr_to_df(prs)
                         return {"success": True, "data": df.to_csv(index=False)}
                     else:
                         error_text = await response.text()
@@ -998,9 +1025,10 @@ class AzurePullRequestTool(ToolInterface):
                 organization=arguments.get("organization"),
                 creator=arguments.get("creator", "default"),
                 reviewer=arguments.get("reviewer"),
-                status=arguments.get("status"),
+                status=arguments.get("status", "active"),
                 source_branch=arguments.get("source_branch"),
-                target_branch=arguments.get("target_branch"),
+                target_branch=arguments.get("target_branch", "default"),
+                exclude_drafts=arguments.get("exclude_drafts", True),
                 top=arguments.get("top"),
                 skip=arguments.get("skip"),
             )
