@@ -141,7 +141,7 @@ class AzureHttpClient:
         url: str,
         headers: Optional[Dict[str, str]] = None,
         params: Optional[Dict[str, Any]] = None,
-        json: Optional[Dict[str, Any]] = None,
+        json: Optional[Union[Dict[str, Any], List[Any]]] = None,
         data: Optional[Any] = None,
         **kwargs
     ) -> Dict[str, Any]:
@@ -324,7 +324,7 @@ class AzureHttpClient:
         organization: str,
         project: str,
         endpoint: str,
-        json: Optional[Dict[str, Any]] = None,
+        json: Optional[Union[Dict[str, Any], List[Any]]] = None,
         data: Optional[Any] = None,
         **kwargs
     ) -> Dict[str, Any]:
@@ -339,7 +339,7 @@ class AzureHttpClient:
         organization: str,
         project: str,
         endpoint: str,
-        json: Optional[Dict[str, Any]] = None,
+        json: Optional[Union[Dict[str, Any], List[Any]]] = None,
         data: Optional[Any] = None,
         **kwargs
     ) -> Dict[str, Any]:
@@ -354,7 +354,7 @@ class AzureHttpClient:
         organization: str,
         project: str,
         endpoint: str,
-        json: Optional[Dict[str, Any]] = None,
+        json: Optional[Union[Dict[str, Any], List[Any]]] = None,
         data: Optional[Any] = None,
         **kwargs
     ) -> Dict[str, Any]:
