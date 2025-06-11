@@ -15,6 +15,7 @@ Test Categories:
 - Server integration
 """
 
+import os
 import pytest
 import pytest_asyncio
 import base64
@@ -395,6 +396,7 @@ class TestServerIntegration:
             assert "image_name" in get_session_image_tool.inputSchema["required"]
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(os.name == 'nt', reason="Skipping on Windows due to timeout issues with MCP client session cleanup (Issue #205)")
     async def test_builtin_tool_execution_via_server(self, mcp_client_info, tmp_path):
         """Test executing built-in tool through the MCP server."""
         from .conftest import create_mcp_client
@@ -430,6 +432,7 @@ class TestServerIntegration:
                 # Note: The actual type checking depends on the MCP client implementation
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(os.name == 'nt', reason="Skipping on Windows due to timeout issues with MCP client session cleanup (Issue #205)")
     async def test_builtin_tool_error_handling_via_server(self, mcp_client_info):
         """Test error handling of built-in tool through the MCP server."""
         from .conftest import create_mcp_client
