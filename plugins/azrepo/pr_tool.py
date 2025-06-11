@@ -502,7 +502,12 @@ class AzurePullRequestTool(ToolInterface):
 
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests"
-            url = self._build_api_url(organization=org, project=proj, endpoint=endpoint)
+            # Validate parameters before calling build_api_url
+            if not org:
+                raise ValueError("Organization must be provided")
+            if not proj:
+                raise ValueError("Project must be provided")
+            url = build_api_url(org, proj, endpoint)
             headers = self._get_auth_headers()
 
             # Build query parameters
@@ -574,7 +579,12 @@ class AzurePullRequestTool(ToolInterface):
 
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}?api-version=7.1"
-            url = self._build_api_url(org, proj, endpoint)
+            # Validate parameters before calling build_api_url
+            if not org:
+                raise ValueError("Organization must be provided")
+            if not proj:
+                raise ValueError("Project must be provided")
+            url = build_api_url(org, proj, endpoint)
             headers = self._get_auth_headers()
 
             # Make REST API call
@@ -658,7 +668,12 @@ class AzurePullRequestTool(ToolInterface):
 
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests?api-version=7.1"
-            url = self._build_api_url(org, proj, endpoint)
+            # Validate parameters before calling build_api_url
+            if not org:
+                raise ValueError("Organization must be provided")
+            if not proj:
+                raise ValueError("Project must be provided")
+            url = build_api_url(org, proj, endpoint)
             headers = self._get_auth_headers()
 
             # Build request body
@@ -725,7 +740,12 @@ class AzurePullRequestTool(ToolInterface):
         try:
             # Build URL and headers for updating PR
             endpoint = f"git/repositories/{repository}/pullrequests/{pr_id}?api-version=7.1"
-            url = self._build_api_url(organization, project, endpoint)
+            # Validate parameters before calling build_api_url
+            if not organization:
+                raise ValueError("Organization must be provided")
+            if not project:
+                raise ValueError("Project must be provided")
+            url = build_api_url(organization, project, endpoint)
             headers = self._get_auth_headers()
 
             # Build request body for completion settings
@@ -782,7 +802,12 @@ class AzurePullRequestTool(ToolInterface):
 
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}?api-version=7.1"
-            url = self._build_api_url(org, proj, endpoint)
+            # Validate parameters before calling build_api_url
+            if not org:
+                raise ValueError("Organization must be provided")
+            if not proj:
+                raise ValueError("Project must be provided")
+            url = build_api_url(org, proj, endpoint)
             headers = self._get_auth_headers()
 
             # Build request body with only provided fields
@@ -872,7 +897,12 @@ class AzurePullRequestTool(ToolInterface):
 
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/reviewers/{current_user}?api-version=7.1"
-            url = self._build_api_url(org, proj, endpoint)
+            # Validate parameters before calling build_api_url
+            if not org:
+                raise ValueError("Organization must be provided")
+            if not proj:
+                raise ValueError("Project must be provided")
+            url = build_api_url(org, proj, endpoint)
             headers = self._get_auth_headers()
 
             # Build request body
@@ -923,7 +953,12 @@ class AzurePullRequestTool(ToolInterface):
 
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}?api-version=7.1"
-            url = self._build_api_url(org, proj, endpoint)
+            # Validate parameters before calling build_api_url
+            if not org:
+                raise ValueError("Organization must be provided")
+            if not proj:
+                raise ValueError("Project must be provided")
+            url = build_api_url(org, proj, endpoint)
             headers = self._get_auth_headers()
 
             # Build request body with work item references
@@ -1031,20 +1066,3 @@ class AzurePullRequestTool(ToolInterface):
     ) -> Dict[str, str]:
         """Backward compatibility method for tests."""
         return get_auth_headers(content_type=content_type)
-
-    def _build_api_url(
-        self,
-        organization: Optional[str] = None,
-        project: Optional[str] = None,
-        endpoint: str = "",
-    ) -> str:
-        """Backward compatibility method for tests."""
-        org = organization or self.default_organization
-        if not org:
-            raise ValueError("Organization must be provided")
-
-        proj = project or self.default_project
-        if not proj:
-            raise ValueError("Project must be provided")
-
-        return build_api_url(org, proj, endpoint)

@@ -766,33 +766,3 @@ class AzureWorkItemTool(ToolInterface):
         else:
             # Normal flow
             return get_auth_headers(content_type=content_type)
-
-    def _build_api_url(
-        self, organization: Optional[str] = None, project: Optional[str] = None, endpoint: Optional[str] = None
-    ) -> str:
-        """Build the Azure DevOps API URL for work item operations.
-
-        Args:
-            organization: Azure DevOps organization
-            project: Azure DevOps project
-            endpoint: API endpoint path
-
-        Returns:
-            Complete API URL
-
-        Raises:
-            ValueError: If organization or project is not provided
-        """
-        org = organization or self.default_organization
-        if not org:
-            raise ValueError("Organization must be provided")
-
-        proj = project or self.default_project
-        if not proj:
-            raise ValueError("Project must be provided")
-
-        # If no endpoint is provided, use default for creating work item
-        if endpoint is None:
-            endpoint = f"wit/workitems/$Task?api-version={API_VERSION}"
-
-        return build_api_url(org, proj, endpoint)
