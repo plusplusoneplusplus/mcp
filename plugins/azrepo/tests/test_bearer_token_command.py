@@ -21,6 +21,10 @@ def mock_executor():
 @pytest.fixture
 def mock_env_manager_with_token_command():
     """Mock environment manager with bearer token command configured."""
+    # Clear bearer token cache before each test
+    from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+    clear_bearer_token_cache()
+
     with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
         # Mock the load method
         mock_env_manager.load.return_value = None
@@ -52,6 +56,10 @@ def mock_env_manager_with_token_command():
 @pytest.fixture
 def mock_env_manager_with_static_token():
     """Mock environment manager with static bearer token configured."""
+    # Clear bearer token cache before each test
+    from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+    clear_bearer_token_cache()
+
     with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
         # Mock the load method
         mock_env_manager.load.return_value = None
@@ -81,6 +89,10 @@ def mock_env_manager_with_static_token():
 @pytest.fixture
 def mock_env_manager_no_token():
     """Mock environment manager with no bearer token configured."""
+    # Clear bearer token cache before each test
+    from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+    clear_bearer_token_cache()
+
     with patch("plugins.azrepo.workitem_tool.env_manager") as mock_env_manager:
         # Mock the load method
         mock_env_manager.load.return_value = None
@@ -162,7 +174,7 @@ class TestBearerTokenCommand:
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
     def test_multiple_auth_header_calls_refresh_token(self, mock_subprocess_run, mock_executor, mock_env_manager_with_token_command):
-        """Test that multiple calls to get auth headers refresh the token each time."""
+        """Test that multiple calls to get auth headers use cached token within cache duration."""
         # Mock subprocess.run to simulate successful command execution
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -183,8 +195,8 @@ class TestBearerTokenCommand:
         assert headers2["Authorization"] == "Bearer dynamic-token-from-command-123"
         assert headers3["Authorization"] == "Bearer dynamic-token-from-command-123"
 
-        # Verify that subprocess.run was called multiple times (once for each auth header request)
-        assert mock_subprocess_run.call_count == 3
+        # With caching, subprocess.run should only be called once (first call caches the token)
+        assert mock_subprocess_run.call_count == 1
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
     @pytest.mark.asyncio
@@ -340,6 +352,10 @@ class TestEndToEndBearerTokenWorkflow:
     @pytest.mark.asyncio
     async def test_end_to_end_create_work_item_with_token_command(self, mock_subprocess_run, mock_executor):
         """Test complete workflow of creating a work item using bearer token command."""
+        # Clear bearer token cache before test
+        from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+        clear_bearer_token_cache()
+
         # Mock subprocess.run for token command
         mock_result = MagicMock()
         mock_result.returncode = 0

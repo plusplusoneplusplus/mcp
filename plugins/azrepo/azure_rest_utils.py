@@ -25,6 +25,11 @@ _identity_cache: Dict[str, Dict[str, Any]] = {}
 _cache_expiry: Dict[str, datetime] = {}
 CACHE_DURATION_MINUTES = 30
 
+# Bearer token cache to avoid repeated command executions
+_bearer_token_cache: Optional[str] = None
+_bearer_token_cache_expiry: Optional[datetime] = None
+BEARER_TOKEN_CACHE_DURATION_SECONDS = 300  # 5 minutes
+
 
 @dataclass
 class IdentityInfo:
@@ -120,6 +125,16 @@ def _cache_identity(cache_key: str, identity_data: Dict[str, Any]) -> None:
     """
     _identity_cache[cache_key] = identity_data
     _cache_expiry[cache_key] = datetime.now() + timedelta(minutes=CACHE_DURATION_MINUTES)
+
+
+def clear_bearer_token_cache() -> None:
+    """Clear the bearer token cache.
+
+    This is primarily used for testing to ensure clean state between tests.
+    """
+    global _bearer_token_cache, _bearer_token_cache_expiry
+    _bearer_token_cache = None
+    _bearer_token_cache_expiry = None
 
 
 async def resolve_identity(
@@ -484,6 +499,8 @@ def get_auth_headers(content_type: str = "application/json") -> Dict[str, str]:
     Returns:
         Dictionary with authorization headers
     """
+    global _bearer_token_cache, _bearer_token_cache_expiry
+
     bearer_token = None
 
     # Always get fresh Azure repo parameters from environment manager
@@ -493,7 +510,19 @@ def get_auth_headers(content_type: str = "application/json") -> Dict[str, str]:
     # Try bearer token command first (takes precedence over static token)
     bearer_token_command = azrepo_params.get("bearer_token_command")
     if bearer_token_command:
-        bearer_token = execute_bearer_token_command(bearer_token_command)
+        # Check if we have a cached token that's still valid
+        if (_bearer_token_cache and _bearer_token_cache_expiry and
+            datetime.now() < _bearer_token_cache_expiry):
+            bearer_token = _bearer_token_cache
+            logger.debug("Using cached bearer token")
+        else:
+            # Execute command to get fresh token
+            bearer_token = execute_bearer_token_command(bearer_token_command)
+            if bearer_token:
+                # Cache the token for a short period
+                _bearer_token_cache = bearer_token
+                _bearer_token_cache_expiry = datetime.now() + timedelta(seconds=BEARER_TOKEN_CACHE_DURATION_SECONDS)
+                logger.debug("Cached new bearer token")
 
     # If no token from command, fall back to static token from environment
     if not bearer_token:

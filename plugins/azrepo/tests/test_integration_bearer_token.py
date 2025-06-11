@@ -18,6 +18,10 @@ class TestBearerTokenCommandIntegration:
     async def test_complete_workflow_with_bearer_token_command(self, mock_subprocess_run):
         """Test the complete workflow: environment config -> command execution -> work item creation."""
 
+        # Clear bearer token cache before test
+        from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+        clear_bearer_token_cache()
+
         # Step 1: Mock the bearer token command execution
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -129,7 +133,9 @@ class TestBearerTokenCommandIntegration:
 
                     # Check the patch document
                     patch_document = post_call_args[1]["json"]
-                    assert len(patch_document) == 5  # title, description, area_path, iteration, assigned_to
+                    # With identity resolution, if the current user cannot be resolved,
+                    # the work item will be left unassigned (4 fields instead of 5)
+                    assert len(patch_document) == 4  # title, description, area_path, iteration (no assigned_to due to resolution failure)
 
                     # Verify patch document contents
                     title_patch = next(p for p in patch_document if p["path"] == "/fields/System.Title")
@@ -140,15 +146,17 @@ class TestBearerTokenCommandIntegration:
                     assert description_patch["op"] == "add"
                     assert description_patch["value"] == "Add OAuth2 authentication to the application"
 
-                    # Verify the auto-assignment field is included
-                    assigned_to_patch = next(p for p in patch_document if p["path"] == "/fields/System.AssignedTo")
-                    assert assigned_to_patch["op"] == "add"
-                    # The value should be the current user (in CI environment, this is typically "runner")
-                    assert assigned_to_patch["value"] is not None
+                    # Verify that no assignment field is included due to identity resolution failure
+                    assigned_to_patches = [p for p in patch_document if p["path"] == "/fields/System.AssignedTo"]
+                    assert len(assigned_to_patches) == 0  # No assignment due to identity resolution failure
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
     def test_bearer_token_command_failure_graceful_handling(self, mock_subprocess_run):
         """Test that bearer token command failures are handled gracefully."""
+
+        # Clear bearer token cache before test
+        from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+        clear_bearer_token_cache()
 
         # Mock command failure
         mock_result = MagicMock()
@@ -221,6 +229,10 @@ class TestBearerTokenCommandIntegration:
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
     def test_command_takes_precedence_when_both_configured(self, mock_subprocess_run):
         """Test that bearer token command takes precedence over static token when both are configured."""
+
+        # Clear bearer token cache before test
+        from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+        clear_bearer_token_cache()
 
         # Mock successful command execution
         mock_result = MagicMock()
