@@ -19,6 +19,7 @@ from .azure_rest_utils import (
     get_auth_headers,
     build_api_url,
     process_rest_response,
+    validate_and_format_assignee,
 )
 
 # Import markdown to HTML conversion utility
@@ -164,7 +165,7 @@ class AzureWorkItemTool(ToolInterface):
                 },
                 "assigned_to": {
                     "type": "string",
-                    "description": "User to assign the work item to. Use 'current' to assign to current user, 'none' for unassigned, or specify a username/email. Defaults to current user if not specified.",
+                    "description": "User to assign the work item to. Supports multiple formats: 'current' (assign to current user), 'none'/'unassigned' (leave unassigned), email address (e.g., 'user@domain.com'), display name (e.g., 'John Doe'), or combo format (e.g., 'John Doe <user@domain.com>'). The identity must exist in the Azure DevOps organization. Defaults to current user if not specified.",
                     "default": "current",
                     "nullable": True,
                 },
@@ -501,19 +502,42 @@ class AzureWorkItemTool(ToolInterface):
                     "value": iteration
                 })
 
-            # Handle assignment logic
+            # Handle assignment logic with identity resolution
             assignee = None
-            # Check both parameter and instance configuration for auto-assignment
+            assignment_error = None
+
+            # Determine the assignee to resolve
+            assignee_to_resolve = assigned_to
             should_auto_assign = auto_assign_to_current_user and self.auto_assign_to_current_user
-            if should_auto_assign and assigned_to == "current":
-                current_user = get_current_username()
-                if current_user:
-                    assignee = current_user
-                    self.logger.debug(f"Auto-assigning work item to current user: {current_user}")
-                else:
-                    self.logger.warning("Could not determine current user for auto-assignment")
-            elif assigned_to and assigned_to not in ["current", "none"]:
-                assignee = assigned_to
+
+            # If auto-assignment is enabled and assigned_to is "current", or if assigned_to is None and auto-assignment is enabled
+            if (should_auto_assign and assigned_to == "current") or (assigned_to is None and should_auto_assign):
+                assignee_to_resolve = "current"
+            elif assigned_to and assigned_to.lower() in ["none", "unassigned"]:
+                assignee_to_resolve = None
+
+            # Resolve and validate the assignee if one is specified
+            if assignee_to_resolve:
+                try:
+                    validated_assignee, error_message = await validate_and_format_assignee(
+                        assignee_to_resolve, org, proj, fallback_to_current_user=False
+                    )
+
+                    if validated_assignee:
+                        assignee = validated_assignee
+                        self.logger.debug(f"Successfully resolved assignee '{assignee_to_resolve}' to '{assignee}'")
+                    else:
+                        assignment_error = error_message or f"Failed to resolve assignee '{assignee_to_resolve}'"
+                        self.logger.warning(assignment_error)
+
+                        # If auto-assignment was requested but failed, and we're not already trying current user,
+                        # try to fallback to leaving unassigned rather than failing the entire operation
+                        if assignee_to_resolve != "current":
+                            self.logger.info("Leaving work item unassigned due to identity resolution failure")
+
+                except Exception as e:
+                    assignment_error = f"Error resolving assignee '{assignee_to_resolve}': {str(e)}"
+                    self.logger.error(assignment_error)
 
             # Add assignment to patch document if assignee is determined
             if assignee:
@@ -522,6 +546,14 @@ class AzureWorkItemTool(ToolInterface):
                     "path": "/fields/System.AssignedTo",
                     "value": assignee
                 })
+
+            # Log assignment result
+            if assignee:
+                self.logger.info(f"Work item will be assigned to: {assignee}")
+            elif assignment_error:
+                self.logger.warning(f"Work item will be left unassigned due to assignment error: {assignment_error}")
+            else:
+                self.logger.debug("Work item will be left unassigned")
 
             # Get authentication headers
             headers = get_auth_headers(content_type="application/json-patch+json")
