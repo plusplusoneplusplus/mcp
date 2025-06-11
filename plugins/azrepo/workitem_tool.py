@@ -126,7 +126,7 @@ class AzureWorkItemTool(ToolInterface):
             "properties": {
                 "operation": {
                     "type": "string",
-                    "description": "The work item operation to perform",
+                    "description": "The work item operation to perform, support get, create, update",
                     "enum": [
                         "get",
                         "create",
