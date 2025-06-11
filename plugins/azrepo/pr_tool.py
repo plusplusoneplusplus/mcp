@@ -37,6 +37,10 @@ try:
         PullRequestCreateResponse,
         PullRequestUpdateResponse,
         PullRequestVoteEnum,
+        PullRequestComment,
+        PullRequestThread,
+        PullRequestCommentsResponse,
+        PullRequestCommentResponse,
     )
 except ImportError:
     # Fallback for when module is loaded directly by plugin system
@@ -63,6 +67,10 @@ except ImportError:
     PullRequestCreateResponse = types_module.PullRequestCreateResponse
     PullRequestUpdateResponse = types_module.PullRequestUpdateResponse
     PullRequestVoteEnum = types_module.PullRequestVoteEnum
+    PullRequestComment = types_module.PullRequestComment
+    PullRequestThread = types_module.PullRequestThread
+    PullRequestCommentsResponse = types_module.PullRequestCommentsResponse
+    PullRequestCommentResponse = types_module.PullRequestCommentResponse
 
 
 @register_tool
@@ -135,6 +143,10 @@ class AzurePullRequestTool(ToolInterface):
                         "update",
                         "vote",
                         "add_work_items",
+                        "get_comments",
+                        "resolve_comment",
+                        "add_comment",
+                        "update_comment",
                     ],
                 },
                 "pull_request_id": {
@@ -242,6 +254,41 @@ class AzurePullRequestTool(ToolInterface):
                 "delete_source_branch": {
                     "type": "boolean",
                     "description": "Delete the source branch after PR completion",
+                    "nullable": True,
+                },
+                "comment_id": {
+                    "type": ["string", "integer"],
+                    "description": "ID of the comment to resolve or update",
+                    "nullable": True,
+                },
+                "thread_id": {
+                    "type": ["string", "integer"],
+                    "description": "ID of the comment thread",
+                    "nullable": True,
+                },
+                "comment_content": {
+                    "type": "string",
+                    "description": "Content of the comment (supports markdown)",
+                    "nullable": True,
+                },
+                "response_text": {
+                    "type": "string",
+                    "description": "Response text when resolving a comment",
+                    "nullable": True,
+                },
+                "comment_status": {
+                    "type": "string",
+                    "description": "Filter comments by status (active, resolved, etc.)",
+                    "nullable": True,
+                },
+                "comment_author": {
+                    "type": "string",
+                    "description": "Filter comments by author",
+                    "nullable": True,
+                },
+                "parent_comment_id": {
+                    "type": ["string", "integer"],
+                    "description": "ID of parent comment when replying to existing comment",
                     "nullable": True,
                 },
             },
@@ -1014,6 +1061,275 @@ class AzurePullRequestTool(ToolInterface):
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    async def get_comments(
+        self,
+        pull_request_id: Union[int, str],
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        repository: Optional[str] = None,
+        comment_status: Optional[str] = None,
+        comment_author: Optional[str] = None,
+        top: Optional[int] = None,
+        skip: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Get comments for a pull request using REST API."""
+        try:
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
+            repo = self._get_param_with_default(repository, self.default_repository)
+
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
+
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads"
+            url = build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
+
+            # Build query parameters
+            params: Dict[str, Union[str, int]] = {"api-version": "7.1"}
+
+            if top:
+                params["$top"] = top
+            if skip:
+                params["$skip"] = skip
+
+            self.logger.debug(f"Getting PR comments with URL: {url} and params: {params}")
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, params=params) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            data = json.loads(response_text)
+                            threads = data.get("value", [])
+
+                            # Filter by status if specified
+                            if comment_status:
+                                threads = [t for t in threads if t.get("status", "").lower() == comment_status.lower()]
+
+                            # Filter by author if specified
+                            if comment_author:
+                                filtered_threads = []
+                                for thread in threads:
+                                    comments = thread.get("comments", [])
+                                    filtered_comments = [
+                                        c for c in comments
+                                        if c.get("author", {}).get("uniqueName", "").lower() == comment_author.lower() or
+                                           c.get("author", {}).get("displayName", "").lower() == comment_author.lower()
+                                    ]
+                                    if filtered_comments:
+                                        thread_copy = thread.copy()
+                                        thread_copy["comments"] = filtered_comments
+                                        filtered_threads.append(thread_copy)
+                                threads = filtered_threads
+
+                            return {"success": True, "data": threads}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def resolve_comment(
+        self,
+        pull_request_id: Union[int, str],
+        thread_id: Union[int, str],
+        response_text: Optional[str] = None,
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        repository: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Resolve a pull request comment thread using REST API."""
+        try:
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
+            repo = self._get_param_with_default(repository, self.default_repository)
+
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
+
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads/{thread_id}"
+            url = build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
+
+            # Build request body to resolve the thread
+            request_body = {
+                "status": "fixed"  # Azure DevOps uses "fixed" to mark threads as resolved
+            }
+
+            # Add response comment if provided
+            if response_text:
+                # First, add a response comment to the thread
+                comment_result = await self.add_comment(
+                    pull_request_id=pull_request_id,
+                    thread_id=thread_id,
+                    comment_content=response_text,
+                    organization=org,
+                    project=proj,
+                    repository=repo,
+                )
+                if not comment_result.get("success", False):
+                    return comment_result
+
+            self.logger.debug(f"Resolving comment thread {thread_id} on PR {pull_request_id}")
+
+            # Make REST API call to update thread status
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(url, json=request_body, headers=headers, params={"api-version": "7.1"}) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            thread_data = json.loads(response_text)
+                            return {"success": True, "data": thread_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Thread {thread_id} not found on PR {pull_request_id}"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def add_comment(
+        self,
+        pull_request_id: Union[int, str],
+        comment_content: str,
+        thread_id: Optional[Union[int, str]] = None,
+        parent_comment_id: Optional[Union[int, str]] = None,
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        repository: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Add a comment to a pull request using REST API."""
+        try:
+            if not comment_content:
+                return {"success": False, "error": "Comment content is required"}
+
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
+            repo = self._get_param_with_default(repository, self.default_repository)
+
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
+
+            if thread_id:
+                # Add comment to existing thread
+                endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads/{thread_id}/comments"
+                url = build_api_url(org, proj, endpoint)
+
+                request_body = {
+                    "content": comment_content,
+                    "commentType": "text"
+                }
+
+                if parent_comment_id:
+                    request_body["parentCommentId"] = int(parent_comment_id)
+
+            else:
+                # Create new thread with comment
+                endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads"
+                url = build_api_url(org, proj, endpoint)
+
+                request_body = {
+                    "comments": [
+                        {
+                            "content": comment_content,
+                            "commentType": "text"
+                        }
+                    ],
+                    "status": "active"
+                }
+
+            headers = self._get_auth_headers()
+
+            self.logger.debug(f"Adding comment to PR {pull_request_id}, thread_id: {thread_id}")
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=request_body, headers=headers, params={"api-version": "7.1"}) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            comment_data = json.loads(response_text)
+                            return {"success": True, "data": comment_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Pull request {pull_request_id} or thread {thread_id} not found"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def update_comment(
+        self,
+        pull_request_id: Union[int, str],
+        thread_id: Union[int, str],
+        comment_id: Union[int, str],
+        comment_content: str,
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        repository: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update an existing pull request comment using REST API."""
+        try:
+            if not comment_content:
+                return {"success": False, "error": "Comment content is required"}
+
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
+            repo = self._get_param_with_default(repository, self.default_repository)
+
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
+
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads/{thread_id}/comments/{comment_id}"
+            url = build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
+
+            # Build request body
+            request_body = {
+                "content": comment_content
+            }
+
+            self.logger.debug(f"Updating comment {comment_id} in thread {thread_id} on PR {pull_request_id}")
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(url, json=request_body, headers=headers, params={"api-version": "7.1"}) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            comment_data = json.loads(response_text)
+                            return {"success": True, "data": comment_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Comment {comment_id} not found in thread {thread_id} on PR {pull_request_id}"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments."""
         operation = arguments.get("operation", "")
@@ -1076,6 +1392,46 @@ class AzurePullRequestTool(ToolInterface):
                 pull_request_id=arguments.get("pull_request_id"),
                 work_items=arguments.get("work_items", []),
                 organization=arguments.get("organization"),
+            )
+        elif operation == "get_comments":
+            return await self.get_comments(
+                pull_request_id=arguments.get("pull_request_id"),
+                organization=arguments.get("organization"),
+                project=arguments.get("project"),
+                repository=arguments.get("repository"),
+                comment_status=arguments.get("comment_status"),
+                comment_author=arguments.get("comment_author"),
+                top=arguments.get("top"),
+                skip=arguments.get("skip"),
+            )
+        elif operation == "resolve_comment":
+            return await self.resolve_comment(
+                pull_request_id=arguments.get("pull_request_id"),
+                thread_id=arguments.get("thread_id"),
+                response_text=arguments.get("response_text"),
+                organization=arguments.get("organization"),
+                project=arguments.get("project"),
+                repository=arguments.get("repository"),
+            )
+        elif operation == "add_comment":
+            return await self.add_comment(
+                pull_request_id=arguments.get("pull_request_id"),
+                comment_content=arguments.get("comment_content"),
+                thread_id=arguments.get("thread_id"),
+                parent_comment_id=arguments.get("parent_comment_id"),
+                organization=arguments.get("organization"),
+                project=arguments.get("project"),
+                repository=arguments.get("repository"),
+            )
+        elif operation == "update_comment":
+            return await self.update_comment(
+                pull_request_id=arguments.get("pull_request_id"),
+                thread_id=arguments.get("thread_id"),
+                comment_id=arguments.get("comment_id"),
+                comment_content=arguments.get("comment_content"),
+                organization=arguments.get("organization"),
+                project=arguments.get("project"),
+                repository=arguments.get("repository"),
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}
