@@ -444,77 +444,10 @@ class PluginRegistry:
                 # Add to discovered paths to avoid reprocessing
                 self.discovered_paths.add(plugin_name)
 
-                # Look for all files ending with tool.py
-                tool_files = list(item.glob("*tool.py"))
-                
-                # Individual Plugin Loading Logs
-                logger.info(f"🔌 Loading plugin: {plugin_name}")
-                
-                if tool_files:
-                    logger.info(f"  📄 Found tool modules: {', '.join([f.name for f in tool_files])}")
-                    
-                    loaded_tools = []
-                    for tool_file in tool_files:
-                        try:
-                            # Extract module name from filename (e.g., "repo_tool.py" -> "repo_tool")
-                            module_name = tool_file.stem
+                # Dynamically import the plugin as a module
+                module = importlib.import_module(plugin_name)
+                self._scan_module_for_tools(module)
 
-                            # Import the module directly using importlib
-                            spec = importlib.util.spec_from_file_location(
-                                f"{plugin_name}.{module_name}", str(tool_file)
-                            )
-                            if spec and spec.loader:
-                                module = importlib.util.module_from_spec(spec)
-                                sys.modules[spec.name] = module
-                                spec.loader.exec_module(module)
-
-                                # Scan for tools in the module
-                                tools_before = len(self.tools)
-                                self._scan_module_for_tools(module)
-                                tools_after = len(self.tools)
-                                tools_added = tools_after - tools_before
-                                
-                                if tools_added > 0:
-                                    loaded_tools.append(module_name)
-                                    logger.info(f"  ✅ Successfully loaded: {module_name} ({tools_added} tools)")
-                                else:
-                                    logger.info(f"  ⚠️  No tools found in: {module_name}")
-                            else:
-                                logger.error(f"  ❌ Failed to create spec for {tool_file}")
-                        except Exception as e:
-                            logger.error(f"  ❌ Error importing tool module from {tool_file}: {e}")
-                    
-                    if loaded_tools:
-                        plugins_loaded += 1
-                        plugin_duration = time.time() - plugin_start_time
-                        logger.info(f"  ⏱️  Plugin loaded in {plugin_duration:.3f}s")
-                        plugin_details.append({
-                            "name": plugin_name,
-                            "status": "success",
-                            "duration": plugin_duration,
-                            "tool_modules": loaded_tools,
-                            "source_path": str(item)
-                        })
-                    else:
-                        plugins_failed += 1
-                        plugin_details.append({
-                            "name": plugin_name,
-                            "status": "failed",
-                            "duration": time.time() - plugin_start_time,
-                            "error": "No tools successfully loaded",
-                            "source_path": str(item)
-                        })
-                else:
-                    logger.info(f"  📄 No tool modules found (*tool.py)")
-                    plugins_failed += 1
-                    plugin_details.append({
-                        "name": plugin_name,
-                        "status": "failed",
-                        "duration": time.time() - plugin_start_time,
-                        "error": "No tool modules found",
-                        "source_path": str(item)
-                    })
-                    
             except Exception as e:
                 plugins_failed += 1
                 plugin_duration = time.time() - plugin_start_time
@@ -538,9 +471,7 @@ class PluginRegistry:
             for detail in plugin_details:
                 status_icon = "✅" if detail["status"] == "success" else "❌"
                 logger.info(f"    {status_icon} {detail['name']}: {detail['status']} ({detail['duration']:.3f}s)")
-                if detail["status"] == "success" and "tool_modules" in detail:
-                    logger.info(f"      └─ Modules: {', '.join(detail['tool_modules'])}")
-                elif detail["status"] == "failed" and "error" in detail:
+                if detail["status"] == "failed" and "error" in detail:
                     logger.info(f"      └─ Error: {detail['error']}")
 
     def _log_plugin_discovery_start(self, plugin_dir: Path):
