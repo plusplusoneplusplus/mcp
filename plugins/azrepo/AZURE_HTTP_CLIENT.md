@@ -1,211 +1,271 @@
-# AzureHttpClient Usage Guide
+# Azure HTTP Client
 
-## Overview
+A centralized HTTP client utility for Azure DevOps REST API operations, designed to eliminate HTTP message proliferation and provide robust connection management.
 
-The `AzureHttpClient` class provides a centralized HTTP client for Azure DevOps REST API operations. It replaces the need for multiple individual `aiohttp.ClientSession()` instances throughout the Azure DevOps tools, providing connection pooling, retry logic, and standardized error handling.
+## Features
 
-## Key Benefits
+- **Connection Pooling**: Reuses connections to improve performance
+- **Automatic Retries**: Handles transient failures with exponential backoff
+- **Standardized Error Handling**: Consistent error responses across all operations
+- **Resource Management**: Proper cleanup of connections and sessions
+- **Azure DevOps Integration**: Built-in support for authentication and URL building
+- **Configurable**: Customizable timeouts, retry policies, and connection limits
 
-- **Connection Pooling**: Reuses connections across multiple requests (100 total, 30 per-host)
-- **Retry Logic**: Automatic retries with exponential backoff for transient failures
-- **Standardized Error Handling**: Consistent error processing and response formatting
-- **Resource Management**: Proper async context manager for cleanup
-- **Authentication Integration**: Seamless integration with existing `get_auth_headers()` function
+## Quick Start
 
-## Basic Usage
+### Basic Usage with Azure DevOps Integration
 
 ```python
-from azure_rest_utils import AzureHttpClient, get_auth_headers, build_api_url
+from plugins.azrepo.azure_rest_utils import AzureHttpClient
 
-async def make_api_request():
-    # Create client with default configuration
+async def example_usage():
     async with AzureHttpClient() as client:
-        headers = get_auth_headers()
-        url = build_api_url(organization, project, endpoint)
-        
-        # Make GET request
-        response = await client.get(url, headers=headers)
-        
-        if response['success']:
-            data = response['data']
-            print(f"Success: {data}")
+        # Get work items - automatically handles auth and URL building
+        result = await client.azure_get(
+            organization="myorg",
+            project="myproject",
+            endpoint="wit/workitems/123",
+            params={"api-version": "7.1"}
+        )
+
+        if result['success']:
+            work_item = result['data']
+            print(f"Work item title: {work_item['fields']['System.Title']}")
         else:
-            print(f"Error: {response['error']}")
+            print(f"Error: {result['error']}")
+
+        # Create a work item
+        work_item_data = {
+            "op": "add",
+            "path": "/fields/System.Title",
+            "value": "New Bug Report"
+        }
+
+        result = await client.azure_patch(
+            organization="myorg",
+            project="myproject",
+            endpoint="wit/workitems/$Bug",
+            json=[work_item_data],
+            params={"api-version": "7.1"}
+        )
+
+        if result['success']:
+            print(f"Created work item: {result['data']['id']}")
 ```
 
-## Configuration Options
+### Advanced Usage with Custom Configuration
 
 ```python
-# Custom configuration
-async with AzureHttpClient(
-    total_connections=50,        # Total connection pool limit
-    per_host_connections=15,     # Per-host connection limit
-    dns_cache_ttl=600,          # DNS cache TTL in seconds
-    request_timeout=60,         # Request timeout in seconds
-    max_retries=5,              # Maximum retry attempts
-    retry_backoff_factor=1.0,   # Exponential backoff factor
-    retry_statuses=[429, 500, 502, 503, 504]  # Status codes to retry
-) as client:
-    # Use client...
+from plugins.azrepo.azure_rest_utils import AzureHttpClient
+
+# Custom configuration for high-throughput scenarios
+async def high_performance_example():
+    client = AzureHttpClient(
+        total_connections=200,      # Increase connection pool
+        per_host_connections=50,    # More connections per host
+        request_timeout=30,         # Longer timeout
+        max_retries=5,             # More retry attempts
+        retry_backoff_factor=2.0   # Faster backoff
+    )
+
+    async with client:
+        # Batch operations
+        tasks = []
+        for work_item_id in range(1, 101):
+            task = client.azure_get(
+                organization="myorg",
+                project="myproject",
+                endpoint=f"wit/workitems/{work_item_id}",
+                params={"api-version": "7.1"}
+            )
+            tasks.append(task)
+
+        # Execute all requests concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results
+        successful_items = [r['data'] for r in results if isinstance(r, dict) and r.get('success')]
+        print(f"Retrieved {len(successful_items)} work items")
 ```
 
-## HTTP Methods
+## API Reference
 
-The client supports all standard HTTP methods:
+### Azure DevOps Convenience Methods
 
-```python
-async with AzureHttpClient() as client:
-    # GET request
-    response = await client.get(url, headers=headers, params=params)
-    
-    # POST request with JSON
-    response = await client.post(url, headers=headers, json=data)
-    
-    # PATCH request
-    response = await client.patch(url, headers=headers, json=update_data)
-    
-    # PUT request
-    response = await client.put(url, headers=headers, json=data)
-    
-    # DELETE request
-    response = await client.delete(url, headers=headers)
-```
+These methods automatically handle authentication, URL building, and response processing:
 
-## Response Format
+#### `azure_get(organization, project, endpoint, params=None, **kwargs)`
+Perform GET requests to Azure DevOps REST API.
 
-All methods return a standardized response format:
+#### `azure_post(organization, project, endpoint, json=None, data=None, **kwargs)`
+Perform POST requests to Azure DevOps REST API.
 
+#### `azure_patch(organization, project, endpoint, json=None, data=None, **kwargs)`
+Perform PATCH requests to Azure DevOps REST API.
+
+#### `azure_put(organization, project, endpoint, json=None, data=None, **kwargs)`
+Perform PUT requests to Azure DevOps REST API.
+
+#### `azure_delete(organization, project, endpoint, **kwargs)`
+Perform DELETE requests to Azure DevOps REST API.
+
+**Parameters:**
+- `organization`: Azure DevOps organization name or full URL
+- `project`: Azure DevOps project name
+- `endpoint`: API endpoint path (without leading slash)
+- `json`: JSON payload for POST/PATCH/PUT requests
+- `data`: Raw data payload for POST/PATCH/PUT requests
+- `params`: Query parameters for GET requests
+- `**kwargs`: Additional arguments passed to the underlying request
+
+**Returns:**
+All methods return a standardized response dictionary:
 ```python
 {
-    "success": bool,                    # True if request succeeded
-    "data": dict,                      # Response data (on success)
-    "error": str,                      # Error message (on failure)
-    "status_code": int,                # HTTP status code
-    "raw_response": str                # Raw response text
+    "success": bool,
+    "data": Optional[Dict[str, Any]],    # Present on success
+    "error": Optional[str],              # Present on failure
+    "raw_output": Optional[str]          # Present on failure or parse error
 }
 ```
 
-## Error Handling and Retries
+### Low-Level HTTP Methods
 
-The client automatically retries requests for the following conditions:
+For non-Azure DevOps APIs or when you need full control:
 
-- **HTTP Status Codes**: 429 (Too Many Requests), 500, 502, 503, 504
-- **Timeout Errors**: Server timeout and connection timeout errors
-- **Exponential Backoff**: Delays increase exponentially between retries
+#### `request(method, url, **kwargs)`
+Generic HTTP request method with retry logic.
+
+#### `get(url, **kwargs)`, `post(url, **kwargs)`, `patch(url, **kwargs)`, `put(url, **kwargs)`, `delete(url, **kwargs)`
+Convenience methods for specific HTTP verbs.
+
+## Configuration Options
+
+### Constructor Parameters
 
 ```python
-# Example with custom retry configuration
-async with AzureHttpClient(
-    max_retries=3,
-    retry_backoff_factor=0.5,
-    retry_statuses=[429, 500, 503]
-) as client:
-    response = await client.get(url, headers=headers)
-    # Will retry up to 3 times with delays: 0.5s, 1.0s, 2.0s
+AzureHttpClient(
+    total_connections: int = 100,           # Total connection pool size
+    per_host_connections: int = 30,         # Max connections per host
+    dns_cache_ttl: int = 300,              # DNS cache TTL in seconds
+    request_timeout: int = 30,              # Request timeout in seconds
+    max_retries: int = 3,                   # Maximum retry attempts
+    retry_backoff_factor: float = 1.0,      # Exponential backoff factor
+    retry_statuses: Optional[List[int]] = None  # HTTP status codes to retry
+)
 ```
 
-## Migration from Individual Sessions
+### Default Retry Status Codes
+- `429` - Too Many Requests
+- `500` - Internal Server Error
+- `502` - Bad Gateway
+- `503` - Service Unavailable
+- `504` - Gateway Timeout
 
-### Before (Multiple Sessions)
+## Migration Guide
+
+### From Individual Sessions
+
+**Before:**
 ```python
-# Old pattern - creates new session for each request
-async def old_make_request():
+async with aiohttp.ClientSession() as session:
     headers = get_auth_headers()
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            if response.status == 200:
-                return await response.json()
-            else:
-                raise Exception(f"HTTP {response.status}")
+    url = build_api_url(org, project, endpoint)
+    async with session.get(url, headers=headers) as response:
+        result = process_rest_response(await response.text(), response.status)
 ```
 
-### After (Centralized Client)
+**After:**
 ```python
-# New pattern - reuses connection pool
-async def new_make_request():
-    async with AzureHttpClient() as client:
-        headers = get_auth_headers()
-        response = await client.get(url, headers=headers)
-        
-        if response['success']:
-            return response['data']
-        else:
-            raise Exception(response['error'])
+async with AzureHttpClient() as client:
+    result = await client.azure_get(org, project, endpoint)
 ```
 
-## Integration with Existing Tools
+### From Multiple Tools
 
-The `AzureHttpClient` is designed to integrate seamlessly with existing Azure DevOps utilities:
-
+**Before (PR Tool):**
 ```python
-from azure_rest_utils import AzureHttpClient, get_auth_headers, build_api_url, process_rest_response
-
-async def list_pull_requests(organization, project, repository):
-    async with AzureHttpClient() as client:
-        # Use existing utilities
-        headers = get_auth_headers()
-        endpoint = f"git/repositories/{repository}/pullrequests"
-        url = build_api_url(organization, project, endpoint)
-        
-        # Make request with automatic retry and error handling
-        response = await client.get(url, headers=headers, params={
-            "api-version": "7.1",
-            "searchCriteria.status": "active"
-        })
-        
-        return response
+# 11 separate ClientSession instances across different methods
+async with aiohttp.ClientSession() as session:
+    # ... authentication and URL building logic repeated
 ```
 
-## Performance Benefits
-
-- **Reduced Connection Overhead**: Connection pooling eliminates the need to establish new connections for each request
-- **DNS Caching**: Reduces DNS lookup overhead for repeated requests to the same hosts
-- **Keep-Alive Connections**: Maintains persistent connections for better performance
-- **Configurable Limits**: Prevents resource exhaustion with configurable connection limits
+**After:**
+```python
+# Single shared client instance
+async with AzureHttpClient() as client:
+    # All operations use the same connection pool
+    pr_result = await client.azure_get(org, project, "git/pullrequests/123")
+    comments_result = await client.azure_get(org, project, "git/pullrequests/123/threads")
+```
 
 ## Best Practices
 
-1. **Use Context Manager**: Always use `async with` to ensure proper cleanup
-2. **Reuse Client Instance**: Create one client per operation scope, not per request
-3. **Configure Appropriately**: Adjust connection limits and timeouts based on your use case
-4. **Handle Errors Gracefully**: Check the `success` field in responses
-5. **Monitor Retry Behavior**: Log retry attempts for debugging and monitoring
-
-## Example: Complete Tool Integration
+### 1. Use Context Managers
+Always use the client within an async context manager to ensure proper resource cleanup:
 
 ```python
-class AzurePullRequestTool:
-    def __init__(self):
-        # Configure client for this tool's needs
-        self.http_client_config = {
-            'total_connections': 20,
-            'per_host_connections': 10,
-            'request_timeout': 30,
-            'max_retries': 3
-        }
-    
-    async def execute_tool(self, arguments):
-        async with AzureHttpClient(**self.http_client_config) as client:
-            if arguments['operation'] == 'list':
-                return await self._list_pull_requests(client, arguments)
-            elif arguments['operation'] == 'create':
-                return await self._create_pull_request(client, arguments)
-            # ... other operations
-    
-    async def _list_pull_requests(self, client, args):
-        headers = get_auth_headers()
-        url = build_api_url(args['org'], args['project'], 
-                           f"git/repositories/{args['repo']}/pullrequests")
-        
-        response = await client.get(url, headers=headers, params={
-            "api-version": "7.1",
-            "searchCriteria.status": args.get('status', 'active')
-        })
-        
-        if response['success']:
-            return {"success": True, "data": response['data']}
-        else:
-            return {"success": False, "error": response['error']}
+async with AzureHttpClient() as client:
+    # Your operations here
+    pass
+# Resources automatically cleaned up
 ```
 
-This centralized approach eliminates the HTTP message proliferation issue and provides a robust foundation for all Azure DevOps REST API operations. 
+### 2. Reuse Client Instances
+Create one client instance per logical operation group:
+
+```python
+# Good: One client for related operations
+async with AzureHttpClient() as client:
+    work_item = await client.azure_get(org, project, "wit/workitems/123")
+    comments = await client.azure_get(org, project, "wit/workitems/123/comments")
+
+# Avoid: Multiple clients for related operations
+async with AzureHttpClient() as client1:
+    work_item = await client1.azure_get(org, project, "wit/workitems/123")
+async with AzureHttpClient() as client2:
+    comments = await client2.azure_get(org, project, "wit/workitems/123/comments")
+```
+
+### 3. Handle Errors Gracefully
+Always check the `success` field in responses:
+
+```python
+result = await client.azure_get(org, project, endpoint)
+if result['success']:
+    data = result['data']
+    # Process successful response
+else:
+    logger.error(f"API request failed: {result['error']}")
+    # Handle error appropriately
+```
+
+### 4. Configure for Your Use Case
+Adjust configuration based on your application's needs:
+
+```python
+# High-throughput applications
+client = AzureHttpClient(
+    total_connections=200,
+    per_host_connections=50,
+    max_retries=5
+)
+
+# Low-latency applications
+client = AzureHttpClient(
+    request_timeout=10,
+    max_retries=1,
+    retry_backoff_factor=0.5
+)
+```
+
+## Integration with Existing Code
+
+The `AzureHttpClient` seamlessly integrates with existing Azure DevOps utilities:
+
+- **Authentication**: Automatically uses `get_auth_headers()` for all Azure requests
+- **URL Building**: Leverages `build_api_url()` for proper endpoint construction
+- **Response Processing**: Uses `process_rest_response()` for consistent error handling
+- **Environment**: Works with existing environment variable configuration
+
+This ensures backward compatibility while providing the benefits of centralized HTTP management.

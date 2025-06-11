@@ -374,3 +374,88 @@ class TestAzureHttpClient:
             expected_delays = [0.1, 0.2]
             actual_delays = [call[0][0] for call in mock_sleep.call_args_list]
             assert actual_delays == expected_delays
+
+    @pytest.mark.asyncio
+    async def test_azure_convenience_methods(self):
+        """Test Azure DevOps convenience methods with automatic auth and URL building."""
+        with patch('plugins.azrepo.azure_rest_utils.aiohttp.TCPConnector'), \
+             patch('plugins.azrepo.azure_rest_utils.aiohttp.ClientSession') as mock_client_session, \
+             patch('plugins.azrepo.azure_rest_utils.get_auth_headers') as mock_get_auth, \
+             patch('plugins.azrepo.azure_rest_utils.build_api_url') as mock_build_url:
+
+            # Mock connector and session
+            mock_connector = AsyncMock()
+            mock_session = AsyncMock()
+            mock_client_session.return_value = mock_session
+
+            # Mock response
+            mock_response = AsyncMock()
+            mock_response.status = 200
+            mock_response.text = AsyncMock(return_value='{"result": "success"}')
+
+            # Mock the context manager for session.request
+            mock_context_manager = AsyncMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+            mock_session.request.return_value = mock_context_manager
+
+            # Mock utility functions
+            mock_get_auth.return_value = {"Authorization": "Bearer token", "Content-Type": "application/json"}
+            mock_build_url.return_value = "https://dev.azure.com/org/project/_apis/test"
+
+            client = AzureHttpClient()
+
+            async with client:
+                # Test azure_get method
+                result = await client.azure_get("org", "project", "test", params={"api-version": "7.1"})
+
+                # Verify utility functions were called
+                mock_build_url.assert_called_with("org", "project", "test")
+                mock_get_auth.assert_called_with("application/json")
+
+                # Verify response
+                assert result['success'] is True
+                assert result['data'] == {"result": "success"}
+
+    @pytest.mark.asyncio
+    async def test_azure_post_with_json(self):
+        """Test Azure DevOps POST method with JSON payload."""
+        with patch('plugins.azrepo.azure_rest_utils.aiohttp.TCPConnector'), \
+             patch('plugins.azrepo.azure_rest_utils.aiohttp.ClientSession') as mock_client_session, \
+             patch('plugins.azrepo.azure_rest_utils.get_auth_headers') as mock_get_auth, \
+             patch('plugins.azrepo.azure_rest_utils.build_api_url') as mock_build_url:
+
+            # Mock connector and session
+            mock_connector = AsyncMock()
+            mock_session = AsyncMock()
+            mock_client_session.return_value = mock_session
+
+            # Mock response
+            mock_response = AsyncMock()
+            mock_response.status = 201
+            mock_response.text = AsyncMock(return_value='{"id": 123, "created": true}')
+
+            # Mock the context manager for session.request
+            mock_context_manager = AsyncMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_response)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=None)
+            mock_session.request.return_value = mock_context_manager
+
+            # Mock utility functions
+            mock_get_auth.return_value = {"Authorization": "Bearer token", "Content-Type": "application/json"}
+            mock_build_url.return_value = "https://dev.azure.com/org/project/_apis/test"
+
+            client = AzureHttpClient()
+
+            async with client:
+                # Test azure_post method
+                test_data = {"name": "test", "value": 123}
+                result = await client.azure_post("org", "project", "test", json=test_data)
+
+                # Verify utility functions were called
+                mock_build_url.assert_called_with("org", "project", "test")
+                mock_get_auth.assert_called_with("application/json")
+
+                # Verify response
+                assert result['success'] is True
+                assert result['data'] == {"id": 123, "created": True}

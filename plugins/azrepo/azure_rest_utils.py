@@ -266,6 +266,116 @@ class AzureHttpClient:
         """Convenience method for DELETE requests."""
         return await self.request('DELETE', url, **kwargs)
 
+    # Integration methods with existing utilities
+    async def azure_request(
+        self,
+        method: str,
+        organization: str,
+        project: str,
+        endpoint: str,
+        content_type: str = "application/json",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Make an Azure DevOps REST API request with automatic authentication and URL building.
+
+        This method integrates with existing utility functions to provide a seamless
+        experience for Azure DevOps API calls.
+
+        Args:
+            method: HTTP method (GET, POST, PATCH, PUT, DELETE)
+            organization: Azure DevOps organization name or URL
+            project: Azure DevOps project name
+            endpoint: API endpoint path without leading slash
+            content_type: Content-Type header value
+            **kwargs: Additional arguments passed to the request
+
+        Returns:
+            Dictionary with standardized response format from process_rest_response()
+        """
+        # Build URL using existing utility
+        url = build_api_url(organization, project, endpoint)
+
+        # Get authentication headers using existing utility
+        headers = get_auth_headers(content_type)
+
+        # Merge with any additional headers provided
+        if 'headers' in kwargs:
+            headers.update(kwargs.pop('headers'))
+
+        # Make the request
+        return await self.request(method, url, headers=headers, **kwargs)
+
+    async def azure_get(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps GET requests."""
+        return await self.azure_request(
+            'GET', organization, project, endpoint,
+            params=params, **kwargs
+        )
+
+    async def azure_post(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps POST requests."""
+        return await self.azure_request(
+            'POST', organization, project, endpoint,
+            json=json, data=data, **kwargs
+        )
+
+    async def azure_patch(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps PATCH requests."""
+        return await self.azure_request(
+            'PATCH', organization, project, endpoint,
+            json=json, data=data, **kwargs
+        )
+
+    async def azure_put(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps PUT requests."""
+        return await self.azure_request(
+            'PUT', organization, project, endpoint,
+            json=json, data=data, **kwargs
+        )
+
+    async def azure_delete(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps DELETE requests."""
+        return await self.azure_request(
+            'DELETE', organization, project, endpoint, **kwargs
+        )
+
 
 @dataclass
 class IdentityInfo:
