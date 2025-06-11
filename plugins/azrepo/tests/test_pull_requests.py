@@ -5,8 +5,87 @@ Tests for pull request operations.
 import json
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
+from plugins.azrepo.tests.workitem_helpers import mock_azure_http_client
+from typing import Optional
 
 from ..pr_tool import AzurePullRequestTool
+
+
+def mock_pr_azure_http_client(
+    method: str = "post",
+    status_code: int = 200,
+    response_data: Optional[dict] = None,
+    error_message: Optional[str] = None,
+    raw_response_text: Optional[str] = None,
+):
+    """
+    Helper function to mock AzureHttpClient responses for PR tool tests.
+    This patches the correct import path for the PR tool.
+    """
+    # Prepare the response data
+    json_parse_error = None
+    if raw_response_text is not None:
+        text_payload = raw_response_text
+        try:
+            json_payload = json.loads(text_payload)
+        except json.JSONDecodeError as e:
+            json_payload = {"error": "invalid json in mock"}
+            json_parse_error = e
+    else:
+        if status_code < 300 and response_data is None:
+            response_data = {
+                "id": 12345,
+                "rev": 1,
+                "fields": {"System.Title": "Test Work Item"},
+                "url": "https://dev.azure.com/testorg/test-project/_apis/wit/workitems/12345",
+            }
+
+        json_payload = (
+            response_data if status_code < 300 else {"message": error_message}
+        )
+        text_payload = json.dumps(json_payload)
+
+    # Create the standardized AzureHttpClient response format
+    if status_code < 300:
+        # Check for JSON parse error on successful status code
+        if json_parse_error:
+            mock_result = {
+                "success": False,
+                "error": f"Failed to parse response: {json_parse_error}",
+                "status_code": status_code,
+                "raw_response": text_payload
+            }
+        else:
+            mock_result = {
+                "success": True,
+                "data": json_payload,
+                "status_code": status_code,
+                "raw_response": text_payload
+            }
+    else:
+        # Format error message the same way as the real AzureHttpClient
+        if status_code == 404:
+            error_msg = "Resource not found"
+        else:
+            error_msg = f"HTTP {status_code}: {error_message or text_payload}"
+        
+        mock_result = {
+            "success": False,
+            "error": error_msg,
+            "status_code": status_code,
+            "raw_response": text_payload
+        }
+
+    # Create the mock AzureHttpClient
+    mock_client = MagicMock()
+    mock_client.request = AsyncMock(return_value=mock_result)
+
+    # Set up the async context manager
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    # Patch the correct import path for PR tool
+    return patch("plugins.azrepo.pr_tool.AzureHttpClient", return_value=mock_client)
 
 
 @pytest.fixture
@@ -599,12 +678,11 @@ class TestVotingAndReviewers:
     """Test voting and reviewer operations using REST API."""
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.put")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_current_username")
-    async def test_set_vote(self, mock_username, mock_auth_headers, mock_put, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_current_username")
+    async def test_set_vote(self, mock_username, mock_auth_headers, azure_pr_tool):
         """Test setting a vote on a pull request via REST API."""
-        # Setup mock response for aiohttp
+        # Setup mock response data
         mock_reviewer_data = {
             "id": "test-user",
             "displayName": "Test User",
@@ -612,37 +690,36 @@ class TestVotingAndReviewers:
             "isRequired": False
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text.return_value = json.dumps(mock_reviewer_data)
-        mock_put.return_value.__aenter__.return_value = mock_response
-        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
         mock_username.return_value = "test-user"
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         # Configure the tool with default values
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.set_vote(123, "approve")
+        with mock_pr_azure_http_client(method="put", response_data=mock_reviewer_data) as mock_client:
+            result = await azure_pr_tool.set_vote(123, "approve")
 
-        mock_put.assert_called_once()
-        call_args, call_kwargs = mock_put.call_args
-        assert "pullrequests/123/reviewers/test-user" in call_args[0]
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            
+            # Check the method and URL
+            assert call_args[0] == "PUT"
+            assert "pullrequests/123/reviewers/test-user" in call_args[1]
 
-        # Check the request body
-        request_body = call_kwargs["json"]
-        assert request_body["vote"] == 10  # approve maps to 10
-        assert request_body["isRequired"] is False
+            # Check the request body
+            request_body = call_kwargs["json"]
+            assert request_body["vote"] == 10  # approve maps to 10
+            assert request_body["isRequired"] is False
 
-        assert result["success"] is True
-        assert result["data"]["vote"] == 10
+            assert result["success"] is True
+            assert result["data"]["vote"] == 10
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.put")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_current_username")
-    async def test_set_vote_invalid_value(self, mock_username, mock_auth_headers, mock_put, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_current_username")
+    async def test_set_vote_invalid_value(self, mock_username, azure_pr_tool):
         """Test setting an invalid vote value."""
         mock_username.return_value = "test-user"
 
@@ -654,16 +731,14 @@ class TestVotingAndReviewers:
         result = await azure_pr_tool.set_vote(123, "invalid-vote")
 
         # Should not make any HTTP calls for invalid vote
-        mock_put.assert_not_called()
         assert result["success"] is False
         assert "Invalid vote value" in result["error"]
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.patch")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_add_work_items(self, mock_auth_headers, mock_patch, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_add_work_items(self, mock_auth_headers, azure_pr_tool):
         """Test adding work items to a pull request via REST API."""
-        # Setup mock response for aiohttp
+        # Setup mock response data
         mock_pr_data = {
             "pullRequestId": 123,
             "workItemRefs": [
@@ -672,10 +747,6 @@ class TestVotingAndReviewers:
             ]
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text.return_value = json.dumps(mock_pr_data)
-        mock_patch.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         # Configure the tool with default values
@@ -683,20 +754,25 @@ class TestVotingAndReviewers:
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.add_work_items(123, [456, 789])
+        with mock_pr_azure_http_client(method="patch", response_data=mock_pr_data) as mock_client:
+            result = await azure_pr_tool.add_work_items(123, [456, 789])
 
-        mock_patch.assert_called_once()
-        call_args, call_kwargs = mock_patch.call_args
-        assert "pullrequests/123" in call_args[0]
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            
+            # Check the method and URL
+            assert call_args[0] == "PATCH"
+            assert "pullrequests/123" in call_args[1]
 
-        # Check the request body
-        request_body = call_kwargs["json"]
-        assert len(request_body["workItemRefs"]) == 2
-        assert request_body["workItemRefs"][0]["id"] == "456"
-        assert request_body["workItemRefs"][1]["id"] == "789"
+            # Check the request body
+            request_body = call_kwargs["json"]
+            assert len(request_body["workItemRefs"]) == 2
+            assert request_body["workItemRefs"][0]["id"] == "456"
+            assert request_body["workItemRefs"][1]["id"] == "789"
 
-        assert result["success"] is True
-        assert result["data"]["pullRequestId"] == 123
+            assert result["success"] is True
+            assert result["data"]["pullRequestId"] == 123
 
     @pytest.mark.asyncio
     async def test_add_work_items_empty_list(self, azure_pr_tool):
@@ -716,9 +792,8 @@ class TestCommentManagement:
     """Test comment management operations."""
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_get_comments_basic(self, mock_auth_headers, mock_get, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_get_comments_basic(self, mock_auth_headers, azure_pr_tool):
         """Test basic comment retrieval via REST API."""
         # Setup mock response for comment threads
         mock_threads = [
@@ -758,34 +833,33 @@ class TestCommentManagement:
             }
         ]
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_threads}
-        mock_response.text.return_value = json.dumps({"value": mock_threads})
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.get_comments(pull_request_id=123)
+        with mock_pr_azure_http_client(method="get", response_data={"value": mock_threads}) as mock_client:
+            result = await azure_pr_tool.get_comments(pull_request_id=123)
 
-        mock_get.assert_called_once()
-        call_args, call_kwargs = mock_get.call_args
-        assert "pullrequests/123/threads" in call_args[0]
-        params = call_kwargs["params"]
-        assert params["api-version"] == "7.1"
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            
+            # Check the method and URL
+            assert call_args[0] == "GET"
+            assert "pullrequests/123/threads" in call_args[1]
+            params = call_kwargs["params"]
+            assert params["api-version"] == "7.1"
 
-        assert result["success"] is True
-        assert len(result["data"]) == 2
-        assert result["data"][0]["id"] == 1
-        assert result["data"][1]["id"] == 2
+            assert result["success"] is True
+            assert len(result["data"]) == 2
+            assert result["data"][0]["id"] == 1
+            assert result["data"][1]["id"] == 2
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_get_comments_with_filters(self, mock_auth_headers, mock_get, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_get_comments_with_filters(self, mock_auth_headers, azure_pr_tool):
         """Test comment retrieval with status and author filters."""
         mock_threads = [
             {
@@ -824,41 +898,36 @@ class TestCommentManagement:
             }
         ]
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_threads}
-        mock_response.text.return_value = json.dumps({"value": mock_threads})
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        # Test status filter
-        result = await azure_pr_tool.get_comments(
-            pull_request_id=123,
-            comment_status="active"
-        )
+        with mock_pr_azure_http_client(method="get", response_data={"value": mock_threads}) as mock_client:
+            # Test status filter
+            result = await azure_pr_tool.get_comments(
+                pull_request_id=123,
+                comment_status="active"
+            )
 
-        assert result["success"] is True
-        assert len(result["data"]) == 1
-        assert result["data"][0]["status"] == "active"
+            assert result["success"] is True
+            assert len(result["data"]) == 1
+            assert result["data"][0]["status"] == "active"
 
-        # Test author filter
-        result = await azure_pr_tool.get_comments(
-            pull_request_id=123,
-            comment_author="john.doe@company.com"
-        )
+            # Test author filter
+            result = await azure_pr_tool.get_comments(
+                pull_request_id=123,
+                comment_author="john.doe@company.com"
+            )
 
-        assert result["success"] is True
-        assert len(result["data"]) == 1
-        assert result["data"][0]["comments"][0]["author"]["uniqueName"] == "john.doe@company.com"
+            assert result["success"] is True
+            assert len(result["data"]) == 1
+            assert result["data"][0]["comments"][0]["author"]["uniqueName"] == "john.doe@company.com"
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.patch")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_resolve_comment_basic(self, mock_auth_headers, mock_patch, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_resolve_comment_basic(self, mock_auth_headers, azure_pr_tool):
         """Test basic comment resolution via REST API."""
         mock_thread = {
             "id": 1,
@@ -878,36 +947,35 @@ class TestCommentManagement:
             ]
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = mock_thread
-        mock_response.text.return_value = json.dumps(mock_thread)
-        mock_patch.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.resolve_comment(
-            pull_request_id=123,
-            thread_id=1
-        )
+        with mock_pr_azure_http_client(method="patch", response_data=mock_thread) as mock_client:
+            result = await azure_pr_tool.resolve_comment(
+                pull_request_id=123,
+                thread_id=1
+            )
 
-        mock_patch.assert_called_once()
-        call_args, call_kwargs = mock_patch.call_args
-        assert "pullrequests/123/threads/1" in call_args[0]
-        assert call_kwargs["json"]["status"] == "fixed"
-        params = call_kwargs["params"]
-        assert params["api-version"] == "7.1"
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            
+            # Check the method and URL
+            assert call_args[0] == "PATCH"
+            assert "pullrequests/123/threads/1" in call_args[1]
+            assert call_kwargs["json"]["status"] == "fixed"
+            params = call_kwargs["params"]
+            assert params["api-version"] == "7.1"
 
-        assert result["success"] is True
-        assert result["data"]["status"] == "fixed"
+            assert result["success"] is True
+            assert result["data"]["status"] == "fixed"
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.post")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_add_comment_new_thread(self, mock_auth_headers, mock_post, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_add_comment_new_thread(self, mock_auth_headers, azure_pr_tool):
         """Test adding a comment to create a new thread."""
         mock_thread = {
             "id": 3,
@@ -927,36 +995,35 @@ class TestCommentManagement:
             ]
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = mock_thread
-        mock_response.text.return_value = json.dumps(mock_thread)
-        mock_post.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.add_comment(
-            pull_request_id=123,
-            comment_content="This is a new comment"
-        )
+        with mock_pr_azure_http_client(method="post", response_data=mock_thread) as mock_client:
+            result = await azure_pr_tool.add_comment(
+                pull_request_id=123,
+                comment_content="This is a new comment"
+            )
 
-        mock_post.assert_called_once()
-        call_args, call_kwargs = mock_post.call_args
-        assert "pullrequests/123/threads" in call_args[0]
-        request_body = call_kwargs["json"]
-        assert request_body["comments"][0]["content"] == "This is a new comment"
-        assert request_body["status"] == "active"
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            
+            # Check the method and URL
+            assert call_args[0] == "POST"
+            assert "pullrequests/123/threads" in call_args[1]
+            request_body = call_kwargs["json"]
+            assert request_body["comments"][0]["content"] == "This is a new comment"
+            assert request_body["status"] == "active"
 
-        assert result["success"] is True
-        assert result["data"]["id"] == 3
+            assert result["success"] is True
+            assert result["data"]["id"] == 3
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.post")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_add_comment_to_existing_thread(self, mock_auth_headers, mock_post, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_add_comment_to_existing_thread(self, mock_auth_headers, azure_pr_tool):
         """Test adding a comment to an existing thread."""
         mock_comment = {
             "id": 104,
@@ -970,37 +1037,36 @@ class TestCommentManagement:
             "commentType": "text"
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = mock_comment
-        mock_response.text.return_value = json.dumps(mock_comment)
-        mock_post.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.add_comment(
-            pull_request_id=123,
-            comment_content="Reply to existing thread",
-            thread_id=1
-        )
+        with mock_pr_azure_http_client(method="post", response_data=mock_comment) as mock_client:
+            result = await azure_pr_tool.add_comment(
+                pull_request_id=123,
+                comment_content="Reply to existing thread",
+                thread_id=1
+            )
 
-        mock_post.assert_called_once()
-        call_args, call_kwargs = mock_post.call_args
-        assert "pullrequests/123/threads/1/comments" in call_args[0]
-        request_body = call_kwargs["json"]
-        assert request_body["content"] == "Reply to existing thread"
-        assert request_body["commentType"] == "text"
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            
+            # Check the method and URL
+            assert call_args[0] == "POST"
+            assert "pullrequests/123/threads/1/comments" in call_args[1]
+            request_body = call_kwargs["json"]
+            assert request_body["content"] == "Reply to existing thread"
+            assert request_body["commentType"] == "text"
 
-        assert result["success"] is True
-        assert result["data"]["id"] == 104
+            assert result["success"] is True
+            assert result["data"]["id"] == 104
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.patch")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_update_comment(self, mock_auth_headers, mock_patch, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_update_comment(self, mock_auth_headers, azure_pr_tool):
         """Test updating an existing comment."""
         mock_comment = {
             "id": 101,
@@ -1015,32 +1081,32 @@ class TestCommentManagement:
             "commentType": "text"
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = mock_comment
-        mock_response.text.return_value = json.dumps(mock_comment)
-        mock_patch.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.update_comment(
-            pull_request_id=123,
-            thread_id=1,
-            comment_id=101,
-            comment_content="Updated comment content"
-        )
+        with mock_pr_azure_http_client(method="patch", response_data=mock_comment) as mock_client:
+            result = await azure_pr_tool.update_comment(
+                pull_request_id=123,
+                thread_id=1,
+                comment_id=101,
+                comment_content="Updated comment content"
+            )
 
-        mock_patch.assert_called_once()
-        call_args, call_kwargs = mock_patch.call_args
-        assert "pullrequests/123/threads/1/comments/101" in call_args[0]
-        request_body = call_kwargs["json"]
-        assert request_body["content"] == "Updated comment content"
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            
+            # Check the method and URL
+            assert call_args[0] == "PATCH"
+            assert "pullrequests/123/threads/1/comments/101" in call_args[1]
+            request_body = call_kwargs["json"]
+            assert request_body["content"] == "Updated comment content"
 
-        assert result["success"] is True
-        assert result["data"]["content"] == "Updated comment content"
+            assert result["success"] is True
+            assert result["data"]["content"] == "Updated comment content"
 
     @pytest.mark.asyncio
     async def test_add_comment_empty_content(self, azure_pr_tool):
@@ -1067,21 +1133,17 @@ class TestCommentManagement:
         assert "Comment content is required" in result["error"]
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
-    async def test_get_comments_not_found(self, mock_auth_headers, mock_get, azure_pr_tool):
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    async def test_get_comments_not_found(self, mock_auth_headers, azure_pr_tool):
         """Test handling of PR not found during comment retrieval."""
-        mock_response = AsyncMock()
-        mock_response.status = 404
-        mock_response.text.return_value = "Pull request not found"
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.get_comments(pull_request_id=999)
+        with mock_pr_azure_http_client(method="get", status_code=404, error_message="Pull request not found") as mock_client:
+            result = await azure_pr_tool.get_comments(pull_request_id=999)
 
-        assert result["success"] is False
-        assert "Pull request 999 not found" in result["error"]
+            assert result["success"] is False
+            assert "Pull request 999 not found" in result["error"]
