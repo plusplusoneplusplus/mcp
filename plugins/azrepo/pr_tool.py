@@ -591,15 +591,39 @@ class AzurePullRequestTool(ToolInterface):
     async def get_pull_request(
         self, pull_request_id: Union[int, str], organization: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get details of a specific pull request."""
-        command = f"repos pr show --id {pull_request_id}"
+        """Get details of a specific pull request using REST API."""
+        try:
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(None, self.default_project)
+            repo = self._get_param_with_default(None, self.default_repository)
 
-        # Use configured default for organization
-        org = self._get_param_with_default(organization, self.default_organization)
-        if org:
-            command += f" --org {org}"
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
 
-        return await self._run_az_command(command)
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}?api-version=7.1"
+            url = self._build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            pr_data = json.loads(response_text)
+                            return {"success": True, "data": pr_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    elif response.status == 404:
+                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def create_pull_request(
         self,
@@ -617,88 +641,151 @@ class AzurePullRequestTool(ToolInterface):
         squash: bool = False,
         delete_source_branch: bool = False,
     ) -> Dict[str, Any]:
-        """Create a new pull request."""
-        # Handle None source_branch case
-        if source_branch is None:
-            # Generate branch name from commit ID and create/push it
-            commit_branch = self._generate_branch_name_from_commit()
-            self.logger.info(f"Creating branch from commit: {commit_branch}")
+        """Create a new pull request using REST API."""
+        try:
+            # Handle None source_branch case (preserve existing auto-branch creation logic)
+            if source_branch is None:
+                # Generate branch name from commit ID and create/push it
+                commit_branch = self._generate_branch_name_from_commit()
+                self.logger.info(f"Creating branch from commit: {commit_branch}")
 
-            branch_result = self._create_and_push_branch(commit_branch)
-            if not branch_result.get("success", False):
-                return branch_result
+                branch_result = self._create_and_push_branch(commit_branch)
+                if not branch_result.get("success", False):
+                    return branch_result
 
-            source_branch = commit_branch
+                source_branch = commit_branch
 
-            # If title is also None, get it from last commit message
+                # If title is also None, get it from last commit message
+                if title is None:
+                    commit_title = self._get_last_commit_message()
+                    if commit_title:
+                        title = commit_title
+                        self.logger.info(f"Using commit message as title: {title}")
+                    else:
+                        title = f"Auto PR from {source_branch}"
+                        self.logger.warning(
+                            f"Could not get commit message, using default title: {title}"
+                        )
+
+            # Ensure we have a title
             if title is None:
-                commit_title = self._get_last_commit_message()
-                if commit_title:
-                    title = commit_title
-                    self.logger.info(f"Using commit message as title: {title}")
-                else:
-                    title = f"Auto PR from {source_branch}"
-                    self.logger.warning(
-                        f"Could not get commit message, using default title: {title}"
-                    )
+                return {
+                    "success": False,
+                    "error": "Title is required when source_branch is provided",
+                }
 
-        # Ensure we have a title
-        if title is None:
-            return {
-                "success": False,
-                "error": "Title is required when source_branch is provided",
+            # Use configured defaults for core parameters
+            target_br = self._get_param_with_default(
+                target_branch, self.default_target_branch
+            )
+            repo = self._get_param_with_default(repository, self.default_repository)
+            proj = self._get_param_with_default(project, self.default_project)
+            org = self._get_param_with_default(organization, self.default_organization)
+
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
+
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests?api-version=7.1"
+            url = self._build_api_url(org, proj, endpoint)
+            headers = self._get_auth_headers()
+
+            # Build request body
+            request_body = {
+                "sourceRefName": f"refs/heads/{source_branch}",
+                "targetRefName": f"refs/heads/{target_br or 'main'}",
+                "title": title,
+                "isDraft": draft
             }
 
-        command = "repos pr create"
+            if description:
+                request_body["description"] = description
 
-        # Required parameters
-        command += f' --title "{title}"'
-        command += f" --source-branch {source_branch}"
+            # Add reviewers if provided
+            if reviewers:
+                request_body["reviewers"] = [{"id": reviewer} for reviewer in reviewers]
 
-        # Use configured defaults for core parameters
-        target_br = self._get_param_with_default(
-            target_branch, self.default_target_branch
-        )
-        repo = self._get_param_with_default(repository, self.default_repository)
-        proj = self._get_param_with_default(project, self.default_project)
-        org = self._get_param_with_default(organization, self.default_organization)
+            # Add work items if provided
+            if work_items:
+                request_body["workItemRefs"] = [{"id": str(item)} for item in work_items]
 
-        # Add optional parameters
-        if target_br:
-            command += f" --target-branch {target_br}"
-        if description:
-            # Escape quotes in description and wrap each line
-            desc_lines = description.replace('"', '\\"').split("\n")
-            for line in desc_lines:
-                command += f' --description "{line}"'
-        if repo:
-            command += f" --repository {repo}"
-        if proj:
-            command += f" --project {proj}"
-        if org:
-            command += f" --org {org}"
+            self.logger.debug(f"Creating pull request with body: {request_body}")
 
-        # Add reviewers if provided
-        if reviewers:
-            for reviewer in reviewers:
-                command += f" --reviewers {reviewer}"
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, headers=headers, json=request_body) as response:
+                    response_text = await response.text()
 
-        # Add work items if provided
-        if work_items:
-            for item in work_items:
-                command += f" --work-items {item}"
+                    if response.status == 201:
+                        try:
+                            pr_data = json.loads(response_text)
 
-        # Add flags
-        if draft:
-            command += " --draft"
-        if auto_complete:
-            command += " --auto-complete"
-        if squash:
-            command += " --squash"
-        if delete_source_branch:
-            command += " --delete-source-branch"
+                            # Handle auto-complete and other post-creation settings
+                            if auto_complete or squash or delete_source_branch:
+                                pr_id = pr_data.get("pullRequestId")
+                                if pr_id:
+                                    # Update PR with completion settings
+                                    update_result = await self._update_pr_completion_settings(
+                                        pr_id, org, proj, repo, auto_complete, squash, delete_source_branch
+                                    )
+                                    if not update_result.get("success", False):
+                                        self.logger.warning(f"Failed to set completion settings: {update_result.get('error')}")
 
-        return await self._run_az_command(command)
+                            return {"success": True, "data": pr_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def _update_pr_completion_settings(
+        self,
+        pr_id: Union[int, str],
+        organization: str,
+        project: str,
+        repository: str,
+        auto_complete: bool = False,
+        squash: bool = False,
+        delete_source_branch: bool = False,
+    ) -> Dict[str, Any]:
+        """Update pull request completion settings using REST API."""
+        try:
+            # Build URL and headers for updating PR
+            endpoint = f"git/repositories/{repository}/pullrequests/{pr_id}?api-version=7.1"
+            url = self._build_api_url(organization, project, endpoint)
+            headers = self._get_auth_headers()
+
+            # Build request body for completion settings
+            request_body = {}
+
+            if auto_complete:
+                # Set auto-complete with merge options
+                request_body["completionOptions"] = {
+                    "mergeCommitMessage": "",
+                    "deleteSourceBranch": delete_source_branch,
+                    "squashMerge": squash,
+                    "mergeStrategy": "squash" if squash else "merge"
+                }
+                request_body["autoCompleteSetBy"] = {"id": self._get_current_username()}
+
+            # Make REST API call to update PR
+            async with aiohttp.ClientSession() as session:
+                async with session.patch(url, headers=headers, json=request_body) as response:
+                    response_text = await response.text()
+
+                    if response.status == 200:
+                        try:
+                            pr_data = json.loads(response_text)
+                            return {"success": True, "data": pr_data}
+                        except json.JSONDecodeError as e:
+                            return {"success": False, "error": f"Failed to parse response: {e}"}
+                    else:
+                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+
+        except Exception as e:
+            return {"success": False, "error": str(e)}
 
     async def update_pull_request(
         self,
