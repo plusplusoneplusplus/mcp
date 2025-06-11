@@ -17,7 +17,7 @@ Your primary task is to read a GitHub issue, understand the requirements, implem
 
 **⚠️ IMPORTANT: Always start by checking out the main branch**
 ```bash
-git checkout main && git pull origin main
+git checkout main && git pull origin main && source .venv/bin/activate
 ```
 This ensures you're working from the latest stable code and prevents conflicts.
 
