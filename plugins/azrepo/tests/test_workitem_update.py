@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch
 
-from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response
+from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response, mock_azure_http_client
 
 
 class TestUpdateWorkItem:
@@ -12,7 +12,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_title_only(self, azure_workitem_tool):
         """Test updating work item title only."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Work Item Title"
@@ -25,7 +25,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_description_only(self, azure_workitem_tool):
         """Test updating work item description only."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 description="Updated test description"
@@ -38,7 +38,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_both_fields(self, azure_workitem_tool):
         """Test updating both title and description."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title",
@@ -52,7 +52,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_with_markdown(self, azure_workitem_tool):
         """Test updating work item description with markdown content."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 description="## Updated Description\n\nNew details with **markdown** support"
@@ -64,7 +64,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_string_id(self, azure_workitem_tool):
         """Test updating work item with string ID."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id="12345",
                 title="Updated Title"
@@ -76,7 +76,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_with_overrides(self, azure_workitem_tool):
         """Test updating work item with parameter overrides."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title",
@@ -121,7 +121,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_not_found(self, azure_workitem_tool):
         """Test updating work item that doesn't exist."""
-        with mock_aiohttp_response(method="patch", status_code=404, error_message="Work item not found"):
+        with mock_azure_http_client(method="patch", status_code=404, error_message="Work item not found"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=99999,
                 title="Updated Title"
@@ -134,7 +134,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_http_error(self, azure_workitem_tool):
         """Test updating work item with HTTP error."""
-        with mock_aiohttp_response(method="patch", status_code=401, error_message="Access denied"):
+        with mock_azure_http_client(method="patch", status_code=401, error_message="Access denied"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title"
@@ -147,7 +147,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_json_parse_error(self, azure_workitem_tool):
         """Test updating work item with JSON parsing error."""
-        with mock_aiohttp_response(method="patch", status_code=200, raw_response_text="Invalid JSON"):
+        with mock_azure_http_client(method="patch", status_code=200, raw_response_text="Invalid JSON"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title"
@@ -174,7 +174,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_with_special_characters(self, azure_workitem_tool):
         """Test updating work item with special characters."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title with Special Characters: @#$%^&*()",
@@ -187,7 +187,7 @@ class TestUpdateWorkItem:
     @pytest.mark.asyncio
     async def test_update_work_item_with_unicode(self, azure_workitem_tool):
         """Test updating work item with Unicode characters."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title with Unicode: 测试 🚀 ñáéíóú",
@@ -204,7 +204,7 @@ class TestExecuteToolUpdate:
     @pytest.mark.asyncio
     async def test_execute_tool_update_success(self, azure_workitem_tool):
         """Test successful update via execute_tool."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.execute_tool({
                 "operation": "update",
                 "work_item_id": 12345,
@@ -218,7 +218,7 @@ class TestExecuteToolUpdate:
     @pytest.mark.asyncio
     async def test_execute_tool_update_title_only(self, azure_workitem_tool):
         """Test updating title only via execute_tool."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.execute_tool({
                 "operation": "update",
                 "work_item_id": 12345,
@@ -231,7 +231,7 @@ class TestExecuteToolUpdate:
     @pytest.mark.asyncio
     async def test_execute_tool_update_description_only(self, azure_workitem_tool):
         """Test updating description only via execute_tool."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.execute_tool({
                 "operation": "update",
                 "work_item_id": 12345,
@@ -266,7 +266,7 @@ class TestExecuteToolUpdate:
     @pytest.mark.asyncio
     async def test_execute_tool_update_with_overrides(self, azure_workitem_tool):
         """Test update operation with parameter overrides."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.execute_tool({
                 "operation": "update",
                 "work_item_id": 12345,
@@ -281,7 +281,7 @@ class TestExecuteToolUpdate:
     @pytest.mark.asyncio
     async def test_execute_tool_update_error_propagation(self, azure_workitem_tool):
         """Test that update errors are properly propagated through execute_tool."""
-        with mock_aiohttp_response(method="patch", status_code=404, error_message="Work item not found"):
+        with mock_azure_http_client(method="patch", status_code=404, error_message="Work item not found"):
             result = await azure_workitem_tool.execute_tool({
                 "operation": "update",
                 "work_item_id": 99999,
@@ -294,7 +294,7 @@ class TestExecuteToolUpdate:
     @pytest.mark.asyncio
     async def test_execute_tool_update_with_markdown(self, azure_workitem_tool):
         """Test update operation with markdown description."""
-        with mock_aiohttp_response(method="patch"):
+        with mock_azure_http_client(method="patch"):
             result = await azure_workitem_tool.execute_tool({
                 "operation": "update",
                 "work_item_id": 12345,

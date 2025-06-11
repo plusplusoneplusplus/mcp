@@ -85,12 +85,14 @@ def mock_azure_http_client(
         A patch object for AzureHttpClient.
     """
     # Prepare the response data
+    json_parse_error = None
     if raw_response_text is not None:
         text_payload = raw_response_text
         try:
             json_payload = json.loads(text_payload)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             json_payload = {"error": "invalid json in mock"}
+            json_parse_error = e
     else:
         if status_code < 300 and response_data is None:
             response_data = {
@@ -107,16 +109,31 @@ def mock_azure_http_client(
 
     # Create the standardized AzureHttpClient response format
     if status_code < 300:
-        mock_result = {
-            "success": True,
-            "data": json_payload,
-            "status_code": status_code,
-            "raw_response": text_payload
-        }
+        # Check for JSON parse error on successful status code
+        if json_parse_error:
+            mock_result = {
+                "success": False,
+                "error": f"Failed to parse response: {json_parse_error}",
+                "status_code": status_code,
+                "raw_response": text_payload
+            }
+        else:
+            mock_result = {
+                "success": True,
+                "data": json_payload,
+                "status_code": status_code,
+                "raw_response": text_payload
+            }
     else:
+        # Format error message the same way as the real AzureHttpClient
+        if status_code == 404:
+            error_msg = "Resource not found"
+        else:
+            error_msg = f"HTTP {status_code}: {error_message or text_payload}"
+        
         mock_result = {
             "success": False,
-            "error": error_message or f"HTTP {status_code}",
+            "error": error_msg,
             "status_code": status_code,
             "raw_response": text_payload
         }
