@@ -7,7 +7,6 @@ import uuid
 import os
 from typing import Dict, Any, List, Optional, Union
 
-import aiohttp
 import git
 
 # Import the required interfaces and decorators
@@ -23,6 +22,7 @@ from .azure_rest_utils import (
     get_auth_headers,
     build_api_url,
     process_rest_response,
+    AzureHttpClient,
 )
 
 # Import types from the plugin
@@ -561,7 +561,7 @@ class AzurePullRequestTool(ToolInterface):
             if not proj:
                 raise ValueError("Project must be provided")
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build query parameters
             params: Dict[str, Union[str, int]] = {"api-version": "7.1"}
@@ -609,29 +609,28 @@ class AzurePullRequestTool(ToolInterface):
             )
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        prs = data.get("value", [])
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('GET', url, headers=headers, params=params)
+                if result["success"]:
+                    data = result.get("data", {})
+                    prs = data.get("value", [])
 
-                        # Filter out draft PRs if exclude_drafts is True
-                        if exclude_drafts:
-                            prs = [pr for pr in prs if not pr.get("isDraft", False)]
-                            self.logger.debug(f"Filtered out draft PRs, {len(prs)} PRs remaining")
+                    # Filter out draft PRs if exclude_drafts is True
+                    if exclude_drafts:
+                        prs = [pr for pr in prs if not pr.get("isDraft", False)]
+                        self.logger.debug(f"Filtered out draft PRs, {len(prs)} PRs remaining")
 
-                        # Convert to DataFrame and return CSV
-                        df = self.convert_pr_to_df(prs)
-                        return {"success": True, "data": df.to_csv(index=False)}
-                    else:
-                        error_text = await response.text()
-                        self.logger.error(
-                            f"Failed to list pull requests: HTTP {response.status} - {error_text}"
-                        )
-                        return {
-                            "success": False,
-                            "error": f"HTTP {response.status}: {error_text}",
-                        }
+                    # Convert to DataFrame and return CSV
+                    df = self.convert_pr_to_df(prs)
+                    return {"success": True, "data": df.to_csv(index=False)}
+                else:
+                    self.logger.error(
+                        f"Failed to list pull requests: {result.get('error', 'Unknown error')}"
+                    )
+                    return {
+                        "success": False,
+                        "error": result.get("error", "Unknown error"),
+                    }
         except Exception as e:
             self.logger.error(
                 f"An unexpected error occurred while listing pull requests: {e}"
@@ -659,23 +658,17 @@ class AzurePullRequestTool(ToolInterface):
             if not proj:
                 raise ValueError("Project must be provided")
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            pr_data = json.loads(response_text)
-                            return {"success": True, "data": pr_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('GET', url, headers=headers)
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -748,7 +741,7 @@ class AzurePullRequestTool(ToolInterface):
             if not proj:
                 raise ValueError("Project must be provided")
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build request body
             request_body = {
@@ -772,30 +765,25 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.debug(f"Creating pull request with body: {request_body}")
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=headers, json=request_body) as response:
-                    response_text = await response.text()
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('POST', url, headers=headers, json=request_body)
+                if result["success"] and result.get("status_code") == 201:
+                    pr_data = result.get("data", {})
 
-                    if response.status == 201:
-                        try:
-                            pr_data = json.loads(response_text)
+                    # Handle auto-complete and other post-creation settings
+                    if auto_complete or squash or delete_source_branch:
+                        pr_id = pr_data.get("pullRequestId")
+                        if pr_id:
+                            # Update PR with completion settings
+                            update_result = await self._update_pr_completion_settings(
+                                pr_id, org, proj, repo, auto_complete, squash, delete_source_branch
+                            )
+                            if not update_result.get("success", False):
+                                self.logger.warning(f"Failed to set completion settings: {update_result.get('error')}")
 
-                            # Handle auto-complete and other post-creation settings
-                            if auto_complete or squash or delete_source_branch:
-                                pr_id = pr_data.get("pullRequestId")
-                                if pr_id:
-                                    # Update PR with completion settings
-                                    update_result = await self._update_pr_completion_settings(
-                                        pr_id, org, proj, repo, auto_complete, squash, delete_source_branch
-                                    )
-                                    if not update_result.get("success", False):
-                                        self.logger.warning(f"Failed to set completion settings: {update_result.get('error')}")
-
-                            return {"success": True, "data": pr_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+                    return {"success": True, "data": pr_data}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -820,7 +808,7 @@ class AzurePullRequestTool(ToolInterface):
             if not project:
                 raise ValueError("Project must be provided")
             url = build_api_url(organization, project, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build request body for completion settings
             request_body = {}
@@ -836,18 +824,12 @@ class AzurePullRequestTool(ToolInterface):
                 request_body["autoCompleteSetBy"] = {"id": self._get_current_username()}
 
             # Make REST API call to update PR
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(url, headers=headers, json=request_body) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            pr_data = json.loads(response_text)
-                            return {"success": True, "data": pr_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('PATCH', url, headers=headers, json=request_body)
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -882,7 +864,7 @@ class AzurePullRequestTool(ToolInterface):
             if not proj:
                 raise ValueError("Project must be provided")
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build request body with only provided fields
             request_body = {}
@@ -918,20 +900,14 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.debug(f"Updating PR {pull_request_id} with body: {request_body}")
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(url, json=request_body, headers=headers) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            pr_data = json.loads(response_text)
-                            return {"success": True, "data": pr_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('PATCH', url, headers=headers, json=request_body)
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -977,7 +953,7 @@ class AzurePullRequestTool(ToolInterface):
             if not proj:
                 raise ValueError("Project must be provided")
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build request body
             request_body = {
@@ -988,20 +964,14 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.debug(f"Setting vote {vote} ({VOTE_MAPPING[vote]}) on PR {pull_request_id} for user {current_user}")
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.put(url, json=request_body, headers=headers) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            reviewer_data = json.loads(response_text)
-                            return {"success": True, "data": reviewer_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Pull request {pull_request_id} not found or user not authorized"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('PUT', url, headers=headers, json=request_body)
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Pull request {pull_request_id} not found or user not authorized"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1033,7 +1003,7 @@ class AzurePullRequestTool(ToolInterface):
             if not proj:
                 raise ValueError("Project must be provided")
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build request body with work item references
             request_body = {
@@ -1043,20 +1013,14 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.debug(f"Adding work items to PR {pull_request_id}: {work_items}")
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(url, json=request_body, headers=headers) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            pr_data = json.loads(response_text)
-                            return {"success": True, "data": pr_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('PATCH', url, headers=headers, json=request_body)
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1085,7 +1049,7 @@ class AzurePullRequestTool(ToolInterface):
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads"
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build query parameters
             params: Dict[str, Union[str, int]] = {"api-version": "7.1"}
@@ -1098,42 +1062,37 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.debug(f"Getting PR comments with URL: {url} and params: {params}")
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, params=params) as response:
-                    response_text = await response.text()
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('GET', url, headers=headers, params=params)
+                if result["success"]:
+                    data = result.get("data", {})
+                    threads = data.get("value", [])
 
-                    if response.status == 200:
-                        try:
-                            data = json.loads(response_text)
-                            threads = data.get("value", [])
+                    # Filter by status if specified
+                    if comment_status:
+                        threads = [t for t in threads if t.get("status", "").lower() == comment_status.lower()]
 
-                            # Filter by status if specified
-                            if comment_status:
-                                threads = [t for t in threads if t.get("status", "").lower() == comment_status.lower()]
+                    # Filter by author if specified
+                    if comment_author:
+                        filtered_threads = []
+                        for thread in threads:
+                            comments = thread.get("comments", [])
+                            filtered_comments = [
+                                c for c in comments
+                                if c.get("author", {}).get("uniqueName", "").lower() == comment_author.lower() or
+                                   c.get("author", {}).get("displayName", "").lower() == comment_author.lower()
+                            ]
+                            if filtered_comments:
+                                thread_copy = thread.copy()
+                                thread_copy["comments"] = filtered_comments
+                                filtered_threads.append(thread_copy)
+                        threads = filtered_threads
 
-                            # Filter by author if specified
-                            if comment_author:
-                                filtered_threads = []
-                                for thread in threads:
-                                    comments = thread.get("comments", [])
-                                    filtered_comments = [
-                                        c for c in comments
-                                        if c.get("author", {}).get("uniqueName", "").lower() == comment_author.lower() or
-                                           c.get("author", {}).get("displayName", "").lower() == comment_author.lower()
-                                    ]
-                                    if filtered_comments:
-                                        thread_copy = thread.copy()
-                                        thread_copy["comments"] = filtered_comments
-                                        filtered_threads.append(thread_copy)
-                                threads = filtered_threads
-
-                            return {"success": True, "data": threads}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Pull request {pull_request_id} not found"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+                    return {"success": True, "data": threads}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Pull request {pull_request_id} not found"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1160,7 +1119,7 @@ class AzurePullRequestTool(ToolInterface):
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads/{thread_id}"
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build request body to resolve the thread
             request_body = {
@@ -1184,20 +1143,14 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.debug(f"Resolving comment thread {thread_id} on PR {pull_request_id}")
 
             # Make REST API call to update thread status
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(url, json=request_body, headers=headers, params={"api-version": "7.1"}) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            thread_data = json.loads(response_text)
-                            return {"success": True, "data": thread_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Thread {thread_id} not found on PR {pull_request_id}"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('PATCH', url, headers=headers, json=request_body, params={"api-version": "7.1"})
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Thread {thread_id} not found on PR {pull_request_id}"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1253,25 +1206,19 @@ class AzurePullRequestTool(ToolInterface):
                     "status": "active"
                 }
 
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             self.logger.debug(f"Adding comment to PR {pull_request_id}, thread_id: {thread_id}")
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=request_body, headers=headers, params={"api-version": "7.1"}) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            comment_data = json.loads(response_text)
-                            return {"success": True, "data": comment_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Pull request {pull_request_id} or thread {thread_id} not found"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('POST', url, headers=headers, json=request_body, params={"api-version": "7.1"})
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Pull request {pull_request_id} or thread {thread_id} not found"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1302,7 +1249,7 @@ class AzurePullRequestTool(ToolInterface):
             # Build URL and headers
             endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/threads/{thread_id}/comments/{comment_id}"
             url = build_api_url(org, proj, endpoint)
-            headers = self._get_auth_headers()
+            headers = get_auth_headers()
 
             # Build request body
             request_body = {
@@ -1312,20 +1259,14 @@ class AzurePullRequestTool(ToolInterface):
             self.logger.debug(f"Updating comment {comment_id} in thread {thread_id} on PR {pull_request_id}")
 
             # Make REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(url, json=request_body, headers=headers, params={"api-version": "7.1"}) as response:
-                    response_text = await response.text()
-
-                    if response.status == 200:
-                        try:
-                            comment_data = json.loads(response_text)
-                            return {"success": True, "data": comment_data}
-                        except json.JSONDecodeError as e:
-                            return {"success": False, "error": f"Failed to parse response: {e}"}
-                    elif response.status == 404:
-                        return {"success": False, "error": f"Comment {comment_id} not found in thread {thread_id} on PR {pull_request_id}"}
-                    else:
-                        return {"success": False, "error": f"HTTP {response.status}: {response_text}"}
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('PATCH', url, headers=headers, json=request_body, params={"api-version": "7.1"})
+                if result["success"]:
+                    return {"success": True, "data": result.get("data", {})}
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Comment {comment_id} not found in thread {thread_id} on PR {pull_request_id}"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
 
         except Exception as e:
             return {"success": False, "error": str(e)}
