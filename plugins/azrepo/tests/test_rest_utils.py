@@ -105,6 +105,10 @@ def test_get_current_username_from_env(mock_os, mock_getpass):
 @patch("plugins.azrepo.azure_rest_utils.env_manager")
 def test_get_auth_headers_from_static_token(mock_env_manager):
     """Test getting auth headers from static token."""
+    # Clear bearer token cache before test
+    from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+    clear_bearer_token_cache()
+    
     # Mock env_manager to return a static token
     mock_env_manager.get_azrepo_parameters.return_value = {
         "bearer_token": "static-token-123"
@@ -122,6 +126,10 @@ def test_get_auth_headers_from_static_token(mock_env_manager):
 @patch("plugins.azrepo.azure_rest_utils.execute_bearer_token_command")
 def test_get_auth_headers_from_command(mock_execute_command, mock_env_manager):
     """Test getting auth headers from command."""
+    # Clear bearer token cache before test
+    from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
+    clear_bearer_token_cache()
+    
     # Mock env_manager to return a command
     mock_env_manager.get_azrepo_parameters.return_value = {
         "bearer_token_command": "test-command"
