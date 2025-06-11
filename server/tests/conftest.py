@@ -105,36 +105,56 @@ def get_worker_id() -> str:
 
 
 def kill_process_tree(pid: int) -> None:
-    """Kill a process and all its children."""
+    """Kill a process and all its children with Windows-specific handling."""
     try:
         parent = psutil.Process(pid)
         children = parent.children(recursive=True)
 
+        logger.debug(f"Killing process tree for PID {pid}, found {len(children)} children")
+
         # Terminate children first
         for child in children:
             try:
+                logger.debug(f"Terminating child process {child.pid}")
                 child.terminate()
             except psutil.NoSuchProcess:
+                logger.debug(f"Child process {child.pid} already gone")
                 pass
+            except Exception as e:
+                logger.debug(f"Error terminating child process {child.pid}: {e}")
 
         # Terminate parent
         try:
+            logger.debug(f"Terminating parent process {pid}")
             parent.terminate()
         except psutil.NoSuchProcess:
+            logger.debug(f"Parent process {pid} already gone")
             pass
+        except Exception as e:
+            logger.debug(f"Error terminating parent process {pid}: {e}")
 
-        # Wait for graceful termination
-        gone, alive = psutil.wait_procs(children + [parent], timeout=5)
+        # Wait for graceful termination with platform-specific timeout
+        timeout = 10 if os.name == 'nt' else 5  # Longer timeout on Windows
+        gone, alive = psutil.wait_procs(children + [parent], timeout=timeout)
+
+        logger.debug(f"Graceful termination: {len(gone)} processes terminated, {len(alive)} still alive")
 
         # Force kill any remaining processes
         for proc in alive:
             try:
+                logger.debug(f"Force killing process {proc.pid}")
                 proc.kill()
             except psutil.NoSuchProcess:
+                logger.debug(f"Process {proc.pid} already gone during force kill")
                 pass
+            except Exception as e:
+                logger.debug(f"Error force killing process {proc.pid}: {e}")
 
     except psutil.NoSuchProcess:
+        logger.debug(f"Process {pid} not found during kill_process_tree")
         pass
+    except Exception as e:
+        logger.error(f"Unexpected error in kill_process_tree for PID {pid}: {e}")
 
 
 def wait_for_server_ready(port: int, timeout: int = 30) -> bool:
@@ -329,22 +349,34 @@ async def create_mcp_client(server_url: str, worker_id: str = "test"):
     Helper function to create and initialize an MCP client session.
 
     This is an async context manager that can be used in tests to create client sessions.
+    Enhanced with better error handling and Windows-specific debugging.
     """
     logging.info(f"Worker {worker_id}: Connecting MCP client to {server_url}")
+    logging.debug(f"Worker {worker_id}: Platform: {os.name}, Python: {os.sys.version}")
 
     session = None
     try:
-        # Create SSE client and session
+        # Create SSE client and session with enhanced error handling
         async with sse_client(server_url) as (read, write):
             async with ClientSession(read, write) as session:
-                # Initialize the session
+                # Initialize the session with timeout handling
+                logging.debug(f"Worker {worker_id}: Initializing MCP session...")
                 await session.initialize()
 
-                logging.info(f"Worker {worker_id}: MCP client session initialized")
+                logging.info(f"Worker {worker_id}: MCP client session initialized successfully")
+                logging.debug(f"Worker {worker_id}: Session capabilities: {getattr(session, 'server_capabilities', 'Unknown')}")
 
                 yield session
     except Exception as e:
-        logging.error(f"Worker {worker_id}: Error in MCP client session: {e}")
+        # Enhanced error logging for debugging Windows-specific issues
+        logging.error(f"Worker {worker_id}: Error in MCP client session: {type(e).__name__}: {e}")
+        logging.debug(f"Worker {worker_id}: Exception details: {repr(e)}")
+        logging.debug(f"Worker {worker_id}: Server URL: {server_url}")
+        
+        # Log additional context for debugging
+        import traceback
+        logging.debug(f"Worker {worker_id}: Full traceback:\n{traceback.format_exc()}")
+        
         raise
     finally:
         logging.info(f"Worker {worker_id}: MCP client session cleanup completed")

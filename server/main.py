@@ -46,6 +46,9 @@ from server import image_tool
 # Create the server
 server = Server("mymcp")
 
+# Add debug logging for server events
+logging.info("MCP Server created successfully")
+
 # Initialize tools system directly with tracing
 with time_operation("Tool Discovery and Registration"):
     discover_and_register_tools()
@@ -199,6 +202,9 @@ async def list_tools() -> list[Tool]:
 
 @server.call_tool()
 async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextContent, ImageContent]]:
+    logging.info(f"🔧 TOOL CALL HANDLER INVOKED: {name} with arguments: {arguments}")
+    logging.info(f"🔧 Handler running on platform: {os.name}")
+    
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
     )
@@ -224,11 +230,18 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         logging.error(f"Tool '{name}' not found. Available tools: {available_tools}")
         logging.error(f"Filtered tools: {filtered_tools}")
 
-        error_msg = f"Error: Tool '{name}' not found."
+        # Enhanced error message with more explicit error indicators
+        error_msg = f"Error: Tool '{name}' not found. Available tools: {', '.join(available_tools) if available_tools else 'None'}"
+        
+        # Log additional debugging information for Windows troubleshooting
+        logging.debug(f"Tool lookup failed for '{name}' - Platform: {os.name}, Worker: {os.environ.get('PYTEST_WORKER_ID', 'unknown')}")
+        
         record_tool_invocation(
             name, arguments, error_msg, 0, False, error_msg, invocation_dir
         )
-        return [TextContent(type="text", text=error_msg)]
+        response = [TextContent(type="text", text=error_msg)]
+        logging.info(f"Returning error response for tool '{name}': {response}")
+        return response
     tool_sources = registry.get_tool_sources()
     source = tool_sources.get(name, "unknown")
     if not config.is_source_enabled(source):
@@ -276,6 +289,10 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         error_msg = f"Error executing tool {name}: {str(e)}"
         success = False
         duration_ms = (time.time() - start_time) * 1000
+        
+        # Enhanced error logging for debugging
+        logging.debug(f"Tool execution exception details - Tool: {name}, Platform: {os.name}, Exception: {repr(e)}")
+        
         record_tool_invocation(
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
@@ -313,7 +330,15 @@ async def handle_sse(request):
         options = server.create_initialization_options()
         # Add prompt capabilities
         options.capabilities.prompts = PromptsCapability(supported=True)
-        await server.run(streams[0], streams[1], options, raise_exceptions=True)
+        
+        # Enhanced error handling for Windows compatibility
+        try:
+            await server.run(streams[0], streams[1], options, raise_exceptions=False)
+        except Exception as e:
+            logging.error(f"SSE handler error: {type(e).__name__}: {e}")
+            logging.debug(f"SSE handler exception details: {repr(e)}")
+            # Don't re-raise to prevent worker crashes
+            pass
 
 
 # --- Web Knowledge Import UI ---
