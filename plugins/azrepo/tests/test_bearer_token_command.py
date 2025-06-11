@@ -7,6 +7,7 @@ import json
 from unittest.mock import AsyncMock, patch, MagicMock
 from plugins.azrepo.workitem_tool import AzureWorkItemTool
 import plugins.azrepo.azure_rest_utils
+from plugins.azrepo.tests.workitem_helpers import mock_azure_http_client
 
 
 @pytest.fixture
@@ -212,21 +213,9 @@ class TestBearerTokenCommand:
         # Create tool instance
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
-        # Mock aiohttp session for REST API call
-        with patch("aiohttp.ClientSession") as mock_session_class:
-            mock_session = MagicMock()
-            mock_response = MagicMock()
-            mock_response.status = 200
-            mock_response.text = AsyncMock(return_value='{"id": 123, "fields": {"System.Title": "Test Work Item"}}')
-
-            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-            mock_session.__aexit__ = AsyncMock(return_value=None)
-            mock_session.post = MagicMock()
-            mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-            mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-
-            mock_session_class.return_value = mock_session
-
+        # Mock AzureHttpClient for REST API call
+        response_data = {"id": 123, "fields": {"System.Title": "Test Work Item"}}
+        with mock_azure_http_client(method="post", response_data=response_data) as mock_client_class:
             # Create work item
             result = await tool.create_work_item(
                 title="Test Work Item",
@@ -237,9 +226,12 @@ class TestBearerTokenCommand:
             assert result["success"] is True
             assert "data" in result
 
-            # Verify that the POST request was made with the correct authorization header
-            mock_session.post.assert_called_once()
-            call_args = mock_session.post.call_args
+            # Verify that the request was made
+            mock_client_class.return_value.request.assert_called_once()
+            call_args = mock_client_class.return_value.request.call_args
+            
+            # Verify the method and headers
+            assert call_args[0][0] == "POST"  # method
             headers = call_args[1]["headers"]
             assert headers["Authorization"] == "Bearer dynamic-token-from-command-123"
 
@@ -387,21 +379,9 @@ class TestEndToEndBearerTokenWorkflow:
                 # Create tool instance
                 tool = AzureWorkItemTool(command_executor=mock_executor)
 
-                # Mock aiohttp for create_work_item API call
-                with patch("aiohttp.ClientSession") as mock_session_class:
-                    mock_session = MagicMock()
-                    mock_response = MagicMock()
-                    mock_response.status = 200
-                    mock_response.text = AsyncMock(return_value='{"id": 456, "fields": {"System.Title": "End-to-End Test"}}')
-
-                    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-                    mock_session.__aexit__ = AsyncMock(return_value=None)
-                    mock_session.post = MagicMock()
-                    mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-                    mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-
-                    mock_session_class.return_value = mock_session
-
+                # Mock AzureHttpClient for create_work_item API call
+                response_data = {"id": 456, "fields": {"System.Title": "End-to-End Test"}}
+                with mock_azure_http_client(method="post", response_data=response_data) as mock_client_class:
                     # Execute the create_work_item operation
                     result = await tool.create_work_item(
                         title="End-to-End Test",
@@ -417,7 +397,7 @@ class TestEndToEndBearerTokenWorkflow:
                     mock_subprocess_run.assert_called_once()
 
                     # Verify API call with correct token
-                    mock_session.post.assert_called_once()
-                    call_args = mock_session.post.call_args
+                    mock_client_class.return_value.request.assert_called_once()
+                    call_args = mock_client_class.return_value.request.call_args
                     headers = call_args[1]["headers"]
                     assert headers["Authorization"] == "Bearer end-to-end-token-abc"

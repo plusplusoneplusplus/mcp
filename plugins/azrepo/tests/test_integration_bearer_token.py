@@ -8,6 +8,7 @@ import json
 from unittest.mock import AsyncMock, patch, MagicMock
 from plugins.azrepo.workitem_tool import AzureWorkItemTool
 import plugins.azrepo.azure_rest_utils
+from plugins.azrepo.tests.workitem_helpers import mock_azure_http_client
 
 
 class TestBearerTokenCommandIntegration:
@@ -61,37 +62,26 @@ class TestBearerTokenCommandIntegration:
                 tool = AzureWorkItemTool(command_executor=mock_executor)
 
                 # Step 4: Mock the REST API response for work item creation
-                with patch("aiohttp.ClientSession") as mock_session_class:
-                    mock_session = MagicMock()
-                    mock_response = MagicMock()
-                    mock_response.status = 200
-                    mock_response.text = AsyncMock(return_value=json.dumps({
-                        "id": 12345,
-                        "rev": 1,
-                        "fields": {
-                            "System.Id": 12345,
-                            "System.Title": "Implement user authentication",
-                            "System.Description": "Add OAuth2 authentication to the application",
-                            "System.WorkItemType": "Task",
-                            "System.State": "New",
-                            "System.AreaPath": "MyProject\\Development\\Backend",
-                            "System.IterationPath": "MyProject\\Sprint 1",
-                            "System.CreatedDate": "2024-01-20T10:00:00.000Z",
-                            "System.CreatedBy": {
-                                "displayName": "John Doe",
-                                "uniqueName": "john.doe@company.com"
-                            }
-                        },
-                        "url": "https://dev.azure.com/mycompany/_apis/wit/workItems/12345"
-                    }))
-
-                    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
-                    mock_session.__aexit__ = AsyncMock(return_value=None)
-                    mock_session.post = MagicMock()
-                    mock_session.post.return_value.__aenter__ = AsyncMock(return_value=mock_response)
-                    mock_session.post.return_value.__aexit__ = AsyncMock(return_value=None)
-
-                    mock_session_class.return_value = mock_session
+                response_data = {
+                    "id": 12345,
+                    "rev": 1,
+                    "fields": {
+                        "System.Id": 12345,
+                        "System.Title": "Implement user authentication",
+                        "System.Description": "Add OAuth2 authentication to the application",
+                        "System.WorkItemType": "Task",
+                        "System.State": "New",
+                        "System.AreaPath": "MyProject\\Development\\Backend",
+                        "System.IterationPath": "MyProject\\Sprint 1",
+                        "System.CreatedDate": "2024-01-20T10:00:00.000Z",
+                        "System.CreatedBy": {
+                            "displayName": "John Doe",
+                            "uniqueName": "john.doe@company.com"
+                        }
+                    },
+                    "url": "https://dev.azure.com/mycompany/_apis/wit/workItems/12345"
+                }
+                with mock_azure_http_client(method="post", response_data=response_data) as mock_client_class:
 
                     # Step 5: Execute the tool (simulates user calling the tool)
                     result = await tool.execute_tool({
@@ -118,12 +108,13 @@ class TestBearerTokenCommandIntegration:
                     assert call_args[1]["timeout"] == 30
 
                     # Verify the REST API was called with the correct token
-                    mock_session.post.assert_called_once()
-                    post_call_args = mock_session.post.call_args
+                    mock_client_class.return_value.request.assert_called_once()
+                    post_call_args = mock_client_class.return_value.request.call_args
 
-                    # Check the URL
+                    # Check the method and URL
+                    assert post_call_args[0][0] == "POST"  # method
                     expected_url = "https://dev.azure.com/mycompany/MyProject/_apis/wit/workitems/$Task?api-version=7.1"
-                    assert post_call_args[0][0] == expected_url
+                    assert post_call_args[0][1] == expected_url  # url
 
                     # Check the headers contain the bearer token
                     headers = post_call_args[1]["headers"]
