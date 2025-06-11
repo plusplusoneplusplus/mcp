@@ -88,27 +88,32 @@ class TestMCPClientConnection:
         worker_id = mcp_client_info['worker_id']
 
         async with create_mcp_client(server_url, worker_id) as session:
-            # Try to call a non-existent tool
-            # The MCP protocol may handle this differently than expected
             try:
                 result = await session.call_tool("non_existent_tool", {})
-                # If no exception is raised, check if the result indicates an error
+
+                # Enhanced result validation
                 if hasattr(result, 'isError') and result.isError:
                     logging.info("Non-existent tool call returned error result as expected")
-                elif hasattr(result, 'content'):
-                    # Check if the content indicates an error
-                    error_indicators = ['error', 'not found', 'unknown', 'invalid']
+                    return
+
+                if hasattr(result, 'content'):
+                    error_indicators = ['error', 'not found', 'unknown', 'invalid', 'does not exist']
                     content_text = str(result.content).lower()
+
                     if any(indicator in content_text for indicator in error_indicators):
-                        logging.info("Non-existent tool call returned error content as expected")
+                        logging.info(f"Non-existent tool call returned error content as expected: {content_text}")
+                        return
                     else:
                         pytest.fail(f"Expected error for non-existent tool, but got: {result.content}")
                 else:
                     pytest.fail(f"Expected error for non-existent tool, but got successful result: {result}")
+
             except Exception as e:
-                # If an exception is raised, that's also acceptable
+                # Log detailed exception information for debugging
                 logging.info(f"Non-existent tool call raised exception as expected: {type(e).__name__}: {e}")
-                assert True  # Test passes if exception is raised
+                logging.debug(f"Exception details: {repr(e)}")
+                # Test passes if exception is raised - this is expected behavior
+                return
 
     @pytest.mark.asyncio
     async def test_mcp_protocol_handshake(self, mcp_client_info):
