@@ -31,6 +31,50 @@ class PullRequestRef(BaseModel):
     target_reference_name: Optional[str] = None
 
 
+class PullRequestComment(BaseModel):
+    """Pull request comment information"""
+
+    id: int
+    content: str
+    author: PullRequestIdentity
+    created_date: datetime
+    status: str  # active, resolved, etc.
+    thread_id: Optional[int] = None
+    parent_comment_id: Optional[int] = None
+    last_updated_date: Optional[datetime] = None
+    last_content_updated_date: Optional[datetime] = None
+    comment_type: Optional[str] = None  # text, system, etc.
+
+
+class PullRequestThread(BaseModel):
+    """Pull request comment thread information"""
+
+    id: int
+    status: str  # active, resolved, etc.
+    comments: List[PullRequestComment]
+    properties: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    thread_context: Optional[Dict[str, Any]] = None
+    pull_request_thread_context: Optional[Dict[str, Any]] = None
+
+
+class PullRequestCommentsResponse(BaseModel):
+    """Response from get PR comments operation"""
+
+    success: bool
+    data: Optional[List[PullRequestThread]] = None
+    error: Optional[str] = None
+    raw_output: Optional[str] = None
+
+
+class PullRequestCommentResponse(BaseModel):
+    """Response from comment operations (add, update, resolve)"""
+
+    success: bool
+    data: Optional[Union[PullRequestComment, PullRequestThread]] = None
+    error: Optional[str] = None
+    raw_output: Optional[str] = None
+
+
 class PullRequest(BaseModel):
     """Pull request information"""
 
