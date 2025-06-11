@@ -67,11 +67,14 @@ except ImportError:
 
 @register_tool
 class AzurePullRequestTool(ToolInterface):
-    """Dedicated tool for managing Azure DevOps Pull Requests.
+    """Dedicated tool for managing Azure DevOps Pull Requests using REST API.
 
     This tool provides comprehensive pull request management capabilities
     including creating, updating, listing, and voting on pull requests.
-    It automatically loads default configuration values from the environment
+    All operations use the Azure DevOps REST API for improved performance
+    and reliability compared to CLI-based approaches.
+
+    The tool automatically loads default configuration values from the environment
     while allowing parameter overrides for specific operations.
 
     Configuration:
@@ -82,6 +85,10 @@ class AzurePullRequestTool(ToolInterface):
         - AZREPO_REPO: Default repository name/ID
         - AZREPO_BRANCH: Default target branch
         - AZREPO_PR_BRANCH_PREFIX: Default prefix for auto-generated PR branch names
+
+    Authentication:
+        Uses bearer token authentication with Azure DevOps REST API.
+        Tokens are automatically retrieved from the environment or Azure CLI.
 
     Example:
         # List pull requests (uses configured defaults)
@@ -237,10 +244,10 @@ class AzurePullRequestTool(ToolInterface):
         }
 
     def __init__(self, command_executor=None):
-        """Initialize the AzurePullRequestTool with a command executor and load configuration.
+        """Initialize the AzurePullRequestTool and load configuration.
 
         Args:
-            command_executor: An instance of CommandExecutor to use for running commands.
+            command_executor: An instance of CommandExecutor to use for Git operations.
                               If None, it will be obtained from the registry.
         """
         if command_executor is None:
@@ -307,7 +314,7 @@ class AzurePullRequestTool(ToolInterface):
         """
         return param_value if param_value is not None else default_value
 
-    # Moved to azure_rest_utils.py
+
 
     def _get_default_pr_branch_prefix(self) -> str:
         """Get the default PR branch prefix including username.
@@ -431,43 +438,7 @@ class AzurePullRequestTool(ToolInterface):
                 "error": f"Failed to create/push branch with GitPython: {str(e)}",
             }
 
-    async def _run_az_command(
-        self, command: str, timeout: Optional[float] = None
-    ) -> Dict[str, Any]:
-        """Run an Azure CLI command and parse the JSON output.
 
-        Args:
-            command: The az command to execute
-            timeout: Optional timeout in seconds
-
-        Returns:
-            Parsed JSON response from the command
-        """
-        full_command = f"az {command} --output json"
-        self.logger.debug(f"Executing command: {full_command}")
-
-        result = await self.executor.execute_async(full_command, timeout)
-        token = result.get("token")
-
-        status = await self.executor.query_process(token, wait=True, timeout=timeout)
-
-        if not status.get("success", False):
-            self.logger.error(f"Command failed: {status.get('error', 'Unknown error')}")
-            return {"success": False, "error": status.get("error", "Unknown error")}
-
-        try:
-            output = status.get("output", "")
-            if output:
-                return {"success": True, "data": json.loads(output)}
-            else:
-                return {"success": True, "data": {}}
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse JSON output: {e}")
-            return {
-                "success": False,
-                "error": f"Failed to parse JSON output: {e}",
-                "raw_output": status.get("output", ""),
-            }
 
     def convert_pr_to_df(self, prs_in_json):
         """Convert pull request JSON data to a pandas DataFrame."""
