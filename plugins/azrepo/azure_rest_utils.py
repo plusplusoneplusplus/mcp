@@ -11,6 +11,7 @@ import getpass
 import subprocess
 import re
 import aiohttp
+import asyncio
 from typing import Dict, Any, Optional, Union, List, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -29,6 +30,351 @@ CACHE_DURATION_MINUTES = 30
 _bearer_token_cache: Optional[str] = None
 _bearer_token_cache_expiry: Optional[datetime] = None
 BEARER_TOKEN_CACHE_DURATION_SECONDS = 300  # 5 minutes
+
+
+class AzureHttpClient:
+    """Centralized HTTP client for Azure DevOps REST API operations.
+
+    This class provides a reusable HTTP client with connection pooling, retry logic,
+    and standardized error handling for Azure DevOps REST API calls. It implements
+    the async context manager protocol for proper resource management.
+
+    Features:
+    - Connection pooling with configurable limits
+    - Retry logic with exponential backoff
+    - Standardized error handling and response processing
+    - Integration with existing authentication system
+    - Proper async context manager for resource cleanup
+
+    Example:
+        async with AzureHttpClient() as client:
+            response = await client.request('GET', url, headers=headers)
+            data = response.get('data')
+    """
+
+    def __init__(
+        self,
+        total_connections: int = 100,
+        per_host_connections: int = 30,
+        dns_cache_ttl: int = 300,
+        request_timeout: int = 30,
+        max_retries: int = 3,
+        retry_backoff_factor: float = 0.5,
+        retry_statuses: Optional[List[int]] = None
+    ):
+        """Initialize the AzureHttpClient.
+
+        Args:
+            total_connections: Total connection pool limit
+            per_host_connections: Per-host connection limit
+            dns_cache_ttl: DNS cache TTL in seconds
+            request_timeout: Request timeout in seconds
+            max_retries: Maximum number of retry attempts
+            retry_backoff_factor: Exponential backoff factor for retries
+            retry_statuses: HTTP status codes that should trigger retries
+        """
+        self.total_connections = total_connections
+        self.per_host_connections = per_host_connections
+        self.dns_cache_ttl = dns_cache_ttl
+        self.request_timeout = request_timeout
+        self.max_retries = max_retries
+        self.retry_backoff_factor = retry_backoff_factor
+        self.retry_statuses = retry_statuses or [429, 500, 502, 503, 504]
+
+        self._session: Optional[aiohttp.ClientSession] = None
+        self._connector: Optional[aiohttp.TCPConnector] = None
+
+    async def __aenter__(self) -> 'AzureHttpClient':
+        """Async context manager entry."""
+        await self._initialize_session()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit with proper cleanup."""
+        await self._cleanup_session()
+
+    async def _initialize_session(self) -> None:
+        """Initialize the HTTP session with connection pooling."""
+        if self._session is not None:
+            return
+
+        # Create TCP connector with connection pooling
+        self._connector = aiohttp.TCPConnector(
+            limit=self.total_connections,
+            limit_per_host=self.per_host_connections,
+            ttl_dns_cache=self.dns_cache_ttl,
+            use_dns_cache=True,
+            keepalive_timeout=30,
+            enable_cleanup_closed=True
+        )
+
+        # Create timeout configuration
+        timeout = aiohttp.ClientTimeout(total=float(self.request_timeout))
+
+        # Create session with connector and timeout
+        self._session = aiohttp.ClientSession(
+            connector=self._connector,
+            timeout=timeout,
+            raise_for_status=False  # We handle status codes manually
+        )
+
+        logger.debug(
+            f"Initialized AzureHttpClient session with {self.total_connections} total connections, "
+            f"{self.per_host_connections} per-host connections"
+        )
+
+    async def _cleanup_session(self) -> None:
+        """Clean up the HTTP session and connector."""
+        if self._session:
+            await self._session.close()
+            self._session = None
+
+        if self._connector:
+            await self._connector.close()
+            self._connector = None
+
+        logger.debug("Cleaned up AzureHttpClient session")
+
+    async def request(
+        self,
+        method: str,
+        url: str,
+        headers: Optional[Dict[str, str]] = None,
+        params: Optional[Dict[str, Any]] = None,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Make an HTTP request with retry logic and standardized error handling.
+
+        Args:
+            method: HTTP method (GET, POST, PATCH, PUT, DELETE)
+            url: Request URL
+            headers: Optional request headers
+            params: Optional query parameters
+            json: Optional JSON payload
+            data: Optional request data
+            **kwargs: Additional arguments passed to aiohttp
+
+        Returns:
+            Dictionary with standardized response format:
+            {
+                "success": bool,
+                "data": Optional[Dict[str, Any]],  # Present on success
+                "error": Optional[str],            # Present on failure
+                "status_code": int,                # HTTP status code
+                "raw_response": Optional[str]      # Raw response text
+            }
+        """
+        if not self._session:
+            raise RuntimeError("AzureHttpClient session not initialized. Use 'async with' context manager.")
+
+        last_exception = None
+
+        for attempt in range(self.max_retries + 1):
+            try:
+                # Calculate delay for exponential backoff
+                if attempt > 0:
+                    delay = self.retry_backoff_factor * (2 ** (attempt - 1))
+                    logger.debug(f"Retrying request after {delay:.2f}s delay (attempt {attempt + 1}/{self.max_retries + 1})")
+                    await asyncio.sleep(delay)
+
+                # Prepare request arguments - only include non-None values
+                request_kwargs: Dict[str, Any] = {}
+
+                if headers is not None:
+                    request_kwargs['headers'] = headers
+                if params is not None:
+                    request_kwargs['params'] = params
+                if json is not None:
+                    request_kwargs['json'] = json
+                elif data is not None:
+                    request_kwargs['data'] = data
+
+                # Add any additional kwargs
+                request_kwargs.update(kwargs)
+
+                # Make the HTTP request
+                session = self._session
+                if session is None:
+                    raise RuntimeError("Session is None")
+
+                async with session.request(
+                    method=method.upper(),
+                    url=url,
+                    **request_kwargs
+                ) as response:
+                    response_text = await response.text()
+                    status_code = response.status
+
+                    logger.debug(f"{method.upper()} {url} -> {status_code}")
+
+                    # Check if we should retry based on status code
+                    if attempt < self.max_retries and status_code in self.retry_statuses:
+                        logger.warning(f"Request failed with status {status_code}, will retry")
+                        continue
+
+                    # Process the response using existing utility function
+                    result = process_rest_response(response_text, status_code)
+                    result["status_code"] = status_code
+                    result["raw_response"] = response_text
+
+                    return result
+
+            except aiohttp.ClientError as e:
+                last_exception = e
+                logger.warning(f"HTTP client error on attempt {attempt + 1}: {e}")
+
+                # Don't retry on client errors unless it's a timeout
+                if not isinstance(e, (aiohttp.ServerTimeoutError, asyncio.TimeoutError)):
+                    break
+
+            except Exception as e:
+                last_exception = e
+                logger.error(f"Unexpected error on attempt {attempt + 1}: {e}")
+                break
+
+        # If we get here, all retries failed
+        error_msg = f"Request failed after {self.max_retries + 1} attempts"
+        if last_exception:
+            error_msg += f": {str(last_exception)}"
+
+        return {
+            "success": False,
+            "error": error_msg,
+            "status_code": 0,
+            "raw_response": None
+        }
+
+    async def get(self, url: str, **kwargs) -> Dict[str, Any]:
+        """Convenience method for GET requests."""
+        return await self.request('GET', url, **kwargs)
+
+    async def post(self, url: str, **kwargs) -> Dict[str, Any]:
+        """Convenience method for POST requests."""
+        return await self.request('POST', url, **kwargs)
+
+    async def patch(self, url: str, **kwargs) -> Dict[str, Any]:
+        """Convenience method for PATCH requests."""
+        return await self.request('PATCH', url, **kwargs)
+
+    async def put(self, url: str, **kwargs) -> Dict[str, Any]:
+        """Convenience method for PUT requests."""
+        return await self.request('PUT', url, **kwargs)
+
+    async def delete(self, url: str, **kwargs) -> Dict[str, Any]:
+        """Convenience method for DELETE requests."""
+        return await self.request('DELETE', url, **kwargs)
+
+    # Integration methods with existing utilities
+    async def azure_request(
+        self,
+        method: str,
+        organization: str,
+        project: str,
+        endpoint: str,
+        content_type: str = "application/json",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Make an Azure DevOps REST API request with automatic authentication and URL building.
+
+        This method integrates with existing utility functions to provide a seamless
+        experience for Azure DevOps API calls.
+
+        Args:
+            method: HTTP method (GET, POST, PATCH, PUT, DELETE)
+            organization: Azure DevOps organization name or URL
+            project: Azure DevOps project name
+            endpoint: API endpoint path without leading slash
+            content_type: Content-Type header value
+            **kwargs: Additional arguments passed to the request
+
+        Returns:
+            Dictionary with standardized response format from process_rest_response()
+        """
+        # Build URL using existing utility
+        url = build_api_url(organization, project, endpoint)
+
+        # Get authentication headers using existing utility
+        headers = get_auth_headers(content_type)
+
+        # Merge with any additional headers provided
+        if 'headers' in kwargs:
+            headers.update(kwargs.pop('headers'))
+
+        # Make the request
+        return await self.request(method, url, headers=headers, **kwargs)
+
+    async def azure_get(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps GET requests."""
+        return await self.azure_request(
+            'GET', organization, project, endpoint,
+            params=params, **kwargs
+        )
+
+    async def azure_post(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps POST requests."""
+        return await self.azure_request(
+            'POST', organization, project, endpoint,
+            json=json, data=data, **kwargs
+        )
+
+    async def azure_patch(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps PATCH requests."""
+        return await self.azure_request(
+            'PATCH', organization, project, endpoint,
+            json=json, data=data, **kwargs
+        )
+
+    async def azure_put(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        json: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps PUT requests."""
+        return await self.azure_request(
+            'PUT', organization, project, endpoint,
+            json=json, data=data, **kwargs
+        )
+
+    async def azure_delete(
+        self,
+        organization: str,
+        project: str,
+        endpoint: str,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Convenience method for Azure DevOps DELETE requests."""
+        return await self.azure_request(
+            'DELETE', organization, project, endpoint, **kwargs
+        )
 
 
 @dataclass
