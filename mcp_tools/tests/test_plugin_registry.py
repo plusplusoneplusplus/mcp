@@ -278,7 +278,7 @@ def test_valid_tool_sources():
     """
     # Register tools with different valid sources
     clean_registry = PluginRegistry()
-    clean_registry._initialize()  # Reset to clean state
+    clean_registry.clear()  # Reset to clean state
 
     # Register tools with different sources
     clean_registry.register_tool(MockCodeTool, source="code")

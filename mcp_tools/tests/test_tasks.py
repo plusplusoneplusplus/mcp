@@ -1,8 +1,12 @@
 import asyncio
 import platform
-from mcp_tools.tools import load_tasks_from_yaml, executor
+import pytest
+from mcp_tools.tools import load_tasks_from_yaml
+from mcp_tools.command_executor import CommandExecutor
 
+executor = CommandExecutor()
 
+@pytest.mark.asyncio
 async def test_tasks():
     """Test the task abstraction layer with OS-conditional commands"""
     print("Testing task abstraction layer with OS-conditional commands...")
