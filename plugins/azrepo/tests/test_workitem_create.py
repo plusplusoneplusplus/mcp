@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import patch
 
-from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response
+from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response, mock_azure_http_client
 
 
 class TestCreateWorkItem:
@@ -12,7 +12,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_basic(self, azure_workitem_tool):
         """Test basic work item creation."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 description="Test description"
@@ -25,7 +25,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_with_custom_type(self, azure_workitem_tool):
         """Test work item creation with custom type."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Bug Report",
                 work_item_type="Bug"
@@ -37,7 +37,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_with_overrides(self, azure_workitem_tool):
         """Test work item creation with parameter overrides."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Custom Work Item",
                 area_path="CustomArea",
@@ -52,7 +52,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_minimal(self, azure_workitem_tool):
         """Test work item creation with minimal parameters."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(title="Minimal Work Item")
 
             assert result["success"] is True
@@ -84,7 +84,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_http_error(self, azure_workitem_tool):
         """Test work item creation with HTTP error."""
-        with mock_aiohttp_response(method="post", status_code=401, error_message="Access denied"):
+        with mock_azure_http_client(method="post", status_code=401, error_message="Access denied"):
             result = await azure_workitem_tool.create_work_item(title="Test Work Item")
 
             assert result["success"] is False
@@ -93,7 +93,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_json_parse_error(self, azure_workitem_tool):
         """Test work item creation with JSON parsing error."""
-        with mock_aiohttp_response(method="post", status_code=200, raw_response_text="Invalid JSON"):
+        with mock_azure_http_client(method="post", status_code=200, raw_response_text="Invalid JSON"):
             result = await azure_workitem_tool.create_work_item(title="Test Work Item")
             assert result["success"] is False
             assert "Failed to parse response" in result["error"]
@@ -102,7 +102,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_with_special_characters(self, azure_workitem_tool):
         """Test work item creation with special characters."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Fix issue with 'quotes' and \"double quotes\"",
                 description="Description with special chars: @#$%^&*()_+-={}[]|\\:;\"'<>?,./"
@@ -114,7 +114,7 @@ class TestCreateWorkItem:
     @pytest.mark.asyncio
     async def test_create_work_item_with_unicode(self, azure_workitem_tool):
         """Test work item creation with Unicode characters."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Unicode test: 测试 🚀 émojis",
                 description="Description with Unicode: café naïve résumé 中文"
@@ -130,7 +130,7 @@ class TestExecuteToolCreate:
     @pytest.mark.asyncio
     async def test_execute_tool_create_success(self, azure_workitem_tool):
         """Test successful work item creation through execute_tool."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             arguments = {
                 "operation": "create",
                 "title": "Test Work Item",
@@ -173,7 +173,7 @@ class TestExecuteToolCreate:
     @pytest.mark.asyncio
     async def test_execute_tool_create_with_all_params(self, azure_workitem_tool):
         """Test work item creation with all parameters."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             arguments = {
                 "operation": "create",
                 "title": "Complete Work Item",
@@ -200,7 +200,7 @@ class TestExecuteToolCreate:
             "project": "custom-project"
         }
 
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool_no_defaults.execute_tool(arguments)
 
             assert result["success"] is True
@@ -209,7 +209,7 @@ class TestExecuteToolCreate:
     @pytest.mark.asyncio
     async def test_execute_tool_create_error_propagation(self, azure_workitem_tool):
         """Test error propagation through execute_tool."""
-        with mock_aiohttp_response(method="post", status_code=401, error_message="Access denied"):
+        with mock_azure_http_client(method="post", status_code=401, error_message="Access denied"):
             arguments = {
                 "operation": "create",
                 "title": "Failed Work Item"

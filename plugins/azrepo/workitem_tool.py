@@ -2,7 +2,6 @@
 
 import logging
 import json
-import aiohttp
 from typing import Dict, Any, List, Optional, Union
 from unittest.mock import patch
 
@@ -20,6 +19,7 @@ from .azure_rest_utils import (
     build_api_url,
     process_rest_response,
     validate_and_format_assignee,
+    AzureHttpClient,
 )
 
 # Import markdown to HTML conversion utility
@@ -382,35 +382,31 @@ class AzureWorkItemTool(ToolInterface):
 
             self.logger.debug(f"Getting work item via REST API: {url}")
 
-            # Make the REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers) as response:
-                    response_text = await response.text()
+            # Make the REST API call using centralized HTTP client
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('GET', url, headers=headers)
 
-                    if response.status == 200:
-                        try:
-                            work_item_data = json.loads(response_text)
-                            return {"success": True, "data": work_item_data}
-                        except json.JSONDecodeError as e:
-                            self.logger.error(f"Failed to parse work item response: {e}")
-                            return {
-                                "success": False,
-                                "error": f"Failed to parse response: {e}",
-                                "raw_output": response_text
-                            }
-                    elif response.status == 404:
+                if result["success"]:
+                    return {"success": True, "data": result["data"]}
+                else:
+                    # Handle specific error cases for backward compatibility
+                    status_code = result.get("status_code", 0)
+                    error_msg = result.get("error", "Unknown error")
+                    raw_response = result.get("raw_response", "")
+
+                    if status_code == 404:
                         self.logger.error(f"Work item {work_item_id} not found")
                         return {
                             "success": False,
                             "error": f"Work item {work_item_id} not found",
-                            "raw_output": response_text
+                            "raw_output": raw_response
                         }
                     else:
-                        self.logger.error(f"Work item retrieval failed with status {response.status}: {response_text}")
+                        self.logger.error(f"Work item retrieval failed: {error_msg}")
                         return {
                             "success": False,
-                            "error": f"HTTP {response.status}: {response_text}",
-                            "raw_output": response_text
+                            "error": error_msg,
+                            "raw_output": raw_response
                         }
 
         except Exception as e:
@@ -561,29 +557,23 @@ class AzureWorkItemTool(ToolInterface):
             self.logger.debug(f"Creating work item via REST API: {url}")
             self.logger.debug(f"Patch document: {json.dumps(patch_document, indent=2)}")
 
-            # Make the REST API call
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=patch_document, headers=headers) as response:
-                    response_text = await response.text()
+            # Make the REST API call using centralized HTTP client
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('POST', url, json=patch_document, headers=headers)
 
-                    if response.status == 200:
-                        try:
-                            work_item_data = json.loads(response_text)
-                            return {"success": True, "data": work_item_data}
-                        except json.JSONDecodeError as e:
-                            self.logger.error(f"Failed to parse work item response: {e}")
-                            return {
-                                "success": False,
-                                "error": f"Failed to parse response: {e}",
-                                "raw_output": response_text
-                            }
-                    else:
-                        self.logger.error(f"Work item creation failed with status {response.status}: {response_text}")
-                        return {
-                            "success": False,
-                            "error": f"HTTP {response.status}: {response_text}",
-                            "raw_output": response_text
-                        }
+                if result["success"]:
+                    return {"success": True, "data": result["data"]}
+                else:
+                    # Handle error cases for backward compatibility
+                    error_msg = result.get("error", "Unknown error")
+                    raw_response = result.get("raw_response", "")
+
+                    self.logger.error(f"Work item creation failed: {error_msg}")
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "raw_output": raw_response
+                    }
 
         except Exception as e:
             self.logger.error(f"Error creating work item: {e}")
@@ -657,35 +647,31 @@ class AzureWorkItemTool(ToolInterface):
             self.logger.debug(f"Updating work item via REST API: {url}")
             self.logger.debug(f"Patch document: {json.dumps(patch_document, indent=2)}")
 
-            # Make the REST API call using PATCH method
-            async with aiohttp.ClientSession() as session:
-                async with session.patch(url, json=patch_document, headers=headers) as response:
-                    response_text = await response.text()
+            # Make the REST API call using centralized HTTP client
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('PATCH', url, json=patch_document, headers=headers)
 
-                    if response.status == 200:
-                        try:
-                            work_item_data = json.loads(response_text)
-                            return {"success": True, "data": work_item_data}
-                        except json.JSONDecodeError as e:
-                            self.logger.error(f"Failed to parse work item response: {e}")
-                            return {
-                                "success": False,
-                                "error": f"Failed to parse response: {e}",
-                                "raw_output": response_text
-                            }
-                    elif response.status == 404:
+                if result["success"]:
+                    return {"success": True, "data": result["data"]}
+                else:
+                    # Handle specific error cases for backward compatibility
+                    status_code = result.get("status_code", 0)
+                    error_msg = result.get("error", "Unknown error")
+                    raw_response = result.get("raw_response", "")
+
+                    if status_code == 404:
                         self.logger.error(f"Work item {work_item_id} not found")
                         return {
                             "success": False,
                             "error": f"Work item {work_item_id} not found",
-                            "raw_output": response_text
+                            "raw_output": raw_response
                         }
                     else:
-                        self.logger.error(f"Work item update failed with status {response.status}: {response_text}")
+                        self.logger.error(f"Work item update failed: {error_msg}")
                         return {
                             "success": False,
-                            "error": f"HTTP {response.status}: {response_text}",
-                            "raw_output": response_text
+                            "error": error_msg,
+                            "raw_output": raw_response
                         }
 
         except Exception as e:

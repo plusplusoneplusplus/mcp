@@ -5,7 +5,7 @@ Tests for markdown conversion functionality in work item creation.
 import pytest
 from unittest.mock import patch
 from plugins.azrepo.tests.helpers import patch_azure_utils_env_manager
-from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response
+from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response, mock_azure_http_client
 
 
 class TestMarkdownConversion:
@@ -31,7 +31,7 @@ User should be logged in successfully.
 Error message appears: `Invalid credentials`
 """
 
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Login Bug",
                 description=markdown_description
@@ -45,7 +45,7 @@ Error message appears: `Invalid credentials`
         """Test work item creation with plain text description."""
         plain_description = "This is a simple plain text description without any markdown formatting."
 
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Simple Task",
                 description=plain_description
@@ -82,7 +82,7 @@ def login():
 > **Note**: This feature should be implemented in the next sprint.
 """
 
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Authentication System",
                 description=mixed_description,
@@ -95,7 +95,7 @@ def login():
     @pytest.mark.asyncio
     async def test_create_work_item_no_description(self, azure_workitem_tool):
         """Test work item creation without description."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Task Without Description"
             )
@@ -106,7 +106,7 @@ def login():
     @pytest.mark.asyncio
     async def test_create_work_item_empty_description(self, azure_workitem_tool):
         """Test work item creation with empty description."""
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Task With Empty Description",
                 description=""
@@ -132,7 +132,7 @@ npm test
 ```
 """
 
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             arguments = {
                 "operation": "create",
                 "title": "Development Task",
@@ -170,7 +170,7 @@ console.log(message);
 4. Item with "quotes"
 """
 
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Special Characters Test",
                 description=special_description
@@ -197,7 +197,7 @@ console.log(message);
 - Optimize registration performance
 """
 
-        with mock_aiohttp_response(method="post"):
+        with mock_azure_http_client(method="post"):
             result = await azure_workitem_tool.create_work_item(
                 title="Test Results Summary",
                 description=table_description
