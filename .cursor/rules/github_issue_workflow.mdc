@@ -95,11 +95,76 @@ This ensures you're working from the latest stable code and prevents conflicts.
 - Include the code editor name at the end of commit messages for development context
 - Squash or organize commits if needed for a clean history
 
-### 5. Pre-Submission Code Review Phase
+### 5. Local Test Execution and Validation Phase
+
+**⚠️ MANDATORY: Complete Local Testing Before PR Submission**
+
+Before creating a pull request, you MUST execute and validate all relevant test cases locally to ensure your implementation works correctly and doesn't introduce regressions.
+
+**Local Testing Requirements:**
+1. **Run All Existing Tests:** Execute the complete test suite to ensure no regressions
+   ```bash
+   # Use project-specific test commands, examples:
+   uv run pytest                    # For Python projects with pytest
+   uv run python -m pytest         # Alternative pytest execution
+   uv run python -m unittest       # For unittest-based projects
+   npm test                         # For Node.js projects
+   make test                        # If project uses Makefile
+   ```
+
+2. **Run New/Modified Tests:** Execute any tests you've added or modified
+   ```bash
+   # Run specific test files or test cases
+   uv run pytest tests/test_new_feature.py
+   uv run pytest -k "test_specific_function"
+   ```
+
+3. **Integration Testing:** Test the feature end-to-end in a local environment
+   - Start the application locally if applicable
+   - Test the specific functionality addressed by the issue
+   - Verify edge cases and error scenarios
+   - Test with different input combinations
+
+4. **Cross-Platform Testing (if applicable):** Test on different environments if the project supports multiple platforms
+
+5. **Performance Testing (if applicable):** Run performance tests if your changes could impact performance
+
+**Test Validation Checklist:**
+- [ ] All existing tests pass without failures
+- [ ] New tests pass and provide adequate coverage
+- [ ] Integration tests demonstrate the feature works end-to-end
+- [ ] No test warnings or deprecation messages introduced
+- [ ] Test execution time hasn't significantly increased
+- [ ] All test dependencies are properly installed and configured
+
+**Test Results Documentation:**
+Document your local testing results:
+
+```markdown
+## Local Test Execution Results
+- **Code Editor:** [Editor used for development]
+- **Test Framework:** [pytest/unittest/jest/etc.]
+- **Total Tests Run:** [Number of tests executed]
+- **Test Results:** [All passed/X failed/X skipped]
+- **New Tests Added:** [Number and description]
+- **Test Coverage:** [Coverage percentage if available]
+- **Integration Testing:** [Completed/Not applicable]
+- **Performance Impact:** [None/Improved/Degraded - with details]
+- **Test Execution Time:** [Total time taken]
+```
+
+**If Tests Fail:**
+- **DO NOT CREATE THE PULL REQUEST**
+- **Fix all failing tests before proceeding**
+- **Investigate and resolve any test failures**
+- **Re-run the complete test suite after fixes**
+- **Document any test changes or fixes made**
+
+### 6. Pre-Submission Code Review Phase
 
 **⚠️ MANDATORY: Automated Code Review Before PR Submission**
 
-Before creating a pull request, you MUST perform an automated code review using available tools (GitHub Copilot, AI code review tools, etc.) to assess the quality of your implementation.
+After successful local test validation, you MUST perform an automated code review using available tools (GitHub Copilot, AI code review tools, etc.) to assess the quality of your implementation.
 
 **Code Review Process:**
 1. **Request Automated Review:** Use available code review tools to analyze your changes
@@ -136,7 +201,7 @@ Document the review process and results in your workflow output:
 
 **Only proceed to the next phase if the code review results are satisfactory.**
 
-### 6. Pull Request Phase
+### 7. Pull Request Phase
 
 **Create Pull Request:**
 - Write a clear, descriptive PR title that references the issue (e.g., "Fix issue #123: Update validation logic")
@@ -154,7 +219,7 @@ Document the review process and results in your workflow output:
 - Include screenshots or demos for UI changes
 - Link to any related issues or PRs
 
-### 7. Post-Submission Phase
+### 8. Post-Submission Phase
 
 **Monitor and Respond:**
 - Respond promptly to review comments and feedback
@@ -232,6 +297,20 @@ When working through this workflow, provide updates at each major step:
 - **Editor Features Used:** [Any specific editor features utilized, e.g., AI assistance, extensions, etc.]
 ```
 
+### Local Test Execution Results
+```markdown
+## Local Test Execution Results
+- **Code Editor:** [Editor used for development]
+- **Test Framework:** [pytest/unittest/jest/etc.]
+- **Total Tests Run:** [Number of tests executed]
+- **Test Results:** [All passed/X failed/X skipped]
+- **New Tests Added:** [Number and description]
+- **Test Coverage:** [Coverage percentage if available]
+- **Integration Testing:** [Completed/Not applicable]
+- **Performance Impact:** [None/Improved/Degraded - with details]
+- **Test Execution Time:** [Total time taken]
+```
+
 ### Pre-Submission Code Review
 ```markdown
 ## Pre-Submission Code Review
@@ -269,12 +348,13 @@ When working through this workflow, provide updates at each major step:
 2. **Communication:** Keep stakeholders informed of progress and any blockers
 3. **Documentation:** Document decisions and trade-offs made during implementation
 4. **Testing:** Prioritize thorough testing to prevent regressions
-5. **Code Quality:** Maintain high code quality standards throughout
-6. **Pre-Submission Review:** Always perform automated code review before creating PRs
-7. **Quality Gates:** Never submit PRs with significant code quality issues
-8. **Git Hygiene:** Keep commit history clean and meaningful
-9. **Branch Management:** Always return to main branch after completion
-10. **Issue Tracking:** Ensure proper linking between issues, commits, and PRs
+5. **Local Test Validation:** Always execute and validate all tests locally before PR submission
+6. **Code Quality:** Maintain high code quality standards throughout
+7. **Pre-Submission Review:** Always perform automated code review before creating PRs
+8. **Quality Gates:** Never submit PRs with significant code quality issues or failing tests
+9. **Git Hygiene:** Keep commit history clean and meaningful
+10. **Branch Management:** Always return to main branch after completion
+11. **Issue Tracking:** Ensure proper linking between issues, commits, and PRs
 
 ## Error Handling
 
