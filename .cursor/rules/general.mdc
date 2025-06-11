@@ -12,3 +12,17 @@ alwaysApply: true
    - Use existing virtual environment if available, otherwise use `uv venv` for virtual environment creation
 2. Do not generate readme markdown files unless I explicitly ask
 3. Do not generate example unless I explicitly ask
+4. **GitHub Issue Resolution Workflow**: When the user asks to resolve, work on, or implement a GitHub issue, follow the comprehensive workflow defined in `@github_issue_workflow.mdc`. This includes:
+   - Pre-work setup (checkout main, pull latest changes)
+   - Issue analysis and planning
+   - Implementation with proper branch management
+   - Quality assurance and testing
+   - Mandatory pre-submission code review
+   - Pull request creation and management
+   - Post-submission monitoring and cleanup
+5. **GitHub Issue Creation Workflow**: When the user asks to create a GitHub issue, follow the structured approach defined in `@generate_github_issue.mdc`. This includes:
+   - Repository identification and verification
+   - Issue analysis and requirement clarification
+   - Proper issue structure with categorized titles
+   - Comprehensive descriptions with acceptance criteria
+   - Appropriate labels and metadata suggestions
