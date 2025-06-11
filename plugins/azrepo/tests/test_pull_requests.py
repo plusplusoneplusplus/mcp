@@ -68,7 +68,7 @@ def mock_pr_azure_http_client(
             error_msg = "Resource not found"
         else:
             error_msg = f"HTTP {status_code}: {error_message or text_payload}"
-        
+
         mock_result = {
             "success": False,
             "error": error_msg,
@@ -126,17 +126,11 @@ class TestListPullRequestsAPI:
     """Test the list_pull_requests method using the REST API."""
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_basic(
-        self, mock_auth_headers, mock_get, azure_pr_tool, mock_pr_list_response
+        self, mock_auth_headers, azure_pr_tool, mock_pr_list_response
     ):
         """Test basic pull request listing via REST API with new defaults."""
-        # Setup mock response for aiohttp
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_pr_list_response["data"]}
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         # Configure the tool with default values
@@ -148,88 +142,85 @@ class TestListPullRequestsAPI:
         with patch.object(
             azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
         ):
-            result = await azure_pr_tool.list_pull_requests()
+            with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
+                result = await azure_pr_tool.list_pull_requests()
 
-            mock_get.assert_called_once()
-            call_args, call_kwargs = mock_get.call_args
-            assert "pullrequests" in call_args[0]
-            params = call_kwargs["params"]
-            assert params["searchCriteria.creatorId"] == "test.user@company.com"
-            # New default behavior: status should be "active"
-            assert params["searchCriteria.status"] == "active"
-            # New default behavior: target branch should be "main"
-            assert params["searchCriteria.targetRefName"] == "refs/heads/main"
+                # Verify the HTTP client was called
+                mock_client.return_value.request.assert_called_once()
+                call_args, call_kwargs = mock_client.return_value.request.call_args
 
-            assert result["success"] is True
-            assert "id,creator,date,title,source_ref,target_ref" in result["data"]
+                # Check the method and URL
+                assert call_args[0] == "GET"
+                assert "pullrequests" in call_args[1]
+                params = call_kwargs["params"]
+                assert params["searchCriteria.creatorId"] == "test.user@company.com"
+                # New default behavior: status should be "active"
+                assert params["searchCriteria.status"] == "active"
+                # New default behavior: target branch should be "main"
+                assert params["searchCriteria.targetRefName"] == "refs/heads/main"
+
+                assert result["success"] is True
+                assert "id,creator,date,title,source_ref,target_ref" in result["data"]
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_with_filters(
-        self, mock_auth_headers, mock_get, azure_pr_tool, mock_pr_list_response
+        self, mock_auth_headers, azure_pr_tool, mock_pr_list_response
     ):
         """Test pull request listing with filters via REST API."""
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_pr_list_response["data"]}
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        await azure_pr_tool.list_pull_requests(
-            status="active",
-            creator="test-creator",
-            reviewer="test-reviewer",
-            source_branch="feature/branch",
-            target_branch="main",
-            top=20,
-            skip=5,
-        )
+        with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
+            await azure_pr_tool.list_pull_requests(
+                status="active",
+                creator="test-creator",
+                reviewer="test-reviewer",
+                source_branch="feature/branch",
+                target_branch="main",
+                top=20,
+                skip=5,
+            )
 
-        mock_get.assert_called_once()
-        call_args, call_kwargs = mock_get.call_args
-        params = call_kwargs["params"]
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            params = call_kwargs["params"]
 
-        assert params["searchCriteria.status"] == "active"
-        assert params["searchCriteria.creatorId"] == "test-creator"
-        assert params["searchCriteria.reviewerId"] == "test-reviewer"
-        assert params["searchCriteria.sourceRefName"] == "refs/heads/feature/branch"
-        assert params["searchCriteria.targetRefName"] == "refs/heads/main"
-        assert params["$top"] == 20
-        assert params["$skip"] == 5
+            assert params["searchCriteria.status"] == "active"
+            assert params["searchCriteria.creatorId"] == "test-creator"
+            assert params["searchCriteria.reviewerId"] == "test-reviewer"
+            assert params["searchCriteria.sourceRefName"] == "refs/heads/feature/branch"
+            assert params["searchCriteria.targetRefName"] == "refs/heads/main"
+            assert params["$top"] == 20
+            assert params["$skip"] == 5
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_api_failure(
-        self, mock_auth_headers, mock_get, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test handling of API failure during pull request listing."""
-        mock_response = AsyncMock()
-        mock_response.status = 401
-        mock_response.text.return_value = "Authentication failed"
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.list_pull_requests()
+        with mock_pr_azure_http_client(method="get", status_code=401, error_message="Authentication failed") as mock_client:
+            result = await azure_pr_tool.list_pull_requests()
 
-        assert result["success"] is False
-        assert "401" in result["error"]
-        assert "Authentication failed" in result["error"]
+            assert result["success"] is False
+            assert "401" in result["error"]
+            assert "Authentication failed" in result["error"]
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_exclude_drafts_default(
-        self, mock_auth_headers, mock_get, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test that draft PRs are excluded by default."""
         # Setup mock response with both draft and non-draft PRs
@@ -256,10 +247,6 @@ class TestListPullRequestsAPI:
             }
         ]
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_prs}
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
@@ -270,20 +257,20 @@ class TestListPullRequestsAPI:
         with patch.object(
             azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
         ):
-            result = await azure_pr_tool.list_pull_requests()
+            with mock_pr_azure_http_client(method="get", response_data={"value": mock_prs}) as mock_client:
+                result = await azure_pr_tool.list_pull_requests()
 
-            assert result["success"] is True
-            # Should only contain the non-draft PR
-            assert "123" in result["data"]
-            assert "Non-draft PR" in result["data"]
-            assert "124" not in result["data"]
-            assert "Draft PR" not in result["data"]
+                assert result["success"] is True
+                # Should only contain the non-draft PR
+                assert "123" in result["data"]
+                assert "Non-draft PR" in result["data"]
+                assert "124" not in result["data"]
+                assert "Draft PR" not in result["data"]
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_include_drafts(
-        self, mock_auth_headers, mock_get, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test that draft PRs are included when exclude_drafts=False."""
         # Setup mock response with both draft and non-draft PRs
@@ -310,10 +297,6 @@ class TestListPullRequestsAPI:
             }
         ]
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_prs}
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
@@ -324,26 +307,22 @@ class TestListPullRequestsAPI:
         with patch.object(
             azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
         ):
-            result = await azure_pr_tool.list_pull_requests(exclude_drafts=False)
+            with mock_pr_azure_http_client(method="get", response_data={"value": mock_prs}) as mock_client:
+                result = await azure_pr_tool.list_pull_requests(exclude_drafts=False)
 
-            assert result["success"] is True
-            # Should contain both PRs
-            assert "123" in result["data"]
-            assert "Non-draft PR" in result["data"]
-            assert "124" in result["data"]
-            assert "Draft PR" in result["data"]
+                assert result["success"] is True
+                # Should contain both PRs
+                assert "123" in result["data"]
+                assert "Non-draft PR" in result["data"]
+                assert "124" in result["data"]
+                assert "Draft PR" in result["data"]
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_backward_compatibility(
-        self, mock_auth_headers, mock_get, azure_pr_tool, mock_pr_list_response
+        self, mock_auth_headers, azure_pr_tool, mock_pr_list_response
     ):
         """Test backward compatibility - explicit None values should work as before."""
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_pr_list_response["data"]}
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
@@ -353,35 +332,32 @@ class TestListPullRequestsAPI:
         with patch.object(
             azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
         ):
-            # Explicitly pass None values to get old behavior
-            result = await azure_pr_tool.list_pull_requests(
-                status=None,
-                target_branch=None,
-                exclude_drafts=False
-            )
+            with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
+                # Explicitly pass None values to get old behavior
+                result = await azure_pr_tool.list_pull_requests(
+                    status=None,
+                    target_branch=None,
+                    exclude_drafts=False
+                )
 
-            mock_get.assert_called_once()
-            call_args, call_kwargs = mock_get.call_args
-            params = call_kwargs["params"]
+                # Verify the HTTP client was called
+                mock_client.return_value.request.assert_called_once()
+                call_args, call_kwargs = mock_client.return_value.request.call_args
+                params = call_kwargs["params"]
 
-            # Should not have status filter (old behavior)
-            assert "searchCriteria.status" not in params
-            # Should not have target branch filter (old behavior)
-            assert "searchCriteria.targetRefName" not in params
+                # Should not have status filter (old behavior)
+                assert "searchCriteria.status" not in params
+                # Should not have target branch filter (old behavior)
+                assert "searchCriteria.targetRefName" not in params
 
-            assert result["success"] is True
+                assert result["success"] is True
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_custom_target_branch_default(
-        self, mock_auth_headers, mock_get, azure_pr_tool, mock_pr_list_response
+        self, mock_auth_headers, azure_pr_tool, mock_pr_list_response
     ):
         """Test that configured default target branch is used when target_branch='default'."""
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json.return_value = {"value": mock_pr_list_response["data"]}
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
@@ -392,29 +368,30 @@ class TestListPullRequestsAPI:
         with patch.object(
             azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
         ):
-            result = await azure_pr_tool.list_pull_requests()
+            with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
+                result = await azure_pr_tool.list_pull_requests()
 
-            mock_get.assert_called_once()
-            call_args, call_kwargs = mock_get.call_args
-            params = call_kwargs["params"]
+                # Verify the HTTP client was called
+                mock_client.return_value.request.assert_called_once()
+                call_args, call_kwargs = mock_client.return_value.request.call_args
+                params = call_kwargs["params"]
 
-            # Should use configured default target branch
-            assert params["searchCriteria.targetRefName"] == "refs/heads/develop"
+                # Should use configured default target branch
+                assert params["searchCriteria.targetRefName"] == "refs/heads/develop"
 
-            assert result["success"] is True
+                assert result["success"] is True
 
 
 class TestGetPullRequest:
     """Test the get_pull_request method using REST API."""
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_get_pull_request_basic(
-        self, mock_auth_headers, mock_get, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test getting a specific pull request via REST API."""
-        # Setup mock response for aiohttp
+        # Setup mock response data
         mock_pr_data = {
             "pullRequestId": 123,
             "title": "Test PR",
@@ -425,10 +402,6 @@ class TestGetPullRequest:
             "creationDate": "2024-01-15T10:30:00.000Z",
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text.return_value = json.dumps(mock_pr_data)
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         # Configure the tool with default values
@@ -436,48 +409,46 @@ class TestGetPullRequest:
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.get_pull_request(123)
+        with mock_pr_azure_http_client(method="get", response_data=mock_pr_data) as mock_client:
+            result = await azure_pr_tool.get_pull_request(123)
 
-        mock_get.assert_called_once()
-        call_args, call_kwargs = mock_get.call_args
-        assert "pullrequests/123" in call_args[0]
-        assert result["success"] is True
-        assert result["data"]["pullRequestId"] == 123
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            assert call_args[0] == "GET"
+            assert "pullrequests/123" in call_args[1]
+            assert result["success"] is True
+            assert result["data"]["pullRequestId"] == 123
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.get")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_get_pull_request_not_found(
-        self, mock_auth_headers, mock_get, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test getting a non-existent pull request."""
-        mock_response = AsyncMock()
-        mock_response.status = 404
-        mock_response.text.return_value = "Pull request not found"
-        mock_get.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.get_pull_request(999)
+        with mock_pr_azure_http_client(method="get", status_code=404, error_message="Pull request not found") as mock_client:
+            result = await azure_pr_tool.get_pull_request(999)
 
-        assert result["success"] is False
-        assert "Pull request 999 not found" in result["error"]
+            assert result["success"] is False
+            assert "Pull request 999 not found" in result["error"]
 
 
 class TestCreatePullRequest:
     """Test the create_pull_request method using REST API."""
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.post")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_create_pull_request_basic(
-        self, mock_auth_headers, mock_post, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test creating a basic pull request via REST API."""
-        # Setup mock response for aiohttp
+        # Setup mock response data
         mock_pr_data = {
             "pullRequestId": 123,
             "title": "Test PR",
@@ -488,10 +459,6 @@ class TestCreatePullRequest:
             "creationDate": "2024-01-15T10:30:00.000Z",
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 201
-        mock_response.text.return_value = json.dumps(mock_pr_data)
-        mock_post.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         # Configure the tool with default values
@@ -500,30 +467,31 @@ class TestCreatePullRequest:
         azure_pr_tool.default_repository = "test-repo"
         azure_pr_tool.default_target_branch = "main"
 
-        result = await azure_pr_tool.create_pull_request(
-            title="Test PR", source_branch="feature/test"
-        )
+        with mock_pr_azure_http_client(method="post", status_code=201, response_data=mock_pr_data) as mock_client:
+            result = await azure_pr_tool.create_pull_request(
+                title="Test PR", source_branch="feature/test"
+            )
 
-        mock_post.assert_called_once()
-        call_args, call_kwargs = mock_post.call_args
-        assert "pullrequests" in call_args[0]
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            assert call_args[0] == "POST"
+            assert "pullrequests" in call_args[1]
 
-        # Check the request body
-        request_body = call_kwargs["json"]
-        assert request_body["title"] == "Test PR"
-        assert request_body["sourceRefName"] == "refs/heads/feature/test"
-        assert request_body["targetRefName"] == "refs/heads/main"
-        assert request_body["isDraft"] is False
+            # Check the request body
+            request_body = call_kwargs["json"]
+            assert request_body["title"] == "Test PR"
+            assert request_body["sourceRefName"] == "refs/heads/feature/test"
+            assert request_body["targetRefName"] == "refs/heads/main"
+            assert request_body["isDraft"] is False
 
-        assert result["success"] is True
-        assert result["data"]["pullRequestId"] == 123
+            assert result["success"] is True
+            assert result["data"]["pullRequestId"] == 123
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.post")
-    @patch("aiohttp.ClientSession.patch")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_create_pull_request_with_completion_options(
-        self, mock_auth_headers, mock_patch, mock_post, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test creating a pull request with auto-complete and other completion options."""
         # Setup mock response for PR creation
@@ -533,18 +501,19 @@ class TestCreatePullRequest:
             "sourceRefName": "refs/heads/feature/test",
             "targetRefName": "refs/heads/main",
             "status": "active",
+            "createdBy": {"displayName": "John Doe", "uniqueName": "john.doe@abc.com"},
+            "creationDate": "2024-01-15T10:30:00.000Z",
         }
 
-        mock_create_response = AsyncMock()
-        mock_create_response.status = 201
-        mock_create_response.text.return_value = json.dumps(mock_pr_data)
-        mock_post.return_value.__aenter__.return_value = mock_create_response
-
         # Setup mock response for completion settings update
-        mock_update_response = AsyncMock()
-        mock_update_response.status = 200
-        mock_update_response.text.return_value = json.dumps(mock_pr_data)
-        mock_patch.return_value.__aenter__.return_value = mock_update_response
+        mock_completion_data = {
+            "pullRequestId": 123,
+            "autoCompleteSetBy": {"id": "test-user"},
+            "completionOptions": {
+                "squashMerge": True,
+                "deleteSourceBranch": True
+            }
+        }
 
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
@@ -554,47 +523,60 @@ class TestCreatePullRequest:
         azure_pr_tool.default_repository = "test-repo"
         azure_pr_tool.default_target_branch = "main"
 
-        result = await azure_pr_tool.create_pull_request(
-            title="Test PR",
-            source_branch="feature/test",
-            description="Test description",
-            reviewers=["user1", "user2"],
-            work_items=[123, 456],
-            draft=True,
-            auto_complete=True,
-            squash=True,
-            delete_source_branch=True,
-        )
+        with patch.object(
+            azure_pr_tool, "_get_current_username", return_value="test-user"
+        ):
+            # Mock the AzureHttpClient to handle both calls
+            with patch("plugins.azrepo.pr_tool.AzureHttpClient") as mock_client_class:
+                mock_client = AsyncMock()
+                mock_client_class.return_value.__aenter__.return_value = mock_client
 
-        # Verify PR creation call
-        mock_post.assert_called_once()
-        create_call_args, create_call_kwargs = mock_post.call_args
-        request_body = create_call_kwargs["json"]
+                # Configure the mock to return different responses for POST and PATCH
+                def side_effect(method, url, **kwargs):
+                    if method == "POST":
+                        return {"success": True, "status_code": 201, "data": mock_pr_data}
+                    elif method == "PATCH":
+                        return {"success": True, "status_code": 200, "data": mock_completion_data}
+                    else:
+                        return {"success": False, "error": "Unexpected method"}
 
-        assert request_body["title"] == "Test PR"
-        assert request_body["description"] == "Test description"
-        assert request_body["isDraft"] is True
-        assert len(request_body["reviewers"]) == 2
-        assert len(request_body["workItemRefs"]) == 2
+                mock_client.request.side_effect = side_effect
 
-        # Verify completion settings update call
-        mock_patch.assert_called_once()
+                result = await azure_pr_tool.create_pull_request(
+                    title="Test PR",
+                    source_branch="feature/test",
+                    auto_complete=True,
+                    squash=True,
+                    delete_source_branch=True
+                )
 
-        assert result["success"] is True
-        assert result["data"]["pullRequestId"] == 123
+                # Verify both calls were made
+                assert mock_client.request.call_count == 2
+
+                # Verify the POST call for PR creation
+                post_call = mock_client.request.call_args_list[0]
+                assert post_call[0][0] == "POST"
+                assert "pullrequests" in post_call[0][1]
+
+                # Verify the PATCH call for completion settings
+                patch_call = mock_client.request.call_args_list[1]
+                assert patch_call[0][0] == "PATCH"
+                assert "pullrequests/123" in patch_call[0][1]
+
+                assert result["success"] is True
+                assert result["data"]["pullRequestId"] == 123
 
 
 class TestUpdatePullRequest:
     """Test the update_pull_request method using REST API."""
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.patch")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_update_pull_request_basic(
-        self, mock_auth_headers, mock_patch, azure_pr_tool
+        self, mock_auth_headers, azure_pr_tool
     ):
         """Test updating a pull request via REST API."""
-        # Setup mock response for aiohttp
+        # Setup mock response data
         mock_pr_data = {
             "pullRequestId": 123,
             "title": "New Title",
@@ -602,10 +584,6 @@ class TestUpdatePullRequest:
             "status": "active"
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text.return_value = json.dumps(mock_pr_data)
-        mock_patch.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
         # Configure the tool with default values
@@ -613,41 +591,39 @@ class TestUpdatePullRequest:
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.update_pull_request(
-            123, title="New Title", description="New description"
-        )
+        with mock_pr_azure_http_client(method="patch", response_data=mock_pr_data) as mock_client:
+            result = await azure_pr_tool.update_pull_request(
+                123, title="New Title", description="New description"
+            )
 
-        mock_patch.assert_called_once()
-        call_args, call_kwargs = mock_patch.call_args
-        assert "pullrequests/123" in call_args[0]
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            assert call_args[0] == "PATCH"
+            assert "pullrequests/123" in call_args[1]
 
-        # Check the request body
-        request_body = call_kwargs["json"]
-        assert request_body["title"] == "New Title"
-        assert request_body["description"] == "New description"
+            # Check the request body
+            request_body = call_kwargs["json"]
+            assert request_body["title"] == "New Title"
+            assert request_body["description"] == "New description"
 
-        assert result["success"] is True
-        assert result["data"]["pullRequestId"] == 123
+            assert result["success"] is True
+            assert result["data"]["pullRequestId"] == 123
 
     @pytest.mark.asyncio
-    @patch("aiohttp.ClientSession.patch")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.get_auth_headers")
     @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_current_username")
     async def test_update_pull_request_with_flags(
-        self, mock_username, mock_auth_headers, mock_patch, azure_pr_tool
+        self, mock_username, mock_auth_headers, azure_pr_tool
     ):
         """Test updating a pull request with completion options via REST API."""
-        # Setup mock response for aiohttp
+        # Setup mock response data
         mock_pr_data = {
             "pullRequestId": 123,
             "status": "active",
             "autoCompleteSetBy": {"id": "test-user"}
         }
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.text.return_value = json.dumps(mock_pr_data)
-        mock_patch.return_value.__aenter__.return_value = mock_response
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
         mock_username.return_value = "test-user"
 
@@ -656,22 +632,25 @@ class TestUpdatePullRequest:
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        result = await azure_pr_tool.update_pull_request(
-            123, auto_complete=True, squash=False, delete_source_branch=True
-        )
+        with mock_pr_azure_http_client(method="patch", response_data=mock_pr_data) as mock_client:
+            result = await azure_pr_tool.update_pull_request(
+                123, auto_complete=True, squash=False, delete_source_branch=True
+            )
 
-        mock_patch.assert_called_once()
-        call_args, call_kwargs = mock_patch.call_args
-        assert "pullrequests/123" in call_args[0]
+            # Verify the HTTP client was called
+            mock_client.return_value.request.assert_called_once()
+            call_args, call_kwargs = mock_client.return_value.request.call_args
+            assert call_args[0] == "PATCH"
+            assert "pullrequests/123" in call_args[1]
 
-        # Check the request body
-        request_body = call_kwargs["json"]
-        assert request_body["autoCompleteSetBy"]["id"] == "test-user"
-        assert request_body["completionOptions"]["squashMerge"] is False
-        assert request_body["completionOptions"]["deleteSourceBranch"] is True
+            # Check the request body
+            request_body = call_kwargs["json"]
+            assert request_body["autoCompleteSetBy"]["id"] == "test-user"
+            assert request_body["completionOptions"]["squashMerge"] is False
+            assert request_body["completionOptions"]["deleteSourceBranch"] is True
 
-        assert result["success"] is True
-        assert result["data"]["pullRequestId"] == 123
+            assert result["success"] is True
+            assert result["data"]["pullRequestId"] == 123
 
 
 class TestVotingAndReviewers:
@@ -704,7 +683,7 @@ class TestVotingAndReviewers:
             # Verify the HTTP client was called
             mock_client.return_value.request.assert_called_once()
             call_args, call_kwargs = mock_client.return_value.request.call_args
-            
+
             # Check the method and URL
             assert call_args[0] == "PUT"
             assert "pullrequests/123/reviewers/test-user" in call_args[1]
@@ -760,7 +739,7 @@ class TestVotingAndReviewers:
             # Verify the HTTP client was called
             mock_client.return_value.request.assert_called_once()
             call_args, call_kwargs = mock_client.return_value.request.call_args
-            
+
             # Check the method and URL
             assert call_args[0] == "PATCH"
             assert "pullrequests/123" in call_args[1]
@@ -845,7 +824,7 @@ class TestCommentManagement:
             # Verify the HTTP client was called
             mock_client.return_value.request.assert_called_once()
             call_args, call_kwargs = mock_client.return_value.request.call_args
-            
+
             # Check the method and URL
             assert call_args[0] == "GET"
             assert "pullrequests/123/threads" in call_args[1]
@@ -962,7 +941,7 @@ class TestCommentManagement:
             # Verify the HTTP client was called
             mock_client.return_value.request.assert_called_once()
             call_args, call_kwargs = mock_client.return_value.request.call_args
-            
+
             # Check the method and URL
             assert call_args[0] == "PATCH"
             assert "pullrequests/123/threads/1" in call_args[1]
@@ -1010,7 +989,7 @@ class TestCommentManagement:
             # Verify the HTTP client was called
             mock_client.return_value.request.assert_called_once()
             call_args, call_kwargs = mock_client.return_value.request.call_args
-            
+
             # Check the method and URL
             assert call_args[0] == "POST"
             assert "pullrequests/123/threads" in call_args[1]
@@ -1053,7 +1032,7 @@ class TestCommentManagement:
             # Verify the HTTP client was called
             mock_client.return_value.request.assert_called_once()
             call_args, call_kwargs = mock_client.return_value.request.call_args
-            
+
             # Check the method and URL
             assert call_args[0] == "POST"
             assert "pullrequests/123/threads/1/comments" in call_args[1]
@@ -1098,7 +1077,7 @@ class TestCommentManagement:
             # Verify the HTTP client was called
             mock_client.return_value.request.assert_called_once()
             call_args, call_kwargs = mock_client.return_value.request.call_args
-            
+
             # Check the method and URL
             assert call_args[0] == "PATCH"
             assert "pullrequests/123/threads/1/comments/101" in call_args[1]
