@@ -3,170 +3,143 @@ Tests for pull request operations.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 from ..pr_tool import AzurePullRequestTool
 
 
-class TestListPullRequests:
-    """Test the list_pull_requests method."""
+@pytest.fixture
+def mock_aiohttp_get():
+    """Fixture to mock aiohttp.ClientSession.get."""
+
+    async def _mock_json():
+        return {
+            "value": [
+                {
+                    "pullRequestId": 123,
+                    "title": "Test PR 1",
+                    "sourceRefName": "refs/heads/feature/test1",
+                    "targetRefName": "refs/heads/main",
+                    "status": "active",
+                    "createdBy": {
+                        "displayName": "John Doe",
+                        "uniqueName": "john.doe@abc.com",
+                    },
+                    "creationDate": "2024-01-15T10:30:00.000Z",
+                }
+            ]
+        }
+
+    mock_response = MagicMock()
+    mock_response.status = 200
+    mock_response.json = AsyncMock(side_effect=_mock_json)
+    mock_response.text = AsyncMock(return_value="Success")
+
+    # This is the async context manager
+    async_get_mock = AsyncMock()
+    async_get_mock.__aenter__.return_value = mock_response
+    async_get_mock.__aexit__.return_value = None
+    return async_get_mock
+
+
+class TestListPullRequestsAPI:
+    """Test the list_pull_requests method using the REST API."""
 
     @pytest.mark.asyncio
-    async def test_list_pull_requests_basic(self, azure_pr_tool, mock_pr_list_response):
-        """Test basic pull request listing."""
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
+    @patch("aiohttp.ClientSession.get")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    async def test_list_pull_requests_basic(
+        self, mock_auth_headers, mock_get, azure_pr_tool, mock_pr_list_response
+    ):
+        """Test basic pull request listing via REST API."""
+        # Setup mock response for aiohttp
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json.return_value = {"value": mock_pr_list_response["data"]}
+        mock_get.return_value.__aenter__.return_value = mock_response
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
-        result = await azure_pr_tool.list_pull_requests()
+        # Configure the tool with default values
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
 
-        # Should include current user as creator by default
-        azure_pr_tool._run_az_command.assert_called_once()
-        command_called = azure_pr_tool._run_az_command.call_args[0][0]
-        assert "repos pr list" in command_called
-        assert "--creator" in command_called
+        with patch.object(
+            azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
+        ):
+            result = await azure_pr_tool.list_pull_requests()
 
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-        assert "id,creator,date,title,source_ref,target_ref" in result["data"]
+            mock_get.assert_called_once()
+            call_args, call_kwargs = mock_get.call_args
+            assert "pullrequests" in call_args[0]
+            params = call_kwargs["params"]
+            assert params["searchCriteria.creatorId"] == "test.user@company.com"
+            assert "searchCriteria.status" not in params
+
+            assert result["success"] is True
+            assert "id,creator,date,title,source_ref,target_ref" in result["data"]
 
     @pytest.mark.asyncio
+    @patch("aiohttp.ClientSession.get")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
     async def test_list_pull_requests_with_filters(
-        self, azure_pr_tool, mock_pr_list_response
+        self, mock_auth_headers, mock_get, azure_pr_tool, mock_pr_list_response
     ):
-        """Test pull request listing with filters."""
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
+        """Test pull request listing with filters via REST API."""
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json.return_value = {"value": mock_pr_list_response["data"]}
+        mock_get.return_value.__aenter__.return_value = mock_response
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
-        result = await azure_pr_tool.list_pull_requests(
-            repository="test-repo",
-            project="test-project",
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
+
+        await azure_pr_tool.list_pull_requests(
             status="active",
-            creator="test-user",
-            top=10,
+            creator="test-creator",
+            reviewer="test-reviewer",
+            source_branch="feature/branch",
+            target_branch="main",
+            top=20,
+            skip=5,
         )
 
-        expected_command = "repos pr list --repository test-repo --project test-project --creator test-user --status active --top 10"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
+        mock_get.assert_called_once()
+        call_args, call_kwargs = mock_get.call_args
+        params = call_kwargs["params"]
 
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-        assert "id,creator,date,title,source_ref,target_ref" in result["data"]
-
-
-class TestListPullRequestsCreatorBehavior:
-    """Test the creator parameter behavior in list_pull_requests method."""
+        assert params["searchCriteria.status"] == "active"
+        assert params["searchCriteria.creatorId"] == "test-creator"
+        assert params["searchCriteria.reviewerId"] == "test-reviewer"
+        assert params["searchCriteria.sourceRefName"] == "refs/heads/feature/branch"
+        assert params["searchCriteria.targetRefName"] == "refs/heads/main"
+        assert params["$top"] == 20
+        assert params["$skip"] == 5
 
     @pytest.mark.asyncio
-    @patch.object(AzurePullRequestTool, "_get_current_username")
-    async def test_list_pull_requests_default_creator(
-        self, mock_get_username, azure_pr_tool, mock_pr_list_response
+    @patch("aiohttp.ClientSession.get")
+    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_auth_headers")
+    async def test_list_pull_requests_api_failure(
+        self, mock_auth_headers, mock_get, azure_pr_tool
     ):
-        """Test that default creator parameter uses current user."""
-        mock_get_username.return_value = "currentuser"
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
+        """Test handling of API failure during pull request listing."""
+        mock_response = AsyncMock()
+        mock_response.status = 401
+        mock_response.text.return_value = "Authentication failed"
+        mock_get.return_value.__aenter__.return_value = mock_response
+        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
 
-        # Call with default creator parameter
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
+
         result = await azure_pr_tool.list_pull_requests()
 
-        expected_command = "repos pr list --creator currentuser"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-        mock_get_username.assert_called_once()
-
-    @pytest.mark.asyncio
-    @patch.object(AzurePullRequestTool, "_get_current_username")
-    async def test_list_pull_requests_default_creator_no_username(
-        self, mock_get_username, azure_pr_tool, mock_pr_list_response
-    ):
-        """Test default creator behavior when username cannot be detected."""
-        mock_get_username.return_value = None
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
-
-        # Call with default creator parameter
-        result = await azure_pr_tool.list_pull_requests()
-
-        # Should not include creator filter if username detection fails
-        expected_command = "repos pr list"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-        mock_get_username.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_list_pull_requests_explicit_none_creator(
-        self, azure_pr_tool, mock_pr_list_response
-    ):
-        """Test that explicit None creator lists all PRs."""
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
-
-        result = await azure_pr_tool.list_pull_requests(creator=None)
-
-        # Should not include creator filter
-        expected_command = "repos pr list"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-
-    @pytest.mark.asyncio
-    async def test_list_pull_requests_explicit_empty_creator(
-        self, azure_pr_tool, mock_pr_list_response
-    ):
-        """Test that explicit empty string creator lists all PRs."""
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
-
-        result = await azure_pr_tool.list_pull_requests(creator="")
-
-        # Should not include creator filter
-        expected_command = "repos pr list"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-
-    @pytest.mark.asyncio
-    async def test_list_pull_requests_explicit_username_creator(
-        self, azure_pr_tool, mock_pr_list_response
-    ):
-        """Test that explicit username creator filters by that user."""
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
-
-        result = await azure_pr_tool.list_pull_requests(creator="specificuser")
-
-        expected_command = "repos pr list --creator specificuser"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-
-    @pytest.mark.asyncio
-    @patch.object(AzurePullRequestTool, "_get_current_username")
-    async def test_list_pull_requests_default_with_other_params(
-        self, mock_get_username, azure_pr_tool, mock_pr_list_response
-    ):
-        """Test default creator behavior with other parameters."""
-        mock_get_username.return_value = "currentuser"
-        azure_pr_tool._run_az_command = AsyncMock(return_value=mock_pr_list_response)
-
-        result = await azure_pr_tool.list_pull_requests(
-            repository="test-repo", status="active", top=5
-        )
-
-        expected_command = "repos pr list --repository test-repo --creator currentuser --status active --top 5"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
-
-        # Should return CSV data
-        assert result["success"] is True
-        assert isinstance(result["data"], str)
-        mock_get_username.assert_called_once()
+        assert result["success"] is False
+        assert "401" in result["error"]
+        assert "Authentication failed" in result["error"]
 
 
 class TestGetPullRequest:
@@ -274,10 +247,13 @@ class TestUpdatePullRequest:
         )
 
         result = await azure_pr_tool.update_pull_request(
-            pull_request_id=123, title="Updated Title"
+            123, title="New Title", description="New description"
         )
 
-        expected_command = 'repos pr update --id 123 --title "Updated Title"'
+        expected_command = (
+            'repos pr update --id 123 --title "New Title" '
+            '--description "New description"'
+        )
         azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
         assert result == mock_command_success_response
 
@@ -285,24 +261,25 @@ class TestUpdatePullRequest:
     async def test_update_pull_request_with_flags(
         self, azure_pr_tool, mock_command_success_response
     ):
-        """Test updating a pull request with boolean flags."""
+        """Test updating a pull request with flags."""
         azure_pr_tool._run_az_command = AsyncMock(
             return_value=mock_command_success_response
         )
 
         result = await azure_pr_tool.update_pull_request(
-            pull_request_id=123, auto_complete=True, squash=False, draft=True
+            123, auto_complete=True, squash=False, delete_source_branch=True
         )
 
         expected_command = (
-            "repos pr update --id 123 --auto-complete true --squash false --draft true"
+            "repos pr update --id 123 --auto-complete true "
+            "--squash false --delete-source-branch true"
         )
         azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
         assert result == mock_command_success_response
 
 
 class TestVotingAndReviewers:
-    """Test voting and reviewer management methods."""
+    """Test voting and reviewer operations."""
 
     @pytest.mark.asyncio
     async def test_set_vote(self, azure_pr_tool, mock_command_success_response):
@@ -313,8 +290,9 @@ class TestVotingAndReviewers:
 
         result = await azure_pr_tool.set_vote(123, "approve")
 
-        expected_command = "repos pr set-vote --id 123 --vote approve"
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
+        azure_pr_tool._run_az_command.assert_called_once_with(
+            "repos pr set-vote --id 123 --vote approve"
+        )
         assert result == mock_command_success_response
 
     @pytest.mark.asyncio
@@ -326,8 +304,7 @@ class TestVotingAndReviewers:
 
         result = await azure_pr_tool.add_work_items(123, [456, 789])
 
-        expected_command = (
+        azure_pr_tool._run_az_command.assert_called_once_with(
             "repos pr work-item add --id 123 --work-items 456 --work-items 789"
         )
-        azure_pr_tool._run_az_command.assert_called_once_with(expected_command)
         assert result == mock_command_success_response

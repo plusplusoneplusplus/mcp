@@ -7,6 +7,7 @@ import uuid
 import os
 from typing import Dict, Any, List, Optional, Union
 
+import aiohttp
 import git
 
 # Import the required interfaces and decorators
@@ -506,60 +507,86 @@ class AzurePullRequestTool(ToolInterface):
         top: Optional[int] = None,
         skip: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """List pull requests in the repository."""
-        command = "repos pr list"
+        """List pull requests in the repository using REST API."""
+        try:
+            # Use configured defaults for core parameters
+            repo = self._get_param_with_default(repository, self.default_repository)
+            proj = self._get_param_with_default(project, self.default_project)
+            org = self._get_param_with_default(organization, self.default_organization)
 
-        # Use configured defaults for core parameters
-        repo = self._get_param_with_default(repository, self.default_repository)
-        proj = self._get_param_with_default(project, self.default_project)
-        org = self._get_param_with_default(organization, self.default_organization)
-
-        # Handle creator parameter with default behavior
-        if creator == "default":
-            # Use current user as default
-            creator = self._get_current_username()
-            if creator:
-                self.logger.debug(f"Using current user as creator filter: {creator}")
-
-        # Add optional parameters
-        if repo:
-            command += f" --repository {repo}"
-        if proj:
-            command += f" --project {proj}"
-        if org:
-            command += f" --org {org}"
-        if creator:
-            command += f" --creator {creator}"
-        if reviewer:
-            command += f" --reviewer {reviewer}"
-        if status:
-            command += f" --status {status}"
-        if source_branch:
-            command += f" --source-branch {source_branch}"
-        if target_branch:
-            command += f" --target-branch {target_branch}"
-        if top:
-            command += f" --top {top}"
-        if skip:
-            command += f" --skip {skip}"
-
-        result = await self._run_az_command(command)
-
-        # If successful, convert to DataFrame and return as CSV
-        if result.get("success", False) and "data" in result:
-            try:
-                df = self.convert_pr_to_df(result["data"])
-                csv_data = df.to_csv(index=False)
-                return {"success": True, "data": csv_data}
-            except Exception as e:
-                self.logger.warning(f"Failed to convert PRs to DataFrame: {e}")
-                # Return error if conversion fails
+            if not all([repo, proj, org]):
+                missing = [
+                    name
+                    for name, value in [
+                        ("repository", repo),
+                        ("project", proj),
+                        ("organization", org),
+                    ]
+                    if not value
+                ]
                 return {
                     "success": False,
-                    "error": f"Failed to convert PRs to CSV: {str(e)}",
+                    "error": f"Missing required parameters: {', '.join(missing)}",
                 }
 
-        return result
+            # Build URL and headers
+            endpoint = f"git/repositories/{repo}/pullrequests"
+            url = self._build_api_url(organization=org, project=proj, endpoint=endpoint)
+            headers = self._get_auth_headers()
+
+            # Build query parameters
+            params: Dict[str, Union[str, int]] = {"api-version": "7.1"}
+            if status:
+                params["searchCriteria.status"] = status
+
+            # Handle creator parameter with default behavior
+            if creator == "default":
+                creator_id = self._get_current_username()
+                if creator_id:
+                    self.logger.debug(
+                        f"Using current user as creator filter: {creator_id}"
+                    )
+                    params["searchCriteria.creatorId"] = creator_id
+            elif creator:
+                params["searchCriteria.creatorId"] = creator
+
+            if reviewer:
+                params["searchCriteria.reviewerId"] = reviewer
+            if source_branch:
+                params["searchCriteria.sourceRefName"] = f"refs/heads/{source_branch}"
+            if target_branch:
+                params["searchCriteria.targetRefName"] = f"refs/heads/{target_branch}"
+            if top:
+                params["$top"] = top
+            if skip:
+                params["$skip"] = skip
+
+            self.logger.debug(
+                f"Listing pull requests with URL: {url} and params: {params}"
+            )
+
+            # Make REST API call
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        # Convert to DataFrame and return CSV
+                        df = self.convert_pr_to_df(data.get("value", []))
+                        return {"success": True, "data": df.to_csv(index=False)}
+                    else:
+                        error_text = await response.text()
+                        self.logger.error(
+                            f"Failed to list pull requests: HTTP {response.status} - {error_text}"
+                        )
+                        return {
+                            "success": False,
+                            "error": f"HTTP {response.status}: {error_text}",
+                        }
+        except Exception as e:
+            self.logger.error(
+                f"An unexpected error occurred while listing pull requests: {e}"
+            )
+            return {"success": False, "error": str(e)}
 
     async def get_pull_request(
         self, pull_request_id: Union[int, str], organization: Optional[str] = None
@@ -828,11 +855,18 @@ class AzurePullRequestTool(ToolInterface):
             return username.decode("utf-8")
         return username
 
-    def _get_auth_headers(self, content_type: str = "application/json") -> Dict[str, str]:
+    def _get_auth_headers(
+        self, content_type: str = "application/json"
+    ) -> Dict[str, str]:
         """Backward compatibility method for tests."""
         return get_auth_headers(content_type=content_type)
 
-    def _build_api_url(self, organization: Optional[str] = None, project: Optional[str] = None, endpoint: str = "") -> str:
+    def _build_api_url(
+        self,
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        endpoint: str = "",
+    ) -> str:
         """Backward compatibility method for tests."""
         org = organization or self.default_organization
         if not org:
