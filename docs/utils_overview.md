@@ -95,4 +95,17 @@ This document provides a high-level overview of the utilities available in the `
 
 ---
 
+## LLM Clients (`llm_clients`)
+
+**Functionality:**
+- Async wrappers for interacting with LLM backends.
+- Includes clients for OpenAI and the local Ollama server.
+
+**Usage:**
+- `OpenAIClient(api_key, base_url, default_model)` for OpenAI or Azure OpenAI APIs.
+- `OllamaClient(base_url, default_model)` for local models via the Ollama service.
+- Useful for integrating chat completion features into tools and plugins.
+
+---
+
 For more details, see the source code and inline documentation in each utility folder.
