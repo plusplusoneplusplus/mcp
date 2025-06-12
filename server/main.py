@@ -204,7 +204,7 @@ async def list_tools() -> list[Tool]:
 async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextContent, ImageContent]]:
     logging.info(f"🔧 TOOL CALL HANDLER INVOKED: {name} with arguments: {arguments}")
     logging.info(f"🔧 Handler running on platform: {os.name}")
-    
+
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
     )
@@ -232,10 +232,10 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
 
         # Enhanced error message with more explicit error indicators
         error_msg = f"Error: Tool '{name}' not found. Available tools: {', '.join(available_tools) if available_tools else 'None'}"
-        
+
         # Log additional debugging information for Windows troubleshooting
         logging.debug(f"Tool lookup failed for '{name}' - Platform: {os.name}, Worker: {os.environ.get('PYTEST_WORKER_ID', 'unknown')}")
-        
+
         record_tool_invocation(
             name, arguments, error_msg, 0, False, error_msg, invocation_dir
         )
@@ -289,10 +289,10 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         error_msg = f"Error executing tool {name}: {str(e)}"
         success = False
         duration_ms = (time.time() - start_time) * 1000
-        
+
         # Enhanced error logging for debugging
         logging.debug(f"Tool execution exception details - Tool: {name}, Platform: {os.name}, Exception: {repr(e)}")
-        
+
         record_tool_invocation(
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
@@ -330,7 +330,7 @@ async def handle_sse(request):
         options = server.create_initialization_options()
         # Add prompt capabilities
         options.capabilities.prompts = PromptsCapability(supported=True)
-        
+
         # Enhanced error handling for Windows compatibility
         try:
             await server.run(streams[0], streams[1], options, raise_exceptions=False)
@@ -369,6 +369,11 @@ async def config_page(request: Request):
         "config.html", {"request": request, "current_page": "config"}
     )
 
+async def tools_page(request: Request):
+    return templates.TemplateResponse(
+        "tools.html", {"request": request, "current_page": "tools"}
+    )
+
 async def tool_history_page(request: Request):
     return templates.TemplateResponse(
         "tool_history.html", {"request": request, "current_page": "tool_history"}
@@ -380,6 +385,7 @@ routes = [
     Route("/", endpoint=index, methods=["GET"]),
     Route("/knowledge", endpoint=knowledge, methods=["GET"]),
     Route("/jobs", endpoint=jobs, methods=["GET"]),
+    Route("/tools", endpoint=tools_page, methods=["GET"]),
     Route("/tool-history", endpoint=tool_history_page, methods=["GET"]),
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),

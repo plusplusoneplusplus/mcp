@@ -71,6 +71,8 @@ Private overrides can be placed in `server/.private/` or in a folder pointed to 
 
 Tools are modular plugins registered through `mcp_tools`. Built-in utilities include a command executor, browser automation, time helpers, and a YAML-defined tool loader. Additional examples live in the `plugins/` directory. See `mcp_tools/docs/creating_tools.md` for details on building custom tools.
 
+The web interface offers a Tools dashboard at `/tools` for browsing all registered tools and viewing their details.
+
 ## Running Tests
 
 Execute all test suites with:
@@ -103,4 +105,3 @@ Editors like Cursor/VSCode can use the SSE endpoint by adding the following to y
 
 ![MCP Server Configuration](assets/mcp-server.png)
 ![MCP Server async command execution](assets/mcp-async-command.png)
-
