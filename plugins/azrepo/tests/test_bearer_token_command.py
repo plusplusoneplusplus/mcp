@@ -137,7 +137,8 @@ class TestBearerTokenCommand:
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
         # Get auth headers - this should trigger dynamic token loading
-        headers = tool._get_auth_headers()
+        from plugins.azrepo.azure_rest_utils import get_auth_headers
+        headers = get_auth_headers(content_type="application/json-patch+json")
 
         # Verify the token was loaded dynamically
         assert "Authorization" in headers
@@ -156,7 +157,8 @@ class TestBearerTokenCommand:
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
         # Get auth headers
-        headers = tool._get_auth_headers()
+        from plugins.azrepo.azure_rest_utils import get_auth_headers
+        headers = get_auth_headers(content_type="application/json-patch+json")
 
         # Verify the static token was used
         assert "Authorization" in headers
@@ -171,7 +173,8 @@ class TestBearerTokenCommand:
 
         # Getting auth headers should raise an error
         with pytest.raises(ValueError, match="Bearer token not configured"):
-            tool._get_auth_headers()
+            from plugins.azrepo.azure_rest_utils import get_auth_headers
+            get_auth_headers(content_type="application/json-patch+json")
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
     def test_multiple_auth_header_calls_refresh_token(self, mock_subprocess_run, mock_executor, mock_env_manager_with_token_command):
@@ -187,9 +190,10 @@ class TestBearerTokenCommand:
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
         # Call get_auth_headers multiple times
-        headers1 = tool._get_auth_headers()
-        headers2 = tool._get_auth_headers()
-        headers3 = tool._get_auth_headers()
+        from plugins.azrepo.azure_rest_utils import get_auth_headers
+        headers1 = get_auth_headers(content_type="application/json-patch+json")
+        headers2 = get_auth_headers(content_type="application/json-patch+json")
+        headers3 = get_auth_headers(content_type="application/json-patch+json")
 
         # Verify all calls returned the same token (since our mock returns the same value)
         assert headers1["Authorization"] == "Bearer dynamic-token-from-command-123"
@@ -229,7 +233,7 @@ class TestBearerTokenCommand:
             # Verify that the request was made
             mock_client_class.return_value.request.assert_called_once()
             call_args = mock_client_class.return_value.request.call_args
-            
+
             # Verify the method and headers
             assert call_args[0][0] == "POST"  # method
             headers = call_args[1]["headers"]
