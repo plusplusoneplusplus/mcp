@@ -1,4 +1,13 @@
-"""Async Ollama LLM client using httpx."""
+"""Async Ollama LLM client using httpx.
+
+This client assumes the [`ollama`](https://github.com/jmorganca/ollama)
+service is running locally. Install and start the service (usually via
+```
+ollama serve
+```
+) so that it listens on ``http://localhost:11434``.  Provide the model
+name with ``default_model`` or when calling :py:meth:`completion`.
+"""
 
 from typing import Dict, Any, List
 import httpx
