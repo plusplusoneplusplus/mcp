@@ -52,6 +52,13 @@ For relationships between entities:
 
 ## Output Format
 
+**⚠️ IMPORTANT: Commit ID Preservation**
+All output files MUST include the commit ID(s) at the top of each file for traceability. Use the following format:
+
+```markdown
+<!-- Source Commit(s): [commit_id_1], [commit_id_2], ... -->
+```
+
 Your output should be structured as a set of markdown files organized as follows:
 
 ### 1. How-To Pattern Documents
@@ -60,6 +67,7 @@ For each identified pattern, create a separate markdown file.
     - **File Naming:** `how-to-<pattern-name-slugified>.md` (e.g., `how-to-add-configuration.md`)
     - **Content:**
         ```markdown
+        <!-- Source Commit(s): [commit_id_1], [commit_id_2], ... -->
         # How To: [Pattern Name]
 
         ## Description
@@ -80,6 +88,7 @@ For each identified entity, create or update a markdown file.
     - **File Naming:** `entity-<entity-name-slugified>.md` (e.g., `entity-user-authentication.md`)
     - **Content (if new entity):**
         ```markdown
+        <!-- Source Commit(s): [commit_id_1], [commit_id_2], ... -->
         # Entity: [Entity Name]
 
         ## Description
@@ -108,11 +117,12 @@ For each identified relationship, append to the *source entity's* markdown file 
         ```markdown
         - **Relates to:** `[Target Entity Name]`
           - **Reason/Context:** [Description of why/how these entities are related, based on the commit.]
-          - **Link:** `[./entity-<target-entity-name-slugified>.md](./entity-<target-entity-name-slugified>.md)`
+          - **Link:** `[./entity-<target-entity-name-slugified>.md](mdc:entity-<target-entity-name-slugified>.md)`
         ```
 
 **Example of appending a relationship to `entity-auth-service.md`:**
 ```markdown
+<!-- Source Commit(s): abc123, def456 -->
 # Entity: AuthService
 
 ## Description
@@ -121,10 +131,10 @@ Handles user authentication and authorization.
 ## Relationships
 - **Relates to:** `DatabaseConnector`
   - **Reason/Context:** AuthService uses DatabaseConnector to retrieve user credentials from the database.
-  - **Link:** `[./entity-database-connector.md](./entity-database-connector.md)`
+  - **Link:** `[./entity-database-connector.md](mdc:entity-database-connector.md)`
 - **Relates to:** `RateLimiter`  <!-- New relationship being added -->
   - **Reason/Context:** AuthService calls RateLimiter to prevent brute-force attacks on login attempts, as introduced in commit [commit_hash_or_description].
-  - **Link:** `[./entity-rate-limiter.md](./entity-rate-limiter.md)`
+  - **Link:** `[./entity-rate-limiter.md](mdc:entity-rate-limiter.md)`
 ```
 
 ## General Guidelines
