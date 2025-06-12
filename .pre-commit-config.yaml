@@ -40,7 +40,7 @@ repos:
     hooks:
       - id: custom-secret-scanner
         name: Custom Secret Scanner
-        entry: python -m utils.secret_scanner.cli
+        entry: bash -c 'PYTHONPATH=. uv run python -m utils.secret_scanner.cli "$@"' --
         language: system
         files: \.(py|js|ts|json|yaml|yml|env|txt|md)$
         exclude: |
@@ -56,5 +56,7 @@ repos:
             scripts/\.profile/.*|
             server/\.browserprofile/.*|
             .*/__init__\.py$|
-            .*/prompts/.*\.txt$
+            .*/prompts/.*\.txt$|
+            utils/secret_scanner/.*\.py$|
+            \.pre-commit-config\.yaml$
           )$
