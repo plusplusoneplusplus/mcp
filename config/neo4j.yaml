@@ -1,0 +1,18 @@
+neo4j:
+  connection:
+    uri: "bolt://localhost:7687"
+    username: "neo4j"
+    password_env: "NEO4J_PASSWORD"
+    database: "neo4j"
+  pool:
+    max_connections: 50
+    connection_timeout: 30
+    max_retry_time: 30
+  performance:
+    query_timeout: 60
+    batch_size: 1000
+    enable_query_logging: false
+  indexes:
+    auto_create: true
+    node_indexes: []
+    relationship_indexes: []
