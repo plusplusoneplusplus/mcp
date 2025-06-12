@@ -141,31 +141,34 @@ neo4j:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
             f.write(yaml_content)
             f.flush()
+            temp_file_path = f.name
 
-            try:
-                config = Neo4jConfig.from_yaml_file(Path(f.name))
-                assert config.connection.uri == "bolt://test:7687"
-                assert config.connection.username == "testuser"
-                assert config.pool.max_connections == 100
-            finally:
-                os.unlink(f.name)
+        try:
+            config = Neo4jConfig.from_yaml_file(Path(temp_file_path))
+            assert config.connection.uri == "bolt://test:7687"
+            assert config.connection.username == "testuser"
+            assert config.pool.max_connections == 100
+        finally:
+            os.unlink(temp_file_path)
 
     def test_to_yaml_file(self):
         """Test saving config to YAML file."""
         config = Neo4jConfig()
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
-            try:
-                config.to_yaml_file(Path(f.name))
+            temp_file_path = f.name
 
-                # Verify file was created and contains expected content
-                with open(f.name, 'r') as read_f:
-                    content = read_f.read()
-                    assert 'neo4j:' in content
-                    assert 'connection:' in content
-                    assert 'pool:' in content
-            finally:
-                os.unlink(f.name)
+        try:
+            config.to_yaml_file(Path(temp_file_path))
+
+            # Verify file was created and contains expected content
+            with open(temp_file_path, 'r') as read_f:
+                content = read_f.read()
+                assert 'neo4j:' in content
+                assert 'connection:' in content
+                assert 'pool:' in content
+        finally:
+            os.unlink(temp_file_path)
 
 
 class TestConfigLoader:

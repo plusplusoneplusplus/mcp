@@ -209,6 +209,7 @@ if [[ "$PARALLEL_MODE" == "--parallel" || "$PARALLEL_MODE" == "-p" ]]; then
         "utils.secret_scanner:utils/secret_scanner/tests"
         "utils.ocr_extractor:utils/ocr_extractor/tests"
         "utils.playwright:utils/playwright/tests"
+        "utils.graph_interface:utils/graph_interface/tests"
         "plugins.azrepo:plugins/azrepo/tests"
         "plugins.kusto:plugins/kusto/tests"
         "plugins.git_tool:plugins/git_tool/tests"
@@ -285,6 +286,7 @@ else
     run_component_tests "utils.secret_scanner" "utils/secret_scanner/tests" "$TEST_PATTERN"
     run_component_tests "utils.ocr_extractor" "utils/ocr_extractor/tests" "$TEST_PATTERN"
     run_component_tests "utils.playwright" "utils/playwright/tests" "$TEST_PATTERN"
+    run_component_tests "utils.graph_interface" "utils/graph_interface/tests" "$TEST_PATTERN"
 
     # Run tests for plugins
     run_component_tests "plugins.azrepo" "plugins/azrepo/tests" "$TEST_PATTERN"
