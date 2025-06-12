@@ -56,13 +56,19 @@ When migrating existing code to use these shared utilities:
 
 ## Backward Compatibility
 
-For backward compatibility with existing tests, wrapper methods have been added to the original classes:
+All backward compatibility wrapper methods have been completely removed from both tools. The methods that were removed include:
 
-- `_get_auth_headers()` - Delegates to the shared utility
-- `_get_current_username()` - Delegates to the shared utility
-- `_build_api_url()` - Delegates to the shared utility
+- **From AzureWorkItemTool**: `_get_auth_headers()`, `_get_current_username()`
+- **From AzurePullRequestTool**: `_get_auth_headers()`, `_get_current_username()`
 
-These methods maintain the original interface while using the shared implementations.
+These methods were either only used in tests or have been replaced with direct calls to shared utilities in production code. This results in:
+
+- **Cleaner code**: No unnecessary wrapper methods
+- **Better maintainability**: Direct calls to shared utilities
+- **Improved testability**: Tests mock the shared utilities directly
+- **Consistency**: Both tools follow the same pattern
+
+All production code now calls the shared utility functions directly, and tests have been updated to mock the appropriate functions where they are imported and used.
 
 ## Testing
 
@@ -88,4 +94,4 @@ Potential future improvements to the shared utilities:
 1. Add support for additional authentication methods
 2. Implement retry logic for transient API failures
 3. Add caching for frequently used responses
-4. Create higher-level API helpers for common operations 
+4. Create higher-level API helpers for common operations

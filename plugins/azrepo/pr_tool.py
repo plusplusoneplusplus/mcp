@@ -375,7 +375,7 @@ class AzurePullRequestTool(ToolInterface):
         Returns:
             Default prefix in format 'auto-pr/<username>/' or 'auto-pr' if username unavailable
         """
-        username = self._get_current_username()
+        username = get_current_username()
         if username:
             return f"auto-pr/{username}/"
         else:
@@ -576,7 +576,7 @@ class AzurePullRequestTool(ToolInterface):
 
             # Handle creator parameter with default behavior
             if creator == "default":
-                creator_id = self._get_current_username()
+                creator_id = get_current_username()
                 if creator_id:
                     # Resolve local username to Azure DevOps identity
                     try:
@@ -837,7 +837,7 @@ class AzurePullRequestTool(ToolInterface):
                     "squashMerge": squash,
                     "mergeStrategy": "squash" if squash else "merge"
                 }
-                request_body["autoCompleteSetBy"] = {"id": self._get_current_username()}
+                request_body["autoCompleteSetBy"] = {"id": get_current_username()}
 
             # Make REST API call to update PR
             async with AzureHttpClient() as http_client:
@@ -907,7 +907,7 @@ class AzurePullRequestTool(ToolInterface):
             # Handle auto-complete
             if auto_complete is not None:
                 if auto_complete:
-                    current_user = self._get_current_username()
+                    current_user = get_current_username()
                     if current_user:
                         request_body["autoCompleteSetBy"] = {"id": current_user}
                 else:
@@ -957,7 +957,7 @@ class AzurePullRequestTool(ToolInterface):
                 return {"success": False, "error": "Organization, project, and repository are required"}
 
             # Get current user ID for reviewer endpoint
-            current_user = self._get_current_username()
+            current_user = get_current_username()
             if not current_user:
                 return {"success": False, "error": "Unable to determine current user for voting"}
 
@@ -1392,18 +1392,3 @@ class AzurePullRequestTool(ToolInterface):
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}
-
-    # Backward compatibility methods for tests
-    def _get_current_username(self) -> Optional[str]:
-        """Backward compatibility method for tests."""
-        # Convert potential bytes to string if needed
-        username = get_current_username()
-        if isinstance(username, bytes):
-            return username.decode("utf-8")
-        return username
-
-    def _get_auth_headers(
-        self, content_type: str = "application/json"
-    ) -> Dict[str, str]:
-        """Backward compatibility method for tests."""
-        return get_auth_headers(content_type=content_type)
