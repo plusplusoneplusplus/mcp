@@ -30,6 +30,9 @@ from .exceptions import (
     ValidationError,
     TransactionError
 )
+from .query_builder import QueryBuilder
+from .node_manager import NodeManager
+from .relationship_manager import RelationshipManager
 
 __version__ = "0.1.0"
 __author__ = "MCP Planning Team"
@@ -37,6 +40,11 @@ __author__ = "MCP Planning Team"
 __all__ = [
     # Core client
     "Neo4jClient",
+
+    # High-level managers
+    "NodeManager",
+    "RelationshipManager",
+    "QueryBuilder",
 
     # Data models
     "GraphNode",
