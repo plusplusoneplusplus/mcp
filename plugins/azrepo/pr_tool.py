@@ -581,12 +581,12 @@ class AzurePullRequestTool(ToolInterface):
                     # Resolve local username to Azure DevOps identity
                     try:
                         identity_info = await resolve_identity(creator_id, org, proj)
-                        if identity_info.is_valid and identity_info.unique_name:
-                            resolved_creator = identity_info.unique_name
+                        if identity_info.is_valid and identity_info.id:
+                            user_id = identity_info.id
                             self.logger.debug(
-                                f"Resolved current user '{creator_id}' to Azure DevOps identity: {resolved_creator}"
+                                f"Resolved current user '{creator_id}' to Azure DevOps identity: {user_id}"
                             )
-                            params["searchCriteria.creatorId"] = resolved_creator
+                            params["searchCriteria.creatorId"] = user_id
                         else:
                             self.logger.warning(
                                 f"Unable to resolve current user '{creator_id}' to Azure DevOps identity. "

@@ -394,6 +394,12 @@ def get_current_username() -> Optional[str]:
     Returns:
         The current username, or None if unable to determine
     """
+
+    # Try to get current user's email first (more reliable for Azure DevOps)if
+    current_user_email = get_current_user_email()
+    if current_user_email:
+        return current_user_email
+
     try:
         # Try getpass.getuser() first (works on most platforms)
         return getpass.getuser()
@@ -408,6 +414,65 @@ def get_current_username() -> Optional[str]:
 
         # Return None if unable to determine username
         logger.warning("Unable to determine current username")
+        return None
+
+
+def get_current_user_email() -> Optional[str]:
+    """Get the current user's email address in a cross-platform way.
+    
+    On Windows, this uses 'whoami /upn' to get the User Principal Name (UPN),
+    which is typically the user's email address in domain environments.
+    On other platforms, it falls back to environment variables.
+
+    Returns:
+        The current user's email address, or None if unable to determine
+    """
+    try:
+        # On Windows, try whoami /upn first to get the UPN (usually email)
+        if os.name == 'nt':  # Windows
+            try:
+                logger.debug("Attempting to get current user email using 'whoami /upn' on Windows")
+                result = subprocess.run(
+                    ["whoami", "/upn"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                
+                if result.returncode == 0:
+                    upn = result.stdout.strip()
+                    if upn and is_valid_email(upn):
+                        logger.debug(f"Successfully retrieved user email from whoami /upn: {upn}")
+                        return upn
+                    else:
+                        logger.debug(f"whoami /upn returned '{upn}' which is not a valid email format")
+                else:
+                    logger.debug(f"whoami /upn failed with return code {result.returncode}: {result.stderr}")
+            except subprocess.TimeoutExpired:
+                logger.warning("whoami /upn command timed out")
+            except Exception as e:
+                logger.debug(f"Error executing whoami /upn: {e}")
+        
+        # Fallback to environment variables that might contain email
+        email_env_vars = [
+            "USERPRINCIPALNAME",  # Windows domain environments
+            "USER_EMAIL",         # Custom environment variable
+            "EMAIL",              # Generic email environment variable
+            "MAIL",               # Unix mail environment variable
+        ]
+        
+        for env_var in email_env_vars:
+            email = os.environ.get(env_var)
+            if email and is_valid_email(email):
+                logger.debug(f"Found user email in environment variable {env_var}: {email}")
+                return email
+        
+        # If no email found, return None
+        logger.debug("Unable to determine current user email from any source")
+        return None
+        
+    except Exception as e:
+        logger.warning(f"Error getting current user email: {e}")
         return None
 
 
@@ -570,46 +635,93 @@ async def _resolve_identity_via_api(
     """
     try:
         # Build API URL for identity resolution
-        # Use the Identity API to resolve the identity
+        # Handle different organization URL formats
         if organization.startswith(("http://", "https://")):
             base_url = organization.rstrip("/")
+            
+            # For Visual Studio Team Services URLs, use the correct identity service endpoint
+            if "visualstudio.com" in base_url:
+                # Extract organization name from URL like https://msazure.visualstudio.com
+                org_name = base_url.split("//")[1].split(".")[0]
+                vssps_base_url = f"https://vssps.dev.azure.com/{org_name}"
+            else:
+                # For dev.azure.com URLs, extract organization name
+                if "dev.azure.com" in base_url:
+                    org_name = base_url.split("/")[-1]
+                    vssps_base_url = f"https://vssps.dev.azure.com/{org_name}"
+                else:
+                    # For other custom URLs, try to use them directly
+                    vssps_base_url = base_url
         else:
-            base_url = f"https://vssps.dev.azure.com/{organization}"
+            # Plain organization name
+            base_url = f"https://dev.azure.com/{organization}"
+            vssps_base_url = f"https://vssps.dev.azure.com/{organization}"
 
         # Try multiple API endpoints for identity resolution
         endpoints_to_try = [
+            # Try the VSSPS identity service first (most reliable)
+            f"{vssps_base_url}/_apis/identities?searchFilter=General&filterValue={identity}&api-version=7.1",
+            # Try the graph API as fallback
+            f"{vssps_base_url}/_apis/graph/users?subjectTypes=aad,msa&api-version=7.1-preview.1",
+            # Try the main organization URL as additional fallback
             f"{base_url}/_apis/identities?searchFilter=General&filterValue={identity}&api-version=7.1",
-            f"{base_url}/_apis/graph/users?subjectTypes=aad,msa&api-version=7.1-preview.1"
         ]
 
         headers = get_auth_headers()
+        
+        logger.debug(f"Attempting to resolve identity '{identity}' using endpoints: {endpoints_to_try}")
 
-        async with aiohttp.ClientSession() as session:
-            # Try the identities API first
+        # Use AzureHttpClient for better error handling and retry logic
+        async with AzureHttpClient() as client:
+            # Try each endpoint
             for endpoint in endpoints_to_try:
                 try:
-                    async with session.get(endpoint, headers=headers) as response:
-                        if response.status == 200:
-                            data = await response.json()
+                    logger.debug(f"Trying identity resolution endpoint: {endpoint}")
+                    
+                    # Make request with built-in retry logic and error handling
+                    result = await client.get(endpoint, headers=headers)
+                    
+                    logger.debug(f"Identity API response status: {result.get('status_code')}")
+                    
+                    if result.get("success") and result.get("data"):
+                        data = result["data"]
+                        logger.debug(f"Identity API response data: {data}")
 
-                            # Process identities API response
+                        # Process identities API response
+                        if "value" in data and data["value"]:
+                            for identity_item in data["value"]:
+                                # Check if this identity matches our search
+                                if _identity_matches(identity_item, identity):
+                                    logger.debug(f"Found matching identity: {identity_item}")
+                                    return _create_identity_info_from_api_response(identity_item)
+
+                            # If we found results but no matches, log for debugging
                             if "value" in data and data["value"]:
-                                for identity_item in data["value"]:
-                                    # Check if this identity matches our search
-                                    if _identity_matches(identity_item, identity):
-                                        return _create_identity_info_from_api_response(identity_item)
-
-                            # If we found results but no matches, continue to next endpoint
-                            continue
+                                logger.debug(f"Found {len(data['value'])} identities but none matched '{identity}'")
+                                for item in data["value"]:
+                                    logger.debug(f"Available identity: {item.get('displayName', 'N/A')} ({item.get('uniqueName', 'N/A')})")
+                    else:
+                        # Handle error cases
+                        status_code = result.get("status_code", 0)
+                        error_msg = result.get("error", "Unknown error")
+                        
+                        if status_code == 401:
+                            logger.warning(f"Authentication failed for endpoint {endpoint}")
+                        elif status_code == 403:
+                            logger.warning(f"Access denied for endpoint {endpoint}")
+                        else:
+                            logger.debug(f"Identity API returned error: {error_msg}")
 
                 except Exception as e:
                     logger.debug(f"Failed to resolve identity via endpoint {endpoint}: {e}")
                     continue
 
-        # If API resolution fails, try to validate the format and create a basic identity
+        # Enhanced fallback strategies
+        logger.debug(f"API resolution failed, trying fallback strategies for '{identity}'")
+        
+        # Strategy 1: If it looks like an email, accept it directly
         if is_valid_email(identity):
-            # For valid email formats, create a basic identity info
-            # Azure DevOps often accepts email addresses directly
+            logger.debug(f"Identity '{identity}' is a valid email format, accepting directly")
             return IdentityInfo(
                 display_name=identity,
                 unique_name=identity,
@@ -618,15 +730,57 @@ async def _resolve_identity_via_api(
                 is_valid=True,
                 error_message=""
             )
+        
+        # Strategy 2: Try common email domain patterns for the username
+        # This is useful for corporate environments where username might be part of email
+        common_domains = []
+        
+        # Extract potential domain from organization URL
+        if "visualstudio.com" in organization or "dev.azure.com" in organization:
+            # For Azure DevOps organizations, try to infer domain
+            if "dev.azure.com" in organization:
+                # For dev.azure.com URLs, extract the organization name from the path
+                org_name = organization.split("/")[-1] if "/" in organization else organization
+            else:
+                # For visualstudio.com URLs, extract from subdomain
+                org_name = organization.split("//")[1].split(".")[0] if "//" in organization else organization
+            logger.debug(f"Extracted organization name: {org_name}")
+            
+            # Generic patterns for Azure DevOps organizations
+            common_domains = [
+                f"{org_name}.com",
+                f"{org_name}.onmicrosoft.com"
+            ]
+            
+            logger.debug(f"Will try common domains: {common_domains}")
+        
+        # Try common domain patterns
+        for domain in common_domains:
+            potential_email = f"{identity}@{domain}"
+            logger.debug(f"Trying potential email format: {potential_email}")
+            
+            # Validate email format and return directly if valid
+            if is_valid_email(potential_email):
+                logger.debug(f"Accepting constructed email format: {potential_email}")
+                return IdentityInfo(
+                    display_name=potential_email,
+                    unique_name=potential_email,
+                    id="",
+                    descriptor="",
+                    is_valid=True,
+                    error_message=""
+                )
 
         # If all resolution attempts fail
+        error_msg = f"Unable to resolve identity '{identity}' in organization '{organization}'"
+        logger.warning(error_msg)
         return IdentityInfo(
             display_name="",
             unique_name="",
             id="",
             descriptor="",
             is_valid=False,
-            error_message=f"Unable to resolve identity '{identity}' in organization '{organization}'"
+            error_message=error_msg
         )
 
     except Exception as e:
@@ -669,9 +823,37 @@ def _identity_matches(identity_item: Dict[str, Any], search_term: str) -> bool:
             properties.get("Mail", {}).get("$value", ""),
         ])
 
+    # First try exact matches
+    for field in fields_to_check:
+        if field and field.lower() == search_lower:
+            return True
+
+    # Then try partial matches (contains)
     for field in fields_to_check:
         if field and search_lower in field.lower():
             return True
+    
+    # Special handling for username patterns
+    # If search term looks like a username (no @ symbol), try matching against email prefixes
+    if "@" not in search_term:
+        for field in fields_to_check:
+            if field and "@" in field:
+                # Extract username part from email
+                email_prefix = field.split("@")[0].lower()
+                if email_prefix == search_lower:
+                    return True
+                # Also try partial match on email prefix
+                if search_lower in email_prefix:
+                    return True
+    
+    # Try reverse matching - if the field contains the search term as a substring
+    # This helps with cases where display names might contain the username
+    for field in fields_to_check:
+        if field and len(search_term) >= 3:  # Only for reasonably long search terms
+            field_words = field.lower().split()
+            for word in field_words:
+                if search_lower in word or word in search_lower:
+                    return True
 
     return False
 
@@ -739,7 +921,6 @@ async def validate_and_format_assignee(
         return None, ""
 
     if assignee.lower() == "current":
-        # Try to get current user's identity
         current_username = get_current_username()
         if not current_username:
             return None, "Unable to determine current user for assignment"

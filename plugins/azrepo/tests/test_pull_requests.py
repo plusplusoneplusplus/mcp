@@ -139,7 +139,7 @@ class TestListPullRequestsAPI:
         mock_resolve_identity.return_value = IdentityInfo(
             display_name="Test User",
             unique_name="test.user@company.com",
-            id="test123",
+            id="test.user@company.com",
             descriptor="test_desc",
             is_valid=True,
             error_message=""
