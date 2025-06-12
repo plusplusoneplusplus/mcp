@@ -23,6 +23,7 @@ from .azure_rest_utils import (
     build_api_url,
     process_rest_response,
     AzureHttpClient,
+    resolve_identity,
 )
 
 # Import types from the plugin
@@ -207,7 +208,7 @@ class AzurePullRequestTool(ToolInterface):
                 },
                 "creator": {
                     "type": "string",
-                    "description": "Filter PRs by creator (defaults to current user if not specified, use empty string to list all PRs)",
+                    "description": "Filter PRs by creator. Use 'default' to filter by current user (resolves local username to Azure DevOps identity), use empty string to list all PRs, or specify a specific Azure DevOps user identifier",
                     "nullable": True,
                 },
                 "reviewer": {
@@ -577,10 +578,25 @@ class AzurePullRequestTool(ToolInterface):
             if creator == "default":
                 creator_id = self._get_current_username()
                 if creator_id:
-                    self.logger.debug(
-                        f"Using current user as creator filter: {creator_id}"
-                    )
-                    params["searchCriteria.creatorId"] = creator_id
+                    # Resolve local username to Azure DevOps identity
+                    try:
+                        identity_info = await resolve_identity(creator_id, org, proj)
+                        if identity_info.is_valid and identity_info.unique_name:
+                            resolved_creator = identity_info.unique_name
+                            self.logger.debug(
+                                f"Resolved current user '{creator_id}' to Azure DevOps identity: {resolved_creator}"
+                            )
+                            params["searchCriteria.creatorId"] = resolved_creator
+                        else:
+                            self.logger.warning(
+                                f"Unable to resolve current user '{creator_id}' to Azure DevOps identity. "
+                                f"Listing all PRs instead. Error: {identity_info.error_message}"
+                            )
+                    except Exception as e:
+                        self.logger.warning(
+                            f"Failed to resolve current user '{creator_id}' to Azure DevOps identity: {e}. "
+                            f"Listing all PRs instead."
+                        )
             elif creator:
                 params["searchCriteria.creatorId"] = creator
 

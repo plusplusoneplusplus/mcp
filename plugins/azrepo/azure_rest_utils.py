@@ -109,7 +109,7 @@ class AzureHttpClient:
         )
 
         # Create timeout configuration
-        timeout = aiohttp.ClientTimeout(total=float(self.request_timeout))
+        timeout = aiohttp.ClientTimeout(total=self.request_timeout)
 
         # Create session with connector and timeout
         self._session = aiohttp.ClientSession(

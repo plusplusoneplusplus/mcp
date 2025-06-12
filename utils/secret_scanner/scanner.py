@@ -1,6 +1,10 @@
 from typing import List, Dict, Tuple
-from detect_secrets.core.plugins import initialize
-from detect_secrets.settings import get_settings
+try:
+    from detect_secrets.core.plugins import initialize
+    from detect_secrets.settings import get_settings
+except ImportError:
+    raise ImportError("detect-secrets not installed, please source the virtual environment if not already done")
+
 import io
 import math
 import re
