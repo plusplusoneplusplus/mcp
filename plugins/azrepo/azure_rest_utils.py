@@ -15,6 +15,7 @@ import asyncio
 from typing import Dict, Any, Optional, Union, List, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from urllib.parse import quote_plus
 
 # Import configuration manager
 from config import env_manager
@@ -108,7 +109,7 @@ class AzureHttpClient:
             enable_cleanup_closed=True
         )
 
-        # Create timeout configuration
+        # Create timeout configuration - Fixed syntax
         timeout = aiohttp.ClientTimeout(total=float(self.request_timeout))
 
         # Create session with connector and timeout
@@ -391,17 +392,63 @@ class IdentityInfo:
 def get_current_username() -> Optional[str]:
     """Get the current username in a cross-platform way.
 
+    For enterprise environments, attempts to resolve the username to an email format
+    that Azure DevOps can recognize.
+
     Returns:
-        The current username, or None if unable to determine
+        The current username, preferably in email format for enterprise environments,
+        or None if unable to determine
     """
     try:
         # Try getpass.getuser() first (works on most platforms)
-        return getpass.getuser()
+        username = getpass.getuser()
+
+        # Check if we're in a Windows enterprise environment
+        # and try to get the full UPN (User Principal Name)
+        if os.name == 'nt':  # Windows
+            try:
+                # Try to get UPN from environment variables first
+                upn = os.environ.get('USERPRINCIPALNAME')
+                if upn and is_valid_email(upn):
+                    logger.debug(f"Found UPN from environment: {upn}")
+                    return upn
+
+                # Try to get domain from environment and construct email
+                userdomain = os.environ.get('USERDOMAIN')
+                if userdomain and userdomain.lower() not in ['workgroup', username.lower()]:
+                    # Common enterprise domain patterns
+                    potential_email = f"{username}@{userdomain.lower()}.com"
+                    logger.debug(f"Constructed potential enterprise email: {potential_email}")
+                    return potential_email
+
+                # Try to extract domain from LOGONSERVER or other indicators
+                logon_server = os.environ.get('LOGONSERVER', '').replace('\\\\', '')
+                if logon_server and logon_server.lower() not in ['localhost', username.lower()]:
+                    potential_email = f"{username}@{logon_server.lower()}.com"
+                    logger.debug(f"Constructed email from logon server: {potential_email}")
+                    return potential_email
+
+            except Exception as e:
+                logger.debug(f"Failed to resolve enterprise username: {e}")
+
+        # If already in email format, return as-is
+        if is_valid_email(username):
+            return username
+
+        # Return the basic username as fallback
+        return username
+
     except Exception:
         try:
             # Fallback to environment variables
             username = os.environ.get("USER") or os.environ.get("USERNAME")
             if username:
+                # Apply same enterprise logic to environment username
+                if os.name == 'nt' and username:
+                    userdomain = os.environ.get('USERDOMAIN')
+                    if userdomain and userdomain.lower() not in ['workgroup', username.lower()]:
+                        potential_email = f"{username}@{userdomain.lower()}.com"
+                        return potential_email
                 return username
         except Exception:
             pass
@@ -570,24 +617,41 @@ async def _resolve_identity_via_api(
     """
     try:
         # Build API URL for identity resolution
-        # Use the Identity API to resolve the identity
         if organization.startswith(("http://", "https://")):
             base_url = organization.rstrip("/")
+            # Extract organization name for vssps URL
+            if "dev.azure.com" in base_url:
+                org_name = base_url.split("/")[-1]
+                vssps_base_url = f"https://vssps.dev.azure.com/{org_name}"
+            else:
+                # For on-premises or other custom URLs, use the same base
+                vssps_base_url = base_url
         else:
-            base_url = f"https://vssps.dev.azure.com/{organization}"
+            vssps_base_url = f"https://vssps.dev.azure.com/{organization}"
 
-        # Try multiple API endpoints for identity resolution
+        # URL encode the identity parameter to handle special characters
+        encoded_identity = quote_plus(identity)
+
+        # Use correct API endpoints for identity resolution
         endpoints_to_try = [
-            f"{base_url}/_apis/identities?searchFilter=General&filterValue={identity}&api-version=7.1",
-            f"{base_url}/_apis/graph/users?subjectTypes=aad,msa&api-version=7.1-preview.1"
+            # Primary Identity API endpoint - correct usage
+            f"{vssps_base_url}/_apis/identities?searchFilter=General&filterValue={encoded_identity}&api-version=7.1",
+            # Fallback: try with different search filter
+            f"{vssps_base_url}/_apis/identities?searchFilter=MailAddress&filterValue={encoded_identity}&api-version=7.1",
+            # Last resort: try with AccountName filter if it looks like a username
+            f"{vssps_base_url}/_apis/identities?searchFilter=AccountName&filterValue={encoded_identity}&api-version=7.1" if not is_valid_email(identity) else None
         ]
+
+        # Remove None entries
+        endpoints_to_try = [ep for ep in endpoints_to_try if ep is not None]
 
         headers = get_auth_headers()
 
         async with aiohttp.ClientSession() as session:
-            # Try the identities API first
+            # Try each endpoint in order
             for endpoint in endpoints_to_try:
                 try:
+                    logger.debug(f"Trying identity resolution endpoint: {endpoint}")
                     async with session.get(endpoint, headers=headers) as response:
                         if response.status == 200:
                             data = await response.json()
@@ -597,10 +661,14 @@ async def _resolve_identity_via_api(
                                 for identity_item in data["value"]:
                                     # Check if this identity matches our search
                                     if _identity_matches(identity_item, identity):
+                                        logger.debug(f"Successfully resolved identity: {identity}")
                                         return _create_identity_info_from_api_response(identity_item)
 
                             # If we found results but no matches, continue to next endpoint
+                            logger.debug(f"No matching identity found in response from {endpoint}")
                             continue
+                        else:
+                            logger.debug(f"Identity API returned status {response.status} for endpoint {endpoint}")
 
                 except Exception as e:
                     logger.debug(f"Failed to resolve identity via endpoint {endpoint}: {e}")
@@ -610,6 +678,7 @@ async def _resolve_identity_via_api(
         if is_valid_email(identity):
             # For valid email formats, create a basic identity info
             # Azure DevOps often accepts email addresses directly
+            logger.debug(f"Creating basic identity info for valid email: {identity}")
             return IdentityInfo(
                 display_name=identity,
                 unique_name=identity,
@@ -620,6 +689,7 @@ async def _resolve_identity_via_api(
             )
 
         # If all resolution attempts fail
+        logger.warning(f"Unable to resolve identity '{identity}' in organization '{organization}'")
         return IdentityInfo(
             display_name="",
             unique_name="",
