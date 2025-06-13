@@ -1,7 +1,7 @@
 """High-level graph manager with advanced operations."""
 
 import logging
-from collections import deque
+from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Set
 
 from .exceptions import GraphOperationError, Neo4jQueryError, ValidationError
