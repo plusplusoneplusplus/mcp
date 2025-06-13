@@ -6,9 +6,7 @@ import os
 import logging
 from typing import List, Dict, Any, Optional, Tuple, Union
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from utils.vector_store.vector_store import ChromaVectorStore
-from utils.vector_store.markdown_table_segmenter import MarkdownTableSegmenter
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -37,6 +35,8 @@ class MarkdownSegmenter:
             chunk_overlap: Overlap between text chunks in characters
             table_max_rows: Maximum number of rows in a table before splitting
         """
+        from utils.vector_store.markdown_table_segmenter import MarkdownTableSegmenter
+        
         # Prevent invalid configurations
         if chunk_overlap >= chunk_size:
             chunk_overlap = max(0, chunk_size - 1)
@@ -53,7 +53,7 @@ class MarkdownSegmenter:
             vector_store=self.vector_store, model=self.model
         )
 
-    def _initialize_model(self, model_name: str) -> SentenceTransformer:
+    def _initialize_model(self, model_name: str):
         """
         Initialize the sentence transformer model with fallback support.
 
@@ -66,6 +66,8 @@ class MarkdownSegmenter:
         Raises:
             RuntimeError: If both primary and fallback models fail to load
         """
+        from sentence_transformers import SentenceTransformer
+        
         # List of fallback models to try if the primary model fails
         fallback_models = [
             "all-mpnet-base-v2",

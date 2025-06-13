@@ -204,9 +204,13 @@ class TestBearerTokenCommand:
         assert mock_subprocess_run.call_count == 1
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
+    @patch("plugins.azrepo.azure_rest_utils.get_current_username")
     @pytest.mark.asyncio
-    async def test_create_work_item_uses_dynamic_token(self, mock_subprocess_run, mock_executor, mock_env_manager_with_token_command):
+    async def test_create_work_item_uses_dynamic_token(self, mock_get_current_username, mock_subprocess_run, mock_executor, mock_env_manager_with_token_command):
         """Test that create_work_item operation uses dynamic token loading."""
+        # Mock get_current_username to avoid extra subprocess call on Windows
+        mock_get_current_username.return_value = "testuser"
+        
         # Mock subprocess.run to simulate successful command execution
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -345,9 +349,13 @@ class TestEndToEndBearerTokenWorkflow:
     """Test end-to-end workflow using bearer token command."""
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
+    @patch("plugins.azrepo.azure_rest_utils.get_current_username")
     @pytest.mark.asyncio
-    async def test_end_to_end_create_work_item_with_token_command(self, mock_subprocess_run, mock_executor):
+    async def test_end_to_end_create_work_item_with_token_command(self, mock_get_current_username, mock_subprocess_run, mock_executor):
         """Test complete workflow of creating a work item using bearer token command."""
+        # Mock get_current_username to avoid extra subprocess call on Windows
+        mock_get_current_username.return_value = "testuser"
+        
         # Clear bearer token cache before test
         from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
         clear_bearer_token_cache()

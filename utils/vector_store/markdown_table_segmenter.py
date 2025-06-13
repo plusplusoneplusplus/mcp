@@ -6,7 +6,6 @@ import os
 import logging
 from typing import List, Dict, Any, Optional, Tuple, Union
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from utils.vector_store.vector_store import ChromaVectorStore
 
 # Set up logger for this module
@@ -22,7 +21,7 @@ class MarkdownTableSegmenter:
         self,
         vector_store: ChromaVectorStore,
         model_name: str = "all-MiniLM-L6-v2",
-        model: Optional[SentenceTransformer] = None
+        model: Optional[Any] = None
     ):
         """
         Initialize the table segmenter with an embedding model and vector store.
@@ -40,7 +39,7 @@ class MarkdownTableSegmenter:
             self.model = self._initialize_model(model_name)
         self.vector_store = vector_store
 
-    def _initialize_model(self, model_name: str) -> SentenceTransformer:
+    def _initialize_model(self, model_name: str):
         """
         Initialize the sentence transformer model with fallback support.
 
@@ -53,6 +52,8 @@ class MarkdownTableSegmenter:
         Raises:
             RuntimeError: If both primary and fallback models fail to load
         """
+        from sentence_transformers import SentenceTransformer
+        
         # List of fallback models to try if the primary model fails
         fallback_models = [
             "all-mpnet-base-v2",
