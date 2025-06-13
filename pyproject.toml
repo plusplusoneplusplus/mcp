@@ -23,7 +23,6 @@ dependencies = [
     "chromadb>=0.4.22", # Vector database for semantic search
     # YAML parser
     "pyyaml>=6.0.1", # YAML parser
-    "black>=25.0.01", # Python formatter
     # Process utilities
     "psutil>=5.9.5", # Process utilities for monitoring and management
     # HTTP/SSE server
@@ -78,14 +77,6 @@ dependencies = [
     # Neo4j graph database
     "neo4j>=5.15.0", # Neo4j Python driver
     "typing-extensions>=4.8.0", # Enhanced typing support
-]
-
-[project.optional-dependencies]
-dev = [
-    "black",
-    "isort",
-    "flake8",
-    "mypy",
 ]
 
 [tool.setuptools]
