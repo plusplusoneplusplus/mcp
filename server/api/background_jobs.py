@@ -44,32 +44,20 @@ async def api_list_background_jobs(request: Request):
 
         jobs = []
 
-        # Get running jobs from running_processes
-        if hasattr(command_executor, "running_processes"):
-            for pid, process_data in command_executor.running_processes.items():
-                process = process_data.get("process")
-                if process and process.poll() is None:  # Still running
-                    job_data = {
-                        "token": process_data.get("token", "unknown"),
-                        "command": process_data.get("command", ""),
-                        "start_time": process_data.get("start_time", ""),
-                        "status": "running",
-                        "pid": pid,
-                    }
-
-                    # Add process info if available
-                    try:
-                        process_info = psutil.Process(pid)
-                        job_data.update({
-                            "cpu_percent": process_info.cpu_percent(),
-                            "memory_info": process_info.memory_info()._asdict(),
-                            "create_time": process_info.create_time(),
-                        })
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        job_data["status"] = "completed"
-
-                    if not status_filter or status_filter == job_data["status"]:
-                        jobs.append(job_data)
+        # Get running jobs using the command executor's method (ensures proper field formatting)
+        for info in command_executor.list_running_processes():
+            if not status_filter or status_filter == info.get("status"):
+                pid = info["pid"]
+                # Get the full token and start_time from running_processes
+                if pid in command_executor.running_processes:
+                    process_data = command_executor.running_processes[pid]
+                    info["token"] = process_data["token"]
+                    info["start_time"] = process_data["start_time"]
+                else:
+                    # Fallback if process data not found
+                    info["token"] = command_executor.running_processes.get(pid, {}).get("token", "unknown")
+                    info["start_time"] = None
+                jobs.append(info)
 
         # Get completed jobs from completed_processes if requested
         if include_completed and hasattr(command_executor, "completed_processes"):
@@ -138,9 +126,11 @@ async def api_get_background_job(request: Request):
                 if process and process.poll() is None:
                     try:
                         process_info = psutil.Process(pid)
+                        memory_info = process_info.memory_info()
                         job_data.update({
                             "cpu_percent": process_info.cpu_percent(),
-                            "memory_info": process_info.memory_info()._asdict(),
+                            "memory_mb": memory_info.rss / (1024 * 1024),  # Convert to MB for frontend compatibility
+                            "memory_info": memory_info._asdict(),
                             "create_time": process_info.create_time(),
                             "status": "running",
                         })
@@ -174,23 +164,24 @@ async def api_terminate_background_job(request: Request):
             return JSONResponse({"error": "Missing job token"}, status_code=400)
 
         command_executor = get_command_executor()
-        if not command_executor or not hasattr(command_executor, "background_jobs"):
+        if not command_executor:
             return JSONResponse({"error": "Command executor not available"}, status_code=500)
 
-        job_info = command_executor.background_jobs.get(token)
-        if not job_info:
-            return JSONResponse({"error": "Job not found"}, status_code=404)
-
-        # Terminate the process
-        if job_info.get("process"):
-            try:
-                process = job_info["process"]
-                process.terminate()
-                return JSONResponse({"success": True, "message": f"Job {token} terminated"})
-            except Exception as e:
-                return JSONResponse({"error": f"Failed to terminate job: {str(e)}"}, status_code=500)
-        else:
-            return JSONResponse({"error": "Job process not found"}, status_code=404)
+        # Use the correct method from the command executor interface
+        try:
+            success = command_executor.terminate_by_token(token)
+            if success:
+                return JSONResponse({"success": True, "message": f"Job {token} terminated successfully."})
+            else:
+                return JSONResponse(
+                    {"success": False, "error": f"Failed to terminate job {token}. Job may not exist or already completed."},
+                    status_code=404
+                )
+        except Exception as e:
+            return JSONResponse(
+                {"success": False, "error": f"Error terminating job: {str(e)}"},
+                status_code=500
+            )
 
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
