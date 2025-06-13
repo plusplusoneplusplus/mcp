@@ -152,6 +152,23 @@
             }
         }
     </style>
+
+    <!-- Mermaid.js library for diagram rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#0077cc',
+                primaryTextColor: '#333',
+                primaryBorderColor: '#0077cc',
+                lineColor: '#333',
+                fontFamily: 'Arial, sans-serif'
+            }
+        });
+    </script>
+
     {% block extra_styles %}{% endblock %}
 </head>
 
@@ -165,6 +182,8 @@
             <a href="/tools" class="nav-link {{ 'active' if current_page == 'tools' else '' }}">Tools</a>
             <a href="/tool-history" class="nav-link {{ 'active' if current_page == 'tool_history' else '' }}">Tool
                 History</a>
+            <a href="/visualizations"
+                class="nav-link {{ 'active' if current_page == 'visualizations' else '' }}">Visualizations</a>
             <a href="/config" class="nav-link {{ 'active' if current_page == 'config' else '' }}">Configuration</a>
         </div>
     </nav>

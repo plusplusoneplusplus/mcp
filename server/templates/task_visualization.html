@@ -1,0 +1,634 @@
+{% extends "base.html" %}
+
+{% block title %}Task Visualizations - MCP Knowledge Server{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .visualization-container {
+        display: flex;
+        flex-direction: column;
+        gap: 2em;
+    }
+
+    .controls-panel {
+        background: #fff;
+        padding: 2em;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px #eee;
+    }
+
+    .control-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1em;
+        align-items: center;
+        margin-bottom: 1em;
+    }
+
+    .control-group label {
+        min-width: 120px;
+        font-weight: bold;
+    }
+
+    .control-group select,
+    .control-group input {
+        min-width: 200px;
+        padding: 0.5em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .diagram-selector {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1em;
+        margin-bottom: 1em;
+    }
+
+    .diagram-option {
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5em;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .diagram-option:hover {
+        border-color: #0077cc;
+        background: #e7f3ff;
+    }
+
+    .diagram-option.active {
+        border-color: #0077cc;
+        background: #e7f3ff;
+        box-shadow: 0 4px 12px rgba(0, 119, 204, 0.2);
+    }
+
+    .diagram-option h3 {
+        margin: 0 0 0.5em 0;
+        color: #333;
+        font-size: 1.1em;
+    }
+
+    .diagram-option p {
+        margin: 0;
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .diagram-container {
+        background: #fff;
+        padding: 2em;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px #eee;
+        min-height: 400px;
+    }
+
+    .diagram-content {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 4em;
+        color: #666;
+    }
+
+    .error {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+        padding: 1em;
+        border-radius: 4px;
+        margin: 1em 0;
+    }
+
+    .success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+        padding: 1em;
+        border-radius: 4px;
+        margin: 1em 0;
+    }
+
+    .metadata {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 1em;
+        margin-top: 1em;
+        font-size: 0.9em;
+    }
+
+    .metadata h4 {
+        margin: 0 0 0.5em 0;
+        color: #495057;
+    }
+
+    .metadata-item {
+        margin: 0.3em 0;
+    }
+
+    .export-buttons {
+        display: flex;
+        gap: 1em;
+        margin-top: 1em;
+        flex-wrap: wrap;
+    }
+
+    .export-btn {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 0.5em 1em;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+    }
+
+    .export-btn:hover {
+        background: #218838;
+    }
+
+    .export-btn:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+    }
+
+    .advanced-filters {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 1em;
+        margin-top: 1em;
+    }
+
+    .filter-toggle {
+        cursor: pointer;
+        color: #0077cc;
+        text-decoration: underline;
+        font-size: 0.9em;
+    }
+
+    .filter-content {
+        display: none;
+        margin-top: 1em;
+    }
+
+    .filter-content.show {
+        display: block;
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .control-group {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .control-group label {
+            min-width: auto;
+        }
+
+        .control-group select,
+        .control-group input {
+            min-width: auto;
+            width: 100%;
+        }
+
+        .diagram-selector {
+            grid-template-columns: 1fr;
+        }
+
+        .export-buttons {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="visualization-container">
+    <!-- Demo Mode Notice -->
+    <div id="demo-notice" style="display: none;" class="card">
+        <h3 style="color: #0077cc; margin-top: 0;">🎯 Demo Mode Active</h3>
+        <p>You're currently viewing sample visualizations to demonstrate the system's capabilities. To see real task
+            data, configure your Neo4j graph database connection.</p>
+        <p><strong>Features demonstrated:</strong> Interactive filtering, multiple diagram types, export functionality,
+            and responsive design.</p>
+    </div>
+
+    <!-- Page Header -->
+    <div class="card">
+        <h2>Task Management Visualizations</h2>
+        <p>Interactive diagrams for task dependencies, scheduling, resource allocation, and execution monitoring.</p>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="controls-panel">
+        <h3>Visualization Type</h3>
+        <div class="diagram-selector">
+            <div class="diagram-option active" data-type="task-dependencies">
+                <h3>Task Dependencies</h3>
+                <p>Flowchart showing task relationships and dependencies</p>
+            </div>
+            <div class="diagram-option" data-type="gantt-chart">
+                <h3>Gantt Chart</h3>
+                <p>Project timeline and task scheduling visualization</p>
+            </div>
+            <div class="diagram-option" data-type="resource-allocation">
+                <h3>Resource Allocation</h3>
+                <p>Resource assignment and utilization overview</p>
+            </div>
+            <div class="diagram-option" data-type="execution-timeline">
+                <h3>Execution Timeline</h3>
+                <p>Task execution history over time</p>
+            </div>
+            <div class="diagram-option" data-type="critical-path">
+                <h3>Critical Path</h3>
+                <p>Critical path analysis between tasks</p>
+            </div>
+            <div class="diagram-option" data-type="status-overview">
+                <h3>Status Overview</h3>
+                <p>Task status distribution and summary</p>
+            </div>
+        </div>
+
+        <!-- Filter Controls -->
+        <div class="control-group">
+            <label for="task-ids">Task IDs:</label>
+            <input type="text" id="task-ids" placeholder="Comma-separated task IDs (optional)">
+        </div>
+
+        <!-- Advanced Filters -->
+        <div class="advanced-filters">
+            <div class="filter-toggle" onclick="toggleAdvancedFilters()">
+                Show Advanced Filters ▼
+            </div>
+            <div class="filter-content" id="advanced-filters">
+                <div class="control-group">
+                    <label for="include-status">Include Status:</label>
+                    <select id="include-status">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="include-resources">Include Resources:</label>
+                    <select id="include-resources">
+                        <option value="false">No</option>
+                        <option value="true">Yes</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="time-window">Time Window (hours):</label>
+                    <input type="number" id="time-window" value="24" min="1" max="168">
+                </div>
+                <div class="control-group">
+                    <label for="start-date">Start Date:</label>
+                    <input type="datetime-local" id="start-date">
+                </div>
+                <div class="control-group critical-path-only" style="display: none;">
+                    <label for="start-task">Start Task:</label>
+                    <input type="text" id="start-task" placeholder="Start task ID">
+                </div>
+                <div class="control-group critical-path-only" style="display: none;">
+                    <label for="end-task">End Task:</label>
+                    <input type="text" id="end-task" placeholder="End task ID">
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="control-group">
+            <button onclick="generateDiagram()" id="generate-btn">Generate Diagram</button>
+            <button onclick="refreshDiagram()" id="refresh-btn">Refresh</button>
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="status-message" style="display: none;"></div>
+
+    <!-- Diagram Container -->
+    <div class="diagram-container">
+        <div class="diagram-content" id="diagram-content">
+            <div class="loading">
+                Select a visualization type and click "Generate Diagram" to begin
+            </div>
+        </div>
+
+        <!-- Export Options -->
+        <div class="export-buttons" id="export-buttons" style="display: none;">
+            <button class="export-btn" onclick="exportDiagram('svg')">Export as SVG</button>
+            <button class="export-btn" onclick="exportDiagram('png')">Export as PNG</button>
+            <button class="export-btn" onclick="copyMermaidCode()">Copy Mermaid Code</button>
+        </div>
+
+        <!-- Metadata Display -->
+        <div class="metadata" id="metadata" style="display: none;">
+            <h4>Diagram Information</h4>
+            <div id="metadata-content"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentDiagramType = 'task-dependencies';
+    let currentMermaidCode = '';
+    let currentMetadata = {};
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function () {
+        // Set default start date to now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('start-date').value = now.toISOString().slice(0, 16);
+    });
+
+    // Toggle advanced filters
+    function toggleAdvancedFilters() {
+        const content = document.getElementById('advanced-filters');
+        const toggle = document.querySelector('.filter-toggle');
+
+        if (content.classList.contains('show')) {
+            content.classList.remove('show');
+            toggle.textContent = 'Show Advanced Filters ▼';
+        } else {
+            content.classList.add('show');
+            toggle.textContent = 'Hide Advanced Filters ▲';
+        }
+    }
+
+    // Handle diagram type selection
+    document.querySelectorAll('.diagram-option').forEach(option => {
+        option.addEventListener('click', function () {
+            // Remove active class from all options
+            document.querySelectorAll('.diagram-option').forEach(opt => opt.classList.remove('active'));
+
+            // Add active class to selected option
+            this.classList.add('active');
+
+            // Update current diagram type
+            currentDiagramType = this.dataset.type;
+
+            // Show/hide critical path specific fields
+            const criticalPathFields = document.querySelectorAll('.critical-path-only');
+            if (currentDiagramType === 'critical-path') {
+                criticalPathFields.forEach(field => field.style.display = 'flex');
+            } else {
+                criticalPathFields.forEach(field => field.style.display = 'none');
+            }
+
+            // Clear previous diagram
+            document.getElementById('diagram-content').innerHTML = '<div class="loading">Click "Generate Diagram" to create visualization</div>';
+            document.getElementById('export-buttons').style.display = 'none';
+            document.getElementById('metadata').style.display = 'none';
+        });
+    });
+
+    // Generate diagram
+    async function generateDiagram() {
+        const generateBtn = document.getElementById('generate-btn');
+        const statusMessage = document.getElementById('status-message');
+        const diagramContent = document.getElementById('diagram-content');
+
+        try {
+            // Disable button and show loading
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+            statusMessage.style.display = 'none';
+
+            diagramContent.innerHTML = '<div class="loading">Generating diagram...</div>';
+
+            // Build URL with parameters
+            const url = buildApiUrl();
+
+            // Make API request
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to generate diagram');
+            }
+
+            // Store current data
+            currentMermaidCode = data.mermaid_code;
+            currentMetadata = data.metadata;
+
+            // Show demo notice if in demo mode
+            if (data.metadata.demo_mode) {
+                document.getElementById('demo-notice').style.display = 'block';
+            } else {
+                document.getElementById('demo-notice').style.display = 'none';
+            }
+
+            // Render diagram
+            await renderDiagram(data.mermaid_code);
+
+            // Show metadata
+            displayMetadata(data.metadata);
+
+            // Show export buttons
+            document.getElementById('export-buttons').style.display = 'flex';
+
+            // Show success message
+            const statusMsg = data.metadata.demo_mode ?
+                'Demo diagram generated successfully!' :
+                'Diagram generated successfully!';
+            showStatus(statusMsg, false);
+
+        } catch (error) {
+            console.error('Error generating diagram:', error);
+            showStatus('Error generating diagram: ' + error.message, true);
+            diagramContent.innerHTML = '<div class="error">Failed to generate diagram. Please check your parameters and try again.</div>';
+        } finally {
+            // Re-enable button
+            generateBtn.disabled = false;
+            generateBtn.textContent = 'Generate Diagram';
+        }
+    }
+
+    // Build API URL with parameters
+    function buildApiUrl() {
+        const baseUrl = `/api/visualizations/${currentDiagramType}`;
+        const params = new URLSearchParams();
+
+        // Common parameters
+        const taskIds = document.getElementById('task-ids').value.trim();
+        if (taskIds) {
+            params.append('task_ids', taskIds);
+        }
+
+        // Type-specific parameters
+        switch (currentDiagramType) {
+            case 'task-dependencies':
+                params.append('include_status', document.getElementById('include-status').value);
+                params.append('include_resources', document.getElementById('include-resources').value);
+                break;
+
+            case 'gantt-chart':
+                const startDate = document.getElementById('start-date').value;
+                if (startDate) {
+                    params.append('start_date', new Date(startDate).toISOString());
+                }
+                params.append('include_dependencies', 'true');
+                break;
+
+            case 'execution-timeline':
+                params.append('time_window_hours', document.getElementById('time-window').value);
+                break;
+
+            case 'critical-path':
+                const startTask = document.getElementById('start-task').value.trim();
+                const endTask = document.getElementById('end-task').value.trim();
+                if (startTask) params.append('start_task', startTask);
+                if (endTask) params.append('end_task', endTask);
+                break;
+        }
+
+        return baseUrl + (params.toString() ? '?' + params.toString() : '');
+    }
+
+    // Render Mermaid diagram
+    async function renderDiagram(mermaidCode) {
+        const diagramContent = document.getElementById('diagram-content');
+
+        // Create a unique ID for this diagram
+        const diagramId = 'diagram-' + Date.now();
+
+        // Create container div
+        diagramContent.innerHTML = `<div class="mermaid" id="${diagramId}">${mermaidCode}</div>`;
+
+        // Re-initialize mermaid for the new content
+        await mermaid.init(undefined, `#${diagramId}`);
+    }
+
+    // Display metadata
+    function displayMetadata(metadata) {
+        const metadataDiv = document.getElementById('metadata');
+        const contentDiv = document.getElementById('metadata-content');
+
+        let html = '';
+        for (const [key, value] of Object.entries(metadata)) {
+            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            let displayValue = value;
+
+            if (Array.isArray(value)) {
+                displayValue = value.length > 0 ? value.join(', ') : 'None';
+            } else if (key.includes('_at') || key.includes('date')) {
+                displayValue = new Date(value).toLocaleString();
+            }
+
+            html += `<div class="metadata-item"><strong>${displayKey}:</strong> ${displayValue}</div>`;
+        }
+
+        contentDiv.innerHTML = html;
+        metadataDiv.style.display = 'block';
+    }
+
+    // Show status message
+    function showStatus(message, isError) {
+        const statusDiv = document.getElementById('status-message');
+        statusDiv.textContent = message;
+        statusDiv.className = isError ? 'error' : 'success';
+        statusDiv.style.display = 'block';
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            statusDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    // Refresh diagram
+    function refreshDiagram() {
+        if (currentMermaidCode) {
+            generateDiagram();
+        }
+    }
+
+    // Export diagram as SVG
+    function exportDiagram(format) {
+        if (!currentMermaidCode) {
+            showStatus('No diagram to export', true);
+            return;
+        }
+
+        const diagramElement = document.querySelector('.mermaid svg');
+        if (!diagramElement) {
+            showStatus('Diagram not properly rendered', true);
+            return;
+        }
+
+        try {
+            if (format === 'svg') {
+                // Export as SVG
+                const svgData = new XMLSerializer().serializeToString(diagramElement);
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const svgUrl = URL.createObjectURL(svgBlob);
+
+                const downloadLink = document.createElement('a');
+                downloadLink.href = svgUrl;
+                downloadLink.download = `${currentDiagramType}-${Date.now()}.svg`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                URL.revokeObjectURL(svgUrl);
+
+            } else if (format === 'png') {
+                // Convert SVG to PNG using canvas
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                img.onload = function () {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    canvas.toBlob(function (blob) {
+                        const pngUrl = URL.createObjectURL(blob);
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = pngUrl;
+                        downloadLink.download = `${currentDiagramType}-${Date.now()}.png`;
+                        document.body.appendChild(downloadLink);
+                        downloadLink.click();
+                        document.body.removeChild(downloadLink);
+                        URL.revokeObjectURL(pngUrl);
+                    });
+                };
+
+                const svgData = new XMLSerializer().serializeToString(diagramElement);
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const svgUrl = URL.createObjectURL(svgBlob);
+                img.src = svgUrl;
+            }
+
+            showStatus(`Exported as ${format.toUpperCase()}`, false);
+
+        } catch (error) {
+            console.error('Export error:', error);
+            showStatus('Export failed', true);
+        }
+    }
+
+    // Copy Mermaid code to clipboard
+    async function copyMermaidCode() {
+        if (!currentMermaidCode) {
+            showStatus('No diagram code to copy', true);
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(currentMermaidCode);
+            showStatus('Mermaid code copied to clipboard', false);
+        } catch (error) {
+            console.error('Copy error:', error);
+            showStatus('Failed to copy to clipboard', true);
+        }
+    }
+</script>
+{% endblock %}
