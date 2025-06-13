@@ -14,13 +14,7 @@ The **MCP Server** provides a framework for AI-powered command execution and a p
 
 ## Installation
 
-Run the install script to set up the packages in development mode:
-
-```bash
-scripts/install.sh
-# on Windows
-scripts\install.ps1
-```
+No installation required.
 
 ## Environment Setup
 
@@ -47,9 +41,7 @@ See `docs/config_overview.md` for more information.
 After installing dependencies and configuring `.env`, start the server with:
 
 ```bash
-python server/main.py
-# or
-scripts/start_server.sh
+uv run server/main.py
 ```
 
 Connect to the SSE endpoint at `http://0.0.0.0:8000/sse` or use the additional routes in `server/api.py`.
