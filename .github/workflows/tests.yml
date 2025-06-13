@@ -110,3 +110,34 @@ jobs:
           # Clean up any remaining temporary test files
           Get-ChildItem -Path $env:TEMP -Filter "*test_chroma*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
           Get-ChildItem -Path $env:TEMP -Filter "*pytest*" -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+  docker-test:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          uv pip install pytest pytest-asyncio
+          uv pip install -e .
+
+      - name: Run Docker server test
+        run: |
+          source .venv/bin/activate
+          uv run python -m pytest server/tests/test_docker_server.py -vv
+
