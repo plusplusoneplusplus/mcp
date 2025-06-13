@@ -3,13 +3,19 @@ Tests for work item assignment functionality.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 import plugins.azrepo.azure_rest_utils
-from plugins.azrepo.tests.workitem_helpers import mock_aiohttp_response, mock_azure_http_client
 from plugins.azrepo.azure_rest_utils import IdentityInfo
 
+from plugins.azrepo.tests.test_helpers import (
+    BaseTestClass,
+    assert_http_client_called_with_method,
+    assert_success_response,
+    mock_azure_http_client_context,
+)
 
-class TestWorkItemAssignment:
+
+class TestWorkItemAssignment(BaseTestClass):
     """Test work item assignment functionality."""
 
     @pytest.mark.asyncio
@@ -18,14 +24,14 @@ class TestWorkItemAssignment:
         """Test automatic assignment to current user."""
         mock_validate_assignee.return_value = ("testuser@company.com", "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 description="Test description"
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
             mock_validate_assignee.assert_called_once()
 
     @pytest.mark.asyncio
@@ -34,14 +40,14 @@ class TestWorkItemAssignment:
         """Test auto-assignment when current user cannot be determined."""
         mock_validate_assignee.return_value = (None, "Unable to determine current user for assignment")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 description="Test description"
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.workitem_tool.validate_and_format_assignee")
@@ -49,14 +55,14 @@ class TestWorkItemAssignment:
         """Test explicit user assignment."""
         mock_validate_assignee.return_value = ("specific.user@company.com", "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 assigned_to="specific.user@company.com"
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
             mock_validate_assignee.assert_called_once_with(
                 "specific.user@company.com", "testorg", "test-project", fallback_to_current_user=False
             )
@@ -67,14 +73,14 @@ class TestWorkItemAssignment:
         """Test creating unassigned work items."""
         mock_validate_assignee.return_value = (None, "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 assigned_to="none"
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.workitem_tool.validate_and_format_assignee")
@@ -83,14 +89,14 @@ class TestWorkItemAssignment:
         # When auto-assignment is disabled, no assignee should be resolved
         mock_validate_assignee.return_value = (None, "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 auto_assign_to_current_user=False
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.workitem_tool.validate_and_format_assignee")
@@ -99,13 +105,13 @@ class TestWorkItemAssignment:
         # When auto-assignment is disabled in config, no assignee should be resolved
         mock_validate_assignee.return_value = (None, "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool_no_auto_assign.create_work_item(
                 title="Test Work Item"
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
 
 class TestExecuteToolAssignment:
@@ -117,15 +123,15 @@ class TestExecuteToolAssignment:
         """Test execute_tool create operation with auto-assignment."""
         mock_validate_assignee.return_value = ("testuser@company.com", "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.execute_tool({
                 "operation": "create",
                 "title": "Test Work Item",
                 "description": "Test description"
             })
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.workitem_tool.validate_and_format_assignee")
@@ -133,15 +139,15 @@ class TestExecuteToolAssignment:
         """Test execute_tool create operation with explicit assignment."""
         mock_validate_assignee.return_value = ("specific.user@company.com", "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.execute_tool({
                 "operation": "create",
                 "title": "Test Work Item",
                 "assigned_to": "specific.user@company.com"
             })
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.workitem_tool.validate_and_format_assignee")
@@ -149,15 +155,15 @@ class TestExecuteToolAssignment:
         """Test execute_tool create operation with unassigned work item."""
         mock_validate_assignee.return_value = (None, "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.execute_tool({
                 "operation": "create",
                 "title": "Test Work Item",
                 "assigned_to": "none"
             })
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.workitem_tool.validate_and_format_assignee")
@@ -165,18 +171,18 @@ class TestExecuteToolAssignment:
         """Test execute_tool create operation with auto-assignment disabled."""
         mock_validate_assignee.return_value = (None, "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.execute_tool({
                 "operation": "create",
                 "title": "Test Work Item",
                 "auto_assign_to_current_user": False
             })
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
 
-class TestWorkItemAssignmentWithIdentityResolution:
+class TestWorkItemAssignmentWithIdentityResolution(BaseTestClass):
     """Test work item assignment with identity resolution scenarios."""
 
     @pytest.mark.asyncio
@@ -185,15 +191,15 @@ class TestWorkItemAssignmentWithIdentityResolution:
         """Test work item creation when identity resolution fails."""
         mock_validate_assignee.return_value = (None, "Unable to resolve identity 'invalid@user.com': Identity not found")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 assigned_to="invalid@user.com"
             )
 
             # Work item should still be created successfully, just unassigned
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.workitem_tool.validate_and_format_assignee")
@@ -201,14 +207,14 @@ class TestWorkItemAssignmentWithIdentityResolution:
         """Test work item creation with combo format identity."""
         mock_validate_assignee.return_value = ("john.doe@company.com", "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 assigned_to="John Doe <john.doe@company.com>"
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
             mock_validate_assignee.assert_called_once_with(
                 "John Doe <john.doe@company.com>", "testorg", "test-project", fallback_to_current_user=False
             )
@@ -219,14 +225,14 @@ class TestWorkItemAssignmentWithIdentityResolution:
         """Test work item creation with display name that gets resolved to email."""
         mock_validate_assignee.return_value = ("john.doe@company.com", "")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 assigned_to="John Doe"
             )
 
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")
             mock_validate_assignee.assert_called_once_with(
                 "John Doe", "testorg", "test-project", fallback_to_current_user=False
             )
@@ -237,12 +243,12 @@ class TestWorkItemAssignmentWithIdentityResolution:
         """Test work item creation when identity validation raises an exception."""
         mock_validate_assignee.side_effect = Exception("API connection error")
 
-        with mock_azure_http_client(method="post"):
+        with mock_azure_http_client_context(method="post") as mock_client:
             result = await azure_workitem_tool.create_work_item(
                 title="Test Work Item",
                 assigned_to="test@user.com"
             )
 
             # Work item should still be created successfully, just unassigned
-            assert result["success"] is True
-            assert "data" in result
+            assert_success_response(result)
+            assert_http_client_called_with_method(mock_client, "request")

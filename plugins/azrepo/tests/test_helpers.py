@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from functools import wraps
 from typing import Any, Dict, Generator, Iterable, Optional, Tuple
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from plugins.azrepo.azure_rest_utils import (
     IdentityInfo,
@@ -87,17 +87,21 @@ def mock_azure_http_client_context(
     response: Optional[Dict[str, Any]] = None,
     status_code: int = 200,
     error_message: Optional[str] = None,
+    raw_response: str = "",
 ) -> Generator:
     """Context manager to mock ``AzureHttpClient`` requests."""
     response = response or {"success": status_code < 300, "data": {}}
     mock_client = MagicMock()
-    mock_client.request.return_value = {
-        "success": status_code < 300,
-        "data": response,
-        "error": error_message,
-        "status_code": status_code,
-        "raw_response": "",
-    }
+    success = status_code < 300 and error_message is None
+    mock_client.request = AsyncMock(
+        return_value={
+            "success": success,
+            "data": response,
+            "error": error_message,
+            "status_code": status_code,
+            "raw_response": raw_response,
+        }
+    )
     with patch("plugins.azrepo.workitem_tool.AzureHttpClient", return_value=mock_client) as p:
         mock_client.__aenter__.return_value = mock_client
         mock_client.__aexit__.return_value = None
