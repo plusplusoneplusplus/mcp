@@ -14,6 +14,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        component: [
+          "core-group",      # config, mcp_core, mcp_tools
+          "server-group",    # server, project tests
+          "utils-group-1",   # html_to_markdown, vector_store, secret_scanner
+          "utils-group-2",   # ocr_extractor, playwright, graph_interface
+          "plugins-group-1", # azrepo, kusto
+          "plugins-group-2"  # git_tool, knowledge_indexer
+        ]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -59,42 +67,117 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           source .venv/bin/activate
-          uv pip install pytest pytest-asyncio
+          uv pip install pytest pytest-asyncio pytest-xdist
           uv pip install -e .
 
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         run: |
           .venv\Scripts\activate
-          uv pip install pytest pytest-asyncio
+          uv pip install pytest pytest-asyncio pytest-xdist
           uv pip install -e .
 
       - name: Install Playwright Browsers (Unix)
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && (matrix.component == 'utils-group-2' || matrix.component == 'server-group')
         run: |
           source .venv/bin/activate
           playwright install chromium
 
       - name: Install Playwright Browsers (Windows)
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && (matrix.component == 'utils-group-2' || matrix.component == 'server-group')
         run: |
           .venv\Scripts\activate
           playwright install chromium
 
-      - name: Run tests (Unix)
-        if: runner.os != 'Windows'
+      - name: Run Core Group Tests (Unix)
+        if: runner.os != 'Windows' && matrix.component == 'core-group'
         run: |
           source .venv/bin/activate
-          chmod +x ./scripts/run_tests.sh
-          ./scripts/run_tests.sh
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh core-group
 
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
+      - name: Run Core Group Tests (Windows)
+        if: runner.os == 'Windows' && matrix.component == 'core-group'
         shell: bash
         run: |
           source .venv/Scripts/activate
-          chmod +x ./scripts/run_tests.sh
-          ./scripts/run_tests.sh
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh core-group
+
+      - name: Run Server Group Tests (Unix)
+        if: runner.os != 'Windows' && matrix.component == 'server-group'
+        run: |
+          source .venv/bin/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh server-group
+
+      - name: Run Server Group Tests (Windows)
+        if: runner.os == 'Windows' && matrix.component == 'server-group'
+        shell: bash
+        run: |
+          source .venv/Scripts/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh server-group
+
+      - name: Run Utils Group 1 Tests (Unix)
+        if: runner.os != 'Windows' && matrix.component == 'utils-group-1'
+        run: |
+          source .venv/bin/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh utils-group-1
+
+      - name: Run Utils Group 1 Tests (Windows)
+        if: runner.os == 'Windows' && matrix.component == 'utils-group-1'
+        shell: bash
+        run: |
+          source .venv/Scripts/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh utils-group-1
+
+      - name: Run Utils Group 2 Tests (Unix)
+        if: runner.os != 'Windows' && matrix.component == 'utils-group-2'
+        run: |
+          source .venv/bin/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh utils-group-2
+
+      - name: Run Utils Group 2 Tests (Windows)
+        if: runner.os == 'Windows' && matrix.component == 'utils-group-2'
+        shell: bash
+        run: |
+          source .venv/Scripts/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh utils-group-2
+
+      - name: Run Plugins Group 1 Tests (Unix)
+        if: runner.os != 'Windows' && matrix.component == 'plugins-group-1'
+        run: |
+          source .venv/bin/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh plugins-group-1
+
+      - name: Run Plugins Group 1 Tests (Windows)
+        if: runner.os == 'Windows' && matrix.component == 'plugins-group-1'
+        shell: bash
+        run: |
+          source .venv/Scripts/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh plugins-group-1
+
+      - name: Run Plugins Group 2 Tests (Unix)
+        if: runner.os != 'Windows' && matrix.component == 'plugins-group-2'
+        run: |
+          source .venv/bin/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh plugins-group-2
+
+      - name: Run Plugins Group 2 Tests (Windows)
+        if: runner.os == 'Windows' && matrix.component == 'plugins-group-2'
+        shell: bash
+        run: |
+          source .venv/Scripts/activate
+          chmod +x ./scripts/run_component_group.sh
+          ./scripts/run_component_group.sh plugins-group-2
 
       - name: Cleanup Temporary Files (Unix)
         if: always() && runner.os != 'Windows'
