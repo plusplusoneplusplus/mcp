@@ -55,6 +55,23 @@ scripts/start_server.sh
 Connect to the SSE endpoint at `http://0.0.0.0:8000/sse` or use the additional routes in `server/api.py`.
 Background job endpoints are documented in `docs/background_jobs_api.md`.
 
+## Docker
+
+A `Dockerfile` is included for running the server in a container.
+Build the image with:
+
+```bash
+docker build -t mcp-server .
+```
+
+Then start the container exposing port `8000`:
+
+```bash
+docker run -p 8000:8000 mcp-server
+```
+
+See `docs/docker.md` for more details.
+
 ## Configuration Files
 
 The server loads prompts and tool definitions from YAML files:

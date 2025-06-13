@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.swp
+.venv
+.env
+.history
+.vector_store
+.browserprofile
+*.log
