@@ -127,11 +127,23 @@ class TestListPullRequestsAPI:
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.pr_tool.get_auth_headers")
+    @patch("plugins.azrepo.pr_tool.resolve_identity")
     async def test_list_pull_requests_basic(
-        self, mock_auth_headers, azure_pr_tool, mock_pr_list_response
+        self, mock_resolve_identity, mock_auth_headers, azure_pr_tool, mock_pr_list_response
     ):
         """Test basic pull request listing via REST API with new defaults."""
         mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
+
+        # Mock successful identity resolution
+        from plugins.azrepo.azure_rest_utils import IdentityInfo
+        mock_resolve_identity.return_value = IdentityInfo(
+            display_name="Test User",
+            unique_name="test.user@company.com",
+            id="test.user@company.com",
+            descriptor="test_desc",
+            is_valid=True,
+            error_message=""
+        )
 
         # Configure the tool with default values
         azure_pr_tool.default_organization = "test-org"
@@ -139,8 +151,8 @@ class TestListPullRequestsAPI:
         azure_pr_tool.default_repository = "test-repo"
         azure_pr_tool.default_target_branch = "main"
 
-        with patch.object(
-            azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
+        with patch(
+            "plugins.azrepo.pr_tool.get_current_username", return_value="testuser"
         ):
             with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
                 result = await azure_pr_tool.list_pull_requests()
@@ -153,6 +165,7 @@ class TestListPullRequestsAPI:
                 assert call_args[0] == "GET"
                 assert "pullrequests" in call_args[1]
                 params = call_kwargs["params"]
+                # Now the creator ID should be the resolved identity
                 assert params["searchCriteria.creatorId"] == "test.user@company.com"
                 # New default behavior: status should be "active"
                 assert params["searchCriteria.status"] == "active"
@@ -161,6 +174,9 @@ class TestListPullRequestsAPI:
 
                 assert result["success"] is True
                 assert "id,creator,date,title,source_ref,target_ref" in result["data"]
+
+                # Verify identity resolution was called
+                mock_resolve_identity.assert_called_once_with("testuser", "test-org", "test-project")
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.pr_tool.get_auth_headers")
@@ -254,18 +270,22 @@ class TestListPullRequestsAPI:
         azure_pr_tool.default_repository = "test-repo"
         azure_pr_tool.default_target_branch = "main"
 
-        with patch.object(
-            azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
+        with patch(
+            "plugins.azrepo.pr_tool.get_current_username", return_value="testuser"
         ):
-            with mock_pr_azure_http_client(method="get", response_data={"value": mock_prs}) as mock_client:
-                result = await azure_pr_tool.list_pull_requests()
+            # Mock identity resolution to fail (no bearer token configured)
+            with patch("plugins.azrepo.pr_tool.resolve_identity") as mock_resolve:
+                mock_resolve.side_effect = Exception("Bearer token not configured")
 
-                assert result["success"] is True
-                # Should only contain the non-draft PR
-                assert "123" in result["data"]
-                assert "Non-draft PR" in result["data"]
-                assert "124" not in result["data"]
-                assert "Draft PR" not in result["data"]
+                with mock_pr_azure_http_client(method="get", response_data={"value": mock_prs}) as mock_client:
+                    result = await azure_pr_tool.list_pull_requests()
+
+                    assert result["success"] is True
+                    # Should only contain the non-draft PR
+                    assert "123" in result["data"]
+                    assert "Non-draft PR" in result["data"]
+                    assert "124" not in result["data"]
+                    assert "Draft PR" not in result["data"]
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.pr_tool.get_auth_headers")
@@ -304,18 +324,22 @@ class TestListPullRequestsAPI:
         azure_pr_tool.default_repository = "test-repo"
         azure_pr_tool.default_target_branch = "main"
 
-        with patch.object(
-            azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
+        with patch(
+            "plugins.azrepo.pr_tool.get_current_username", return_value="testuser"
         ):
-            with mock_pr_azure_http_client(method="get", response_data={"value": mock_prs}) as mock_client:
-                result = await azure_pr_tool.list_pull_requests(exclude_drafts=False)
+            # Mock identity resolution to fail (no bearer token configured)
+            with patch("plugins.azrepo.pr_tool.resolve_identity") as mock_resolve:
+                mock_resolve.side_effect = Exception("Bearer token not configured")
 
-                assert result["success"] is True
-                # Should contain both PRs
-                assert "123" in result["data"]
-                assert "Non-draft PR" in result["data"]
-                assert "124" in result["data"]
-                assert "Draft PR" in result["data"]
+                with mock_pr_azure_http_client(method="get", response_data={"value": mock_prs}) as mock_client:
+                    result = await azure_pr_tool.list_pull_requests(exclude_drafts=False)
+
+                    assert result["success"] is True
+                    # Should contain both PRs
+                    assert "123" in result["data"]
+                    assert "Non-draft PR" in result["data"]
+                    assert "124" in result["data"]
+                    assert "Draft PR" in result["data"]
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.pr_tool.get_auth_headers")
@@ -329,8 +353,8 @@ class TestListPullRequestsAPI:
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
 
-        with patch.object(
-            azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
+        with patch(
+            "plugins.azrepo.pr_tool.get_current_username", return_value="test.user@company.com"
         ):
             with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
                 # Explicitly pass None values to get old behavior
@@ -365,8 +389,8 @@ class TestListPullRequestsAPI:
         azure_pr_tool.default_repository = "test-repo"
         azure_pr_tool.default_target_branch = "develop"  # Custom default
 
-        with patch.object(
-            azure_pr_tool, "_get_current_username", return_value="test.user@company.com"
+        with patch(
+            "plugins.azrepo.pr_tool.get_current_username", return_value="test.user@company.com"
         ):
             with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
                 result = await azure_pr_tool.list_pull_requests()
@@ -523,8 +547,8 @@ class TestCreatePullRequest:
         azure_pr_tool.default_repository = "test-repo"
         azure_pr_tool.default_target_branch = "main"
 
-        with patch.object(
-            azure_pr_tool, "_get_current_username", return_value="test-user"
+        with patch(
+            "plugins.azrepo.pr_tool.get_current_username", return_value="test-user"
         ):
             # Mock the AzureHttpClient to handle both calls
             with patch("plugins.azrepo.pr_tool.AzureHttpClient") as mock_client_class:
@@ -612,7 +636,7 @@ class TestUpdatePullRequest:
 
     @pytest.mark.asyncio
     @patch("plugins.azrepo.pr_tool.get_auth_headers")
-    @patch("plugins.azrepo.pr_tool.AzurePullRequestTool._get_current_username")
+    @patch("plugins.azrepo.pr_tool.get_current_username")
     async def test_update_pull_request_with_flags(
         self, mock_username, mock_auth_headers, azure_pr_tool
     ):

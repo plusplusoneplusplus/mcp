@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Tools - MCP Knowledge Server{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .tools-table-container {
+        overflow-x: auto;
+        margin-top: 1em;
+    }
+    .tools-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+    .tools-table th,
+    .tools-table td {
+        padding: 0.75em;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+    .tools-table th {
+        background: #f8f9fa;
+        font-weight: bold;
+        color: #333;
+    }
+    .tools-table tr:hover {
+        background: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Tools Dashboard</h2>
+    <p>Total tools: <span id="tool-count">0</span></p>
+    <div class="tools-table-container">
+        <table class="tools-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Source</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="tools-table-body">
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadTools() {
+    try {
+        const resp = await fetch('/api/tools');
+        const data = await resp.json();
+        document.getElementById('tool-count').textContent = data.total;
+        const body = document.getElementById('tools-table-body');
+        body.innerHTML = '';
+        for (const tool of data.tools) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${tool.name}</td>` +
+                `<td>${tool.description || ''}</td>` +
+                `<td>${tool.source}</td>` +
+                `<td>${tool.active ? '✅' : '❌'}</td>`;
+            body.appendChild(row);
+        }
+    } catch (err) {
+        console.error('Error loading tools', err);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadTools);
+</script>
+{% endblock %}

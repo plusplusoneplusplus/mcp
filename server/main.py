@@ -369,6 +369,11 @@ async def config_page(request: Request):
         "config.html", {"request": request, "current_page": "config"}
     )
 
+async def tools_page(request: Request):
+    return templates.TemplateResponse(
+        "tools.html", {"request": request, "current_page": "tools"}
+    )
+
 async def tool_history_page(request: Request):
     return templates.TemplateResponse(
         "tool_history.html", {"request": request, "current_page": "tool_history"}
@@ -380,6 +385,7 @@ routes = [
     Route("/", endpoint=index, methods=["GET"]),
     Route("/knowledge", endpoint=knowledge, methods=["GET"]),
     Route("/jobs", endpoint=jobs, methods=["GET"]),
+    Route("/tools", endpoint=tools_page, methods=["GET"]),
     Route("/tool-history", endpoint=tool_history_page, methods=["GET"]),
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),

@@ -55,6 +55,23 @@ scripts/start_server.sh
 Connect to the SSE endpoint at `http://0.0.0.0:8000/sse` or use the additional routes in `server/api.py`.
 Background job endpoints are documented in `docs/background_jobs_api.md`.
 
+## Docker
+
+A `Dockerfile` is included for running the server in a container.
+Build the image with:
+
+```bash
+docker build -t mcp-server .
+```
+
+Then start the container exposing port `8000`:
+
+```bash
+docker run -p 8000:8000 mcp-server
+```
+
+See `docs/docker.md` for more details.
+
 ## Configuration Files
 
 The server loads prompts and tool definitions from YAML files:
@@ -70,6 +87,8 @@ Private overrides can be placed in `server/.private/` or in a folder pointed to 
 ## Tool System
 
 Tools are modular plugins registered through `mcp_tools`. Built-in utilities include a command executor, browser automation, time helpers, and a YAML-defined tool loader. Additional examples live in the `plugins/` directory. See `mcp_tools/docs/creating_tools.md` for details on building custom tools.
+
+The web interface offers a Tools dashboard at `/tools` for browsing all registered tools and viewing their details.
 
 ## Running Tests
 
@@ -103,4 +122,3 @@ Editors like Cursor/VSCode can use the SSE endpoint by adding the following to y
 
 ![MCP Server Configuration](assets/mcp-server.png)
 ![MCP Server async command execution](assets/mcp-async-command.png)
-

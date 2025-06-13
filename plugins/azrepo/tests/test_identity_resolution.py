@@ -293,8 +293,8 @@ class TestResolveIdentity:
 
     @pytest.mark.asyncio
     @patch('plugins.azrepo.azure_rest_utils.get_auth_headers')
-    @patch('aiohttp.ClientSession')
-    async def test_resolve_identity_api_no_match(self, mock_session, mock_auth_headers):
+    @patch('plugins.azrepo.azure_rest_utils.AzureHttpClient')
+    async def test_resolve_identity_api_no_match(self, mock_azure_client, mock_auth_headers):
         """Test identity resolution when API returns no matches."""
         # Mock authentication headers
         mock_auth_headers.return_value = {"Authorization": "Bearer token"}
@@ -302,13 +302,14 @@ class TestResolveIdentity:
         # Mock API response with no matching identities
         mock_response_data = {"value": []}
 
-        mock_response = AsyncMock()
-        mock_response.status = 200
-        mock_response.json = AsyncMock(return_value=mock_response_data)
-
-        mock_session_instance = AsyncMock()
-        mock_session_instance.get.return_value.__aenter__.return_value = mock_response
-        mock_session.return_value.__aenter__.return_value = mock_session_instance
+        # Mock AzureHttpClient
+        mock_client_instance = AsyncMock()
+        mock_client_instance.get.return_value = {
+            "success": True,
+            "data": mock_response_data,
+            "status_code": 200
+        }
+        mock_azure_client.return_value.__aenter__.return_value = mock_client_instance
 
         # Test with valid email (should create basic identity)
         result = await resolve_identity("valid@email.com", "test_org")
@@ -319,19 +320,20 @@ class TestResolveIdentity:
 
     @pytest.mark.asyncio
     @patch('plugins.azrepo.azure_rest_utils.get_auth_headers')
-    @patch('aiohttp.ClientSession')
-    async def test_resolve_identity_api_error(self, mock_session, mock_auth_headers):
+    @patch('plugins.azrepo.azure_rest_utils.AzureHttpClient')
+    async def test_resolve_identity_api_error(self, mock_azure_client, mock_auth_headers):
         """Test identity resolution when API returns error."""
         # Mock authentication headers
         mock_auth_headers.return_value = {"Authorization": "Bearer token"}
 
-        # Mock API error response
-        mock_response = AsyncMock()
-        mock_response.status = 500
-
-        mock_session_instance = AsyncMock()
-        mock_session_instance.get.return_value.__aenter__.return_value = mock_response
-        mock_session.return_value.__aenter__.return_value = mock_session_instance
+        # Mock AzureHttpClient to return error
+        mock_client_instance = AsyncMock()
+        mock_client_instance.get.return_value = {
+            "success": False,
+            "error": "Internal server error",
+            "status_code": 500
+        }
+        mock_azure_client.return_value.__aenter__.return_value = mock_client_instance
 
         # Test with invalid identity (not email format)
         result = await resolve_identity("invalid_identity", "test_org")

@@ -1,4 +1,3 @@
-import chromadb
 from typing import List, Optional, Any, Dict
 
 
@@ -16,6 +15,8 @@ class ChromaVectorStore:
             collection_name (str): Name of the collection to use.
             persist_directory (Optional[str]): Directory for persistent storage. If None, uses in-memory DB.
         """
+        import chromadb
+
         if persist_directory is not None:
             self.client = chromadb.PersistentClient(path=persist_directory)
         else:

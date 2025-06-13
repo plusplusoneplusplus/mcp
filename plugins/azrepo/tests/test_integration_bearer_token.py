@@ -15,9 +15,12 @@ class TestBearerTokenCommandIntegration:
     """Integration tests for bearer token command functionality."""
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
+    @patch("plugins.azrepo.azure_rest_utils.get_current_username")
     @pytest.mark.asyncio
-    async def test_complete_workflow_with_bearer_token_command(self, mock_subprocess_run):
+    async def test_complete_workflow_with_bearer_token_command(self, mock_get_current_username, mock_subprocess_run):
         """Test the complete workflow: environment config -> command execution -> work item creation."""
+        # Mock get_current_username to avoid extra subprocess call on Windows
+        mock_get_current_username.return_value = "testuser"
 
         # Clear bearer token cache before test
         from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
@@ -27,7 +30,7 @@ class TestBearerTokenCommandIntegration:
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = json.dumps({
-            "accessToken": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6...",  # Simulated JWT token
+            "accessToken": "***",  # Simulated JWT token
             "expiresOn": "2024-01-20 12:00:00.000000",
             "subscription": "12345678-1234-1234-1234-123456789012",
             "tenant": "87654321-4321-4321-4321-210987654321",
@@ -118,7 +121,7 @@ class TestBearerTokenCommandIntegration:
 
                     # Check the headers contain the bearer token
                     headers = post_call_args[1]["headers"]
-                    assert headers["Authorization"] == "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6..."
+                    assert headers["Authorization"] == "Bearer ***"
                     assert headers["Content-Type"] == "application/json-patch+json"
                     assert headers["Accept"] == "application/json"
 
@@ -179,7 +182,8 @@ class TestBearerTokenCommandIntegration:
 
                 # Attempting to get auth headers should raise a clear error
                 with pytest.raises(ValueError, match="Bearer token not configured"):
-                    tool._get_auth_headers()
+                    from plugins.azrepo.azure_rest_utils import get_auth_headers
+                    get_auth_headers(content_type="application/json-patch+json")
 
                 # Verify the command was attempted
                 mock_subprocess_run.assert_called_once()
@@ -211,7 +215,8 @@ class TestBearerTokenCommandIntegration:
                 tool = AzureWorkItemTool(command_executor=mock_executor)
 
                 # Get auth headers should use static token
-                headers = tool._get_auth_headers()
+                from plugins.azrepo.azure_rest_utils import get_auth_headers
+                headers = get_auth_headers(content_type="application/json-patch+json")
 
                 assert headers["Authorization"] == "Bearer static-token-12345"
                 assert headers["Content-Type"] == "application/json-patch+json"
@@ -256,7 +261,8 @@ class TestBearerTokenCommandIntegration:
                 tool = AzureWorkItemTool(command_executor=mock_executor)
 
                 # Get auth headers should use dynamic token from command
-                headers = tool._get_auth_headers()
+                from plugins.azrepo.azure_rest_utils import get_auth_headers
+                headers = get_auth_headers(content_type="application/json-patch+json")
 
                 assert headers["Authorization"] == "Bearer dynamic-token-from-command"
 

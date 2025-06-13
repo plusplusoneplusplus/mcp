@@ -730,25 +730,3 @@ class AzureWorkItemTool(ToolInterface):
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}
-
-    # Backward compatibility methods for tests
-    def _get_current_username(self) -> Optional[str]:
-        """Backward compatibility method for tests."""
-        return get_current_username()
-
-    def _get_auth_headers(self, content_type: str = "application/json-patch+json") -> Dict[str, str]:
-        """Backward compatibility method for tests."""
-        # If tests are using instance bearer_token, we need to inject it into the azrepo_params
-        # that get_auth_headers will request from env_manager
-        if self.bearer_token:
-            # Patch env_manager to include our bearer token
-            with patch("plugins.azrepo.azure_rest_utils.env_manager") as mock_env_manager:
-                # Get real parameters first
-                real_params = env_manager.get_azrepo_parameters()
-                # Add our bearer token
-                params = {**real_params, "bearer_token": self.bearer_token}
-                mock_env_manager.get_azrepo_parameters.return_value = params
-                return get_auth_headers(content_type=content_type)
-        else:
-            # Normal flow
-            return get_auth_headers(content_type=content_type)
