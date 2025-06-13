@@ -23,7 +23,6 @@ dependencies = [
     "chromadb>=0.4.22", # Vector database for semantic search
     # YAML parser
     "pyyaml>=6.0.1", # YAML parser
-    "black>=25.0.01", # Python formatter
     # Process utilities
     "psutil>=5.9.5", # Process utilities for monitoring and management
     # HTTP/SSE server
@@ -80,14 +79,6 @@ dependencies = [
     "typing-extensions>=4.8.0", # Enhanced typing support
 ]
 
-[project.optional-dependencies]
-dev = [
-    "black",
-    "isort",
-    "flake8",
-    "mypy",
-]
-
 [tool.setuptools]
 packages = ["server", "mcp_tools", "mcp_core", "config", "utils"]
 
@@ -116,3 +107,11 @@ asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 timeout = 60  # 1 minute default timeout per test
 timeout_method = "thread"  # Use thread-based timeout (more reliable than signal)
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "flake8>=7.2.0",
+    "isort>=6.0.1",
+    "mypy>=1.15.0",
+]
