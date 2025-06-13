@@ -50,6 +50,8 @@ from .tools import (
     api_tool_categories,
 )
 
+from .visualizations import visualization_api
+
 # Aggregate all routes into a single list
 api_routes = [
     # Knowledge management endpoints
@@ -88,4 +90,12 @@ api_routes = [
     Route("/api/tools/categories", endpoint=api_tool_categories, methods=["GET"]),
     Route("/api/tools/{tool_name}", endpoint=api_get_tool_detail, methods=["GET"]),
     Route("/api/tools/{tool_name}/execute", endpoint=api_execute_tool, methods=["POST"]),
+
+    # Visualization endpoints
+    Route("/api/visualizations/task-dependencies", endpoint=visualization_api.get_task_dependencies, methods=["GET"]),
+    Route("/api/visualizations/gantt-chart", endpoint=visualization_api.get_gantt_chart, methods=["GET"]),
+    Route("/api/visualizations/resource-allocation", endpoint=visualization_api.get_resource_allocation, methods=["GET"]),
+    Route("/api/visualizations/execution-timeline", endpoint=visualization_api.get_execution_timeline, methods=["GET"]),
+    Route("/api/visualizations/critical-path", endpoint=visualization_api.get_critical_path, methods=["GET"]),
+    Route("/api/visualizations/status-overview", endpoint=visualization_api.get_status_overview, methods=["GET"]),
 ]

@@ -379,6 +379,11 @@ async def tool_history_page(request: Request):
         "tool_history.html", {"request": request, "current_page": "tool_history"}
     )
 
+async def visualizations_page(request: Request):
+    return templates.TemplateResponse(
+        "task_visualization.html", {"request": request, "current_page": "visualizations"}
+    )
+
 
 # --- Add routes ---
 routes = [
@@ -387,6 +392,7 @@ routes = [
     Route("/jobs", endpoint=jobs, methods=["GET"]),
     Route("/tools", endpoint=tools_page, methods=["GET"]),
     Route("/tool-history", endpoint=tool_history_page, methods=["GET"]),
+    Route("/visualizations", endpoint=visualizations_page, methods=["GET"]),
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
