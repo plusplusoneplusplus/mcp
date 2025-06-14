@@ -175,6 +175,9 @@ class TestListPullRequestsAPI:
     @pytest.mark.parametrize("status", [s[0] for s in create_test_cases_for_pr_statuses(["active", "completed", "abandoned"])])
     async def test_list_pull_requests_status_filter(self, azure_pr_tool, status):
         """Ensure status filter is passed correctly."""
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
         with mock_auth_headers(), mock_identity_resolution():
             with mock_pr_azure_http_client(method="get", response_data={"value": []}) as mock_client:
                 result = await azure_pr_tool.list_pull_requests(status=status)
