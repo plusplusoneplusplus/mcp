@@ -48,7 +48,7 @@ class TestWorkItemCreation:
     @pytest.mark.asyncio
     async def test_create_work_item_rest_api_http_error(self, azure_workitem_tool):
         """Test work item creation with HTTP error response."""
-        with mock_azure_http_client_context(method="post", status_code=401, error_message="Access denied"):
+        with mock_azure_http_client_context(method="post", status_code=401, error_message="HTTP 401: Access denied"):
             result = await azure_workitem_tool.create_work_item(title="Test Work Item")
 
             assert_error_response(result)

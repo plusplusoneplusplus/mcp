@@ -144,7 +144,7 @@ class TestUpdateWorkItem(BaseTestClass):
     @pytest.mark.asyncio
     async def test_update_work_item_http_error(self, azure_workitem_tool):
         """Test updating work item with HTTP error."""
-        with mock_azure_http_client_context(method="patch", status_code=401, error_message="Access denied"):
+        with mock_azure_http_client_context(method="patch", status_code=401, error_message="HTTP 401: Access denied"):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title"
@@ -157,7 +157,12 @@ class TestUpdateWorkItem(BaseTestClass):
     @pytest.mark.asyncio
     async def test_update_work_item_json_parse_error(self, azure_workitem_tool):
         """Test updating work item with JSON parsing error."""
-        with mock_azure_http_client_context(method="patch", status_code=200, raw_response_text="Invalid JSON"):
+        with mock_azure_http_client_context(
+            method="patch",
+            status_code=200,
+            error_message="Failed to parse response",
+            raw_response="Invalid JSON",
+        ):
             result = await azure_workitem_tool.update_work_item(
                 work_item_id=12345,
                 title="Updated Title"
