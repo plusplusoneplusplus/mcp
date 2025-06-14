@@ -3,7 +3,9 @@ Tests for Azure DevOps identity resolution functionality.
 """
 
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from plugins.azrepo.tests.test_helpers import BaseTestClass
 import aiohttp
 from datetime import datetime, timedelta
 
@@ -22,7 +24,7 @@ from plugins.azrepo.azure_rest_utils import (
 )
 
 
-class TestEmailValidation:
+class TestEmailValidation(BaseTestClass):
     """Test email validation functionality."""
 
     def test_valid_emails(self):
@@ -55,7 +57,7 @@ class TestEmailValidation:
             assert not is_valid_email(email), f"Email '{email}' should be invalid"
 
 
-class TestIdentityNormalization:
+class TestIdentityNormalization(BaseTestClass):
     """Test identity input normalization."""
 
     def test_normalize_basic_inputs(self):
@@ -83,13 +85,9 @@ class TestIdentityNormalization:
             assert normalize_identity_input(input_val) == expected
 
 
-class TestIdentityCache:
+class TestIdentityCache(BaseTestClass):
     """Test identity caching functionality."""
 
-    def setup_method(self):
-        """Clear cache before each test."""
-        _identity_cache.clear()
-        _cache_expiry.clear()
 
     def test_cache_validity(self):
         """Test cache validity checking."""
@@ -125,7 +123,7 @@ class TestIdentityCache:
         assert _is_cache_valid(cache_key)
 
 
-class TestIdentityMatching:
+class TestIdentityMatching(BaseTestClass):
     """Test identity matching logic."""
 
     def test_identity_matches_basic_fields(self):
@@ -163,7 +161,7 @@ class TestIdentityMatching:
         assert _identity_matches(identity_item, "domain.com")
 
 
-class TestIdentityInfoCreation:
+class TestIdentityInfoCreation(BaseTestClass):
     """Test IdentityInfo creation from API responses."""
 
     def test_create_identity_info_basic(self):
@@ -215,13 +213,8 @@ class TestIdentityInfoCreation:
         assert identity_info.display_name == "Provider Name"  # Should prefer providerDisplayName
 
 
-class TestResolveIdentity:
+class TestResolveIdentity(BaseTestClass):
     """Test identity resolution functionality."""
-
-    def setup_method(self):
-        """Clear cache before each test."""
-        _identity_cache.clear()
-        _cache_expiry.clear()
 
     @pytest.mark.asyncio
     async def test_resolve_identity_empty(self):
@@ -342,13 +335,9 @@ class TestResolveIdentity:
         assert "Unable to resolve identity" in result.error_message
 
 
-class TestValidateAndFormatAssignee:
+class TestValidateAndFormatAssignee(BaseTestClass):
     """Test assignee validation and formatting."""
 
-    def setup_method(self):
-        """Clear cache before each test."""
-        _identity_cache.clear()
-        _cache_expiry.clear()
 
     @pytest.mark.asyncio
     async def test_validate_assignee_none(self):
@@ -477,13 +466,8 @@ class TestValidateAndFormatAssignee:
         assert "API Error" in error
 
 
-class TestIntegrationScenarios:
+class TestIntegrationScenarios(BaseTestClass):
     """Test integration scenarios combining multiple components."""
-
-    def setup_method(self):
-        """Clear cache before each test."""
-        _identity_cache.clear()
-        _cache_expiry.clear()
 
     @pytest.mark.asyncio
     async def test_full_resolution_workflow(self):

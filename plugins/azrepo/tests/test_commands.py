@@ -2,12 +2,18 @@
 Tests for Azure CLI command execution functionality.
 """
 
-import pytest
 import json
+import pytest
 from unittest.mock import AsyncMock
 
+from plugins.azrepo.tests.test_helpers import (
+    BaseTestClass,
+    assert_error_response,
+    assert_success_response,
+)
 
-class TestAzureRepoClientCommands:
+
+class TestAzureRepoClientCommands(BaseTestClass):
     """Test the Azure CLI command execution."""
 
     @pytest.mark.asyncio
@@ -28,7 +34,7 @@ class TestAzureRepoClientCommands:
 
         result = await azure_repo_client._run_az_command("repos pr list")
 
-        assert result["success"] is True
+        assert_success_response(result)
         assert result["data"] == mock_command_success_response["data"]
         azure_repo_client.executor.execute_async.assert_called_once_with(
             "az repos pr list --output json", None
@@ -47,7 +53,7 @@ class TestAzureRepoClientCommands:
 
         result = await azure_repo_client._run_az_command("repos pr list")
 
-        assert result["success"] is False
+        assert_error_response(result)
         assert "Command failed" in result["error"]
 
     @pytest.mark.asyncio
@@ -63,7 +69,7 @@ class TestAzureRepoClientCommands:
 
         result = await azure_repo_client._run_az_command("repos pr list")
 
-        assert result["success"] is False
+        assert_error_response(result)
         assert "Failed to parse JSON output" in result["error"]
 
     @pytest.mark.asyncio
@@ -82,7 +88,7 @@ class TestAzureRepoClientCommands:
 
         result = await azure_repo_client._run_az_command("repos pr list", timeout=30.0)
 
-        assert result["success"] is True
+        assert_success_response(result)
         azure_repo_client.executor.execute_async.assert_called_once_with(
             "az repos pr list --output json", 30.0
         )
@@ -103,7 +109,7 @@ class TestAzureRepoClientCommands:
 
         result = await azure_repo_client._run_az_command("repos pr list")
 
-        assert result["success"] is True
+        assert_success_response(result)
         assert result["data"] == {}
 
     @pytest.mark.asyncio
@@ -119,5 +125,5 @@ class TestAzureRepoClientCommands:
 
         result = await azure_repo_client._run_az_command("repos pr list")
 
-        assert result["success"] is True
+        assert_success_response(result)
         assert result["data"] == {}
