@@ -30,6 +30,10 @@
 !github_cli/
 !github_cli/**
 
+# Track the circleci plugin
+!circleci/
+!circleci/**
+
 # Ignore Python bytecode files
 *.pyc
 __pycache__/
