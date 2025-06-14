@@ -4,13 +4,22 @@ Tests for pull request operations.
 
 import json
 import pytest
+from contextlib import contextmanager
 from unittest.mock import patch, AsyncMock, MagicMock
-from plugins.azrepo.tests.workitem_helpers import mock_azure_http_client
 from typing import Optional
+
+from plugins.azrepo.tests.test_helpers import (
+    mock_auth_headers,
+    mock_identity_resolution,
+    assert_success_response,
+    create_test_cases_for_pr_statuses,
+)
+from plugins.azrepo.tests.workitem_helpers import mock_azure_http_client
 
 from ..pr_tool import AzurePullRequestTool
 
 
+@contextmanager
 def mock_pr_azure_http_client(
     method: str = "post",
     status_code: int = 200,
@@ -84,8 +93,9 @@ def mock_pr_azure_http_client(
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
-    # Patch the correct import path for PR tool
-    return patch("plugins.azrepo.pr_tool.AzureHttpClient", return_value=mock_client)
+    # Patch the correct import path for PR tool and yield the mock client
+    with patch("plugins.azrepo.pr_tool.AzureHttpClient", return_value=mock_client):
+        yield mock_client
 
 
 @pytest.fixture
@@ -126,26 +136,16 @@ class TestListPullRequestsAPI:
     """Test the list_pull_requests method using the REST API."""
 
     @pytest.mark.asyncio
-    @patch("plugins.azrepo.pr_tool.get_auth_headers")
-    @patch("plugins.azrepo.pr_tool.resolve_identity")
     async def test_list_pull_requests_basic(
-        self, mock_resolve_identity, mock_auth_headers, azure_pr_tool, mock_pr_list_response
+        self, azure_pr_tool, mock_pr_list_response
     ):
         """Test basic pull request listing via REST API with new defaults."""
-        mock_auth_headers.return_value = {"Authorization": "Bearer fake-token"}
+        from plugins.azrepo.tests.test_helpers import create_mock_identity_info
 
-        # Mock successful identity resolution
-        from plugins.azrepo.azure_rest_utils import IdentityInfo
-        mock_resolve_identity.return_value = IdentityInfo(
-            display_name="Test User",
-            unique_name="test.user@company.com",
-            id="test.user@company.com",
-            descriptor="test_desc",
-            is_valid=True,
-            error_message=""
+        identity = create_mock_identity_info(
+            display_name="Test User", unique_name="test.user@company.com"
         )
 
-        # Configure the tool with default values
         azure_pr_tool.default_organization = "test-org"
         azure_pr_tool.default_project = "test-project"
         azure_pr_tool.default_repository = "test-repo"
@@ -153,32 +153,37 @@ class TestListPullRequestsAPI:
 
         with patch(
             "plugins.azrepo.pr_tool.get_current_username", return_value="testuser"
-        ):
-            with mock_pr_azure_http_client(method="get", response_data={"value": mock_pr_list_response["data"]}) as mock_client:
+        ), mock_auth_headers(), mock_identity_resolution(identity):
+            with mock_pr_azure_http_client(
+                method="get", response_data={"value": mock_pr_list_response["data"]}
+            ) as mock_client:
                 result = await azure_pr_tool.list_pull_requests()
 
-                # Verify the HTTP client was called
-                mock_client.return_value.request.assert_called_once()
-                call_args, call_kwargs = mock_client.return_value.request.call_args
+                mock_client.request.assert_called_once()
+                call_args, call_kwargs = mock_client.request.call_args
 
-                # Check the method and URL
                 assert call_args[0] == "GET"
                 assert "pullrequests" in call_args[1]
                 params = call_kwargs["params"]
-                # Now the creator ID should be the resolved identity
-                assert params["searchCriteria.creatorId"] == "test.user@company.com"
-                # New default behavior: status should be "active"
+                assert params["searchCriteria.creatorId"] == identity.id
                 assert params["searchCriteria.status"] == "active"
-                # New default behavior: target branch should be "main"
                 assert params["searchCriteria.targetRefName"] == "refs/heads/main"
 
-                assert result["success"] is True
-                assert "id,creator,date,title,source_ref,target_ref" in result["data"]
-
-                # Verify identity resolution was called
-                mock_resolve_identity.assert_called_once_with("testuser", "test-org", "test-project")
+                assert_success_response(result)
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [s[0] for s in create_test_cases_for_pr_statuses(["active", "completed", "abandoned"])])
+    async def test_list_pull_requests_status_filter(self, azure_pr_tool, status):
+        """Ensure status filter is passed correctly."""
+        azure_pr_tool.default_organization = "test-org"
+        azure_pr_tool.default_project = "test-project"
+        azure_pr_tool.default_repository = "test-repo"
+        with mock_auth_headers(), mock_identity_resolution():
+            with mock_pr_azure_http_client(method="get", response_data={"value": []}) as mock_client:
+                result = await azure_pr_tool.list_pull_requests(status=status)
+                params = mock_client.request.call_args[1]["params"]
+                assert params["searchCriteria.status"] == status
+                assert_success_response(result)
     @patch("plugins.azrepo.pr_tool.get_auth_headers")
     async def test_list_pull_requests_with_filters(
         self, mock_auth_headers, azure_pr_tool, mock_pr_list_response
@@ -202,8 +207,8 @@ class TestListPullRequestsAPI:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
             params = call_kwargs["params"]
 
             assert params["searchCriteria.status"] == "active"
@@ -365,8 +370,8 @@ class TestListPullRequestsAPI:
                 )
 
                 # Verify the HTTP client was called
-                mock_client.return_value.request.assert_called_once()
-                call_args, call_kwargs = mock_client.return_value.request.call_args
+                mock_client.request.assert_called_once()
+                call_args, call_kwargs = mock_client.request.call_args
                 params = call_kwargs["params"]
 
                 # Should not have status filter (old behavior)
@@ -396,8 +401,8 @@ class TestListPullRequestsAPI:
                 result = await azure_pr_tool.list_pull_requests()
 
                 # Verify the HTTP client was called
-                mock_client.return_value.request.assert_called_once()
-                call_args, call_kwargs = mock_client.return_value.request.call_args
+                mock_client.request.assert_called_once()
+                call_args, call_kwargs = mock_client.request.call_args
                 params = call_kwargs["params"]
 
                 # Should use configured default target branch
@@ -437,8 +442,8 @@ class TestGetPullRequest:
             result = await azure_pr_tool.get_pull_request(123)
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
             assert call_args[0] == "GET"
             assert "pullrequests/123" in call_args[1]
             assert result["success"] is True
@@ -497,8 +502,8 @@ class TestCreatePullRequest:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
             assert call_args[0] == "POST"
             assert "pullrequests" in call_args[1]
 
@@ -621,8 +626,8 @@ class TestUpdatePullRequest:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
             assert call_args[0] == "PATCH"
             assert "pullrequests/123" in call_args[1]
 
@@ -662,8 +667,8 @@ class TestUpdatePullRequest:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
             assert call_args[0] == "PATCH"
             assert "pullrequests/123" in call_args[1]
 
@@ -705,8 +710,8 @@ class TestVotingAndReviewers:
             result = await azure_pr_tool.set_vote(123, "approve")
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
 
             # Check the method and URL
             assert call_args[0] == "PUT"
@@ -761,8 +766,8 @@ class TestVotingAndReviewers:
             result = await azure_pr_tool.add_work_items(123, [456, 789])
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
 
             # Check the method and URL
             assert call_args[0] == "PATCH"
@@ -846,8 +851,8 @@ class TestCommentManagement:
             result = await azure_pr_tool.get_comments(pull_request_id=123)
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
 
             # Check the method and URL
             assert call_args[0] == "GET"
@@ -963,8 +968,8 @@ class TestCommentManagement:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
 
             # Check the method and URL
             assert call_args[0] == "PATCH"
@@ -1011,8 +1016,8 @@ class TestCommentManagement:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
 
             # Check the method and URL
             assert call_args[0] == "POST"
@@ -1054,8 +1059,8 @@ class TestCommentManagement:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
 
             # Check the method and URL
             assert call_args[0] == "POST"
@@ -1099,8 +1104,8 @@ class TestCommentManagement:
             )
 
             # Verify the HTTP client was called
-            mock_client.return_value.request.assert_called_once()
-            call_args, call_kwargs = mock_client.return_value.request.call_args
+            mock_client.request.assert_called_once()
+            call_args, call_kwargs = mock_client.request.call_args
 
             # Check the method and URL
             assert call_args[0] == "PATCH"
