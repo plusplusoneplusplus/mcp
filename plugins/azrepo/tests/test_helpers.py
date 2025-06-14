@@ -122,7 +122,8 @@ def mock_auth_headers(headers: Optional[Dict[str, str]] = None) -> Generator:
     """Patch ``get_auth_headers`` to return predefined headers."""
     if headers is None:
         headers = {"Authorization": "Bearer fake"}
-    with patch("plugins.azrepo.azure_rest_utils.get_auth_headers", return_value=headers):
+    with patch("plugins.azrepo.azure_rest_utils.get_auth_headers", return_value=headers), \
+        patch("plugins.azrepo.pr_tool.get_auth_headers", return_value=headers):
         yield
 
 
@@ -137,7 +138,8 @@ def mock_current_username(name: str = "testuser") -> Generator:
 def mock_identity_resolution(identity: Optional[IdentityInfo] = None) -> Generator:
     """Patch ``resolve_identity`` to return a pre-defined identity."""
     identity = identity or create_mock_identity_info()
-    with patch("plugins.azrepo.azure_rest_utils.resolve_identity", return_value=identity):
+    with patch("plugins.azrepo.azure_rest_utils.resolve_identity", return_value=identity), \
+        patch("plugins.azrepo.pr_tool.resolve_identity", return_value=identity):
         yield
 
 
