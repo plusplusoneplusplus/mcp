@@ -9,9 +9,10 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from plugins.azrepo.workitem_tool import AzureWorkItemTool
 import plugins.azrepo.azure_rest_utils
 from plugins.azrepo.tests.workitem_helpers import mock_azure_http_client
+from plugins.azrepo.tests.test_helpers import BaseTestClass, assert_success_response
 
 
-class TestBearerTokenCommandIntegration:
+class TestBearerTokenCommandIntegration(BaseTestClass):
     """Integration tests for bearer token command functionality."""
 
     @patch("plugins.azrepo.azure_rest_utils.subprocess.run")
@@ -23,8 +24,6 @@ class TestBearerTokenCommandIntegration:
         mock_get_current_username.return_value = "testuser"
 
         # Clear bearer token cache before test
-        from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
-        clear_bearer_token_cache()
 
         # Step 1: Mock the bearer token command execution
         mock_result = MagicMock()
@@ -97,7 +96,7 @@ class TestBearerTokenCommandIntegration:
                     # Step 6: Verify the complete workflow worked
 
                     # Verify the result is successful
-                    assert result["success"] is True
+                    assert_success_response(result)
                     assert result["data"]["id"] == 12345
                     assert result["data"]["fields"]["System.Title"] == "Implement user authentication"
 
@@ -148,11 +147,6 @@ class TestBearerTokenCommandIntegration:
     def test_bearer_token_command_failure_graceful_handling(self, mock_subprocess_run):
         """Test that bearer token command failures are handled gracefully."""
 
-        # Clear bearer token cache before test
-        from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
-        clear_bearer_token_cache()
-
-        # Mock command failure
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stdout = ""
@@ -226,9 +220,6 @@ class TestBearerTokenCommandIntegration:
     def test_command_takes_precedence_when_both_configured(self, mock_subprocess_run):
         """Test that bearer token command takes precedence over static token when both are configured."""
 
-        # Clear bearer token cache before test
-        from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
-        clear_bearer_token_cache()
 
         # Mock successful command execution
         mock_result = MagicMock()
