@@ -5,8 +5,14 @@ Tests for repository operations.
 import pytest
 from unittest.mock import AsyncMock
 
+from plugins.azrepo.tests.test_helpers import (
+    BaseTestClass,
+    assert_error_response,
+    assert_success_response,
+)
 
-class TestListRepositories:
+
+class TestListRepositories(BaseTestClass):
     """Test the list_repositories method."""
 
     @pytest.mark.asyncio
@@ -62,7 +68,7 @@ class TestListRepositories:
         assert result == mock_repo_list_response
 
 
-class TestGetRepository:
+class TestGetRepository(BaseTestClass):
     """Test the get_repository method."""
 
     @pytest.mark.asyncio
@@ -120,7 +126,7 @@ class TestGetRepository:
         assert result == mock_repo_details_response
 
 
-class TestCloneRepository:
+class TestCloneRepository(BaseTestClass):
     """Test the clone_repository method."""
 
     @pytest.mark.asyncio
@@ -140,7 +146,7 @@ class TestCloneRepository:
         azure_repo_client.executor.execute_async.assert_called_once_with(
             "git clone https://github.com/user/repo.git /path/to/local"
         )
-        assert result["success"] is True
+        assert_success_response(result)
         assert "Repository cloned successfully" in result["message"]
 
     @pytest.mark.asyncio
@@ -163,7 +169,7 @@ class TestCloneRepository:
         azure_repo_client.executor.execute_async.assert_called_once_with(
             expected_command
         )
-        assert result["success"] is True
+        assert_success_response(result)
 
     @pytest.mark.asyncio
     async def test_clone_repository_missing_params(self, azure_repo_client):
@@ -173,7 +179,7 @@ class TestCloneRepository:
             # Missing project and organization
         )
 
-        assert result["success"] is False
+        assert_error_response(result)
         assert (
             "Repository, project, and organization must be specified" in result["error"]
         )
@@ -198,7 +204,7 @@ class TestCloneRepository:
         azure_repo_client.executor.execute_async.assert_called_once_with(
             expected_command
         )
-        assert result["success"] is True
+        assert_success_response(result)
 
     @pytest.mark.asyncio
     async def test_clone_repository_error(self, azure_repo_client):
@@ -213,5 +219,5 @@ class TestCloneRepository:
             clone_url="https://github.com/user/nonexistent.git"
         )
 
-        assert result["success"] is False
+        assert_error_response(result)
         assert "Repository not found" in result["error"]
