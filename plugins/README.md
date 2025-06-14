@@ -24,6 +24,7 @@ plugins/
 ## Plugin Examples
 
 - **text_summarizer**: An example plugin that summarizes text content
+- **github_cli**: Provides access to the GitHub CLI for issue and pull request management
 
 ## Installation
 
