@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
-from plugins.github_cli.github_cli import GithubCliTool
+from plugins.github_cli.github_cli_tool import GithubCliTool
 
 
 @pytest.fixture
@@ -18,7 +18,7 @@ class TestGithubCliTool:
         assert "operation" in schema["properties"]
 
     @pytest.mark.asyncio
-    @patch("plugins.github_cli.github_cli.subprocess.run")
+    @patch("plugins.github_cli.github_cli_tool.subprocess.run")
     async def test_auth_status_success(self, mock_run, gh_tool):
         process = MagicMock()
         process.returncode = 0
@@ -32,7 +32,7 @@ class TestGithubCliTool:
         mock_run.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch("plugins.github_cli.github_cli.subprocess.run")
+    @patch("plugins.github_cli.github_cli_tool.subprocess.run")
     async def test_auth_status_failure(self, mock_run, gh_tool):
         process = MagicMock()
         process.returncode = 1
@@ -52,7 +52,7 @@ class TestGithubCliTool:
         assert "title" in result["error"]
 
     @pytest.mark.asyncio
-    @patch("plugins.github_cli.github_cli.subprocess.run")
+    @patch("plugins.github_cli.github_cli_tool.subprocess.run")
     async def test_pr_create_builds_command(self, mock_run, gh_tool):
         process = MagicMock()
         process.returncode = 0
