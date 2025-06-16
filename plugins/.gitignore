@@ -26,9 +26,6 @@
 !knowledge_indexer/
 !knowledge_indexer/**
 
-# Track the github_cli plugin
-!github_cli/
-!github_cli/**
 
 # Track the circleci plugin
 !circleci/
