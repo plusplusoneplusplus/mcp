@@ -26,6 +26,10 @@ plugins/
 - **text_summarizer**: An example plugin that summarizes text content
 - **circleci**: Trigger and inspect CircleCI pipelines via the REST API
 - **logcli**: Query a Grafana Loki server using the `logcli` command
+- **azrepo**: Interact with Azure DevOps repositories and manage pull requests
+- **git_tool**: Execute Git operations such as status, diff, and branch management
+- **knowledge_indexer**: Index files into a vector store for semantic search
+- **kusto**: Run queries against Azure Data Explorer (Kusto)
 
 ## Installation
 
