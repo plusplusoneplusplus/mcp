@@ -7,6 +7,7 @@ import logging
 from typing import List, Dict, Any, Optional, Tuple, Union
 import numpy as np
 from utils.vector_store.vector_store import ChromaVectorStore
+from utils.vector_store.embedding_service import EmbeddingInterface, SentenceTransformerEmbedding
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -21,22 +22,40 @@ class MarkdownTableSegmenter:
         self,
         vector_store: ChromaVectorStore,
         model_name: str = "all-MiniLM-L6-v2",
-        model: Optional[Any] = None
+        model: Optional[Any] = None,
+        embedding_service: Optional[EmbeddingInterface] = None
     ):
         """
         Initialize the table segmenter with an embedding model and vector store.
 
         Args:
             vector_store: An instance of ChromaVectorStore to use for storing segments.
-            model_name: Name of the sentence transformer model to use for embeddings
+            model_name: Name of the sentence transformer model to use for embeddings (deprecated, use embedding_service)
             model: Optional pre-initialized SentenceTransformer model. If provided, model_name is ignored.
+            embedding_service: Optional embedding service. If not provided, creates SentenceTransformerEmbedding with model_name
         """
-        if model is not None:
+        # Initialize embedding service (new architecture) or fallback to old model approach
+        if embedding_service is not None:
+            self.embedding_service = embedding_service
+            # For backward compatibility, also set self.model
+            if hasattr(embedding_service, '_model'):
+                self.model = embedding_service._model  # type: ignore
+            elif model is not None:
+                self.model = model
+            else:
+                self.model = self._initialize_model(model_name)
+            logger.info("Using provided embedding service")
+        elif model is not None:
             self.model = model
+            # Create embedding service wrapper for the provided model
+            self.embedding_service = SentenceTransformerEmbedding(model_name=model_name)
+            self.embedding_service._model = model  # Use the provided model
             logger.info("Using provided SentenceTransformer model")
         else:
-            # Initialize model with fallback support (same as MarkdownSegmenter)
-            self.model = self._initialize_model(model_name)
+            # Backward compatibility: create embedding service from model_name
+            self.embedding_service = SentenceTransformerEmbedding(model_name=model_name)
+            self.model = self.embedding_service._model
+
         self.vector_store = vector_store
 
     def _initialize_model(self, model_name: str):
@@ -53,7 +72,7 @@ class MarkdownTableSegmenter:
             RuntimeError: If both primary and fallback models fail to load
         """
         from sentence_transformers import SentenceTransformer
-        
+
         # List of fallback models to try if the primary model fails
         fallback_models = [
             "all-mpnet-base-v2",
@@ -176,9 +195,12 @@ class MarkdownTableSegmenter:
             f"{table_info['heading']} {table_info['context']} {table_info['content']}"
         )
 
-        # Generate embedding
-        embedding = self.model.encode(text_to_embed)
-        return embedding.tolist()
+        # Generate embedding using the embedding service
+        embedding = self.embedding_service.encode(text_to_embed)
+        # Ensure we return a single embedding vector
+        if isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], list):
+            return embedding[0]  # Return first embedding if batch was returned
+        return embedding  # type: ignore
 
     def segment_and_store(self, markdown_content: str) -> Tuple[int, List[str]]:
         """
