@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Neo4j Development Environment Setup Script
-# This script sets up the complete Neo4j development environment
+# Neo4j Test Environment Setup Script
+# This script sets up the Neo4j test environment
 
 set -e  # Exit on any error
 
@@ -61,7 +61,7 @@ wait_for_neo4j() {
 
 # Main setup function
 main() {
-    print_status "Starting Neo4j Development Environment Setup..."
+    print_status "Starting Neo4j Test Environment Setup..."
 
     # Check prerequisites
     print_status "Checking prerequisites..."
@@ -93,17 +93,11 @@ main() {
     if [ ! -f ".env" ]; then
         print_status "Creating .env file..."
         cat > .env << EOF
-# Neo4j Development Environment Configuration
+# Neo4j Test Environment Configuration
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=devpassword
+NEO4J_PASSWORD=testpassword
 NEO4J_DATABASE=neo4j
-
-# Neo4j Test Environment Configuration
-NEO4J_TEST_URI=bolt://localhost:7688
-NEO4J_TEST_USERNAME=neo4j
-NEO4J_TEST_PASSWORD=testpassword
-NEO4J_TEST_DATABASE=neo4j
 
 # Debug Configuration
 NEO4J_DEBUG=true
@@ -118,50 +112,77 @@ EOF
     print_status "Stopping any existing Neo4j containers..."
     docker-compose -f docker/neo4j/docker-compose.yml down --remove-orphans || true
 
-    # Start Neo4j services
-    print_status "Starting Neo4j development and test databases..."
+    # Start Neo4j service
+    print_status "Starting Neo4j test database..."
     docker-compose -f docker/neo4j/docker-compose.yml up -d
 
-    # Wait for services to be ready
-    wait_for_neo4j "mcp-neo4j-dev" "neo4j" "devpassword"
-    wait_for_neo4j "mcp-neo4j-test" "neo4j" "testpassword"
+    # Wait for service to be ready
+    wait_for_neo4j "mcp-neo4j" "neo4j" "testpassword"
 
     # Install Python dependencies
     print_status "Installing Python dependencies..."
     uv sync
 
     # Test the connection
-    print_status "Testing Neo4j connections..."
+    print_status "Testing Neo4j connection..."
 
-    # Test development database
+    # Test database
     if uv run python -c "
+import asyncio
+import sys
+import traceback
 from utils.graph_interface.neo4j_client import Neo4jClient
 from utils.graph_interface.config import Neo4jConfig
-config = Neo4jConfig(uri='bolt://localhost:7687', username='neo4j', password='devpassword')
-client = Neo4jClient(config)
-result = client.execute_query('RETURN 1 as test')
-print('Development database connection: OK')
-client.close()
-" 2>/dev/null; then
-        print_success "Development database connection successful"
-    else
-        print_error "Failed to connect to development database"
-        exit 1
-    fi
 
-    # Test test database
-    if uv run python -c "
-from utils.graph_interface.neo4j_client import Neo4jClient
-from utils.graph_interface.config import Neo4jConfig
-config = Neo4jConfig(uri='bolt://localhost:7688', username='neo4j', password='testpassword')
-client = Neo4jClient(config)
-result = client.execute_query('RETURN 1 as test')
-print('Test database connection: OK')
-client.close()
-" 2>/dev/null; then
-        print_success "Test database connection successful"
+async def test_connection():
+    try:
+        print('DEBUG: Starting connection test for database')
+
+        config = Neo4jConfig()
+        config.connection.uri = 'bolt://localhost:7687'
+        config.connection.username = 'neo4j'
+        config.connection.password_env = 'NEO4J_PASSWORD'
+
+        print(f'DEBUG: Config created - URI: {config.connection.uri}, Username: {config.connection.username}')
+
+        client = Neo4jClient(config)
+        print('DEBUG: Neo4j client created')
+
+        try:
+            print('DEBUG: Attempting to connect...')
+            await client.connect()
+            print('DEBUG: Connection successful')
+
+            print('DEBUG: Executing test query...')
+            result = await client.execute_query('RETURN 1 as test')
+            print(f'DEBUG: Query result: {result.records}')
+
+            print('Database connection: OK')
+            return True
+        except Exception as e:
+            print(f'DEBUG: Connection/query error: {type(e).__name__}: {e}')
+            print(f'DEBUG: Traceback: {traceback.format_exc()}')
+            return False
+        finally:
+            print('DEBUG: Disconnecting...')
+            await client.disconnect()
+            print('DEBUG: Disconnected')
+    except Exception as e:
+        print(f'DEBUG: Outer exception: {type(e).__name__}: {e}')
+        print(f'DEBUG: Traceback: {traceback.format_exc()}')
+        return False
+
+import os
+print('DEBUG: Setting environment variable NEO4J_PASSWORD=testpassword')
+os.environ['NEO4J_PASSWORD'] = 'testpassword'
+print('DEBUG: Starting asyncio.run()')
+result = asyncio.run(test_connection())
+print(f'DEBUG: Final result: {result}')
+sys.exit(0 if result else 1)
+"; then
+        print_success "Database connection successful"
     else
-        print_error "Failed to connect to test database"
+        print_error "Failed to connect to database"
         exit 1
     fi
 
@@ -179,14 +200,10 @@ client.close()
 
     # Success message
     echo ""
-    print_success "Neo4j Development Environment Setup Complete!"
+    print_success "Neo4j Test Environment Setup Complete!"
     echo ""
     echo "Access Information:"
-    echo "  Development Database Web UI: http://localhost:7474"
-    echo "    Username: neo4j"
-    echo "    Password: devpassword"
-    echo ""
-    echo "  Test Database Web UI: http://localhost:7475"
+    echo "  Database Web UI: http://localhost:7474"
     echo "    Username: neo4j"
     echo "    Password: testpassword"
     echo ""
