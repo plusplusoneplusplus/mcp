@@ -90,7 +90,7 @@ main() {
     docker-compose -f docker/neo4j/docker-compose.yml up -d neo4j
 
     # Wait for Neo4j to be ready
-    wait_for_neo4j "mcp-neo4j-dev" "neo4j" "development"
+    wait_for_neo4j "mcp-neo4j-dev" "neo4j" "devpassword"
 
     # Re-run initialization scripts
     print_status "Re-initializing database with sample data..."
@@ -98,20 +98,20 @@ main() {
     # Run index creation script
     if [ -f "docker/neo4j/init-scripts/01-create-indexes.cypher" ]; then
         print_status "Creating indexes and constraints..."
-        docker exec -i mcp-neo4j-dev cypher-shell -u neo4j -p development < docker/neo4j/init-scripts/01-create-indexes.cypher
+        docker exec -i mcp-neo4j-dev cypher-shell -u neo4j -p devpassword < docker/neo4j/init-scripts/01-create-indexes.cypher
         print_success "Indexes and constraints created"
     fi
 
     # Run sample data script
     if [ -f "docker/neo4j/init-scripts/02-sample-data.cypher" ]; then
         print_status "Loading sample data..."
-        docker exec -i mcp-neo4j-dev cypher-shell -u neo4j -p development < docker/neo4j/init-scripts/02-sample-data.cypher
+        docker exec -i mcp-neo4j-dev cypher-shell -u neo4j -p devpassword < docker/neo4j/init-scripts/02-sample-data.cypher
         print_success "Sample data loaded"
     fi
 
     # Verify the reset
     print_status "Verifying database reset..."
-    node_count=$(docker exec mcp-neo4j-dev cypher-shell -u neo4j -p development "MATCH (n) RETURN count(n) as count" --format plain | tail -n 1 | tr -d '"')
+    node_count=$(docker exec mcp-neo4j-dev cypher-shell -u neo4j -p devpassword "MATCH (n) RETURN count(n) as count" --format plain | tail -n 1 | tr -d '"')
 
     if [ "$node_count" -gt 0 ]; then
         print_success "Database reset complete! Node count: $node_count"
@@ -125,7 +125,7 @@ main() {
     echo "You can now access the fresh database at:"
     echo "  Web UI: http://localhost:7474"
     echo "  Username: neo4j"
-    echo "  Password: development"
+    echo "  Password: devpassword"
     echo ""
 }
 

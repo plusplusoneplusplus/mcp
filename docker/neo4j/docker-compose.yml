@@ -5,7 +5,7 @@ services:
     image: neo4j:5.15-community
     container_name: mcp-neo4j-dev
     environment:
-      NEO4J_AUTH: neo4j/development
+      NEO4J_AUTH: neo4j/devpassword
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_security_procedures_allowlist: apoc.*
@@ -24,7 +24,7 @@ services:
     networks:
       - neo4j-network
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p development 'RETURN 1'"]
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p devpassword 'RETURN 1'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -34,7 +34,7 @@ services:
     image: neo4j:5.15-community
     container_name: mcp-neo4j-test
     environment:
-      NEO4J_AUTH: neo4j/test
+      NEO4J_AUTH: neo4j/testpassword
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_security_procedures_allowlist: apoc.*
@@ -52,7 +52,7 @@ services:
     networks:
       - neo4j-network
     healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p test 'RETURN 1'"]
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p testpassword 'RETURN 1'"]
       interval: 30s
       timeout: 10s
       retries: 5

@@ -96,13 +96,13 @@ main() {
 # Neo4j Development Environment Configuration
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=development
+NEO4J_PASSWORD=devpassword
 NEO4J_DATABASE=neo4j
 
 # Neo4j Test Environment Configuration
 NEO4J_TEST_URI=bolt://localhost:7688
 NEO4J_TEST_USERNAME=neo4j
-NEO4J_TEST_PASSWORD=test
+NEO4J_TEST_PASSWORD=testpassword
 NEO4J_TEST_DATABASE=neo4j
 
 # Debug Configuration
@@ -123,8 +123,8 @@ EOF
     docker-compose -f docker/neo4j/docker-compose.yml up -d
 
     # Wait for services to be ready
-    wait_for_neo4j "mcp-neo4j-dev" "neo4j" "development"
-    wait_for_neo4j "mcp-neo4j-test" "neo4j" "test"
+    wait_for_neo4j "mcp-neo4j-dev" "neo4j" "devpassword"
+    wait_for_neo4j "mcp-neo4j-test" "neo4j" "testpassword"
 
     # Install Python dependencies
     print_status "Installing Python dependencies..."
@@ -137,7 +137,7 @@ EOF
     if uv run python -c "
 from utils.graph_interface.neo4j_client import Neo4jClient
 from utils.graph_interface.config import Neo4jConfig
-config = Neo4jConfig(uri='bolt://localhost:7687', username='neo4j', password='development')
+config = Neo4jConfig(uri='bolt://localhost:7687', username='neo4j', password='devpassword')
 client = Neo4jClient(config)
 result = client.execute_query('RETURN 1 as test')
 print('Development database connection: OK')
@@ -153,7 +153,7 @@ client.close()
     if uv run python -c "
 from utils.graph_interface.neo4j_client import Neo4jClient
 from utils.graph_interface.config import Neo4jConfig
-config = Neo4jConfig(uri='bolt://localhost:7688', username='neo4j', password='test')
+config = Neo4jConfig(uri='bolt://localhost:7688', username='neo4j', password='testpassword')
 client = Neo4jClient(config)
 result = client.execute_query('RETURN 1 as test')
 print('Test database connection: OK')
@@ -184,11 +184,11 @@ client.close()
     echo "Access Information:"
     echo "  Development Database Web UI: http://localhost:7474"
     echo "    Username: neo4j"
-    echo "    Password: development"
+    echo "    Password: devpassword"
     echo ""
     echo "  Test Database Web UI: http://localhost:7475"
     echo "    Username: neo4j"
-    echo "    Password: test"
+    echo "    Password: testpassword"
     echo ""
     echo "Next Steps:"
     echo "  1. Open the Neo4j Browser at http://localhost:7474"

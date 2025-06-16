@@ -40,13 +40,13 @@ Create a `.env` file in the project root with the following configuration:
 # Development environment
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=development
+NEO4J_PASSWORD=devpassword
 NEO4J_DATABASE=neo4j
 
 # Test environment
 NEO4J_TEST_URI=bolt://localhost:7688
 NEO4J_TEST_USERNAME=neo4j
-NEO4J_TEST_PASSWORD=test
+NEO4J_TEST_PASSWORD=testpassword
 NEO4J_TEST_DATABASE=neo4j
 
 # Optional: Enable debug logging
@@ -76,7 +76,7 @@ docker-compose -f docker/neo4j/docker-compose.yml ps
 docker-compose -f docker/neo4j/docker-compose.yml logs neo4j
 
 # Test connection using cypher-shell
-docker exec -it mcp-neo4j-dev cypher-shell -u neo4j -p development
+docker exec -it mcp-neo4j-dev cypher-shell -u neo4j -p devpassword
 ```
 
 ## Database Access
@@ -85,11 +85,11 @@ docker exec -it mcp-neo4j-dev cypher-shell -u neo4j -p development
 
 - **Development Database**: http://localhost:7474
   - Username: `neo4j`
-  - Password: `development`
+  - Password: `devpassword`
 
 - **Test Database**: http://localhost:7475
   - Username: `neo4j`
-  - Password: `test`
+  - Password: `testpassword`
 
 ### Programmatic Access
 
@@ -105,7 +105,7 @@ client = Neo4jClient(config)
 test_config = Neo4jConfig(
     uri="bolt://localhost:7688",
     username="neo4j",
-    password="test"
+    password="testpassword"
 )
 test_client = Neo4jClient(test_config)
 ```
@@ -233,7 +233,7 @@ RETURN name, state, populationPercent;
 2. **Authentication Failed**
    ```bash
    # Reset password
-   docker exec -it mcp-neo4j-dev neo4j-admin set-initial-password development
+   docker exec -it mcp-neo4j-dev neo4j-admin set-initial-password devpassword
    ```
 
 3. **Out of Memory**

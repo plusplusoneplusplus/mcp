@@ -28,4 +28,4 @@ EXPOSE 7474 7687
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-development} "RETURN 1" || exit 1
+    CMD cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-devpassword} "RETURN 1" || exit 1
