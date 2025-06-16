@@ -12,6 +12,8 @@ from typing import Dict, List, Any, Optional
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 
+from utils.graph_interface.neo4j_client import Neo4jClient
+from utils.graph_interface.config import load_neo4j_config
 from utils.graph_interface.graph_manager import GraphManager
 from utils.graph_interface.visualization.mermaid_generator import MermaidGenerator
 from utils.graph_interface.exceptions import GraphOperationError
@@ -206,27 +208,35 @@ class VisualizationAPI:
 
     def __init__(self):
         """Initialize the visualization API handler."""
-        self.graph_manager = None
-        self.mermaid_generator = None
+        self.neo4j_client: Optional[Neo4jClient] = None
+        self.graph_manager: Optional[GraphManager] = None
+        self.mermaid_generator: Optional[MermaidGenerator] = None
         self.mock_generator = MockMermaidGenerator()
         self._initialize_graph_connection()
 
     def _initialize_graph_connection(self):
         """Initialize the graph manager and mermaid generator."""
         try:
-            # Initialize graph manager (this will need to be configured with proper Neo4j connection)
-            # For now, we'll set it up to be initialized lazily when needed
-            pass
+            # Try to initialize Neo4j client with default configuration
+            logger.info("Initializing Neo4j connection for visualizations...")
+            self.neo4j_client = Neo4jClient()
+            logger.info("Neo4j client created successfully")
         except Exception as e:
-            logger.error(f"Failed to initialize graph connection: {e}")
+            logger.error(f"Failed to initialize Neo4j client: {e}")
+            self.neo4j_client = None
 
     async def _ensure_graph_manager(self):
         """Ensure graph manager is initialized."""
         if self.graph_manager is None:
             try:
-                # Initialize GraphManager with default configuration
-                # This should be configured based on your Neo4j setup
-                self.graph_manager = GraphManager()
+                if self.neo4j_client is None:
+                    raise GraphOperationError("Neo4j client not initialized")
+
+                # Connect to Neo4j
+                await self.neo4j_client.connect()
+
+                # Initialize GraphManager with the connected client
+                self.graph_manager = GraphManager(self.neo4j_client)
                 self.mermaid_generator = MermaidGenerator(self.graph_manager)
                 logger.info("Graph manager and mermaid generator initialized successfully")
             except Exception as e:
@@ -238,10 +248,11 @@ class VisualizationAPI:
         """Get the appropriate generator (real or mock)."""
         try:
             await self._ensure_graph_manager()
+            logger.info("Using real Neo4j database for visualizations")
             return self.mermaid_generator
-        except GraphOperationError:
+        except GraphOperationError as e:
             # Use mock generator for demo purposes
-            logger.info("Using mock generator for demonstration")
+            logger.warning(f"Using mock generator for demonstration: {e}")
             return self.mock_generator
 
     async def get_task_dependencies(self, request: Request) -> JSONResponse:
@@ -503,10 +514,10 @@ class VisualizationAPI:
     async def _count_all_tasks(self) -> int:
         """Count all tasks in the graph."""
         try:
-            # This is a placeholder - implement based on your graph manager's API
             if self.graph_manager:
-                # Assuming graph manager has a method to count nodes by type
-                return await self.graph_manager.count_nodes_by_type("Task")
+                # Use graph stats to count Task nodes
+                stats = await self.graph_manager.get_graph_stats()
+                return stats.labels.get("Task", 0)
             return 0
         except Exception:
             return 0
@@ -514,10 +525,10 @@ class VisualizationAPI:
     async def _count_all_resources(self) -> int:
         """Count all resources in the graph."""
         try:
-            # This is a placeholder - implement based on your graph manager's API
             if self.graph_manager:
-                # Assuming graph manager has a method to count nodes by type
-                return await self.graph_manager.count_nodes_by_type("Resource")
+                # Use graph stats to count Resource nodes
+                stats = await self.graph_manager.get_graph_stats()
+                return stats.labels.get("Resource", 0)
             return 0
         except Exception:
             return 0
