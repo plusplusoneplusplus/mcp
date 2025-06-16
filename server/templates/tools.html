@@ -8,6 +8,7 @@
         overflow-x: auto;
         margin-top: 1em;
     }
+
     .tools-table {
         width: 100%;
         border-collapse: collapse;
@@ -16,19 +17,116 @@
         overflow: hidden;
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
     }
+
     .tools-table th,
     .tools-table td {
         padding: 0.75em;
         text-align: left;
         border-bottom: 1px solid #eee;
     }
+
     .tools-table th {
         background: #f8f9fa;
         font-weight: bold;
         color: #333;
     }
+
     .tools-table tr:hover {
         background: #f8f9fa;
+    }
+
+    .tool-row {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    .tool-row:hover {
+        background: #f0f8ff !important;
+    }
+
+    .tool-row.expanded {
+        background: #e8f4fd !important;
+    }
+
+    .expand-icon {
+        display: inline-block;
+        margin-right: 8px;
+        transition: transform 0.2s ease;
+        font-size: 12px;
+        color: #666;
+    }
+
+    .expand-icon.expanded {
+        transform: rotate(90deg);
+    }
+
+    .parameters-row {
+        display: none;
+        background: #f9f9f9;
+    }
+
+    .parameters-row.show {
+        display: table-row;
+    }
+
+    .parameters-content {
+        padding: 1em;
+        border-left: 3px solid #007bff;
+        background: #fff;
+        margin: 0.5em 0;
+        border-radius: 4px;
+    }
+
+    .parameters-title {
+        font-weight: bold;
+        margin-bottom: 0.5em;
+        color: #333;
+    }
+
+    .parameter-item {
+        margin-bottom: 0.75em;
+        padding: 0.5em;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border-left: 2px solid #28a745;
+    }
+
+    .parameter-name {
+        font-weight: bold;
+        color: #007bff;
+        margin-bottom: 0.25em;
+    }
+
+    .parameter-type {
+        font-size: 0.85em;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    .parameter-description {
+        margin-top: 0.25em;
+        color: #555;
+    }
+
+    .parameter-required {
+        color: #dc3545;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+
+    .no-parameters {
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    .schema-details {
+        margin-top: 0.5em;
+        font-size: 0.9em;
+    }
+
+    .schema-property {
+        margin-left: 1em;
+        margin-bottom: 0.5em;
     }
 </style>
 {% endblock %}
@@ -37,6 +135,7 @@
 <div class="card">
     <h2>Tools Dashboard</h2>
     <p>Total tools: <span id="tool-count">0</span></p>
+    <p><small>Click on any tool row to view its parameters</small></p>
     <div class="tools-table-container">
         <table class="tools-table">
             <thead>
@@ -56,26 +155,130 @@
 
 {% block extra_scripts %}
 <script>
-async function loadTools() {
-    try {
-        const resp = await fetch('/api/tools');
-        const data = await resp.json();
-        document.getElementById('tool-count').textContent = data.total;
-        const body = document.getElementById('tools-table-body');
-        body.innerHTML = '';
-        for (const tool of data.tools) {
-            const row = document.createElement('tr');
-            row.innerHTML = `<td>${tool.name}</td>` +
-                `<td>${tool.description || ''}</td>` +
-                `<td>${tool.source}</td>` +
-                `<td>${tool.active ? '✅' : '❌'}</td>`;
-            body.appendChild(row);
-        }
-    } catch (err) {
-        console.error('Error loading tools', err);
-    }
-}
+    async function loadTools() {
+        try {
+            const resp = await fetch('/api/tools');
+            const data = await resp.json();
+            document.getElementById('tool-count').textContent = data.total;
+            const body = document.getElementById('tools-table-body');
+            body.innerHTML = '';
 
-document.addEventListener('DOMContentLoaded', loadTools);
+            for (let i = 0; i < data.tools.length; i++) {
+                const tool = data.tools[i];
+
+                // Create main tool row
+                const row = document.createElement('tr');
+                row.className = 'tool-row';
+                row.dataset.toolIndex = i;
+                row.innerHTML = `
+                <td>
+                    <span class="expand-icon">▶</span>
+                    ${tool.name}
+                </td>
+                <td>${tool.description || ''}</td>
+                <td>${tool.source}</td>
+                <td>${tool.active ? '✅' : '❌'}</td>
+            `;
+
+                // Create parameters row (initially hidden)
+                const parametersRow = document.createElement('tr');
+                parametersRow.className = 'parameters-row';
+                parametersRow.dataset.toolIndex = i;
+
+                const parametersCell = document.createElement('td');
+                parametersCell.colSpan = 4;
+                parametersCell.innerHTML = createParametersContent(tool);
+                parametersRow.appendChild(parametersCell);
+
+                // Add click handler to main row
+                row.addEventListener('click', function () {
+                    toggleParameters(i);
+                });
+
+                body.appendChild(row);
+                body.appendChild(parametersRow);
+            }
+        } catch (err) {
+            console.error('Error loading tools', err);
+        }
+    }
+
+    function createParametersContent(tool) {
+        const schema = tool.input_schema;
+
+        if (!schema || !schema.properties || Object.keys(schema.properties).length === 0) {
+            return `
+            <div class="parameters-content">
+                <div class="parameters-title">Parameters</div>
+                <div class="no-parameters">This tool has no parameters</div>
+            </div>
+        `;
+        }
+
+        const properties = schema.properties;
+        const required = schema.required || [];
+
+        let parametersHtml = `
+        <div class="parameters-content">
+            <div class="parameters-title">Parameters</div>
+    `;
+
+        for (const [propName, propDetails] of Object.entries(properties)) {
+            const isRequired = required.includes(propName);
+            const type = propDetails.type || 'unknown';
+            const description = propDetails.description || 'No description available';
+
+            parametersHtml += `
+            <div class="parameter-item">
+                <div class="parameter-name">
+                    ${propName}
+                    ${isRequired ? '<span class="parameter-required">(required)</span>' : ''}
+                </div>
+                <div class="parameter-type">Type: ${type}</div>
+                <div class="parameter-description">${description}</div>
+        `;
+
+            // Add additional details if available
+            if (propDetails.default !== undefined) {
+                parametersHtml += `<div class="schema-details">Default: ${JSON.stringify(propDetails.default)}</div>`;
+            }
+            if (propDetails.enum) {
+                parametersHtml += `<div class="schema-details">Allowed values: ${propDetails.enum.join(', ')}</div>`;
+            }
+            if (propDetails.minimum !== undefined) {
+                parametersHtml += `<div class="schema-details">Minimum: ${propDetails.minimum}</div>`;
+            }
+            if (propDetails.maximum !== undefined) {
+                parametersHtml += `<div class="schema-details">Maximum: ${propDetails.maximum}</div>`;
+            }
+
+            parametersHtml += '</div>';
+        }
+
+        parametersHtml += '</div>';
+        return parametersHtml;
+    }
+
+    function toggleParameters(toolIndex) {
+        const toolRow = document.querySelector(`tr.tool-row[data-tool-index="${toolIndex}"]`);
+        const parametersRow = document.querySelector(`tr.parameters-row[data-tool-index="${toolIndex}"]`);
+        const expandIcon = toolRow.querySelector('.expand-icon');
+
+        const isExpanded = parametersRow.classList.contains('show');
+
+        if (isExpanded) {
+            // Collapse
+            parametersRow.classList.remove('show');
+            expandIcon.classList.remove('expanded');
+            toolRow.classList.remove('expanded');
+        } else {
+            // Expand
+            parametersRow.classList.add('show');
+            expandIcon.classList.add('expanded');
+            toolRow.classList.add('expanded');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadTools);
 </script>
 {% endblock %}
