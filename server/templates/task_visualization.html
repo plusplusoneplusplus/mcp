@@ -38,44 +38,51 @@
         border-radius: 4px;
     }
 
-    .diagram-selector {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1em;
-        margin-bottom: 1em;
-    }
-
-    .diagram-option {
+    .diagram-tabs {
+        display: flex;
         background: #f8f9fa;
-        border: 2px solid #e9ecef;
         border-radius: 8px;
-        padding: 1.5em;
-        text-align: center;
+        padding: 0.3em;
+        margin-bottom: 1em;
+        overflow-x: auto;
+        gap: 0.2em;
+    }
+
+    .diagram-tab {
+        background: transparent;
+        border: none;
+        padding: 0.6em 1em;
+        border-radius: 6px;
         cursor: pointer;
-        transition: all 0.3s ease;
-    }
-
-    .diagram-option:hover {
-        border-color: #0077cc;
-        background: #e7f3ff;
-    }
-
-    .diagram-option.active {
-        border-color: #0077cc;
-        background: #e7f3ff;
-        box-shadow: 0 4px 12px rgba(0, 119, 204, 0.2);
-    }
-
-    .diagram-option h3 {
-        margin: 0 0 0.5em 0;
-        color: #333;
-        font-size: 1.1em;
-    }
-
-    .diagram-option p {
-        margin: 0;
-        color: #666;
+        transition: all 0.2s ease;
+        white-space: nowrap;
         font-size: 0.9em;
+        color: #666;
+        min-width: fit-content;
+    }
+
+    .diagram-tab:hover {
+        background: #e9ecef;
+        color: #333;
+    }
+
+    .diagram-tab.active {
+        background: #0077cc;
+        color: white;
+        font-weight: 500;
+    }
+
+    .tab-description {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 0.8em 1em;
+        margin-bottom: 1em;
+        font-size: 0.9em;
+        color: #666;
+        min-height: 2.5em;
+        display: flex;
+        align-items: center;
     }
 
     .diagram-container {
@@ -183,6 +190,164 @@
         display: block;
     }
 
+    /* Connection Status Indicator Styles */
+    .connection-status {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px #eee;
+        margin-bottom: 1em;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .status-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.8em 1.5em;
+        margin: 0;
+    }
+
+    .status-info {
+        display: flex;
+        align-items: center;
+        gap: 1em;
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        animation: pulse 2s infinite;
+        margin-right: 0.5em;
+    }
+
+    .status-real {
+        background: #28a745;
+        border-left: 4px solid #28a745;
+    }
+
+    .status-demo {
+        background: #ffc107;
+        border-left: 4px solid #ffc107;
+    }
+
+    .status-error {
+        background: #dc3545;
+        border-left: 4px solid #dc3545;
+    }
+
+    .status-real .status-indicator {
+        background: #28a745;
+    }
+
+    .status-demo .status-indicator {
+        background: #ffc107;
+    }
+
+    .status-error .status-indicator {
+        background: #dc3545;
+    }
+
+    .status-text {
+        font-weight: bold;
+        font-size: 1em;
+        margin: 0;
+    }
+
+    .status-real .status-text {
+        color: #155724;
+    }
+
+    .status-demo .status-text {
+        color: #856404;
+    }
+
+    .status-error .status-text {
+        color: #721c24;
+    }
+
+    .status-description {
+        margin: 0.2em 0 0 0;
+        font-size: 0.8em;
+        opacity: 0.7;
+    }
+
+    .status-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 0.2em 0.6em;
+        border-radius: 15px;
+        font-size: 0.7em;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .status-real .status-badge {
+        background: rgba(40, 167, 69, 0.1);
+        color: #155724;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .status-demo .status-badge {
+        background: rgba(255, 193, 7, 0.1);
+        color: #856404;
+        border: 1px solid rgba(255, 193, 7, 0.3);
+    }
+
+    .status-error .status-badge {
+        background: rgba(220, 53, 69, 0.1);
+        color: #721c24;
+        border: 1px solid rgba(220, 53, 69, 0.3);
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+
+    /* Demo Mode Banner */
+    .demo-banner {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        border: 2px solid #ffc107;
+        border-radius: 8px;
+        padding: 1.5em 2em;
+        margin-bottom: 1em;
+        display: none;
+    }
+
+    .demo-banner.show {
+        display: block;
+    }
+
+    .demo-banner h3 {
+        color: #856404;
+        margin: 0 0 1em 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
+    }
+
+    .demo-banner ul {
+        margin: 1em 0 0 0;
+        padding-left: 1.5em;
+        color: #856404;
+    }
+
+    .demo-banner li {
+        margin: 0.5em 0;
+    }
+
     /* Responsive design */
     @media (max-width: 768px) {
         .control-group {
@@ -200,12 +365,26 @@
             width: 100%;
         }
 
-        .diagram-selector {
-            grid-template-columns: 1fr;
+        .diagram-tabs {
+            flex-direction: column;
+        }
+
+        .diagram-tab {
+            text-align: center;
         }
 
         .export-buttons {
             flex-direction: column;
+        }
+
+        .status-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1em;
+        }
+
+        .status-info {
+            width: 100%;
         }
     }
 </style>
@@ -213,49 +392,51 @@
 
 {% block content %}
 <div class="visualization-container">
-    <!-- Demo Mode Notice -->
-    <div id="demo-notice" style="display: none;" class="card">
-        <h3 style="color: #0077cc; margin-top: 0;">🎯 Demo Mode Active</h3>
-        <p>You're currently viewing sample visualizations to demonstrate the system's capabilities. To see real task
-            data, configure your Neo4j graph database connection.</p>
-        <p><strong>Features demonstrated:</strong> Interactive filtering, multiple diagram types, export functionality,
-            and responsive design.</p>
+    <!-- Connection Status Banner -->
+    <div class="connection-status" id="connection-status">
+        <div class="status-header">
+            <div class="status-info">
+                <div>
+                    <span class="status-indicator"></span>
+                    <div class="status-text" id="status-text">Checking Neo4j Connection...</div>
+                    <div class="status-description" id="status-description">Initializing database connection</div>
+                </div>
+            </div>
+            <div class="status-badge" id="status-badge">CHECKING</div>
+        </div>
     </div>
 
-    <!-- Page Header -->
-    <div class="card">
-        <h2>Task Management Visualizations</h2>
-        <p>Interactive diagrams for task dependencies, scheduling, resource allocation, and execution monitoring.</p>
+    <!-- Demo Mode Banner -->
+    <div class="demo-banner" id="demo-banner">
+        <h3>🎯 Demo Mode Active</h3>
+        <p><strong>You're viewing sample visualizations.</strong> The system is demonstrating capabilities with mock
+            data because:</p>
+        <ul>
+            <li>Neo4j database connection is not available</li>
+            <li>Database is empty or contains no task data</li>
+            <li>Authentication credentials may be incorrect</li>
+        </ul>
+        <p><strong>Features demonstrated:</strong> Interactive filtering, multiple diagram types, export functionality,
+            and responsive design.</p>
+        <p><strong>To see real data:</strong> Configure your Neo4j database connection and ensure it contains task and
+            resource data.</p>
     </div>
+
+
 
     <!-- Controls Panel -->
     <div class="controls-panel">
         <h3>Visualization Type</h3>
-        <div class="diagram-selector">
-            <div class="diagram-option active" data-type="task-dependencies">
-                <h3>Task Dependencies</h3>
-                <p>Flowchart showing task relationships and dependencies</p>
-            </div>
-            <div class="diagram-option" data-type="gantt-chart">
-                <h3>Gantt Chart</h3>
-                <p>Project timeline and task scheduling visualization</p>
-            </div>
-            <div class="diagram-option" data-type="resource-allocation">
-                <h3>Resource Allocation</h3>
-                <p>Resource assignment and utilization overview</p>
-            </div>
-            <div class="diagram-option" data-type="execution-timeline">
-                <h3>Execution Timeline</h3>
-                <p>Task execution history over time</p>
-            </div>
-            <div class="diagram-option" data-type="critical-path">
-                <h3>Critical Path</h3>
-                <p>Critical path analysis between tasks</p>
-            </div>
-            <div class="diagram-option" data-type="status-overview">
-                <h3>Status Overview</h3>
-                <p>Task status distribution and summary</p>
-            </div>
+        <div class="diagram-tabs">
+            <button class="diagram-tab active" data-type="task-dependencies">Task Dependencies</button>
+            <button class="diagram-tab" data-type="gantt-chart">Gantt Chart</button>
+            <button class="diagram-tab" data-type="resource-allocation">Resource Allocation</button>
+            <button class="diagram-tab" data-type="execution-timeline">Execution Timeline</button>
+            <button class="diagram-tab" data-type="critical-path">Critical Path</button>
+            <button class="diagram-tab" data-type="status-overview">Status Overview</button>
+        </div>
+        <div class="tab-description" id="tab-description">
+            Flowchart showing task relationships and dependencies
         </div>
 
         <!-- Filter Controls -->
@@ -340,6 +521,7 @@
     let currentDiagramType = 'task-dependencies';
     let currentMermaidCode = '';
     let currentMetadata = {};
+    let connectionStatus = 'unknown';
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', function () {
@@ -347,7 +529,66 @@
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         document.getElementById('start-date').value = now.toISOString().slice(0, 16);
+
+        // Check initial connection status
+        checkConnectionStatus();
     });
+
+    // Check Neo4j connection status
+    async function checkConnectionStatus() {
+        try {
+            // Make a simple API call to check if we're in demo mode
+            const response = await fetch('/api/visualizations/status-overview');
+            const data = await response.json();
+
+            if (response.ok && data.metadata) {
+                updateConnectionStatus(data.metadata.demo_mode);
+            } else {
+                updateConnectionStatus(true, 'API Error');
+            }
+        } catch (error) {
+            console.error('Connection check failed:', error);
+            updateConnectionStatus(true, 'Connection Failed');
+        }
+    }
+
+    // Update connection status display
+    function updateConnectionStatus(isDemoMode, errorMessage = null) {
+        const statusDiv = document.getElementById('connection-status');
+        const statusText = document.getElementById('status-text');
+        const statusDescription = document.getElementById('status-description');
+        const statusBadge = document.getElementById('status-badge');
+        const demoBanner = document.getElementById('demo-banner');
+
+        // Remove all status classes
+        statusDiv.classList.remove('status-real', 'status-demo', 'status-error');
+
+        if (errorMessage) {
+            // Error state
+            connectionStatus = 'error';
+            statusDiv.classList.add('status-error');
+            statusText.textContent = 'Connection Error';
+            statusDescription.textContent = errorMessage;
+            statusBadge.textContent = 'ERROR';
+            demoBanner.classList.add('show');
+        } else if (isDemoMode) {
+            // Demo mode
+            connectionStatus = 'demo';
+            statusDiv.classList.add('status-demo');
+            statusText.textContent = 'Demo Mode Active';
+            statusDescription.textContent = 'Using sample data for demonstration';
+            statusBadge.textContent = 'DEMO';
+            demoBanner.classList.add('show');
+        } else {
+            // Real Neo4j connection
+            connectionStatus = 'real';
+            statusDiv.classList.add('status-real');
+            statusText.textContent = 'Neo4j Connected';
+            statusDescription.textContent = 'Connected to real database with live data';
+            statusBadge.textContent = 'LIVE';
+            demoBanner.classList.remove('show');
+        }
+    }
 
     // Toggle advanced filters
     function toggleAdvancedFilters() {
@@ -363,17 +604,30 @@
         }
     }
 
-    // Handle diagram type selection
-    document.querySelectorAll('.diagram-option').forEach(option => {
-        option.addEventListener('click', function () {
-            // Remove active class from all options
-            document.querySelectorAll('.diagram-option').forEach(opt => opt.classList.remove('active'));
+    // Tab descriptions
+    const tabDescriptions = {
+        'task-dependencies': 'Flowchart showing task relationships and dependencies',
+        'gantt-chart': 'Project timeline and task scheduling visualization',
+        'resource-allocation': 'Resource assignment and utilization overview',
+        'execution-timeline': 'Task execution history over time',
+        'critical-path': 'Critical path analysis between tasks',
+        'status-overview': 'Task status distribution and summary'
+    };
 
-            // Add active class to selected option
+    // Handle diagram type selection
+    document.querySelectorAll('.diagram-tab').forEach(tab => {
+        tab.addEventListener('click', function () {
+            // Remove active class from all tabs
+            document.querySelectorAll('.diagram-tab').forEach(t => t.classList.remove('active'));
+
+            // Add active class to selected tab
             this.classList.add('active');
 
             // Update current diagram type
             currentDiagramType = this.dataset.type;
+
+            // Update description
+            document.getElementById('tab-description').textContent = tabDescriptions[currentDiagramType];
 
             // Show/hide critical path specific fields
             const criticalPathFields = document.querySelectorAll('.critical-path-only');
@@ -419,12 +673,8 @@
             currentMermaidCode = data.mermaid_code;
             currentMetadata = data.metadata;
 
-            // Show demo notice if in demo mode
-            if (data.metadata.demo_mode) {
-                document.getElementById('demo-notice').style.display = 'block';
-            } else {
-                document.getElementById('demo-notice').style.display = 'none';
-            }
+            // Update connection status based on response
+            updateConnectionStatus(data.metadata.demo_mode);
 
             // Render diagram
             await renderDiagram(data.mermaid_code);
@@ -437,12 +687,13 @@
 
             // Show success message
             const statusMsg = data.metadata.demo_mode ?
-                'Demo diagram generated successfully!' :
-                'Diagram generated successfully!';
+                'Demo diagram generated successfully! (Using sample data)' :
+                'Diagram generated successfully! (Using real Neo4j data)';
             showStatus(statusMsg, false);
 
         } catch (error) {
             console.error('Error generating diagram:', error);
+            updateConnectionStatus(true, 'Generation Failed');
             showStatus('Error generating diagram: ' + error.message, true);
             diagramContent.innerHTML = '<div class="error">Failed to generate diagram. Please check your parameters and try again.</div>';
         } finally {
@@ -523,6 +774,13 @@
                 displayValue = new Date(value).toLocaleString();
             }
 
+            // Highlight demo mode in metadata
+            if (key === 'demo_mode') {
+                const modeText = value ? 'Yes (Sample Data)' : 'No (Real Data)';
+                const modeColor = value ? '#856404' : '#155724';
+                displayValue = `<span style="color: ${modeColor}; font-weight: bold;">${modeText}</span>`;
+            }
+
             html += `<div class="metadata-item"><strong>${displayKey}:</strong> ${displayValue}</div>`;
         }
 
@@ -547,6 +805,9 @@
     function refreshDiagram() {
         if (currentMermaidCode) {
             generateDiagram();
+        } else {
+            // If no current diagram, re-check connection status
+            checkConnectionStatus();
         }
     }
 
