@@ -5,12 +5,26 @@ from dataclasses import dataclass
 
 
 @dataclass
+class EmbeddingConfig:
+    """Configuration for embedding service."""
+    provider: str = "sentence_transformers"  # 'sentence_transformers' or 'openai'
+    model_name: str = "all-MiniLM-L6-v2"
+    device: Optional[str] = None
+    api_key: Optional[str] = None
+
+
+@dataclass
 class SegmenterConfig:
     """Configuration for the markdown segmenter."""
-    model_name: str = "all-MiniLM-L6-v2"
+    embedding_config: Optional[EmbeddingConfig] = None
     chunk_size: int = 1000
     chunk_overlap: int = 200
     table_max_rows: int = 500
+
+    def __post_init__(self):
+        """Set default embedding config if not provided."""
+        if self.embedding_config is None:
+            self.embedding_config = EmbeddingConfig()
 
 
 @dataclass
