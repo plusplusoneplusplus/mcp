@@ -253,6 +253,18 @@ class TestYamlToolBaseProperties:
         assert tool.input_schema["type"] == "object"
         assert "param" in tool.input_schema["properties"]
 
+    def test_category_property(self, sample_tool_data):
+        """Test the category property getter."""
+        tool_data = dict(sample_tool_data)
+        tool_data["category"] = "testing"
+        tool = YamlToolBase(tool_name="test_tool", tool_data=tool_data)
+        assert tool.category == "testing"
+
+    def test_category_property_default(self):
+        """Test default category when not provided."""
+        tool = YamlToolBase(tool_name="test_tool", tool_data={})
+        assert tool.category == "uncategorized"
+
 
 class TestYamlToolBaseToolTypeHandling:
     """Test cases for tool type handling."""
