@@ -2,6 +2,7 @@ tools:
   execute_command_async:
     enabled: false
     name: execute_command_async
+    category: command
     description: |
       Start a command execution asynchronously and return a token for tracking.
       Use the token to query the status (tool/query_command_status) of the command execution every 30 seconds.
@@ -20,6 +21,7 @@ tools:
   query_command_status:
     enabled: false
     name: query_command_status
+    category: command
     description: Query the status of an asynchronous command execution or wait for it to complete
     inputSchema:
       type: object
@@ -40,6 +42,7 @@ tools:
   execute_task:
     enabled: true
     name: execute_task
+    category: task
     description: |
       Execute a predefined task by name and start it asynchronously.
       Use the token returned by this tool to query the status (tool/query_task_status) of the task execution every 30 seconds.
@@ -55,6 +58,7 @@ tools:
   query_task_status:
     enabled: true
     name: query_task_status
+    category: task
     description: Query the status of an asynchronously executed task
     inputSchema:
       type: object
@@ -68,6 +72,7 @@ tools:
   list_tasks:
     enabled: true
     name: list_tasks
+    category: task
     description: List all available predefined tasks
     inputSchema:
       type: object
@@ -77,6 +82,7 @@ tools:
   list_instructions:
     enabled: true
     name: list_instructions
+    category: instruction
     description: List all available instructions
     inputSchema:
       type: object
@@ -86,6 +92,7 @@ tools:
   get_instruction:
     enabled: true
     name: get_instruction
+    category: instruction
     description: Get a specific instruction with its details
     inputSchema:
       type: object
@@ -99,6 +106,7 @@ tools:
   query_script_status:
     enabled: true
     name: query_script_status
+    category: script
     description: Query the status of an asynchronously executed script
     inputSchema:
       type: object
@@ -116,6 +124,7 @@ tools:
   deploy:
     enabled: true
     name: deploy
+    category: deployment
     description: |
       Deploy the application asynchronously and return a token for tracking.
       Use the token to query the status (tool/query_script_status).
@@ -165,6 +174,7 @@ tools:
   health_check:
     enabled: true
     name: health_check
+    category: monitoring
     description: |
       Check application health status without verbose curl output.
       Use the token to query the status (tool/query_script_status).
@@ -188,6 +198,7 @@ tools:
   validate_config:
     enabled: true
     name: validate_config
+    category: validation
     description: |
       Validate configuration files and show only validation errors.
       Use the token to query the status (tool/query_script_status).

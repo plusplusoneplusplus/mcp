@@ -19,6 +19,7 @@ async def api_list_tools(request: Request) -> JSONResponse:
         input_schema: Dict[str, Any] = (
             instance.input_schema if instance else {}
         )
+        category = getattr(instance, "category", "uncategorized")
         tools.append(
             {
                 "name": name,
@@ -26,6 +27,7 @@ async def api_list_tools(request: Request) -> JSONResponse:
                 "active": name in active_instances,
                 "description": description,
                 "input_schema": input_schema,
+                "category": category,
             }
         )
     return JSONResponse({"tools": tools, "total": len(tools), "active": len(active_instances)})
@@ -42,6 +44,7 @@ async def api_get_tool_detail(request: Request) -> JSONResponse:
             "name": tool_name,
             "description": instance.description,
             "input_schema": instance.input_schema,
+            "category": getattr(instance, "category", "uncategorized"),
             "source": tool_sources.get(tool_name, "unknown"),
             "active": tool_name in injector.get_filtered_instances(),
         }

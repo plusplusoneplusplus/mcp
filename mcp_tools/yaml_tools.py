@@ -61,6 +61,7 @@ class YamlToolBase(ToolInterface):
         )
         self._tool_data = tool_data
         self._tool_type = tool_data.get("type", "object")
+        self._category = tool_data.get("category", "uncategorized")
 
         # Get command executor from injector if not provided
         if command_executor is None:
@@ -84,6 +85,11 @@ class YamlToolBase(ToolInterface):
     def description(self) -> str:
         """Get the tool description."""
         return self._description
+
+    @property
+    def category(self) -> str:
+        """Get the tool category."""
+        return self._category
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -847,6 +853,9 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
         for name, tool_data in tools_data.items():
             try:
                 logger.debug(f"Processing YAML tool: {name}")
+
+                # Ensure category field is present
+                tool_data.setdefault("category", "uncategorized")
 
                 # Skip disabled tools
                 if tool_data.get("enabled", True) == False:
