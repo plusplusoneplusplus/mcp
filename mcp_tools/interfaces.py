@@ -5,7 +5,7 @@ to be compatible with the MCP system.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Union, Generic, TypeVar
+from typing import Dict, Any, List, Optional, Union, Generic, TypeVar, Set
 
 T = TypeVar("T")
 InputType = TypeVar("InputType")
@@ -44,6 +44,8 @@ class ToolInterface(ABC):
     def input_schema(self) -> Dict[str, Any]:
         """Get the JSON schema for the tool input."""
         pass
+
+
 
     @abstractmethod
     async def execute_tool(self, arguments: Dict[str, Any]) -> Any:
@@ -120,7 +122,7 @@ class CommandExecutorInterface(ToolInterface):
     @abstractmethod
     def list_running_processes(self) -> List[Dict[str, Any]]:
         """List all currently running background processes.
-        
+
         Returns:
             List of dictionaries containing process information
         """
@@ -129,7 +131,7 @@ class CommandExecutorInterface(ToolInterface):
     @abstractmethod
     async def start_periodic_status_reporter(self, interval: float = 30.0, enabled: bool = True) -> None:
         """Start periodic status reporting for running processes.
-        
+
         Args:
             interval: Time interval between status reports in seconds
             enabled: Whether to enable periodic reporting

@@ -74,7 +74,7 @@ except ImportError:
     PullRequestCommentResponse = types_module.PullRequestCommentResponse
 
 
-@register_tool
+@register_tool(ecosystem="microsoft")
 class AzurePullRequestTool(ToolInterface):
     """Dedicated tool for managing Azure DevOps Pull Requests using REST API.
 

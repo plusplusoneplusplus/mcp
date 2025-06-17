@@ -35,7 +35,7 @@ class GitOperationType(str, Enum):
     CHERRY_PICK = "git_cherry_pick"
 
 
-@register_tool
+@register_tool(ecosystem="general")
 class GitTool(ToolInterface):
     """Git tool for repository operations through MCP."""
 

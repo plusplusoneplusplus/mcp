@@ -60,7 +60,7 @@ except ImportError:
 # Constants
 API_VERSION = "7.1"  # Azure DevOps API version
 
-@register_tool
+@register_tool(ecosystem="microsoft")
 class AzureWorkItemTool(ToolInterface):
     """Dedicated tool for managing Azure DevOps Work Items.
 
