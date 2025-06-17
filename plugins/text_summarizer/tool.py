@@ -10,7 +10,7 @@ from mcp_tools.plugin import register_tool
 from utils.html_to_markdown import extract_and_format_html
 
 
-@register_tool(os="all")
+@register_tool(os_type="all")
 class WebSummarizerTool(ToolInterface):
     """Tool for summarizing web content and converting it to markdown."""
 
@@ -67,7 +67,7 @@ class WebSummarizerTool(ToolInterface):
         )
 
 
-@register_tool(os="all")
+@register_tool(os_type="all")
 class UrlSummarizerTool(ToolInterface):
     """Tool for fetching a URL and extracting its content into markdown."""
 

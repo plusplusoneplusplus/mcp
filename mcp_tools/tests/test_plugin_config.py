@@ -694,13 +694,13 @@ def test_tool_registration_os_filtering(monkeypatch):
     cfg = PluginConfig()
 
     # Windows tools should be registered
-    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), os="windows")
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), os_type="windows")
 
     # Non-windows tools should not be registered
-    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), os="non-windows")
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), os_type="non-windows")
 
     # Tools without OS should be registered (backward compatibility)
-    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), os=None)
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), os_type=None)
 
 
 def test_tool_registration_combined_filtering(monkeypatch):
@@ -710,16 +710,16 @@ def test_tool_registration_combined_filtering(monkeypatch):
     cfg = PluginConfig()
 
     # Both ecosystem and OS match
-    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="microsoft", os="windows")
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="microsoft", os_type="windows")
 
     # Ecosystem matches, OS doesn't
-    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="microsoft", os="non-windows")
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="microsoft", os_type="non-windows")
 
     # OS matches, ecosystem doesn't
-    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="general", os="windows")
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="general", os_type="windows")
 
     # Neither matches
-    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="general", os="non-windows")
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="general", os_type="non-windows")
 
 
 def test_enable_disable_ecosystem():
@@ -783,4 +783,4 @@ def test_backward_compatibility_ecosystem_os():
     # Tools without ecosystem/OS should always be enabled for backward compatibility
     assert cfg.is_ecosystem_enabled(None)
     assert cfg.is_os_enabled(None)
-    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem=None, os=None)
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem=None, os_type=None)

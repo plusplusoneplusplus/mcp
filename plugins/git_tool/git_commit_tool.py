@@ -22,7 +22,7 @@ class GitCommitOperationType(str, Enum):
     PULL_REBASE = "git_pull_rebase"
 
 
-@register_tool(ecosystem="general", os="all")
+@register_tool(ecosystem="general", os_type="all")
 class GitCommitTool(ToolInterface):
     """Git commit tool for commit and pull rebase operations through MCP."""
 

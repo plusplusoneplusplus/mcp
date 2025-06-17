@@ -12,7 +12,7 @@ from mcp_tools.plugin import register_tool
 from config import env_manager
 
 
-@register_tool(ecosystem="microsoft", os="all")
+@register_tool(ecosystem="microsoft", os_type="all")
 class AzureRepoClient(ToolInterface):
     """Client for interacting with Azure DevOps Repositories using Azure CLI commands.
 

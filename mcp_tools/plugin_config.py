@@ -196,7 +196,7 @@ class PluginConfig:
 
     def should_register_tool_class(
         self, class_name: str, tool_name: str, yaml_tools: Set[str],
-        ecosystem: Optional[str] = None, os: Optional[str] = None
+        ecosystem: Optional[str] = None, os_type: Optional[str] = None
     ) -> bool:
         """Determine if a tool class should be registered.
 
@@ -205,7 +205,7 @@ class PluginConfig:
             tool_name: Name of the tool
             yaml_tools: Set of tool names defined in YAML
             ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
-            os: OS compatibility ("windows", "non-windows", "all")
+            os_type: OS compatibility ("windows", "non-windows", "all")
 
         Returns:
             True if the tool should be registered, False otherwise
@@ -231,8 +231,8 @@ class PluginConfig:
             return False
 
         # Check OS enable/disable status
-        if not self.is_os_enabled(os):
-            logger.debug(f"Skipping registration of tool '{tool_name}' from disabled OS: {os}")
+        if not self.is_os_enabled(os_type):
+            logger.debug(f"Skipping registration of tool '{tool_name}' from disabled OS: {os_type}")
             return False
 
         # Check if there's a YAML definition that should override this
