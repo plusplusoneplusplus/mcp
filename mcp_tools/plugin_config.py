@@ -48,6 +48,11 @@ class PluginConfig:
         self.disabled_ecosystems = set()  # Explicitly disabled ecosystems
         self.ecosystem_enable_mode = "all"  # "all", "whitelist", "blacklist"
 
+        # OS filtering configuration
+        self.enabled_os = set()  # Explicitly enabled OS types
+        self.disabled_os = set()  # Explicitly disabled OS types
+        self.os_enable_mode = "all"  # "all", "whitelist", "blacklist"
+
         # Load environment-based configuration
         self._load_from_env()
 
@@ -116,7 +121,8 @@ class PluginConfig:
         # Load ecosystem configuration
         self._load_ecosystem_config_from_env()
 
-
+        # Load OS configuration
+        self._load_os_config_from_env()
 
         # Log the configuration
         logger.debug(
@@ -185,11 +191,37 @@ class PluginConfig:
             self.disabled_ecosystems.update(disabled_ecosystems)
             logger.info(f"Disabled ecosystems from environment: {self.disabled_ecosystems}")
 
+    def _load_os_config_from_env(self):
+        """Load OS enable/disable configuration from environment variables."""
+        # Get OS enable mode
+        env_os_mode = os.environ.get("MCP_OS_MODE", "all").lower()
+        if env_os_mode in ("all", "whitelist", "blacklist"):
+            self.os_enable_mode = env_os_mode
+        else:
+            logger.warning(f"Invalid MCP_OS_MODE value: {env_os_mode}. Using 'all'")
+            self.os_enable_mode = "all"
 
+        # Get enabled OS types
+        env_enabled_os = os.environ.get("MCP_ENABLED_OS", "")
+        if env_enabled_os:
+            enabled_os = {
+                os_type.strip().lower() for os_type in env_enabled_os.split(",") if os_type.strip()
+            }
+            self.enabled_os.update(enabled_os)
+            logger.info(f"Enabled OS types from environment: {self.enabled_os}")
+
+        # Get disabled OS types
+        env_disabled_os = os.environ.get("MCP_DISABLED_OS", "")
+        if env_disabled_os:
+            disabled_os = {
+                os_type.strip().lower() for os_type in env_disabled_os.split(",") if os_type.strip()
+            }
+            self.disabled_os.update(disabled_os)
+            logger.info(f"Disabled OS types from environment: {self.disabled_os}")
 
     def should_register_tool_class(
         self, class_name: str, tool_name: str, yaml_tools: Set[str],
-        ecosystem: Optional[str] = None
+        ecosystem: Optional[str] = None, os: Optional[str] = None
     ) -> bool:
         """Determine if a tool class should be registered.
 
@@ -198,6 +230,7 @@ class PluginConfig:
             tool_name: Name of the tool
             yaml_tools: Set of tool names defined in YAML
             ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
+            os: OS compatibility ("windows", "non-windows", "all")
 
         Returns:
             True if the tool should be registered, False otherwise
@@ -222,7 +255,10 @@ class PluginConfig:
             logger.debug(f"Skipping registration of tool '{tool_name}' from disabled ecosystem: {ecosystem}")
             return False
 
-
+        # Check OS enable/disable status
+        if not self.is_os_enabled(os):
+            logger.debug(f"Skipping registration of tool '{tool_name}' from disabled OS: {os}")
+            return False
 
         # Check if there's a YAML definition that should override this
         # Only apply this rule to non-YAML tools (classes not starting with YamlTool_)
@@ -300,7 +336,39 @@ class PluginConfig:
             logger.warning(f"Unknown ecosystem enable mode: {self.ecosystem_enable_mode}")
             return True
 
+    def is_os_enabled(self, os: Optional[str]) -> bool:
+        """Check if an OS is enabled based on the current configuration.
 
+        Args:
+            os: Name of the OS to check (case-insensitive)
+
+        Returns:
+            True if the OS should be enabled, False otherwise
+        """
+        # If no OS is specified, treat as enabled (backward compatibility)
+        if os is None:
+            return True
+
+        os_lower = os.lower()
+
+        # If OS is explicitly disabled, return False
+        if os_lower in self.disabled_os:
+            return False
+
+        # Handle different enable modes
+        if self.os_enable_mode == "all":
+            # All OS types are enabled by default unless explicitly disabled
+            return True
+        elif self.os_enable_mode == "whitelist":
+            # Only explicitly enabled OS types are allowed
+            return os_lower in self.enabled_os
+        elif self.os_enable_mode == "blacklist":
+            # All OS types are enabled except those explicitly disabled
+            return os_lower not in self.disabled_os
+        else:
+            # Default to all enabled for unknown modes
+            logger.warning(f"Unknown OS enable mode: {self.os_enable_mode}")
+            return True
 
     def enable_plugin(self, plugin_name: str) -> None:
         """Enable a specific plugin.
@@ -348,7 +416,29 @@ class PluginConfig:
         self.enabled_ecosystems.discard(ecosystem_lower)
         logger.info(f"Ecosystem '{ecosystem}' has been disabled")
 
+    def enable_os(self, os: str) -> None:
+        """Enable a specific OS.
 
+        Args:
+            os: Name of the OS to enable
+        """
+        os_lower = os.lower()
+        self.enabled_os.add(os_lower)
+        # Remove from disabled set if present
+        self.disabled_os.discard(os_lower)
+        logger.info(f"OS '{os}' has been enabled")
+
+    def disable_os(self, os: str) -> None:
+        """Disable a specific OS.
+
+        Args:
+            os: Name of the OS to disable
+        """
+        os_lower = os.lower()
+        self.disabled_os.add(os_lower)
+        # Remove from enabled set if present
+        self.enabled_os.discard(os_lower)
+        logger.info(f"OS '{os}' has been disabled")
 
     def get_available_plugins(self) -> Dict[str, Dict[str, Any]]:
         """Get metadata about all available plugins.

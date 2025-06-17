@@ -51,11 +51,12 @@ class PluginRegistry:
         self.yaml_tool_names: Set[str] = set()
         self.tool_sources: Dict[str, str] = {}  # Track tool source: "code" or "yaml"
         self.tool_ecosystems: Dict[str, Optional[str]] = {}  # Track tool ecosystem
+        self.tool_os: Dict[str, Optional[str]] = {}  # Track tool OS compatibility
 
 
     def register_tool(
         self, tool_class: Type[ToolInterface], source: str = "code",
-        ecosystem: Optional[str] = None
+        ecosystem: Optional[str] = None, os: Optional[str] = None
     ) -> Optional[Type[ToolInterface]]:
         """Register a tool class.
 
@@ -63,6 +64,7 @@ class PluginRegistry:
             tool_class: A class that implements ToolInterface
             source: Source of the tool ("code" or "yaml")
             ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
+            os: OS compatibility ("windows", "non-windows", "all")
 
         Returns:
             The registered tool class or None if it wasn't registered
@@ -93,17 +95,19 @@ class PluginRegistry:
             # Check if this tool should be registered based on configuration
             if not config.should_register_tool_class(
                 tool_class.__name__, tool_name, self.yaml_tool_names,
-                ecosystem=ecosystem
+                ecosystem=ecosystem, os=os
             ):
                 return None
 
             logger.info(
                 f"Registering tool: {tool_name} ({tool_class.__name__}) from {source}"
                 f"{f' [ecosystem: {ecosystem}]' if ecosystem else ''}"
+                f"{f' [os: {os}]' if os else ''}"
             )
             self.tools[tool_name] = tool_class
             self.tool_sources[tool_name] = source
             self.tool_ecosystems[tool_name] = ecosystem
+            self.tool_os[tool_name] = os
             return tool_class
         except Exception as e:
             logger.error(f"Error creating instance of {tool_class.__name__}: {e}")
@@ -304,7 +308,7 @@ class PluginRegistry:
                         # Check if this tool should be registered based on configuration
                         if not config.should_register_tool_class(
                             name, tool_name, self.yaml_tool_names,
-                            ecosystem=ecosystem
+                            ecosystem=ecosystem, os=os
                         ):
                             logger.debug(
                                 f"Skipping registration of {name} (tool: {tool_name}) due to configuration"
@@ -688,6 +692,42 @@ class PluginRegistry:
         """
         return self.tool_ecosystems.copy()
 
+    def get_tools_by_os(self, os: str) -> List[Type[ToolInterface]]:
+        """Get all tools compatible with a specific OS.
+
+        Args:
+            os: The OS to filter by (case-insensitive)
+
+        Returns:
+            List of tool classes compatible with the specified OS
+        """
+        os_lower = os.lower()
+        return [
+            tool_class
+            for tool_name, tool_class in self.tools.items()
+            if (self.tool_os.get(tool_name) or "").lower() == os_lower
+        ]
+
+    def get_available_os(self) -> Set[str]:
+        """Get all available OS types from registered tools.
+
+        Returns:
+            Set of OS types
+        """
+        os_types = set()
+        for os_type in self.tool_os.values():
+            if os_type:
+                os_types.add(os_type)
+        return os_types
+
+    def get_tool_os(self) -> Dict[str, Optional[str]]:
+        """Get the OS mapping for all tools.
+
+        Returns:
+            Dictionary mapping tool names to their OS compatibility
+        """
+        return self.tool_os.copy()
+
 
 
     def get_all_instances(self) -> List[ToolInterface]:
@@ -734,6 +774,7 @@ class PluginRegistry:
         self.yaml_tool_names.clear()
         self.tool_sources.clear()
         self.tool_ecosystems.clear()
+        self.tool_os.clear()
 
     def add_yaml_tool_names(self, tool_names: Set[str]) -> None:
         """Add YAML tool names to the registry.
@@ -769,7 +810,8 @@ class PluginRegistry:
                     tool_name in config.disabled_plugins
                 ),
                 "has_instance": tool_name in self.instances,
-                "ecosystem": self.tool_ecosystems.get(tool_name, None)
+                "ecosystem": self.tool_ecosystems.get(tool_name, None),
+                "os": self.tool_os.get(tool_name, None)
             }
 
         # Add YAML tool names that might not be registered yet
@@ -838,13 +880,14 @@ registry = PluginRegistry()
 
 
 # Decorator for registering tools
-def register_tool(cls=None, *, source="code", ecosystem=None):
+def register_tool(cls=None, *, source="code", ecosystem=None, os=None):
     """Decorator to register a tool class with the plugin registry.
 
     Args:
         cls: The class to register
         source: Source of the tool ("code" or "yaml")
         ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
+        os: OS compatibility ("windows", "non-windows", "all")
 
     Example:
         @register_tool
@@ -852,7 +895,7 @@ def register_tool(cls=None, *, source="code", ecosystem=None):
             ...
 
         # Or with metadata specified:
-        @register_tool(source="yaml", ecosystem="microsoft")
+        @register_tool(source="yaml", ecosystem="microsoft", os="windows")
         class AzureTool(ToolInterface):
             ...
     """
@@ -861,8 +904,9 @@ def register_tool(cls=None, *, source="code", ecosystem=None):
         # Store metadata on the class for discovery
         cls._mcp_ecosystem = ecosystem
         cls._mcp_source = source
+        cls._mcp_os = os
 
-        result = registry.register_tool(cls, source=source, ecosystem=ecosystem)
+        result = registry.register_tool(cls, source=source, ecosystem=ecosystem, os=os)
         return cls if result is None else result
 
     if cls is None:
