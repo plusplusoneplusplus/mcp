@@ -1,4 +1,5 @@
 from mcp_tools.command_executor.executor import CommandExecutor
+from mcp_tools.command_executor.tmux_executor import TmuxExecutor
 from mcp_tools.command_executor.types import (
     CommandResult,
     AsyncCommandResponse,
@@ -16,6 +17,7 @@ from mcp_tools.command_executor.utils import (
 
 __all__ = [
     "CommandExecutor",
+    "TmuxExecutor",
     "CommandResult",
     "AsyncCommandResponse",
     "ProcessStatusResponse",
