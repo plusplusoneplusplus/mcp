@@ -50,15 +50,19 @@ class PluginRegistry:
         self.discovered_paths: Set[str] = set()
         self.yaml_tool_names: Set[str] = set()
         self.tool_sources: Dict[str, str] = {}  # Track tool source: "code" or "yaml"
+        self.tool_ecosystems: Dict[str, Optional[str]] = {}  # Track tool ecosystem
+
 
     def register_tool(
-        self, tool_class: Type[ToolInterface], source: str = "code"
+        self, tool_class: Type[ToolInterface], source: str = "code",
+        ecosystem: Optional[str] = None
     ) -> Optional[Type[ToolInterface]]:
         """Register a tool class.
 
         Args:
             tool_class: A class that implements ToolInterface
             source: Source of the tool ("code" or "yaml")
+            ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
 
         Returns:
             The registered tool class or None if it wasn't registered
@@ -88,15 +92,18 @@ class PluginRegistry:
 
             # Check if this tool should be registered based on configuration
             if not config.should_register_tool_class(
-                tool_class.__name__, tool_name, self.yaml_tool_names
+                tool_class.__name__, tool_name, self.yaml_tool_names,
+                ecosystem=ecosystem
             ):
                 return None
 
             logger.info(
                 f"Registering tool: {tool_name} ({tool_class.__name__}) from {source}"
+                f"{f' [ecosystem: {ecosystem}]' if ecosystem else ''}"
             )
             self.tools[tool_name] = tool_class
             self.tool_sources[tool_name] = source
+            self.tool_ecosystems[tool_name] = ecosystem
             return tool_class
         except Exception as e:
             logger.error(f"Error creating instance of {tool_class.__name__}: {e}")
@@ -291,9 +298,13 @@ class PluginRegistry:
                             )
                             continue
 
+                        # Get ecosystem from the class metadata (set by decorator) or instance if available
+                        ecosystem = getattr(obj, '_mcp_ecosystem', getattr(temp_instance, 'ecosystem', None))
+
                         # Check if this tool should be registered based on configuration
                         if not config.should_register_tool_class(
-                            name, tool_name, self.yaml_tool_names
+                            name, tool_name, self.yaml_tool_names,
+                            ecosystem=ecosystem
                         ):
                             logger.debug(
                                 f"Skipping registration of {name} (tool: {tool_name}) due to configuration"
@@ -333,7 +344,7 @@ class PluginRegistry:
                             continue
 
                         # Use direct registry method for consistency
-                        result = self.register_tool(obj, source="code")
+                        result = self.register_tool(obj, source="code", ecosystem=ecosystem)
                         if result is not None:
                             successful_registrations.append(
                                 f"{name} (as '{tool_name}')"
@@ -401,13 +412,13 @@ class PluginRegistry:
 
         # Check if the directory contains Python files or subdirectories
         plugin_items = list(plugin_dir.iterdir())
-        
+
         # Find plugin directories (subdirectories with __init__.py)
         plugin_subdirs = [
-            item for item in plugin_items 
+            item for item in plugin_items
             if item.is_dir() and (item / "__init__.py").exists()
         ]
-        
+
         if plugin_subdirs:
             plugin_names = [item.name for item in plugin_subdirs]
             logger.info(f"📁 Found plugin directories: {', '.join(plugin_names)}")
@@ -424,7 +435,7 @@ class PluginRegistry:
         for item in plugin_subdirs:
             plugins_discovered += 1
             plugin_start_time = time.time()
-            
+
             try:
                 plugin_name = item.name
 
@@ -446,13 +457,13 @@ class PluginRegistry:
 
                 # Look for all files ending with tool.py
                 tool_files = list(item.glob("*tool.py"))
-                
+
                 # Individual Plugin Loading Logs
                 logger.info(f"🔌 Loading plugin: {plugin_name}")
-                
+
                 if tool_files:
                     logger.info(f"  📄 Found tool modules: {', '.join([f.name for f in tool_files])}")
-                    
+
                     loaded_tools = []
                     for tool_file in tool_files:
                         try:
@@ -473,7 +484,7 @@ class PluginRegistry:
                                 self._scan_module_for_tools(module)
                                 tools_after = len(self.tools)
                                 tools_added = tools_after - tools_before
-                                
+
                                 if tools_added > 0:
                                     loaded_tools.append(module_name)
                                     logger.info(f"  ✅ Successfully loaded: {module_name} ({tools_added} tools)")
@@ -483,7 +494,7 @@ class PluginRegistry:
                                 logger.error(f"  ❌ Failed to create spec for {tool_file}")
                         except Exception as e:
                             logger.error(f"  ❌ Error importing tool module from {tool_file}: {e}")
-                    
+
                     if loaded_tools:
                         plugins_loaded += 1
                         plugin_duration = time.time() - plugin_start_time
@@ -514,14 +525,14 @@ class PluginRegistry:
                         "error": "No tool modules found",
                         "source_path": str(item)
                     })
-                    
+
             except Exception as e:
                 plugins_failed += 1
                 plugin_duration = time.time() - plugin_start_time
                 logger.error(f"🔌 Error loading plugin {item.name}: {e}")
                 plugin_details.append({
                     "name": item.name,
-                    "status": "failed", 
+                    "status": "failed",
                     "duration": plugin_duration,
                     "error": str(e),
                     "source_path": str(item)
@@ -532,7 +543,7 @@ class PluginRegistry:
         logger.info(f"  • Total plugins discovered: {plugins_discovered}")
         logger.info(f"  • Successfully loaded: {plugins_loaded}")
         logger.info(f"  • Failed to load: {plugins_failed}")
-        
+
         if plugin_details:
             logger.info(f"  • Plugin details:")
             for detail in plugin_details:
@@ -545,7 +556,7 @@ class PluginRegistry:
 
     def _log_plugin_discovery_start(self, plugin_dir: Path):
         """Log the start of plugin discovery for a directory.
-        
+
         Args:
             plugin_dir: Path to the plugin directory being scanned
         """
@@ -553,7 +564,7 @@ class PluginRegistry:
 
     def _log_plugin_loaded(self, plugin_name: str, tool_files: List[Path], duration: float):
         """Log successful plugin loading with timing information.
-        
+
         Args:
             plugin_name: Name of the loaded plugin
             tool_files: List of tool files that were processed
@@ -565,7 +576,7 @@ class PluginRegistry:
 
     def _log_plugin_failed(self, plugin_name: str, error: str, duration: float):
         """Log failed plugin loading with error details.
-        
+
         Args:
             plugin_name: Name of the plugin that failed to load
             error: Error message describing the failure
@@ -576,12 +587,12 @@ class PluginRegistry:
 
     def get_plugin_loading_summary(self) -> Dict[str, Any]:
         """Get a comprehensive summary of plugin loading results.
-        
+
         Returns:
             Dictionary containing plugin loading statistics and details
         """
         tool_sources = self.get_tool_sources()
-        
+
         # Group tools by source directory (approximate)
         plugin_groups = {}
         for tool_name, source in tool_sources.items():
@@ -592,11 +603,11 @@ class PluginRegistry:
                     if discovered_path in tool_name.lower():
                         plugin_source = discovered_path
                         break
-                
+
                 if plugin_source not in plugin_groups:
                     plugin_groups[plugin_source] = []
                 plugin_groups[plugin_source].append(tool_name)
-        
+
         return {
             "total_tools_registered": len(self.tools),
             "code_tools": len([s for s in tool_sources.values() if s == "code"]),
@@ -623,19 +634,61 @@ class PluginRegistry:
         return self.tool_sources.copy()
 
     def get_tools_by_source(self, source: str) -> List[Type[ToolInterface]]:
-        """Get all registered tool classes from a specific source.
+        """Get all tools from a specific source.
 
         Args:
-            source: Source of the tools to get ("code" or "yaml")
+            source: The source to filter by ("code" or "yaml")
 
         Returns:
             List of tool classes from the specified source
         """
         return [
-            self.tools[name]
-            for name, src in self.tool_sources.items()
-            if src == source and name in self.tools
+            tool_class
+            for tool_name, tool_class in self.tools.items()
+            if self.tool_sources.get(tool_name) == source
         ]
+
+    def get_tools_by_ecosystem(self, ecosystem: str) -> List[Type[ToolInterface]]:
+        """Get all tools from a specific ecosystem.
+
+        Args:
+            ecosystem: The ecosystem to filter by (case-insensitive)
+
+        Returns:
+            List of tool classes from the specified ecosystem
+        """
+        ecosystem_lower = ecosystem.lower()
+        return [
+            tool_class
+            for tool_name, tool_class in self.tools.items()
+            if (self.tool_ecosystems.get(tool_name) or "").lower() == ecosystem_lower
+        ]
+
+
+
+    def get_available_ecosystems(self) -> Set[str]:
+        """Get all available ecosystems from registered tools.
+
+        Returns:
+            Set of ecosystem names
+        """
+        ecosystems = set()
+        for ecosystem in self.tool_ecosystems.values():
+            if ecosystem:
+                ecosystems.add(ecosystem)
+        return ecosystems
+
+
+
+    def get_tool_ecosystems(self) -> Dict[str, Optional[str]]:
+        """Get the ecosystem mapping for all tools.
+
+        Returns:
+            Dictionary mapping tool names to their ecosystems
+        """
+        return self.tool_ecosystems.copy()
+
+
 
     def get_all_instances(self) -> List[ToolInterface]:
         """Get instances of all registered tools.
@@ -680,6 +733,7 @@ class PluginRegistry:
         self.discovered_paths.clear()
         self.yaml_tool_names.clear()
         self.tool_sources.clear()
+        self.tool_ecosystems.clear()
 
     def add_yaml_tool_names(self, tool_names: Set[str]) -> None:
         """Add YAML tool names to the registry.
@@ -698,9 +752,9 @@ class PluginRegistry:
             registration status, source, and enable/disable state
         """
         from mcp_tools.plugin_config import config
-        
+
         available_plugins = {}
-        
+
         # Add registered tools
         for tool_name, tool_class in self.tools.items():
             source = self.tool_sources.get(tool_name, "unknown")
@@ -711,12 +765,13 @@ class PluginRegistry:
                 "registered": True,
                 "enabled": config.is_plugin_enabled(tool_name),
                 "explicitly_configured": (
-                    tool_name in config.enabled_plugins or 
+                    tool_name in config.enabled_plugins or
                     tool_name in config.disabled_plugins
                 ),
-                "has_instance": tool_name in self.instances
+                "has_instance": tool_name in self.instances,
+                "ecosystem": self.tool_ecosystems.get(tool_name, None)
             }
-        
+
         # Add YAML tool names that might not be registered yet
         for tool_name in self.yaml_tool_names:
             if tool_name not in available_plugins:
@@ -727,12 +782,13 @@ class PluginRegistry:
                     "registered": False,
                     "enabled": config.is_plugin_enabled(tool_name),
                     "explicitly_configured": (
-                        tool_name in config.enabled_plugins or 
+                        tool_name in config.enabled_plugins or
                         tool_name in config.disabled_plugins
                     ),
-                    "has_instance": False
+                    "has_instance": False,
+                    "ecosystem": None
                 }
-        
+
         # Add explicitly configured plugins that might not be discovered yet
         config_plugins = config.enabled_plugins.union(config.disabled_plugins)
         for plugin_name in config_plugins:
@@ -744,9 +800,10 @@ class PluginRegistry:
                     "registered": False,
                     "enabled": config.is_plugin_enabled(plugin_name),
                     "explicitly_configured": True,
-                    "has_instance": False
+                    "has_instance": False,
+                    "ecosystem": None
                 }
-        
+
         return available_plugins
 
     def get_enabled_plugins(self) -> Dict[str, Dict[str, Any]]:
@@ -757,8 +814,8 @@ class PluginRegistry:
         """
         all_plugins = self.get_available_plugins()
         return {
-            name: metadata 
-            for name, metadata in all_plugins.items() 
+            name: metadata
+            for name, metadata in all_plugins.items()
             if metadata["enabled"]
         }
 
@@ -770,8 +827,8 @@ class PluginRegistry:
         """
         all_plugins = self.get_available_plugins()
         return {
-            name: metadata 
-            for name, metadata in all_plugins.items() 
+            name: metadata
+            for name, metadata in all_plugins.items()
             if not metadata["enabled"]
         }
 
@@ -781,26 +838,31 @@ registry = PluginRegistry()
 
 
 # Decorator for registering tools
-def register_tool(cls=None, *, source="code"):
+def register_tool(cls=None, *, source="code", ecosystem=None):
     """Decorator to register a tool class with the plugin registry.
 
     Args:
         cls: The class to register
         source: Source of the tool ("code" or "yaml")
+        ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
 
     Example:
         @register_tool
         class MyTool(ToolInterface):
             ...
 
-        # Or with source specified:
-        @register_tool(source="yaml")
-        class YamlTool(ToolInterface):
+        # Or with metadata specified:
+        @register_tool(source="yaml", ecosystem="microsoft")
+        class AzureTool(ToolInterface):
             ...
     """
 
     def _register(cls):
-        result = registry.register_tool(cls, source=source)
+        # Store metadata on the class for discovery
+        cls._mcp_ecosystem = ecosystem
+        cls._mcp_source = source
+
+        result = registry.register_tool(cls, source=source, ecosystem=ecosystem)
         return cls if result is None else result
 
     if cls is None:
@@ -890,7 +952,7 @@ def discover_and_register_tools():
             try:
                 plugin_roots = config.get_plugin_roots()
                 logger.info(f"🔍 Discovering tools in {len(plugin_roots)} plugin root directories")
-                
+
                 # Log plugin root directories being scanned
                 for i, plugin_root in enumerate(plugin_roots, 1):
                     logger.info(f"  📁 Plugin root {i}: {plugin_root}")
@@ -921,7 +983,7 @@ def discover_and_register_tools():
         tool_sources = registry.get_tool_sources()
         yaml_count = sum(1 for source in tool_sources.values() if source == "yaml")
         code_count = sum(1 for source in tool_sources.values() if source == "code")
-        
+
         # Get plugin loading summary
         plugin_summary = registry.get_plugin_loading_summary()
 
@@ -934,20 +996,20 @@ def discover_and_register_tools():
         logger.info(f"🔧 Code tools: {code_count}")
         logger.info(f"✅ Successfully processed components: {len(successful_tools)}")
         logger.info(f"❌ Failed components: {len(failed_tools)}")
-        
+
         # Plugin source breakdown
         if plugin_summary.get("plugin_groups"):
             logger.info(f"📁 Plugin sources:")
             for plugin_source, tools in plugin_summary["plugin_groups"].items():
                 logger.info(f"  • {plugin_source}: {', '.join(tools) if tools else 'None'}")
-        
+
         # Plugin root directories
         plugin_roots = config.get_plugin_roots()
         if plugin_roots:
             logger.info(f"📂 Plugin root directories scanned:")
             for plugin_root in plugin_roots:
                 logger.info(f"  • {plugin_root}")
-        
+
         # Discovered plugin paths
         if plugin_summary.get("discovered_plugin_paths"):
             logger.info(f"🔌 Discovered plugin directories:")
@@ -966,9 +1028,9 @@ def discover_and_register_tools():
         logger.debug(
             f"Tool details: {[(name, source) for name, source in tool_sources.items()]}"
         )
-        
+
         logger.info("=" * 60)
-        
+
     except Exception as e:
         logger.error(f"❌ Error generating tool discovery summary: {e}")
 

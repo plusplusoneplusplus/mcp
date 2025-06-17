@@ -20,7 +20,7 @@ from mcp_tools.plugin import register_tool
 from config import env
 
 
-@register_tool
+@register_tool(ecosystem="microsoft")
 class KustoClient(KustoClientInterface):
     """Client for interacting with Azure Data Explorer (Kusto).
 

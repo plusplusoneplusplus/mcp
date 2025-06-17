@@ -6,7 +6,7 @@ allowing customization of tool discovery and registration behavior.
 
 import os
 import logging
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,11 @@ class PluginConfig:
         self.enabled_plugins = set()  # Explicitly enabled plugins
         self.disabled_plugins = set()  # Explicitly disabled plugins
         self.plugin_enable_mode = "all"  # "all", "whitelist", "blacklist"
+
+        # Ecosystem filtering configuration
+        self.enabled_ecosystems = set()  # Explicitly enabled ecosystems
+        self.disabled_ecosystems = set()  # Explicitly disabled ecosystems
+        self.ecosystem_enable_mode = "all"  # "all", "whitelist", "blacklist"
 
         # Load environment-based configuration
         self._load_from_env()
@@ -108,6 +113,11 @@ class PluginConfig:
         # Load plugin enable/disable configuration
         self._load_plugin_config_from_env()
 
+        # Load ecosystem configuration
+        self._load_ecosystem_config_from_env()
+
+
+
         # Log the configuration
         logger.debug(
             f"Plugin configuration loaded from environment: "
@@ -115,7 +125,8 @@ class PluginConfig:
             f"register_yaml_tools={self.register_yaml_tools}, "
             f"yaml_overrides_code={self.yaml_overrides_code}, "
             f"plugin_roots={self.plugin_roots}, "
-            f"plugin_enable_mode={self.plugin_enable_mode}"
+            f"plugin_enable_mode={self.plugin_enable_mode}, "
+            f"ecosystem_enable_mode={self.ecosystem_enable_mode}"
         )
 
     def _load_plugin_config_from_env(self):
@@ -146,8 +157,39 @@ class PluginConfig:
             self.disabled_plugins.update(disabled_plugins)
             logger.info(f"Disabled plugins from environment: {self.disabled_plugins}")
 
+    def _load_ecosystem_config_from_env(self):
+        """Load ecosystem enable/disable configuration from environment variables."""
+        # Get ecosystem enable mode
+        env_ecosystem_mode = os.environ.get("MCP_ECOSYSTEM_MODE", "all").lower()
+        if env_ecosystem_mode in ("all", "whitelist", "blacklist"):
+            self.ecosystem_enable_mode = env_ecosystem_mode
+        else:
+            logger.warning(f"Invalid MCP_ECOSYSTEM_MODE value: {env_ecosystem_mode}. Using 'all'")
+            self.ecosystem_enable_mode = "all"
+
+        # Get enabled ecosystems
+        env_enabled_ecosystems = os.environ.get("MCP_ENABLED_ECOSYSTEMS", "")
+        if env_enabled_ecosystems:
+            enabled_ecosystems = {
+                ecosystem.strip().lower() for ecosystem in env_enabled_ecosystems.split(",") if ecosystem.strip()
+            }
+            self.enabled_ecosystems.update(enabled_ecosystems)
+            logger.info(f"Enabled ecosystems from environment: {self.enabled_ecosystems}")
+
+        # Get disabled ecosystems
+        env_disabled_ecosystems = os.environ.get("MCP_DISABLED_ECOSYSTEMS", "")
+        if env_disabled_ecosystems:
+            disabled_ecosystems = {
+                ecosystem.strip().lower() for ecosystem in env_disabled_ecosystems.split(",") if ecosystem.strip()
+            }
+            self.disabled_ecosystems.update(disabled_ecosystems)
+            logger.info(f"Disabled ecosystems from environment: {self.disabled_ecosystems}")
+
+
+
     def should_register_tool_class(
-        self, class_name: str, tool_name: str, yaml_tools: Set[str]
+        self, class_name: str, tool_name: str, yaml_tools: Set[str],
+        ecosystem: Optional[str] = None
     ) -> bool:
         """Determine if a tool class should be registered.
 
@@ -155,6 +197,7 @@ class PluginConfig:
             class_name: Name of the class
             tool_name: Name of the tool
             yaml_tools: Set of tool names defined in YAML
+            ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
 
         Returns:
             True if the tool should be registered, False otherwise
@@ -173,6 +216,13 @@ class PluginConfig:
         if not self.is_plugin_enabled(tool_name):
             logger.debug(f"Skipping registration of disabled plugin: {tool_name}")
             return False
+
+        # Check ecosystem enable/disable status
+        if not self.is_ecosystem_enabled(ecosystem):
+            logger.debug(f"Skipping registration of tool '{tool_name}' from disabled ecosystem: {ecosystem}")
+            return False
+
+
 
         # Check if there's a YAML definition that should override this
         # Only apply this rule to non-YAML tools (classes not starting with YamlTool_)
@@ -216,6 +266,42 @@ class PluginConfig:
             logger.warning(f"Unknown plugin enable mode: {self.plugin_enable_mode}")
             return True
 
+    def is_ecosystem_enabled(self, ecosystem: Optional[str]) -> bool:
+        """Check if an ecosystem is enabled based on the current configuration.
+
+        Args:
+            ecosystem: Name of the ecosystem to check (case-insensitive)
+
+        Returns:
+            True if the ecosystem should be enabled, False otherwise
+        """
+        # If no ecosystem is specified, treat as enabled (backward compatibility)
+        if ecosystem is None:
+            return True
+
+        ecosystem_lower = ecosystem.lower()
+
+        # If ecosystem is explicitly disabled, return False
+        if ecosystem_lower in self.disabled_ecosystems:
+            return False
+
+        # Handle different enable modes
+        if self.ecosystem_enable_mode == "all":
+            # All ecosystems are enabled by default unless explicitly disabled
+            return True
+        elif self.ecosystem_enable_mode == "whitelist":
+            # Only explicitly enabled ecosystems are allowed
+            return ecosystem_lower in self.enabled_ecosystems
+        elif self.ecosystem_enable_mode == "blacklist":
+            # All ecosystems are enabled except those explicitly disabled
+            return ecosystem_lower not in self.disabled_ecosystems
+        else:
+            # Default to all enabled for unknown modes
+            logger.warning(f"Unknown ecosystem enable mode: {self.ecosystem_enable_mode}")
+            return True
+
+
+
     def enable_plugin(self, plugin_name: str) -> None:
         """Enable a specific plugin.
 
@@ -238,6 +324,32 @@ class PluginConfig:
         self.enabled_plugins.discard(plugin_name)
         logger.info(f"Plugin '{plugin_name}' has been disabled")
 
+    def enable_ecosystem(self, ecosystem: str) -> None:
+        """Enable a specific ecosystem.
+
+        Args:
+            ecosystem: Name of the ecosystem to enable
+        """
+        ecosystem_lower = ecosystem.lower()
+        self.enabled_ecosystems.add(ecosystem_lower)
+        # Remove from disabled set if present
+        self.disabled_ecosystems.discard(ecosystem_lower)
+        logger.info(f"Ecosystem '{ecosystem}' has been enabled")
+
+    def disable_ecosystem(self, ecosystem: str) -> None:
+        """Disable a specific ecosystem.
+
+        Args:
+            ecosystem: Name of the ecosystem to disable
+        """
+        ecosystem_lower = ecosystem.lower()
+        self.disabled_ecosystems.add(ecosystem_lower)
+        # Remove from enabled set if present
+        self.enabled_ecosystems.discard(ecosystem_lower)
+        logger.info(f"Ecosystem '{ecosystem}' has been disabled")
+
+
+
     def get_available_plugins(self) -> Dict[str, Dict[str, Any]]:
         """Get metadata about all available plugins.
 
@@ -252,10 +364,10 @@ class PluginConfig:
         except ImportError:
             # Fallback to basic information about configured plugins
             available_plugins = {}
-            
+
             # Add information about explicitly configured plugins
             all_configured_plugins = self.enabled_plugins.union(self.disabled_plugins)
-            
+
             for plugin_name in all_configured_plugins:
                 available_plugins[plugin_name] = {
                     "name": plugin_name,
@@ -265,7 +377,7 @@ class PluginConfig:
                     "registered": False,
                     "has_instance": False
                 }
-            
+
             return available_plugins
 
     def get_yaml_tool_paths(self) -> List[Path]:
