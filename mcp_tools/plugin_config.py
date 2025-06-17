@@ -5,6 +5,7 @@ allowing customization of tool discovery and registration behavior.
 """
 
 import os
+import platform
 import logging
 from typing import List, Dict, Any, Set, Optional
 from pathlib import Path
@@ -178,9 +179,15 @@ class PluginConfig:
             logger.info(f"Enabled ecosystems from environment: {self.enabled_ecosystems}")
 
     def _load_os_config_from_env(self):
-        """Load OS configuration from environment variables."""
+        """Load OS configuration from environment variables with auto-detection."""
         # Get OS setting
-        env_os = os.environ.get("MCP_OS", "*").strip()
+        env_os = os.environ.get("MCP_OS", "").strip()
+
+        if not env_os:
+            # Auto-detect current OS
+            detected_os = self._detect_current_os()
+            logger.info(f"Auto-detected OS: {detected_os}")
+            env_os = detected_os
 
         if env_os == "*":
             # All OS types enabled (empty set means all)
@@ -192,7 +199,26 @@ class PluginConfig:
                 os_type.strip().lower() for os_type in env_os.split(",") if os_type.strip()
             }
             self.enabled_os = enabled_os
-            logger.info(f"Enabled OS types from environment: {self.enabled_os}")
+            logger.info(f"Enabled OS types: {self.enabled_os}")
+
+    def _detect_current_os(self) -> str:
+        """Detect the current operating system and return appropriate MCP OS category.
+
+        Returns:
+            String representing the MCP OS category: 'windows', 'non-windows', or '*'
+        """
+        import platform
+
+        system = platform.system().lower()
+
+        if system == "windows":
+            return "windows"
+        elif system in ("darwin", "linux"):
+            return "non-windows"
+        else:
+            # Unknown platform, fallback to all
+            logger.warning(f"Unknown platform '{system}', defaulting to all OS types")
+            return "*"
 
     def should_register_tool_class(
         self, class_name: str, tool_name: str, yaml_tools: Set[str],

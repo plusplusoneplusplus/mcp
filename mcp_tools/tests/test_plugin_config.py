@@ -606,14 +606,17 @@ def test_ecosystem_config_empty_values(monkeypatch):
     assert cfg.enabled_ecosystems == {"microsoft", "general"}
 
 
-def test_os_config_default():
-    """Test default OS configuration (all enabled)."""
+def test_os_config_default(monkeypatch):
+    """Test default OS configuration (auto-detected)."""
+    # Mock the platform to get predictable results
+    monkeypatch.setattr("platform.system", lambda: "Linux")
     cfg = PluginConfig()
-    assert cfg.enabled_os == set()
-    assert cfg.is_os_enabled("windows")
+    # With auto-detection, should detect "non-windows" for Linux
+    assert cfg.enabled_os == {"non-windows"}
+    assert not cfg.is_os_enabled("windows")
     assert cfg.is_os_enabled("non-windows")
-    assert cfg.is_os_enabled("all")
-    assert cfg.is_os_enabled(None)
+    assert not cfg.is_os_enabled("all")
+    assert cfg.is_os_enabled(None)  # None is always enabled for backward compatibility
 
 
 def test_os_config_asterisk(monkeypatch):
@@ -749,23 +752,19 @@ def test_enable_disable_ecosystem():
     assert cfg.is_ecosystem_enabled("general")
 
 
-def test_enable_disable_os():
+def test_enable_disable_os(monkeypatch):
     """Test enable/disable OS methods."""
+    # Mock the platform to get predictable results
+    monkeypatch.setattr("platform.system", lambda: "Linux")
     cfg = PluginConfig()
 
-    # Initially all OS types are enabled (empty set)
-    assert cfg.enabled_os == set()
-    assert cfg.is_os_enabled("windows")
+    # Initially OS is auto-detected (non-windows for Linux)
+    assert cfg.enabled_os == {"non-windows"}
+    assert cfg.is_os_enabled("non-windows")
 
     # Enable specific OS
     cfg.enable_os("windows")
-    assert cfg.enabled_os == {"windows"}
-    assert cfg.is_os_enabled("windows")
-    assert not cfg.is_os_enabled("non-windows")
-
-    # Enable another OS
-    cfg.enable_os("non-windows")
-    assert cfg.enabled_os == {"windows", "non-windows"}
+    assert cfg.enabled_os == {"non-windows", "windows"}
     assert cfg.is_os_enabled("windows")
     assert cfg.is_os_enabled("non-windows")
 
@@ -777,10 +776,442 @@ def test_enable_disable_os():
 
 
 def test_backward_compatibility_ecosystem_os():
-    """Test backward compatibility for tools without ecosystem/OS metadata."""
+    """Test that tools without ecosystem/OS metadata are always enabled."""
     cfg = PluginConfig()
 
-    # Tools without ecosystem/OS should always be enabled for backward compatibility
-    assert cfg.is_ecosystem_enabled(None)
-    assert cfg.is_os_enabled(None)
-    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem=None, os_type=None)
+    # Enable only specific ecosystem and OS
+    cfg.enabled_ecosystems = {"microsoft"}
+    cfg.enabled_os = {"windows"}
+
+    # Tool without ecosystem/OS should still be enabled
+    assert cfg.should_register_tool_class("Tool", "test_tool", set(), ecosystem=None, os_type=None)
+
+    # Tool with matching ecosystem but no OS should be enabled
+    assert cfg.should_register_tool_class("Tool", "test_tool", set(), ecosystem="microsoft", os_type=None)
+
+    # Tool with matching OS but no ecosystem should be enabled
+    assert cfg.should_register_tool_class("Tool", "test_tool", set(), ecosystem=None, os_type="windows")
+
+
+# OS Auto-Detection Tests
+
+def test_detect_current_os_windows(monkeypatch):
+    """Test OS detection for Windows platform."""
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "windows"
+
+
+def test_detect_current_os_darwin(monkeypatch):
+    """Test OS detection for Darwin/macOS platform."""
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "non-windows"
+
+
+def test_detect_current_os_linux(monkeypatch):
+    """Test OS detection for Linux platform."""
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "non-windows"
+
+
+def test_detect_current_os_unknown(monkeypatch):
+    """Test OS detection for unknown platform."""
+    monkeypatch.setattr("platform.system", lambda: "FreeBSD")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "*"
+
+
+def test_detect_current_os_case_insensitive(monkeypatch):
+    """Test OS detection is case-insensitive."""
+    monkeypatch.setattr("platform.system", lambda: "WINDOWS")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "windows"
+
+    monkeypatch.setattr("platform.system", lambda: "darwin")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "non-windows"
+
+
+def test_os_auto_detection_when_env_empty(monkeypatch):
+    """Test that OS is auto-detected when MCP_OS is empty."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"non-windows"}
+
+
+def test_os_auto_detection_when_env_unset(monkeypatch):
+    """Test that OS is auto-detected when MCP_OS is not set."""
+    monkeypatch.delenv("MCP_OS", raising=False)
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows"}
+
+
+def test_os_auto_detection_when_env_whitespace(monkeypatch):
+    """Test that OS is auto-detected when MCP_OS contains only whitespace."""
+    monkeypatch.setenv("MCP_OS", "   ")
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"non-windows"}
+
+
+def test_os_auto_detection_fallback_to_all(monkeypatch):
+    """Test that auto-detection falls back to all OS types for unknown platforms."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "UnknownOS")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == set()  # Empty set means all enabled
+
+
+def test_os_explicit_config_overrides_auto_detection(monkeypatch):
+    """Test that explicit MCP_OS configuration overrides auto-detection."""
+    monkeypatch.setenv("MCP_OS", "windows")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")  # Different from config
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows"}  # Should use explicit config, not auto-detected
+
+
+def test_os_asterisk_config_overrides_auto_detection(monkeypatch):
+    """Test that MCP_OS=* overrides auto-detection."""
+    monkeypatch.setenv("MCP_OS", "*")
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == set()  # Empty set means all enabled
+
+
+def test_os_auto_detection_logging(monkeypatch, caplog):
+    """Test that auto-detection logs the detected OS."""
+    import logging
+
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+    with caplog.at_level(logging.INFO):
+        cfg = PluginConfig()
+
+    assert "Auto-detected OS: non-windows" in caplog.text
+
+
+def test_os_auto_detection_unknown_platform_warning(monkeypatch, caplog):
+    """Test that unknown platforms generate a warning during auto-detection."""
+    import logging
+
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "WeirdOS")
+
+    with caplog.at_level(logging.WARNING):
+        cfg = PluginConfig()
+
+    assert "Unknown platform 'weirdos', defaulting to all OS types" in caplog.text
+
+
+def test_tool_registration_with_auto_detected_os_windows(monkeypatch):
+    """Test tool registration filtering with auto-detected Windows OS."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+
+    # Windows-specific tool should be registered
+    assert cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+
+    # Non-Windows tool should not be registered
+    assert not cfg.should_register_tool_class("LinuxTool", "linux_tool", set(), os_type="non-windows")
+
+    # Tool without OS specification should be registered
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_tool_registration_with_auto_detected_os_macos(monkeypatch):
+    """Test tool registration filtering with auto-detected macOS."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+    cfg = PluginConfig()
+
+    # Non-Windows tool should be registered
+    assert cfg.should_register_tool_class("MacOSTool", "macos_tool", set(), os_type="non-windows")
+
+    # Windows tool should not be registered
+    assert not cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+
+    # Tool without OS specification should be registered
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_tool_registration_with_auto_detected_os_linux(monkeypatch):
+    """Test tool registration filtering with auto-detected Linux."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+
+    cfg = PluginConfig()
+
+    # Non-Windows tool should be registered
+    assert cfg.should_register_tool_class("LinuxTool", "linux_tool", set(), os_type="non-windows")
+
+    # Windows tool should not be registered
+    assert not cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+
+    # Tool without OS specification should be registered
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_tool_registration_with_auto_detected_unknown_os(monkeypatch):
+    """Test tool registration filtering with auto-detected unknown OS (fallback to all)."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "FreeBSD")
+
+    cfg = PluginConfig()
+
+    # All tools should be registered when OS detection falls back to "*"
+    assert cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+    assert cfg.should_register_tool_class("LinuxTool", "linux_tool", set(), os_type="non-windows")
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_os_auto_detection_integration_with_ecosystem_filtering(monkeypatch):
+    """Test that OS auto-detection works correctly with ecosystem filtering."""
+    monkeypatch.setenv("MCP_OS", "")  # Enable auto-detection
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "microsoft")  # Only Microsoft ecosystem
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+
+    # Tool with matching ecosystem and auto-detected OS should be registered
+    assert cfg.should_register_tool_class(
+        "MSWindowsTool", "ms_windows_tool", set(),
+        ecosystem="microsoft", os_type="windows"
+    )
+
+    # Tool with matching ecosystem but wrong OS should not be registered
+    assert not cfg.should_register_tool_class(
+        "MSLinuxTool", "ms_linux_tool", set(),
+        ecosystem="microsoft", os_type="non-windows"
+    )
+
+    # Tool with wrong ecosystem should not be registered regardless of OS
+    assert not cfg.should_register_tool_class(
+        "GeneralWindowsTool", "general_windows_tool", set(),
+        ecosystem="general", os_type="windows"
+    )
+
+
+# OS Auto-Detection Tests
+
+def test_detect_current_os_windows(monkeypatch):
+    """Test OS detection for Windows platform."""
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "windows"
+
+
+def test_detect_current_os_darwin(monkeypatch):
+    """Test OS detection for Darwin/macOS platform."""
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "non-windows"
+
+
+def test_detect_current_os_linux(monkeypatch):
+    """Test OS detection for Linux platform."""
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "non-windows"
+
+
+def test_detect_current_os_unknown(monkeypatch):
+    """Test OS detection for unknown platform."""
+    monkeypatch.setattr("platform.system", lambda: "FreeBSD")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "*"
+
+
+def test_detect_current_os_case_insensitive(monkeypatch):
+    """Test OS detection is case-insensitive."""
+    monkeypatch.setattr("platform.system", lambda: "WINDOWS")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "windows"
+
+    monkeypatch.setattr("platform.system", lambda: "darwin")
+    cfg = PluginConfig()
+    assert cfg._detect_current_os() == "non-windows"
+
+
+def test_os_auto_detection_when_env_empty(monkeypatch):
+    """Test that OS is auto-detected when MCP_OS is empty."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"non-windows"}
+
+
+def test_os_auto_detection_when_env_unset(monkeypatch):
+    """Test that OS is auto-detected when MCP_OS is not set."""
+    monkeypatch.delenv("MCP_OS", raising=False)
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows"}
+
+
+def test_os_auto_detection_when_env_whitespace(monkeypatch):
+    """Test that OS is auto-detected when MCP_OS contains only whitespace."""
+    monkeypatch.setenv("MCP_OS", "   ")
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"non-windows"}
+
+
+def test_os_auto_detection_fallback_to_all(monkeypatch):
+    """Test that auto-detection falls back to all OS types for unknown platforms."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "UnknownOS")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == set()  # Empty set means all enabled
+
+
+def test_os_explicit_config_overrides_auto_detection(monkeypatch):
+    """Test that explicit MCP_OS configuration overrides auto-detection."""
+    monkeypatch.setenv("MCP_OS", "windows")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")  # Different from config
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows"}  # Should use explicit config, not auto-detected
+
+
+def test_os_asterisk_config_overrides_auto_detection(monkeypatch):
+    """Test that MCP_OS=* overrides auto-detection."""
+    monkeypatch.setenv("MCP_OS", "*")
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+    assert cfg.enabled_os == set()  # Empty set means all enabled
+
+
+def test_os_auto_detection_logging(monkeypatch, caplog):
+    """Test that auto-detection logs the detected OS."""
+    import logging
+
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+    with caplog.at_level(logging.INFO):
+        cfg = PluginConfig()
+
+    assert "Auto-detected OS: non-windows" in caplog.text
+
+
+def test_os_auto_detection_unknown_platform_warning(monkeypatch, caplog):
+    """Test that unknown platforms generate a warning during auto-detection."""
+    import logging
+
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "WeirdOS")
+
+    with caplog.at_level(logging.WARNING):
+        cfg = PluginConfig()
+
+    assert "Unknown platform 'weirdos', defaulting to all OS types" in caplog.text
+
+
+def test_tool_registration_with_auto_detected_os_windows(monkeypatch):
+    """Test tool registration filtering with auto-detected Windows OS."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+
+    # Windows-specific tool should be registered
+    assert cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+
+    # Non-Windows tool should not be registered
+    assert not cfg.should_register_tool_class("LinuxTool", "linux_tool", set(), os_type="non-windows")
+
+    # Tool without OS specification should be registered
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_tool_registration_with_auto_detected_os_macos(monkeypatch):
+    """Test tool registration filtering with auto-detected macOS."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+    cfg = PluginConfig()
+
+    # Non-Windows tool should be registered
+    assert cfg.should_register_tool_class("MacOSTool", "macos_tool", set(), os_type="non-windows")
+
+    # Windows tool should not be registered
+    assert not cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+
+    # Tool without OS specification should be registered
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_tool_registration_with_auto_detected_os_linux(monkeypatch):
+    """Test tool registration filtering with auto-detected Linux."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+
+    cfg = PluginConfig()
+
+    # Non-Windows tool should be registered
+    assert cfg.should_register_tool_class("LinuxTool", "linux_tool", set(), os_type="non-windows")
+
+    # Windows tool should not be registered
+    assert not cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+
+    # Tool without OS specification should be registered
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_tool_registration_with_auto_detected_unknown_os(monkeypatch):
+    """Test tool registration filtering with auto-detected unknown OS (fallback to all)."""
+    monkeypatch.setenv("MCP_OS", "")
+    monkeypatch.setattr("platform.system", lambda: "FreeBSD")
+
+    cfg = PluginConfig()
+
+    # All tools should be registered when OS detection falls back to "*"
+    assert cfg.should_register_tool_class("WindowsTool", "windows_tool", set(), os_type="windows")
+    assert cfg.should_register_tool_class("LinuxTool", "linux_tool", set(), os_type="non-windows")
+    assert cfg.should_register_tool_class("GenericTool", "generic_tool", set(), os_type=None)
+
+
+def test_os_auto_detection_integration_with_ecosystem_filtering(monkeypatch):
+    """Test that OS auto-detection works correctly with ecosystem filtering."""
+    monkeypatch.setenv("MCP_OS", "")  # Enable auto-detection
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "microsoft")  # Only Microsoft ecosystem
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+
+    cfg = PluginConfig()
+
+    # Tool with matching ecosystem and auto-detected OS should be registered
+    assert cfg.should_register_tool_class(
+        "MSWindowsTool", "ms_windows_tool", set(),
+        ecosystem="microsoft", os_type="windows"
+    )
+
+    # Tool with matching ecosystem but wrong OS should not be registered
+    assert not cfg.should_register_tool_class(
+        "MSLinuxTool", "ms_linux_tool", set(),
+        ecosystem="microsoft", os_type="non-windows"
+    )
+
+    # Tool with wrong ecosystem should not be registered regardless of OS
+    assert not cfg.should_register_tool_class(
+        "GeneralWindowsTool", "general_windows_tool", set(),
+        ecosystem="general", os_type="windows"
+    )
