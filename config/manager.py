@@ -197,6 +197,11 @@ class EnvironmentManager:
                 git_root / "config" / "templates" / "env.template" if git_root else None
             )
 
+            # Dump each probed env path to help user troubleshooting.
+            print("Below env file paths have been tried:")
+            for env_path in env_file_paths:
+                print(f"  {env_path}")
+
             if config_template_path and config_template_path.exists():
                 print(
                     f"No .env file found. Please create one using the template at: {config_template_path}"
