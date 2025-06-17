@@ -340,6 +340,10 @@ class PluginConfig:
 
         os_lower = os.lower()
 
+        # Tools with os_type="all" should always be compatible
+        if os_lower == "all":
+            return True
+
         # If enabled_os is empty, all OS types are enabled
         if not self.enabled_os:
             return True

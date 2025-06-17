@@ -615,7 +615,7 @@ def test_os_config_default(monkeypatch):
     assert cfg.enabled_os == {"non-windows"}
     assert not cfg.is_os_enabled("windows")
     assert cfg.is_os_enabled("non-windows")
-    assert not cfg.is_os_enabled("all")
+    assert cfg.is_os_enabled("all")  # Tools with os_type="all" are always compatible
     assert cfg.is_os_enabled(None)  # None is always enabled for backward compatibility
 
 
@@ -636,7 +636,7 @@ def test_os_config_specific_os(monkeypatch):
     assert cfg.enabled_os == {"windows", "non-windows"}
     assert cfg.is_os_enabled("windows")
     assert cfg.is_os_enabled("non-windows")
-    assert not cfg.is_os_enabled("all")
+    assert cfg.is_os_enabled("all")  # Tools with os_type="all" are always compatible
 
 
 def test_os_config_single_os(monkeypatch):
@@ -646,7 +646,7 @@ def test_os_config_single_os(monkeypatch):
     assert cfg.enabled_os == {"windows"}
     assert cfg.is_os_enabled("windows")
     assert not cfg.is_os_enabled("non-windows")
-    assert not cfg.is_os_enabled("all")
+    assert cfg.is_os_enabled("all")  # Tools with os_type="all" are always compatible
 
 
 def test_os_config_case_insensitive(monkeypatch):
