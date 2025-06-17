@@ -12,6 +12,7 @@ import git
 # Import the required interfaces and decorators
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
+from mcp_tools.constants import Ecosystem, OSType
 
 # Import configuration manager
 from config import env_manager
@@ -74,7 +75,7 @@ except ImportError:
     PullRequestCommentResponse = types_module.PullRequestCommentResponse
 
 
-@register_tool(ecosystem="microsoft", os_type="all")
+@register_tool(ecosystem=Ecosystem.MICROSOFT, os_type=OSType.ALL)
 class AzurePullRequestTool(ToolInterface):
     """Dedicated tool for managing Azure DevOps Pull Requests using REST API.
 

@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, Literal
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import BrowserClientInterface
+from mcp_tools.constants import OSType
 from config import env
 from utils.html_to_markdown import extract_and_format_html
 from utils.secret_scanner import redact_secrets
@@ -43,7 +44,7 @@ def _get_domain_from_url(url: str) -> str:
         return "unknown domain"
 
 
-@register_tool(os_type="all")
+@register_tool(os_type=OSType.ALL)
 class BrowserClient(BrowserClientInterface):
     """Client for browser automation operations.
 

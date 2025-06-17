@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
+from mcp_tools.constants import OSType
 
 
 def _has_tmux() -> bool:
@@ -11,7 +12,7 @@ def _has_tmux() -> bool:
     return shutil.which("tmux") is not None
 
 
-@register_tool(os_type="non-windows")
+@register_tool(os_type=OSType.NON_WINDOWS)
 class TmuxExecutor(ToolInterface):
     """Execute commands inside a tmux session using ``send-keys``."""
 

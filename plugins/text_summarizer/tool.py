@@ -7,10 +7,11 @@ from typing import Dict, Any
 # Import the required interfaces and decorators
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
+from mcp_tools.constants import OSType
 from utils.html_to_markdown import extract_and_format_html
 
 
-@register_tool(os_type="all")
+@register_tool(os_type=OSType.ALL)
 class WebSummarizerTool(ToolInterface):
     """Tool for summarizing web content and converting it to markdown."""
 
@@ -67,7 +68,7 @@ class WebSummarizerTool(ToolInterface):
         )
 
 
-@register_tool(os_type="all")
+@register_tool(os_type=OSType.ALL)
 class UrlSummarizerTool(ToolInterface):
     """Tool for fetching a URL and extracting its content into markdown."""
 

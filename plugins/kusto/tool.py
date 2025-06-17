@@ -17,10 +17,11 @@ from azure.identity import DefaultAzureCredential
 # Import the required interfaces and decorators
 from mcp_tools.interfaces import ToolInterface, KustoClientInterface
 from mcp_tools.plugin import register_tool
+from mcp_tools.constants import Ecosystem, OSType
 from config import env
 
 
-@register_tool(ecosystem="microsoft", os_type="all")
+@register_tool(ecosystem=Ecosystem.MICROSOFT, os_type=OSType.ALL)
 class KustoClient(KustoClientInterface):
     """Client for interacting with Azure Data Explorer (Kusto).
 

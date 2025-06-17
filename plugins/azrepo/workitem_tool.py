@@ -8,6 +8,7 @@ from unittest.mock import patch
 # Import the required interfaces and decorators
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
+from mcp_tools.constants import Ecosystem, OSType
 
 # Import configuration manager
 from config import env_manager
@@ -60,7 +61,7 @@ except ImportError:
 # Constants
 API_VERSION = "7.1"  # Azure DevOps API version
 
-@register_tool(ecosystem="microsoft", os_type="all")
+@register_tool(ecosystem=Ecosystem.MICROSOFT, os_type=OSType.ALL)
 class AzureWorkItemTool(ToolInterface):
     """Dedicated tool for managing Azure DevOps Work Items.
 

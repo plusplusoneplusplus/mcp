@@ -13,6 +13,7 @@ import git
 
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
+from mcp_tools.constants import Ecosystem, OSType
 
 
 class GitCommitOperationType(str, Enum):
@@ -22,7 +23,7 @@ class GitCommitOperationType(str, Enum):
     PULL_REBASE = "git_pull_rebase"
 
 
-@register_tool(ecosystem="general", os_type="all")
+@register_tool(ecosystem=Ecosystem.GENERAL, os_type=OSType.ALL)
 class GitCommitTool(ToolInterface):
     """Git commit tool for commit and pull rebase operations through MCP."""
 

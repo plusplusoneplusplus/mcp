@@ -15,6 +15,7 @@ import git
 
 from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
+from mcp_tools.constants import Ecosystem, OSType
 
 
 class GitOperationType(str, Enum):
@@ -35,7 +36,7 @@ class GitOperationType(str, Enum):
     CHERRY_PICK = "git_cherry_pick"
 
 
-@register_tool(ecosystem="general", os_type="all")
+@register_tool(ecosystem=Ecosystem.GENERAL, os_type=OSType.ALL)
 class GitTool(ToolInterface):
     """Git tool for repository operations through MCP."""
 

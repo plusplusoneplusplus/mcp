@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, Literal
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.plugin import register_tool
 from mcp_tools.interfaces import CapturePanelsClientInterface
+from mcp_tools.constants import OSType
 from config import env
 
 DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = env.get_setting(
@@ -14,7 +15,7 @@ DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = env.get_setting(
 DEFAULT_CLIENT_TYPE: str = env.get_setting("client_type", "playwright")
 
 
-@register_tool(os_type="all")
+@register_tool(os_type=OSType.ALL)
 class CapturePanelsClient(CapturePanelsClientInterface):
     """Dedicated client for capturing dashboard panels as PNGs."""
 
