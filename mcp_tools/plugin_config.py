@@ -7,8 +7,10 @@ allowing customization of tool discovery and registration behavior.
 import os
 import platform
 import logging
-from typing import List, Dict, Any, Set, Optional
+from typing import List, Dict, Any, Set, Optional, Union
 from pathlib import Path
+
+from mcp_tools.constants import Ecosystem, OSType
 
 logger = logging.getLogger(__name__)
 
@@ -221,8 +223,12 @@ class PluginConfig:
             return "*"
 
     def should_register_tool_class(
-        self, class_name: str, tool_name: str, yaml_tools: Set[str],
-        ecosystem: Optional[str] = None, os_type: Optional[str] = None
+        self,
+        class_name: str,
+        tool_name: str,
+        yaml_tools: Set[str],
+        ecosystem: Optional[Union[str, Ecosystem]] = None,
+        os_type: Optional[Union[str, OSType]] = None,
     ) -> bool:
         """Determine if a tool class should be registered.
 
@@ -303,7 +309,7 @@ class PluginConfig:
             logger.warning(f"Unknown plugin enable mode: {self.plugin_enable_mode}")
             return True
 
-    def is_ecosystem_enabled(self, ecosystem: Optional[str]) -> bool:
+    def is_ecosystem_enabled(self, ecosystem: Optional[Union[str, Ecosystem]]) -> bool:
         """Check if an ecosystem is enabled based on the current configuration.
 
         Args:
@@ -316,7 +322,7 @@ class PluginConfig:
         if ecosystem is None:
             return True
 
-        ecosystem_lower = ecosystem.lower()
+        ecosystem_lower = str(ecosystem).lower()
 
         # If enabled_ecosystems is empty, all ecosystems are enabled
         if not self.enabled_ecosystems:
@@ -325,7 +331,7 @@ class PluginConfig:
         # Otherwise, only explicitly enabled ecosystems are allowed
         return ecosystem_lower in self.enabled_ecosystems
 
-    def is_os_enabled(self, os: Optional[str]) -> bool:
+    def is_os_enabled(self, os: Optional[Union[str, OSType]]) -> bool:
         """Check if an OS is enabled based on the current configuration.
 
         Args:
@@ -338,7 +344,7 @@ class PluginConfig:
         if os is None:
             return True
 
-        os_lower = os.lower()
+        os_lower = str(os).lower()
 
         # Tools with os_type="all" should always be compatible
         if os_lower == "all":
@@ -373,44 +379,44 @@ class PluginConfig:
         self.enabled_plugins.discard(plugin_name)
         logger.info(f"Plugin '{plugin_name}' has been disabled")
 
-    def enable_ecosystem(self, ecosystem: str) -> None:
+    def enable_ecosystem(self, ecosystem: Union[str, Ecosystem]) -> None:
         """Enable a specific ecosystem.
 
         Args:
             ecosystem: Name of the ecosystem to enable
         """
-        ecosystem_lower = ecosystem.lower()
+        ecosystem_lower = str(ecosystem).lower()
         self.enabled_ecosystems.add(ecosystem_lower)
         logger.info(f"Ecosystem '{ecosystem}' has been enabled")
 
-    def disable_ecosystem(self, ecosystem: str) -> None:
+    def disable_ecosystem(self, ecosystem: Union[str, Ecosystem]) -> None:
         """Disable a specific ecosystem.
 
         Args:
             ecosystem: Name of the ecosystem to disable
         """
-        ecosystem_lower = ecosystem.lower()
+        ecosystem_lower = str(ecosystem).lower()
         # Remove from enabled set (disabling means not in the enabled set)
         self.enabled_ecosystems.discard(ecosystem_lower)
         logger.info(f"Ecosystem '{ecosystem}' has been disabled")
 
-    def enable_os(self, os: str) -> None:
+    def enable_os(self, os: Union[str, OSType]) -> None:
         """Enable a specific OS.
 
         Args:
             os: Name of the OS to enable
         """
-        os_lower = os.lower()
+        os_lower = str(os).lower()
         self.enabled_os.add(os_lower)
         logger.info(f"OS '{os}' has been enabled")
 
-    def disable_os(self, os: str) -> None:
+    def disable_os(self, os: Union[str, OSType]) -> None:
         """Disable a specific OS.
 
         Args:
             os: Name of the OS to disable
         """
-        os_lower = os.lower()
+        os_lower = str(os).lower()
         # Remove from enabled set (disabling means not in the enabled set)
         self.enabled_os.discard(os_lower)
         logger.info(f"OS '{os}' has been disabled")

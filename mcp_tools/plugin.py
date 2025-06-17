@@ -6,10 +6,11 @@ import os
 import pkgutil
 import sys
 import time
-from typing import Dict, List, Type, Set, Optional, Any
+from typing import Dict, List, Type, Set, Optional, Any, Union
 from pathlib import Path
 
 from mcp_tools.interfaces import ToolInterface
+from mcp_tools.constants import Ecosystem, OSType
 from mcp_tools.plugin_config import config
 
 logger = logging.getLogger(__name__)
@@ -55,8 +56,11 @@ class PluginRegistry:
 
 
     def register_tool(
-        self, tool_class: Type[ToolInterface], source: str = "code",
-        ecosystem: Optional[str] = None, os_type: Optional[str] = None
+        self,
+        tool_class: Type[ToolInterface],
+        source: str = "code",
+        ecosystem: Optional[Union[str, Ecosystem]] = None,
+        os_type: Optional[Union[str, OSType]] = None,
     ) -> Optional[Type[ToolInterface]]:
         """Register a tool class.
 
@@ -106,8 +110,10 @@ class PluginRegistry:
             )
             self.tools[tool_name] = tool_class
             self.tool_sources[tool_name] = source
-            self.tool_ecosystems[tool_name] = ecosystem
-            self.tool_os[tool_name] = os_type
+            self.tool_ecosystems[tool_name] = (
+                str(ecosystem) if ecosystem is not None else None
+            )
+            self.tool_os[tool_name] = str(os_type) if os_type is not None else None
             return tool_class
         except Exception as e:
             logger.error(f"Error creating instance of {tool_class.__name__}: {e}")
@@ -883,7 +889,13 @@ registry = PluginRegistry()
 
 
 # Decorator for registering tools
-def register_tool(cls=None, *, source="code", ecosystem=None, os_type=None):
+def register_tool(
+    cls=None,
+    *,
+    source: str = "code",
+    ecosystem: Optional[Union[str, Ecosystem]] = None,
+    os_type: Optional[Union[str, OSType]] = None,
+):
     """Decorator to register a tool class with the plugin registry.
 
     Args:
@@ -905,11 +917,16 @@ def register_tool(cls=None, *, source="code", ecosystem=None, os_type=None):
 
     def _register(cls):
         # Store metadata on the class for discovery
-        cls._mcp_ecosystem = ecosystem
+        cls._mcp_ecosystem = str(ecosystem) if ecosystem is not None else None
         cls._mcp_source = source
-        cls._mcp_os = os_type
+        cls._mcp_os = str(os_type) if os_type is not None else None
 
-        result = registry.register_tool(cls, source=source, ecosystem=ecosystem, os_type=os_type)
+        result = registry.register_tool(
+            cls,
+            source=source,
+            ecosystem=ecosystem,
+            os_type=os_type,
+        )
         return cls if result is None else result
 
     if cls is None:

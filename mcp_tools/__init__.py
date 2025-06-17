@@ -28,6 +28,7 @@ from mcp_tools.plugin import (
     discover_and_register_tools,
     PluginRegistry,
 )
+from mcp_tools.constants import Ecosystem, OSType
 
 # Import dependency injection system
 from mcp_tools.dependency import injector, DependencyInjector
@@ -59,4 +60,6 @@ __all__ = [
     # YAML tools
     "YamlToolBase",
     "discover_and_register_yaml_tools",
+    "Ecosystem",
+    "OSType",
 ]

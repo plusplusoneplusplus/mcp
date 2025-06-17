@@ -1005,6 +1005,22 @@ def test_os_auto_detection_integration_with_ecosystem_filtering(monkeypatch):
     )
 
 
+def test_enum_values_supported():
+    """Ecosystem and OS enums are accepted."""
+    from mcp_tools.constants import Ecosystem, OSType
+
+    cfg = PluginConfig()
+    assert cfg.is_ecosystem_enabled(Ecosystem.MICROSOFT)
+    assert cfg.is_os_enabled(OSType.ALL)
+    assert cfg.should_register_tool_class(
+        "EnumTool",
+        "enum_tool",
+        set(),
+        ecosystem=Ecosystem.GENERAL,
+        os_type=OSType.NON_WINDOWS,
+    )
+
+
 # OS Auto-Detection Tests
 
 def test_detect_current_os_windows(monkeypatch):
