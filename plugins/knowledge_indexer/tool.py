@@ -14,7 +14,7 @@ from utils.vector_store.vector_store import ChromaVectorStore
 from config import env
 
 
-@register_tool
+@register_tool(os="all")
 class KnowledgeIndexerTool(ToolInterface):
     """Tool for users to upload and index new knowledge from files into a vector store."""
 
@@ -203,7 +203,7 @@ class KnowledgeIndexerTool(ToolInterface):
             return {"success": False, "error": f"Knowledge indexing failed: {str(e)}"}
 
 
-@register_tool
+@register_tool(os="all")
 class KnowledgeQueryTool(ToolInterface):
     """Tool for language models to query and retrieve indexed knowledge from the vector store."""
 
@@ -288,7 +288,7 @@ class KnowledgeQueryTool(ToolInterface):
             return {"success": False, "error": f"Knowledge query failed: {str(e)}"}
 
 
-@register_tool
+@register_tool(os="all")
 class KnowledgeCollectionManagerTool(ToolInterface):
     """Internal administrative tool for managing knowledge collections - not for general use."""
 

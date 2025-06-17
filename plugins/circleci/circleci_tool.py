@@ -7,7 +7,7 @@ from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
 
-@register_tool(ecosystem="general")
+@register_tool(ecosystem="general", os="all")
 class CircleCITool(ToolInterface):
     """Interact with the CircleCI REST API."""
 

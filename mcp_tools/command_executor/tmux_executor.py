@@ -11,7 +11,7 @@ def _has_tmux() -> bool:
     return shutil.which("tmux") is not None
 
 
-@register_tool
+@register_tool(os="non-windows")
 class TmuxExecutor(ToolInterface):
     """Execute commands inside a tmux session using ``send-keys``."""
 
