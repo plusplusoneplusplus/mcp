@@ -43,7 +43,7 @@ def _get_domain_from_url(url: str) -> str:
         return "unknown domain"
 
 
-@register_tool
+@register_tool(os_type="all")
 class BrowserClient(BrowserClientInterface):
     """Client for browser automation operations.
 

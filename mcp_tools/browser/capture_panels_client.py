@@ -14,7 +14,7 @@ DEFAULT_BROWSER_TYPE: Literal["chrome", "edge"] = env.get_setting(
 DEFAULT_CLIENT_TYPE: str = env.get_setting("client_type", "playwright")
 
 
-@register_tool
+@register_tool(os_type="all")
 class CapturePanelsClient(CapturePanelsClientInterface):
     """Dedicated client for capturing dashboard panels as PNGs."""
 

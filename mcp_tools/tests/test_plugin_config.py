@@ -11,15 +11,15 @@ def reset_plugin_state():
     """Reset plugin registry and config state before each test."""
     # Clear registry
     registry.clear()
-    
+
     # Reset config to default state
     config.plugin_enable_mode = "all"
     config.enabled_plugins = set()
     config.disabled_plugins = set()
     config.excluded_tool_names = set()
-    
+
     yield
-    
+
     # Clean up after test
     registry.clear()
 
@@ -154,10 +154,10 @@ def test_excluded_tool_names_case_sensitivity(monkeypatch):
     """Tool exclusion should be case-sensitive."""
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "CaseSensitive_Tool")
     cfg = PluginConfig()
-    
+
     # Exact match should be excluded
     assert not cfg.should_register_tool_class("CaseSensitiveTool", "CaseSensitive_Tool", set())
-    
+
     # Different case should not be excluded
     assert cfg.should_register_tool_class("CaseSensitiveTool", "casesensitive_tool", set())
     assert cfg.should_register_tool_class("CaseSensitiveTool", "CASESENSITIVE_TOOL", set())
@@ -168,7 +168,7 @@ def test_excluded_tool_names_non_existent_tools(monkeypatch):
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "non_existent_tool,another_fake_tool")
     cfg = PluginConfig()
     assert cfg.excluded_tool_names == {"non_existent_tool", "another_fake_tool"}
-    
+
     # Real tools should still work normally
     assert cfg.should_register_tool_class("DummyTool", "dummy_tool", set())
 
@@ -192,7 +192,7 @@ def test_excluded_tool_names_very_long_list(monkeypatch):
     # Create a list of 100 tool names
     tool_names = [f"tool_{i}" for i in range(100)]
     excluded_tools_str = ",".join(tool_names)
-    
+
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", excluded_tools_str)
     cfg = PluginConfig()
     assert cfg.excluded_tool_names == set(tool_names)
@@ -204,11 +204,11 @@ def test_excluded_tool_names_integration_multiple_tools(monkeypatch):
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool,another_dummy_tool")
     config._load_from_env()
     registry.clear()
-    
+
     # Try to register both tools
     result1 = registry.register_tool(DummyTool, source="code")
     result2 = registry.register_tool(AnotherDummyTool, source="code")
-    
+
     # Both should be excluded
     assert result1 is None
     assert result2 is None
@@ -221,11 +221,11 @@ def test_excluded_tool_names_integration_partial_exclusion(monkeypatch):
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
     config._load_from_env()
     registry.clear()
-    
+
     # Try to register both tools
     result1 = registry.register_tool(DummyTool, source="code")
     result2 = registry.register_tool(AnotherDummyTool, source="code")
-    
+
     # Only dummy_tool should be excluded
     assert result1 is None
     assert result2 is not None
@@ -237,13 +237,13 @@ def test_excluded_tool_names_with_yaml_tools(monkeypatch):
     """Exclusion should work with YAML tools as well."""
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
     cfg = PluginConfig()
-    
+
     # Test with YAML tools set (simulating YAML override scenario)
     yaml_tools = {"dummy_tool", "other_yaml_tool"}
-    
+
     # Tool should be excluded regardless of YAML presence
     assert not cfg.should_register_tool_class("DummyTool", "dummy_tool", yaml_tools)
-    
+
     # Other tools should work normally
     assert cfg.should_register_tool_class("AnotherTool", "other_tool", yaml_tools)
 
@@ -253,9 +253,9 @@ def test_excluded_tool_names_precedence_over_yaml_override(monkeypatch):
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
     cfg = PluginConfig()
     cfg.yaml_overrides_code = True
-    
+
     yaml_tools = {"dummy_tool"}  # Tool exists in YAML
-    
+
     # Tool should be excluded even though YAML override would normally apply
     assert not cfg.should_register_tool_class("DummyTool", "dummy_tool", yaml_tools)
 
@@ -265,7 +265,7 @@ def test_excluded_tool_names_with_base_class_exclusion(monkeypatch):
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
     monkeypatch.setenv("MCP_EXCLUDED_BASE_CLASSES", "AnotherDummyTool")
     cfg = PluginConfig()
-    
+
     # Both exclusion mechanisms should work
     assert not cfg.should_register_tool_class("DummyTool", "dummy_tool", set())  # Excluded by name
     assert not cfg.should_register_tool_class("AnotherDummyTool", "another_tool", set())  # Excluded by class
@@ -276,12 +276,12 @@ def test_excluded_tool_names_environment_reload(monkeypatch):
     # Start with no exclusions
     cfg = PluginConfig()
     assert cfg.excluded_tool_names == set()
-    
+
     # Set exclusions and reload
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "dummy_tool")
     cfg._load_from_env()
     assert cfg.excluded_tool_names == {"dummy_tool"}
-    
+
     # Change exclusions and reload again (need to clear first since _load_from_env updates)
     cfg.excluded_tool_names.clear()  # Clear existing exclusions
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "another_tool,third_tool")
@@ -330,7 +330,7 @@ def test_is_plugin_enabled_all_mode():
     cfg = PluginConfig()
     cfg.plugin_enable_mode = "all"
     cfg.disabled_plugins = {"disabled_tool"}
-    
+
     assert cfg.is_plugin_enabled("any_tool")
     assert not cfg.is_plugin_enabled("disabled_tool")
 
@@ -340,7 +340,7 @@ def test_is_plugin_enabled_whitelist_mode():
     cfg = PluginConfig()
     cfg.plugin_enable_mode = "whitelist"
     cfg.enabled_plugins = {"enabled_tool"}
-    
+
     assert cfg.is_plugin_enabled("enabled_tool")
     assert not cfg.is_plugin_enabled("other_tool")
 
@@ -350,7 +350,7 @@ def test_is_plugin_enabled_blacklist_mode():
     cfg = PluginConfig()
     cfg.plugin_enable_mode = "blacklist"
     cfg.disabled_plugins = {"disabled_tool"}
-    
+
     assert cfg.is_plugin_enabled("any_tool")
     assert not cfg.is_plugin_enabled("disabled_tool")
 
@@ -359,9 +359,9 @@ def test_enable_plugin():
     """enable_plugin should add plugin to enabled set and remove from disabled set."""
     cfg = PluginConfig()
     cfg.disabled_plugins = {"test_tool"}
-    
+
     cfg.enable_plugin("test_tool")
-    
+
     assert "test_tool" in cfg.enabled_plugins
     assert "test_tool" not in cfg.disabled_plugins
 
@@ -370,9 +370,9 @@ def test_disable_plugin():
     """disable_plugin should add plugin to disabled set and remove from enabled set."""
     cfg = PluginConfig()
     cfg.enabled_plugins = {"test_tool"}
-    
+
     cfg.disable_plugin("test_tool")
-    
+
     assert "test_tool" in cfg.disabled_plugins
     assert "test_tool" not in cfg.enabled_plugins
 
@@ -381,7 +381,7 @@ def test_should_register_tool_class_disabled_plugin():
     """should_register_tool_class should return False for disabled plugins."""
     cfg = PluginConfig()
     cfg.disable_plugin("dummy_tool")
-    
+
     assert not cfg.should_register_tool_class("DummyTool", "dummy_tool", set())
 
 
@@ -390,7 +390,7 @@ def test_should_register_tool_class_enabled_plugin():
     cfg = PluginConfig()
     cfg.plugin_enable_mode = "whitelist"
     cfg.enable_plugin("dummy_tool")
-    
+
     assert cfg.should_register_tool_class("DummyTool", "dummy_tool", set())
 
 
@@ -399,14 +399,14 @@ def test_plugin_registration_respects_enable_disable(monkeypatch):
     # Set up environment to disable dummy_tool
     monkeypatch.setenv("MCP_PLUGIN_MODE", "blacklist")
     monkeypatch.setenv("MCP_DISABLED_PLUGINS", "dummy_tool")
-    
+
     # Reload configuration
     config._load_from_env()
     registry.clear()
-    
+
     # Try to register the tool
     result = registry.register_tool(DummyTool, source="code")
-    
+
     # Tool should not be registered
     assert result is None
     assert "dummy_tool" not in registry.tools
@@ -417,15 +417,15 @@ def test_plugin_registration_whitelist_mode(monkeypatch):
     # Set up environment for whitelist mode
     monkeypatch.setenv("MCP_PLUGIN_MODE", "whitelist")
     monkeypatch.setenv("MCP_ENABLED_PLUGINS", "another_dummy_tool")
-    
+
     # Reload configuration
     config._load_from_env()
     registry.clear()
-    
+
     # Try to register both tools
     result1 = registry.register_tool(DummyTool, source="code")
     result2 = registry.register_tool(AnotherDummyTool, source="code")
-    
+
     # Only the whitelisted tool should be registered
     assert result1 is None
     assert result2 is not None
@@ -438,16 +438,16 @@ def test_get_available_plugins_basic():
     # Set up config with some plugins
     config.enabled_plugins = {"enabled_tool"}
     config.disabled_plugins = {"disabled_tool"}
-    
+
     # Register a tool to test registry integration
     registry.register_tool(DummyTool, source="code")
-    
+
     plugins = config.get_available_plugins()
-    
+
     # Should include the registered tool
     assert "dummy_tool" in plugins
     assert plugins["dummy_tool"]["enabled"] is True  # Not in disabled set
-    
+
     # Should include configured plugins
     assert "enabled_tool" in plugins
     assert "disabled_tool" in plugins
@@ -458,11 +458,11 @@ def test_get_available_plugins_basic():
 def test_backward_compatibility():
     """Existing functionality should continue to work without plugin enable/disable settings."""
     cfg = PluginConfig()
-    
+
     # Test that existing exclusion still works
     cfg.excluded_tool_names.add("excluded_tool")
     assert not cfg.should_register_tool_class("ExcludedTool", "excluded_tool", set())
-    
+
     # Test that normal tools are still registered by default
     assert cfg.should_register_tool_class("NormalTool", "normal_tool", set())
 
@@ -473,21 +473,21 @@ def test_environment_variable_integration(monkeypatch):
     monkeypatch.setenv("MCP_ENABLED_PLUGINS", "tool_a, tool_b")
     monkeypatch.setenv("MCP_DISABLED_PLUGINS", "tool_c, tool_d")
     monkeypatch.setenv("MCP_EXCLUDED_TOOL_NAMES", "tool_e")
-    
+
     cfg = PluginConfig()
-    
+
     assert cfg.plugin_enable_mode == "blacklist"
     assert cfg.enabled_plugins == {"tool_a", "tool_b"}
     assert cfg.disabled_plugins == {"tool_c", "tool_d"}
     assert cfg.excluded_tool_names == {"tool_e"}
-    
+
     # Test plugin status
     assert cfg.is_plugin_enabled("tool_a")  # Explicitly enabled
     assert cfg.is_plugin_enabled("tool_b")  # Explicitly enabled
     assert not cfg.is_plugin_enabled("tool_c")  # Explicitly disabled
     assert not cfg.is_plugin_enabled("tool_d")  # Explicitly disabled
     assert cfg.is_plugin_enabled("tool_f")  # Not configured, should be enabled in blacklist mode
-    
+
     # Test exclusion still works
     assert not cfg.should_register_tool_class("ToolE", "tool_e", set())
 
@@ -498,22 +498,22 @@ def test_plugin_registry_get_available_plugins():
     config.plugin_enable_mode = "all"
     config.enabled_plugins = set()
     config.disabled_plugins = set()
-    
+
     registry.clear()
     registry.register_tool(DummyTool, source="code")
     registry.register_tool(AnotherDummyTool, source="yaml")
-    
+
     plugins = registry.get_available_plugins()
-    
+
     assert "dummy_tool" in plugins
     assert "another_dummy_tool" in plugins
-    
+
     dummy_metadata = plugins["dummy_tool"]
     assert dummy_metadata["name"] == "dummy_tool"
     assert dummy_metadata["class_name"] == "DummyTool"
     assert dummy_metadata["source"] == "code"
     assert dummy_metadata["registered"] is True
-    
+
     another_metadata = plugins["another_dummy_tool"]
     assert another_metadata["source"] == "yaml"
 
@@ -524,15 +524,263 @@ def test_plugin_registry_get_enabled_disabled_plugins():
     config.plugin_enable_mode = "blacklist"
     config.disabled_plugins = {"dummy_tool"}
     config.enabled_plugins = set()
-    
+
     registry.clear()
     registry.register_tool(DummyTool, source="code")
     registry.register_tool(AnotherDummyTool, source="code")
-    
+
     enabled_plugins = registry.get_enabled_plugins()
     disabled_plugins = registry.get_disabled_plugins()
-    
+
     assert "another_dummy_tool" in enabled_plugins
     assert "dummy_tool" in disabled_plugins
     assert "dummy_tool" not in enabled_plugins
     assert "another_dummy_tool" not in disabled_plugins
+
+
+# Tests for simplified ecosystem and OS configuration
+
+def test_ecosystem_config_default():
+    """Test default ecosystem configuration (all enabled)."""
+    cfg = PluginConfig()
+    assert cfg.enabled_ecosystems == set()
+    assert cfg.is_ecosystem_enabled("microsoft")
+    assert cfg.is_ecosystem_enabled("general")
+    assert cfg.is_ecosystem_enabled(None)
+
+
+def test_ecosystem_config_asterisk(monkeypatch):
+    """Test ecosystem configuration with asterisk (all enabled)."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "*")
+    cfg = PluginConfig()
+    assert cfg.enabled_ecosystems == set()
+    assert cfg.is_ecosystem_enabled("microsoft")
+    assert cfg.is_ecosystem_enabled("general")
+    assert cfg.is_ecosystem_enabled("unknown")
+
+
+def test_ecosystem_config_specific_ecosystems(monkeypatch):
+    """Test ecosystem configuration with specific ecosystems."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "microsoft,general")
+    cfg = PluginConfig()
+    assert cfg.enabled_ecosystems == {"microsoft", "general"}
+    assert cfg.is_ecosystem_enabled("microsoft")
+    assert cfg.is_ecosystem_enabled("general")
+    assert not cfg.is_ecosystem_enabled("unknown")
+
+
+def test_ecosystem_config_single_ecosystem(monkeypatch):
+    """Test ecosystem configuration with single ecosystem."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "microsoft")
+    cfg = PluginConfig()
+    assert cfg.enabled_ecosystems == {"microsoft"}
+    assert cfg.is_ecosystem_enabled("microsoft")
+    assert not cfg.is_ecosystem_enabled("general")
+    assert not cfg.is_ecosystem_enabled("unknown")
+
+
+def test_ecosystem_config_case_insensitive(monkeypatch):
+    """Test ecosystem configuration is case insensitive."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "Microsoft,GENERAL")
+    cfg = PluginConfig()
+    assert cfg.enabled_ecosystems == {"microsoft", "general"}
+    assert cfg.is_ecosystem_enabled("Microsoft")
+    assert cfg.is_ecosystem_enabled("MICROSOFT")
+    assert cfg.is_ecosystem_enabled("general")
+    assert cfg.is_ecosystem_enabled("GENERAL")
+
+
+def test_ecosystem_config_whitespace_handling(monkeypatch):
+    """Test ecosystem configuration handles whitespace correctly."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", " microsoft , general , ")
+    cfg = PluginConfig()
+    assert cfg.enabled_ecosystems == {"microsoft", "general"}
+    assert cfg.is_ecosystem_enabled("microsoft")
+    assert cfg.is_ecosystem_enabled("general")
+
+
+def test_ecosystem_config_empty_values(monkeypatch):
+    """Test ecosystem configuration ignores empty values."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "microsoft,,general,")
+    cfg = PluginConfig()
+    assert cfg.enabled_ecosystems == {"microsoft", "general"}
+
+
+def test_os_config_default():
+    """Test default OS configuration (all enabled)."""
+    cfg = PluginConfig()
+    assert cfg.enabled_os == set()
+    assert cfg.is_os_enabled("windows")
+    assert cfg.is_os_enabled("non-windows")
+    assert cfg.is_os_enabled("all")
+    assert cfg.is_os_enabled(None)
+
+
+def test_os_config_asterisk(monkeypatch):
+    """Test OS configuration with asterisk (all enabled)."""
+    monkeypatch.setenv("MCP_OS", "*")
+    cfg = PluginConfig()
+    assert cfg.enabled_os == set()
+    assert cfg.is_os_enabled("windows")
+    assert cfg.is_os_enabled("non-windows")
+    assert cfg.is_os_enabled("all")
+
+
+def test_os_config_specific_os(monkeypatch):
+    """Test OS configuration with specific OS types."""
+    monkeypatch.setenv("MCP_OS", "windows,non-windows")
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows", "non-windows"}
+    assert cfg.is_os_enabled("windows")
+    assert cfg.is_os_enabled("non-windows")
+    assert not cfg.is_os_enabled("all")
+
+
+def test_os_config_single_os(monkeypatch):
+    """Test OS configuration with single OS."""
+    monkeypatch.setenv("MCP_OS", "windows")
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows"}
+    assert cfg.is_os_enabled("windows")
+    assert not cfg.is_os_enabled("non-windows")
+    assert not cfg.is_os_enabled("all")
+
+
+def test_os_config_case_insensitive(monkeypatch):
+    """Test OS configuration is case insensitive."""
+    monkeypatch.setenv("MCP_OS", "Windows,NON-WINDOWS")
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows", "non-windows"}
+    assert cfg.is_os_enabled("Windows")
+    assert cfg.is_os_enabled("WINDOWS")
+    assert cfg.is_os_enabled("non-windows")
+    assert cfg.is_os_enabled("NON-WINDOWS")
+
+
+def test_os_config_whitespace_handling(monkeypatch):
+    """Test OS configuration handles whitespace correctly."""
+    monkeypatch.setenv("MCP_OS", " windows , non-windows , ")
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows", "non-windows"}
+    assert cfg.is_os_enabled("windows")
+    assert cfg.is_os_enabled("non-windows")
+
+
+def test_os_config_empty_values(monkeypatch):
+    """Test OS configuration ignores empty values."""
+    monkeypatch.setenv("MCP_OS", "windows,,non-windows,")
+    cfg = PluginConfig()
+    assert cfg.enabled_os == {"windows", "non-windows"}
+
+
+def test_tool_registration_ecosystem_filtering(monkeypatch):
+    """Test tool registration respects ecosystem filtering."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "microsoft")
+    cfg = PluginConfig()
+
+    # Microsoft ecosystem tools should be registered
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="microsoft")
+
+    # General ecosystem tools should not be registered
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="general")
+
+    # Tools without ecosystem should be registered (backward compatibility)
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem=None)
+
+
+def test_tool_registration_os_filtering(monkeypatch):
+    """Test tool registration respects OS filtering."""
+    monkeypatch.setenv("MCP_OS", "windows")
+    cfg = PluginConfig()
+
+    # Windows tools should be registered
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), os_type="windows")
+
+    # Non-windows tools should not be registered
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), os_type="non-windows")
+
+    # Tools without OS should be registered (backward compatibility)
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), os_type=None)
+
+
+def test_tool_registration_combined_filtering(monkeypatch):
+    """Test tool registration with both ecosystem and OS filtering."""
+    monkeypatch.setenv("MCP_ECOSYSTEMS", "microsoft")
+    monkeypatch.setenv("MCP_OS", "windows")
+    cfg = PluginConfig()
+
+    # Both ecosystem and OS match
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="microsoft", os_type="windows")
+
+    # Ecosystem matches, OS doesn't
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="microsoft", os_type="non-windows")
+
+    # OS matches, ecosystem doesn't
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="general", os_type="windows")
+
+    # Neither matches
+    assert not cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem="general", os_type="non-windows")
+
+
+def test_enable_disable_ecosystem():
+    """Test enable/disable ecosystem methods."""
+    cfg = PluginConfig()
+
+    # Initially all ecosystems are enabled (empty set)
+    assert cfg.enabled_ecosystems == set()
+    assert cfg.is_ecosystem_enabled("microsoft")
+
+    # Enable specific ecosystem
+    cfg.enable_ecosystem("microsoft")
+    assert cfg.enabled_ecosystems == {"microsoft"}
+    assert cfg.is_ecosystem_enabled("microsoft")
+    assert not cfg.is_ecosystem_enabled("general")
+
+    # Enable another ecosystem
+    cfg.enable_ecosystem("general")
+    assert cfg.enabled_ecosystems == {"microsoft", "general"}
+    assert cfg.is_ecosystem_enabled("microsoft")
+    assert cfg.is_ecosystem_enabled("general")
+
+    # Disable an ecosystem
+    cfg.disable_ecosystem("microsoft")
+    assert cfg.enabled_ecosystems == {"general"}
+    assert not cfg.is_ecosystem_enabled("microsoft")
+    assert cfg.is_ecosystem_enabled("general")
+
+
+def test_enable_disable_os():
+    """Test enable/disable OS methods."""
+    cfg = PluginConfig()
+
+    # Initially all OS types are enabled (empty set)
+    assert cfg.enabled_os == set()
+    assert cfg.is_os_enabled("windows")
+
+    # Enable specific OS
+    cfg.enable_os("windows")
+    assert cfg.enabled_os == {"windows"}
+    assert cfg.is_os_enabled("windows")
+    assert not cfg.is_os_enabled("non-windows")
+
+    # Enable another OS
+    cfg.enable_os("non-windows")
+    assert cfg.enabled_os == {"windows", "non-windows"}
+    assert cfg.is_os_enabled("windows")
+    assert cfg.is_os_enabled("non-windows")
+
+    # Disable an OS
+    cfg.disable_os("windows")
+    assert cfg.enabled_os == {"non-windows"}
+    assert not cfg.is_os_enabled("windows")
+    assert cfg.is_os_enabled("non-windows")
+
+
+def test_backward_compatibility_ecosystem_os():
+    """Test backward compatibility for tools without ecosystem/OS metadata."""
+    cfg = PluginConfig()
+
+    # Tools without ecosystem/OS should always be enabled for backward compatibility
+    assert cfg.is_ecosystem_enabled(None)
+    assert cfg.is_os_enabled(None)
+    assert cfg.should_register_tool_class("TestTool", "test_tool", set(), ecosystem=None, os_type=None)

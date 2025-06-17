@@ -6,7 +6,7 @@ from typing import Dict, Any
 from mcp_tools import time_util
 
 
-@register_tool
+@register_tool(os_type="all")
 class TimeTool(ToolInterface):
     @property
     def name(self) -> str:
