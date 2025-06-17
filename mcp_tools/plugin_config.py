@@ -4,11 +4,11 @@ This module provides a configuration system for the plugin registry,
 allowing customization of tool discovery and registration behavior.
 """
 
+import logging
 import os
 import platform
-import logging
-from typing import List, Dict, Any, Set, Optional, Union
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Union
 
 from mcp_tools.constants import Ecosystem, OSType
 
@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 class PluginConfig:
-    """Configuration for the plugin system."""
+    """Configuration for the plugin system.
+
+    This class supports filtering tools by ecosystem and operating system using
+    either plain strings or the :class:`Ecosystem` and :class:`OSType` enums.
+    """
 
     def __init__(self):
         """Initialize plugin configuration with default values."""
@@ -142,14 +146,18 @@ class PluginConfig:
         if env_plugin_mode in ("all", "whitelist", "blacklist"):
             self.plugin_enable_mode = env_plugin_mode
         else:
-            logger.warning(f"Invalid MCP_PLUGIN_MODE value: {env_plugin_mode}. Using 'all'")
+            logger.warning(
+                f"Invalid MCP_PLUGIN_MODE value: {env_plugin_mode}. Using 'all'"
+            )
             self.plugin_enable_mode = "all"
 
         # Get enabled plugins
         env_enabled_plugins = os.environ.get("MCP_ENABLED_PLUGINS", "")
         if env_enabled_plugins:
             enabled_plugins = {
-                plugin.strip() for plugin in env_enabled_plugins.split(",") if plugin.strip()
+                plugin.strip()
+                for plugin in env_enabled_plugins.split(",")
+                if plugin.strip()
             }
             self.enabled_plugins.update(enabled_plugins)
             logger.info(f"Enabled plugins from environment: {self.enabled_plugins}")
@@ -158,7 +166,9 @@ class PluginConfig:
         env_disabled_plugins = os.environ.get("MCP_DISABLED_PLUGINS", "")
         if env_disabled_plugins:
             disabled_plugins = {
-                plugin.strip() for plugin in env_disabled_plugins.split(",") if plugin.strip()
+                plugin.strip()
+                for plugin in env_disabled_plugins.split(",")
+                if plugin.strip()
             }
             self.disabled_plugins.update(disabled_plugins)
             logger.info(f"Disabled plugins from environment: {self.disabled_plugins}")
@@ -175,10 +185,14 @@ class PluginConfig:
         else:
             # Parse comma-separated list
             enabled_ecosystems = {
-                ecosystem.strip().lower() for ecosystem in env_ecosystems.split(",") if ecosystem.strip()
+                ecosystem.strip().lower()
+                for ecosystem in env_ecosystems.split(",")
+                if ecosystem.strip()
             }
             self.enabled_ecosystems = enabled_ecosystems
-            logger.info(f"Enabled ecosystems from environment: {self.enabled_ecosystems}")
+            logger.info(
+                f"Enabled ecosystems from environment: {self.enabled_ecosystems}"
+            )
 
     def _load_os_config_from_env(self):
         """Load OS configuration from environment variables with auto-detection."""
@@ -198,7 +212,9 @@ class PluginConfig:
         else:
             # Parse comma-separated list
             enabled_os = {
-                os_type.strip().lower() for os_type in env_os.split(",") if os_type.strip()
+                os_type.strip().lower()
+                for os_type in env_os.split(",")
+                if os_type.strip()
             }
             self.enabled_os = enabled_os
             logger.info(f"Enabled OS types: {self.enabled_os}")
@@ -236,8 +252,10 @@ class PluginConfig:
             class_name: Name of the class
             tool_name: Name of the tool
             yaml_tools: Set of tool names defined in YAML
-            ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
-            os_type: OS compatibility ("windows", "non-windows", "all")
+            ecosystem: Ecosystem the tool belongs to. Can be a string or
+                :class:`Ecosystem` enum value.
+            os_type: OS compatibility. Can be a string or
+                :class:`OSType` enum value.
 
         Returns:
             True if the tool should be registered, False otherwise
@@ -259,12 +277,16 @@ class PluginConfig:
 
         # Check ecosystem enable/disable status
         if not self.is_ecosystem_enabled(ecosystem):
-            logger.debug(f"Skipping registration of tool '{tool_name}' from disabled ecosystem: {ecosystem}")
+            logger.debug(
+                f"Skipping registration of tool '{tool_name}' from disabled ecosystem: {ecosystem}"
+            )
             return False
 
         # Check OS enable/disable status
         if not self.is_os_enabled(os_type):
-            logger.debug(f"Skipping registration of tool '{tool_name}' from disabled OS: {os_type}")
+            logger.debug(
+                f"Skipping registration of tool '{tool_name}' from disabled OS: {os_type}"
+            )
             return False
 
         # Check if there's a YAML definition that should override this
@@ -313,7 +335,8 @@ class PluginConfig:
         """Check if an ecosystem is enabled based on the current configuration.
 
         Args:
-            ecosystem: Name of the ecosystem to check (case-insensitive)
+            ecosystem: Name of the ecosystem to check. Accepts either a
+                string or :class:`Ecosystem` enum (case-insensitive).
 
         Returns:
             True if the ecosystem should be enabled, False otherwise
@@ -335,7 +358,8 @@ class PluginConfig:
         """Check if an OS is enabled based on the current configuration.
 
         Args:
-            os: Name of the OS to check (case-insensitive)
+            os: Name of the OS to check. Accepts either a string or
+                :class:`OSType` enum (case-insensitive).
 
         Returns:
             True if the OS should be enabled, False otherwise
@@ -383,7 +407,8 @@ class PluginConfig:
         """Enable a specific ecosystem.
 
         Args:
-            ecosystem: Name of the ecosystem to enable
+            ecosystem: The ecosystem to enable. Accepts a string or
+                :class:`Ecosystem` enum.
         """
         ecosystem_lower = str(ecosystem).lower()
         self.enabled_ecosystems.add(ecosystem_lower)
@@ -393,7 +418,8 @@ class PluginConfig:
         """Disable a specific ecosystem.
 
         Args:
-            ecosystem: Name of the ecosystem to disable
+            ecosystem: The ecosystem to disable. Accepts a string or
+                :class:`Ecosystem` enum.
         """
         ecosystem_lower = str(ecosystem).lower()
         # Remove from enabled set (disabling means not in the enabled set)
@@ -404,7 +430,8 @@ class PluginConfig:
         """Enable a specific OS.
 
         Args:
-            os: Name of the OS to enable
+            os: The OS type to enable. Accepts a string or
+                :class:`OSType` enum.
         """
         os_lower = str(os).lower()
         self.enabled_os.add(os_lower)
@@ -414,7 +441,8 @@ class PluginConfig:
         """Disable a specific OS.
 
         Args:
-            os: Name of the OS to disable
+            os: The OS type to disable. Accepts a string or
+                :class:`OSType` enum.
         """
         os_lower = str(os).lower()
         # Remove from enabled set (disabling means not in the enabled set)
@@ -431,6 +459,7 @@ class PluginConfig:
         try:
             # Import here to avoid circular imports
             from mcp_tools.plugin import registry
+
             return registry.get_available_plugins()
         except ImportError:
             # Fallback to basic information about configured plugins
@@ -446,7 +475,7 @@ class PluginConfig:
                     "source": "configuration",
                     "explicitly_configured": True,
                     "registered": False,
-                    "has_instance": False
+                    "has_instance": False,
                 }
 
             return available_plugins
