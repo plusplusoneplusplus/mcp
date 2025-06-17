@@ -1,0 +1,27 @@
+name: Daily Version Bump
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # Every day at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for accessing git tags
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install python-semantic-release
+        run: uv pip install python-semantic-release
+
+      - name: Run semantic-release (version bump if needed)
+        run: semantic-release version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
