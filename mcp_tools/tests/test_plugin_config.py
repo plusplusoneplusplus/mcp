@@ -12,16 +12,24 @@ def reset_plugin_state():
     # Clear registry
     registry.clear()
 
-    # Reset config to default state
+    # Reset config to a clean state
     config.plugin_enable_mode = "all"
     config.enabled_plugins = set()
     config.disabled_plugins = set()
     config.excluded_tool_names = set()
+    config.enabled_ecosystems = set()
+    config.enabled_os = {config._detect_current_os()}
 
     yield
 
     # Clean up after test
     registry.clear()
+    config.plugin_enable_mode = "all"
+    config.enabled_plugins = set()
+    config.disabled_plugins = set()
+    config.excluded_tool_names = set()
+    config.enabled_ecosystems = set()
+    config.enabled_os = {config._detect_current_os()}
 
 class DummyTool(ToolInterface):
     """Simple tool for testing exclusion."""
