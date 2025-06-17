@@ -734,7 +734,6 @@ class PluginRegistry:
         self.yaml_tool_names.clear()
         self.tool_sources.clear()
         self.tool_ecosystems.clear()
-        self.tool_tags.clear()
 
     def add_yaml_tool_names(self, tool_names: Set[str]) -> None:
         """Add YAML tool names to the registry.
