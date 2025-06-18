@@ -18,10 +18,15 @@ jobs:
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
 
-      - name: Install python-semantic-release
-        run: uv pip install python-semantic-release
+      - name: Setup Python environment
+        run: |
+          uv venv
+          source .venv/bin/activate
+          uv pip install python-semantic-release
 
       - name: Run semantic-release (version bump if needed)
-        run: semantic-release version
+        run: |
+          source .venv/bin/activate
+          semantic-release version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
