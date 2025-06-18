@@ -6,7 +6,7 @@ from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
 
-@register_tool
+@register_tool(ecosystem="open-source", os_type="non-windows")
 class LogCliTool(ToolInterface):
     """Interact with Grafana Loki via the ``logcli`` command line tool."""
 
