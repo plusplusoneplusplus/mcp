@@ -21,188 +21,6 @@ from utils.graph_interface.exceptions import GraphOperationError
 logger = logging.getLogger(__name__)
 
 
-class MockMermaidGenerator:
-    """Mock generator for demo purposes when graph connection is unavailable."""
-
-    async def generate_task_dependency_flowchart(self, task_ids=None, include_status=True, include_resources=False):
-        """Generate a sample task dependency flowchart."""
-        status_style = ""
-        if include_status:
-            status_style = """
-    classDef pending fill:#fff2cc,stroke:#d6b656,stroke-width:2px;
-    classDef running fill:#d5e8d4,stroke:#82b366,stroke-width:2px;
-    classDef completed fill:#f8cecc,stroke:#b85450,stroke-width:2px;
-
-    class TASK001,TASK004 pending;
-    class TASK002 running;
-    class TASK003,TASK005 completed;"""
-
-        resource_nodes = ""
-        resource_edges = ""
-        if include_resources:
-            resource_nodes = """
-    RES001["🖥️ Server A"]
-    RES002["💾 Database"]
-    RES003["👤 Developer"]"""
-            resource_edges = """
-    RES001 -.-> TASK002
-    RES002 -.-> TASK003
-    RES003 -.-> TASK001"""
-
-        return f"""flowchart TD
-    TASK001["📋 Setup Environment"]
-    TASK002["⚙️ Configure Database"]
-    TASK003["🔧 Install Dependencies"]
-    TASK004["🧪 Run Tests"]
-    TASK005["🚀 Deploy Application"]{resource_nodes}
-
-    TASK001 --> TASK002
-    TASK001 --> TASK003
-    TASK002 --> TASK004
-    TASK003 --> TASK004
-    TASK004 --> TASK005{resource_edges}{status_style}"""
-
-    async def generate_gantt_chart(self, task_ids=None, start_date=None, include_dependencies=True):
-        """Generate a sample Gantt chart."""
-        start_date_str = start_date.strftime("%Y-%m-%d") if start_date else "2024-01-01"
-        return f"""gantt
-    title Task Execution Schedule
-    dateFormat YYYY-MM-DD
-    axisFormat %m/%d
-
-    section Setup Phase
-    Setup Environment      :active, setup, {start_date_str}, 3d
-    Configure Database      :config, after setup, 2d
-
-    section Development
-    Install Dependencies    :deps, after setup, 1d
-    Implement Features      :feat, after deps, 5d
-    Code Review            :review, after feat, 1d
-
-    section Testing
-    Unit Tests             :unit, after review, 2d
-    Integration Tests      :integration, after unit, 2d
-    Performance Tests      :perf, after integration, 1d
-
-    section Deployment
-    Deploy to Staging      :staging, after perf, 1d
-    Deploy to Production   :prod, after staging, 1d"""
-
-    async def generate_resource_allocation_diagram(self, resource_ids=None):
-        """Generate a sample resource allocation diagram."""
-        return """flowchart LR
-    subgraph "Compute Resources"
-        SERVER1["🖥️ Server-01<br/>CPU: 80%<br/>Memory: 60%"]
-        SERVER2["🖥️ Server-02<br/>CPU: 45%<br/>Memory: 40%"]
-        SERVER3["🖥️ Server-03<br/>CPU: 90%<br/>Memory: 85%"]
-    end
-
-    subgraph "Storage Resources"
-        DB1["💾 Database-Primary<br/>Storage: 70%"]
-        DB2["💾 Database-Replica<br/>Storage: 65%"]
-        CACHE["⚡ Redis Cache<br/>Memory: 55%"]
-    end
-
-    subgraph "Human Resources"
-        DEV1["👤 Developer-A<br/>Availability: 100%"]
-        DEV2["👤 Developer-B<br/>Availability: 80%"]
-        ADMIN["👤 Admin<br/>Availability: 60%"]
-    end
-
-    subgraph "Active Tasks"
-        TASK1["📋 API Development"]
-        TASK2["🔧 Database Migration"]
-        TASK3["🧪 Performance Testing"]
-        TASK4["🔒 Security Audit"]
-    end
-
-    SERVER1 --> TASK1
-    SERVER2 --> TASK2
-    SERVER3 --> TASK3
-    DB1 --> TASK2
-    DB2 --> TASK3
-    CACHE --> TASK1
-    DEV1 --> TASK1
-    DEV2 --> TASK2
-    ADMIN --> TASK4
-
-    classDef highUsage fill:#ffcccb,stroke:#ff6b6b,stroke-width:2px;
-    classDef mediumUsage fill:#fff2cc,stroke:#ffa726,stroke-width:2px;
-    classDef lowUsage fill:#d4edda,stroke:#28a745,stroke-width:2px;
-
-    class SERVER3 highUsage;
-    class SERVER1,DB1,DB2 mediumUsage;
-    class SERVER2,CACHE,DEV1,DEV2,ADMIN lowUsage;"""
-
-    async def generate_execution_timeline(self, task_ids=None, time_window_hours=24):
-        """Generate a sample execution timeline."""
-        return """timeline
-    title Task Execution Timeline (Last 24 Hours)
-
-    section Morning
-        08:00 : Task Setup Started
-              : Environment Configuration
-        09:30 : Database Migration Begin
-              : Schema Updates Applied
-        10:15 : Unit Tests Execution
-              : 145 tests passed
-
-    section Afternoon
-        13:00 : Code Review Session
-              : PR #123 reviewed
-        14:30 : Integration Testing
-              : API endpoints tested
-        15:45 : Performance Optimization
-              : Query performance improved
-
-    section Evening
-        18:00 : Deployment Preparation
-              : Build artifacts created
-        19:30 : Staging Deployment
-              : Release candidate deployed
-        20:15 : Production Deployment
-              : Version 2.1.0 released"""
-
-    async def generate_critical_path_diagram(self, start_task, end_task):
-        """Generate a sample critical path diagram."""
-        return f"""flowchart TD
-    START["{start_task}<br/>📋 Project Start"]
-    DESIGN["🎨 System Design<br/>Duration: 3 days<br/>🔥 CRITICAL"]
-    DEV1["💻 Frontend Dev<br/>Duration: 5 days"]
-    DEV2["⚙️ Backend Dev<br/>Duration: 7 days<br/>🔥 CRITICAL"]
-    DB["💾 Database Setup<br/>Duration: 2 days<br/>🔥 CRITICAL"]
-    TEST["🧪 Testing<br/>Duration: 3 days<br/>🔥 CRITICAL"]
-    DEPLOY["🚀 Deployment<br/>Duration: 1 day<br/>🔥 CRITICAL"]
-    END["{end_task}<br/>✅ Project Complete"]
-
-    START --> DESIGN
-    DESIGN --> DEV1
-    DESIGN --> DEV2
-    DESIGN --> DB
-    DEV1 --> TEST
-    DEV2 --> TEST
-    DB --> TEST
-    TEST --> DEPLOY
-    DEPLOY --> END
-
-    classDef critical fill:#ffcccb,stroke:#ff0000,stroke-width:3px;
-    classDef normal fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
-    classDef milestone fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
-
-    class DESIGN,DEV2,DB,TEST,DEPLOY critical;
-    class DEV1 normal;
-    class START,END milestone;"""
-
-    async def generate_task_status_overview(self):
-        """Generate a sample task status overview."""
-        return """pie title Task Status Distribution
-    "Completed" : 42
-    "In Progress" : 18
-    "Pending" : 25
-    "Blocked" : 8
-    "On Hold" : 7"""
-
-
 class VisualizationAPI:
     """API handler for visualization endpoints."""
 
@@ -211,7 +29,6 @@ class VisualizationAPI:
         self.neo4j_client: Optional[Neo4jClient] = None
         self.graph_manager: Optional[GraphManager] = None
         self.mermaid_generator: Optional[MermaidGenerator] = None
-        self.mock_generator = MockMermaidGenerator()
         self._initialize_graph_connection()
 
     def _initialize_graph_connection(self):
@@ -228,10 +45,10 @@ class VisualizationAPI:
     async def _ensure_graph_manager(self):
         """Ensure graph manager is initialized."""
         if self.graph_manager is None:
-            try:
-                if self.neo4j_client is None:
-                    raise GraphOperationError("Neo4j client not initialized")
+            if self.neo4j_client is None:
+                raise GraphOperationError("Neo4j client not initialized. Neo4j database is required for visualizations.")
 
+            try:
                 # Connect to Neo4j
                 await self.neo4j_client.connect()
 
@@ -241,19 +58,13 @@ class VisualizationAPI:
                 logger.info("Graph manager and mermaid generator initialized successfully")
             except Exception as e:
                 logger.error(f"Failed to initialize graph manager: {e}")
-                # Fall back to demo mode
                 raise GraphOperationError(f"Graph connection unavailable: {e}")
 
     async def _get_generator(self):
-        """Get the appropriate generator (real or mock)."""
-        try:
-            await self._ensure_graph_manager()
-            logger.info("Using real Neo4j database for visualizations")
-            return self.mermaid_generator
-        except GraphOperationError as e:
-            # Use mock generator for demo purposes
-            logger.warning(f"Using mock generator for demonstration: {e}")
-            return self.mock_generator
+        """Get the Neo4j-based mermaid generator."""
+        await self._ensure_graph_manager()
+        logger.info("Using Neo4j database for visualizations")
+        return self.mermaid_generator
 
     async def get_task_dependencies(self, request: Request) -> JSONResponse:
         """Generate task dependency flowchart.
@@ -279,8 +90,10 @@ class VisualizationAPI:
                 include_resources=include_resources
             )
 
-            # Mock task count for demo
-            task_count = len(task_ids) if task_ids else 5
+            # Get actual task count from database
+            task_count = await self._count_all_tasks()
+            if task_ids:
+                task_count = len(task_ids)
 
             response_data = {
                 "diagram_type": "flowchart",
@@ -289,12 +102,18 @@ class VisualizationAPI:
                     "task_count": task_count,
                     "generated_at": datetime.utcnow().isoformat() + "Z",
                     "filters_applied": self._build_filter_list(task_ids, include_status, include_resources),
-                    "demo_mode": isinstance(generator, MockMermaidGenerator)
+                    "data_source": "neo4j"
                 }
             }
 
             return JSONResponse(response_data)
 
+        except GraphOperationError as e:
+            logger.error(f"Graph operation error generating task dependencies: {e}")
+            return JSONResponse(
+                {"error": f"Neo4j database connection required: {str(e)}"},
+                status_code=503
+            )
         except Exception as e:
             logger.error(f"Error generating task dependencies: {e}")
             return JSONResponse(
@@ -329,8 +148,10 @@ class VisualizationAPI:
                 include_dependencies=include_dependencies
             )
 
-            # Mock task count for demo
-            task_count = len(task_ids) if task_ids else 10
+            # Get actual task count from database
+            task_count = await self._count_all_tasks()
+            if task_ids:
+                task_count = len(task_ids)
 
             response_data = {
                 "diagram_type": "gantt",
@@ -339,12 +160,18 @@ class VisualizationAPI:
                     "task_count": task_count,
                     "generated_at": datetime.utcnow().isoformat() + "Z",
                     "filters_applied": self._build_filter_list(task_ids, include_dependencies=include_dependencies),
-                    "demo_mode": isinstance(generator, MockMermaidGenerator)
+                    "data_source": "neo4j"
                 }
             }
 
             return JSONResponse(response_data)
 
+        except GraphOperationError as e:
+            logger.error(f"Graph operation error generating Gantt chart: {e}")
+            return JSONResponse(
+                {"error": f"Neo4j database connection required: {str(e)}"},
+                status_code=503
+            )
         except Exception as e:
             logger.error(f"Error generating Gantt chart: {e}")
             return JSONResponse(
@@ -370,8 +197,10 @@ class VisualizationAPI:
                 resource_ids=resource_ids
             )
 
-            # Mock resource count for demo
-            resource_count = len(resource_ids) if resource_ids else 8
+            # Get actual resource count from database
+            resource_count = await self._count_all_resources()
+            if resource_ids:
+                resource_count = len(resource_ids)
 
             response_data = {
                 "diagram_type": "flowchart",
@@ -380,12 +209,18 @@ class VisualizationAPI:
                     "resource_count": resource_count,
                     "generated_at": datetime.utcnow().isoformat() + "Z",
                     "filters_applied": self._build_filter_list(resource_ids=resource_ids),
-                    "demo_mode": isinstance(generator, MockMermaidGenerator)
+                    "data_source": "neo4j"
                 }
             }
 
             return JSONResponse(response_data)
 
+        except GraphOperationError as e:
+            logger.error(f"Graph operation error generating resource allocation: {e}")
+            return JSONResponse(
+                {"error": f"Neo4j database connection required: {str(e)}"},
+                status_code=503
+            )
         except Exception as e:
             logger.error(f"Error generating resource allocation: {e}")
             return JSONResponse(
@@ -415,8 +250,10 @@ class VisualizationAPI:
                 time_window_hours=time_window_hours
             )
 
-            # Mock task count for demo
-            task_count = len(task_ids) if task_ids else 12
+            # Get actual task count from database
+            task_count = await self._count_all_tasks()
+            if task_ids:
+                task_count = len(task_ids)
 
             response_data = {
                 "diagram_type": "timeline",
@@ -426,12 +263,18 @@ class VisualizationAPI:
                     "time_window_hours": time_window_hours,
                     "generated_at": datetime.utcnow().isoformat() + "Z",
                     "filters_applied": self._build_filter_list(task_ids, time_window_hours=time_window_hours),
-                    "demo_mode": isinstance(generator, MockMermaidGenerator)
+                    "data_source": "neo4j"
                 }
             }
 
             return JSONResponse(response_data)
 
+        except GraphOperationError as e:
+            logger.error(f"Graph operation error generating execution timeline: {e}")
+            return JSONResponse(
+                {"error": f"Neo4j database connection required: {str(e)}"},
+                status_code=503
+            )
         except Exception as e:
             logger.error(f"Error generating execution timeline: {e}")
             return JSONResponse(
@@ -467,12 +310,18 @@ class VisualizationAPI:
                     "end_task": end_task,
                     "generated_at": datetime.utcnow().isoformat() + "Z",
                     "filters_applied": [f"start_task:{start_task}", f"end_task:{end_task}"],
-                    "demo_mode": isinstance(generator, MockMermaidGenerator)
+                    "data_source": "neo4j"
                 }
             }
 
             return JSONResponse(response_data)
 
+        except GraphOperationError as e:
+            logger.error(f"Graph operation error generating critical path: {e}")
+            return JSONResponse(
+                {"error": f"Neo4j database connection required: {str(e)}"},
+                status_code=503
+            )
         except Exception as e:
             logger.error(f"Error generating critical path: {e}")
             return JSONResponse(
@@ -488,8 +337,8 @@ class VisualizationAPI:
             # Generate the diagram
             mermaid_code = await generator.generate_task_status_overview()
 
-            # Mock task count for demo
-            task_count = 100
+            # Get actual task count from database
+            task_count = await self._count_all_tasks()
 
             response_data = {
                 "diagram_type": "pie",
@@ -498,12 +347,18 @@ class VisualizationAPI:
                     "task_count": task_count,
                     "generated_at": datetime.utcnow().isoformat() + "Z",
                     "filters_applied": [],
-                    "demo_mode": isinstance(generator, MockMermaidGenerator)
+                    "data_source": "neo4j"
                 }
             }
 
             return JSONResponse(response_data)
 
+        except GraphOperationError as e:
+            logger.error(f"Graph operation error generating status overview: {e}")
+            return JSONResponse(
+                {"error": f"Neo4j database connection required: {str(e)}"},
+                status_code=503
+            )
         except Exception as e:
             logger.error(f"Error generating status overview: {e}")
             return JSONResponse(
