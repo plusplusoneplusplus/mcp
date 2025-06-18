@@ -31,6 +31,10 @@
 !circleci/
 !circleci/**
 
+# Track the mcp_admin plugin
+!mcp_admin/
+!mcp_admin/**
+
 # Ignore Python bytecode files
 *.pyc
 __pycache__/
