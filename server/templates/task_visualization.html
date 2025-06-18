@@ -316,7 +316,7 @@
         }
     }
 
-    /* Demo Mode Banner */
+    /* Neo4j Error Banner */
     .demo-banner {
         background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
         border: 2px solid #ffc107;
@@ -406,20 +406,20 @@
         </div>
     </div>
 
-    <!-- Demo Mode Banner -->
+    <!-- Neo4j Error Banner -->
     <div class="demo-banner" id="demo-banner">
-        <h3>🎯 Demo Mode Active</h3>
-        <p><strong>You're viewing sample visualizations.</strong> The system is demonstrating capabilities with mock
-            data because:</p>
+        <h3>⚠️ Neo4j Connection Required</h3>
+        <p><strong>Visualizations are not available.</strong> This feature requires a working Neo4j database connection.
+        </p>
         <ul>
-            <li>Neo4j database connection is not available</li>
-            <li>Database is empty or contains no task data</li>
+            <li>Neo4j database connection is not configured or unavailable</li>
+            <li>Database may be empty or contain no task data</li>
             <li>Authentication credentials may be incorrect</li>
         </ul>
-        <p><strong>Features demonstrated:</strong> Interactive filtering, multiple diagram types, export functionality,
-            and responsive design.</p>
-        <p><strong>To see real data:</strong> Configure your Neo4j database connection and ensure it contains task and
-            resource data.</p>
+        <p><strong>To enable visualizations:</strong> Configure your Neo4j database connection and ensure it contains
+            task and resource data.</p>
+        <p><strong>Available features once connected:</strong> Interactive filtering, multiple diagram types, export
+            functionality, and responsive design.</p>
     </div>
 
 
@@ -537,12 +537,12 @@
     // Check Neo4j connection status
     async function checkConnectionStatus() {
         try {
-            // Make a simple API call to check if we're in demo mode
+            // Make a simple API call to check if Neo4j is available
             const response = await fetch('/api/visualizations/status-overview');
             const data = await response.json();
 
             if (response.ok && data.metadata) {
-                updateConnectionStatus(data.metadata.demo_mode);
+                updateConnectionStatus(false); // Neo4j is working
             } else {
                 updateConnectionStatus(true, 'API Error');
             }
@@ -553,7 +553,7 @@
     }
 
     // Update connection status display
-    function updateConnectionStatus(isDemoMode, errorMessage = null) {
+    function updateConnectionStatus(hasError, errorMessage = null) {
         const statusDiv = document.getElementById('connection-status');
         const statusText = document.getElementById('status-text');
         const statusDescription = document.getElementById('status-description');
@@ -563,28 +563,20 @@
         // Remove all status classes
         statusDiv.classList.remove('status-real', 'status-demo', 'status-error');
 
-        if (errorMessage) {
+        if (hasError) {
             // Error state
             connectionStatus = 'error';
             statusDiv.classList.add('status-error');
-            statusText.textContent = 'Connection Error';
-            statusDescription.textContent = errorMessage;
+            statusText.textContent = 'Neo4j Unavailable';
+            statusDescription.textContent = errorMessage || 'Neo4j database connection required for visualizations';
             statusBadge.textContent = 'ERROR';
             demoBanner.classList.add('show');
-        } else if (isDemoMode) {
-            // Demo mode
-            connectionStatus = 'demo';
-            statusDiv.classList.add('status-demo');
-            statusText.textContent = 'Demo Mode Active';
-            statusDescription.textContent = 'Using sample data for demonstration';
-            statusBadge.textContent = 'DEMO';
-            demoBanner.classList.add('show');
         } else {
-            // Real Neo4j connection
+            // Neo4j connection working
             connectionStatus = 'real';
             statusDiv.classList.add('status-real');
             statusText.textContent = 'Neo4j Connected';
-            statusDescription.textContent = 'Connected to real database with live data';
+            statusDescription.textContent = 'Connected to Neo4j database with live data';
             statusBadge.textContent = 'LIVE';
             demoBanner.classList.remove('show');
         }
@@ -674,7 +666,7 @@
             currentMetadata = data.metadata;
 
             // Update connection status based on response
-            updateConnectionStatus(data.metadata.demo_mode);
+            updateConnectionStatus(false); // Success means Neo4j is working
 
             // Render diagram
             await renderDiagram(data.mermaid_code);
@@ -686,10 +678,7 @@
             document.getElementById('export-buttons').style.display = 'flex';
 
             // Show success message
-            const statusMsg = data.metadata.demo_mode ?
-                'Demo diagram generated successfully! (Using sample data)' :
-                'Diagram generated successfully! (Using real Neo4j data)';
-            showStatus(statusMsg, false);
+            showStatus('Diagram generated successfully using Neo4j data!', false);
 
         } catch (error) {
             console.error('Error generating diagram:', error);
@@ -774,11 +763,10 @@
                 displayValue = new Date(value).toLocaleString();
             }
 
-            // Highlight demo mode in metadata
-            if (key === 'demo_mode') {
-                const modeText = value ? 'Yes (Sample Data)' : 'No (Real Data)';
-                const modeColor = value ? '#856404' : '#155724';
-                displayValue = `<span style="color: ${modeColor}; font-weight: bold;">${modeText}</span>`;
+            // Highlight data source in metadata
+            if (key === 'data_source') {
+                const sourceColor = value === 'neo4j' ? '#155724' : '#856404';
+                displayValue = `<span style="color: ${sourceColor}; font-weight: bold;">${value.toUpperCase()}</span>`;
             }
 
             html += `<div class="metadata-item"><strong>${displayKey}:</strong> ${displayValue}</div>`;

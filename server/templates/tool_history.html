@@ -781,7 +781,7 @@ Status: ${execution.success ? 'Success' : 'Failed'}
             html += `
                 <div class="detail-section">
                     <h4>Result</h4>
-                    <div class="detail-content">${JSON.stringify(execution.result, null, 2)}</div>
+                    <div class="detail-content">${formatResultWithNewlines(execution.result)}</div>
                 </div>
             `;
         }
@@ -821,6 +821,20 @@ ${file.content}
         }
 
         detailsContainer.innerHTML = html;
+    }
+
+    // Format result with proper newlines
+    function formatResultWithNewlines(result) {
+        let formattedResult = JSON.stringify(result, null, 2);
+
+        // Convert literal \n to actual newlines for better readability
+        formattedResult = formattedResult.replace(/\\n/g, '\n');
+
+        // Escape HTML to prevent XSS
+        const div = document.createElement('div');
+        div.textContent = formattedResult;
+
+        return div.innerHTML;
     }
 
     // Export Functionality
