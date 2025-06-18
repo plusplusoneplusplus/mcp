@@ -521,25 +521,28 @@
             const response = await fetch('/api/tool-history/stats');
             const data = await response.json();
 
-            if (data.success && data.stats) {
-                const stats = data.stats;
-
+            if (data.success) {
                 // Update stat cards
-                document.getElementById('total-executions').textContent = stats.total_invocations || 0;
+                document.getElementById('total-executions').textContent = data.total_invocations || 0;
                 document.getElementById('total-executions').classList.remove('loading');
 
-                const successRate = ((stats.success_rate || 0) * 100).toFixed(1) + '%';
+                // Calculate success rate from successful/total invocations
+                const successRate = data.total_invocations > 0
+                    ? ((data.successful_invocations / data.total_invocations) * 100).toFixed(1) + '%'
+                    : '0.0%';
                 document.getElementById('success-rate').textContent = successRate;
                 document.getElementById('success-rate').classList.remove('loading');
 
-                const avgDuration = formatDuration(stats.avg_duration || 0);
+                const avgDuration = formatDuration(data.average_duration_ms || 0);
                 document.getElementById('avg-duration').textContent = avgDuration;
                 document.getElementById('avg-duration').classList.remove('loading');
 
                 // Find most used tool
-                const tools = stats.tools || {};
-                const mostUsedTool = Object.keys(tools).reduce((a, b) =>
-                    (tools[a]?.count || 0) > (tools[b]?.count || 0) ? a : b, 'None');
+                const tools = data.tools || {};
+                const mostUsedTool = Object.keys(tools).length > 0
+                    ? Object.keys(tools).reduce((a, b) =>
+                        (tools[a]?.count || 0) > (tools[b]?.count || 0) ? a : b)
+                    : 'None';
                 document.getElementById('most-used-tool').textContent = mostUsedTool;
                 document.getElementById('most-used-tool').classList.remove('loading');
 
