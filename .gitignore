@@ -160,3 +160,11 @@ utils/secret_scanner/**/__pycache__/
 *.db
 *.sqlite
 *.sqlite3
+
+# Ignore local Claude settings and transient files
+.claude/settings.local.json
+.claude/**/tmp/
+.claude/**/logs/
+.claude/**/history/
+.claude/**/cache/
+.claude/**/node_modules/
