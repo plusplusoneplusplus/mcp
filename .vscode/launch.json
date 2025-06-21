@@ -98,6 +98,19 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}",
             }
+        },
+        {
+            "name": "Debug Wu-Wei Extension",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/wu-wei"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/wu-wei/out/**/*.js"
+            ],
+            "preLaunchTask": "npm: compile",
+            "sourceMaps": true
         }
     ]
-} 
+}
