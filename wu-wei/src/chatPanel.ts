@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
 
+interface ChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    timestamp: Date;
+}
+
 /**
  * Wu Wei Chat Panel
  * A simple chat interface that follows wu wei principles - natural, flowing interaction
@@ -11,6 +17,7 @@ export class WuWeiChatPanel {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
+    private _chatHistory: ChatMessage[] = [];
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor
@@ -83,21 +90,102 @@ export class WuWeiChatPanel {
         }
     }
 
-    private _handleUserMessage(message: string) {
-        // For now, just echo back a wu wei inspired response
-        // Later this will integrate with VS Code Language Model API
-        const response = this._generateWuWeiResponse(message);
-
-        this._panel.webview.postMessage({
-            command: 'addMessage',
-            message: response,
-            isUser: false
+    private async _handleUserMessage(message: string) {
+        // Add user message to history
+        this._chatHistory.push({
+            role: 'user',
+            content: message,
+            timestamp: new Date()
         });
+
+        // Show thinking indicator
+        this._panel.webview.postMessage({
+            command: 'showThinking'
+        });
+
+        try {
+            const response = await this._generateAIResponse(message);
+
+            // Add AI response to history
+            this._chatHistory.push({
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            });
+
+            this._panel.webview.postMessage({
+                command: 'addMessage',
+                message: response,
+                isUser: false
+            });
+        } catch (error) {
+            console.error('Wu Wei: Error generating AI response:', error);
+            const fallbackResponse = this._generateWuWeiResponse(message);
+
+            this._chatHistory.push({
+                role: 'assistant',
+                content: fallbackResponse,
+                timestamp: new Date()
+            });
+
+            this._panel.webview.postMessage({
+                command: 'addMessage',
+                message: fallbackResponse,
+                isUser: false
+            });
+        } finally {
+            this._panel.webview.postMessage({
+                command: 'hideThinking'
+            });
+        }
+    }
+
+    private async _generateAIResponse(userMessage: string): Promise<string> {
+        try {
+            // Get configuration
+            const config = vscode.workspace.getConfiguration('wu-wei');
+            const preferredModel = config.get<string>('preferredModel', 'gpt-4o');
+            const systemPrompt = config.get<string>('systemPrompt',
+                'You are Wu Wei, an AI assistant that embodies the philosophy of 无为而治 (wu wei) - effortless action that flows naturally like water. You provide thoughtful, gentle guidance while maintaining harmony and balance. Your responses are wise, concise, and flow naturally without forcing solutions.'
+            );
+
+            // Access language models
+            const models = await vscode.lm.selectChatModels({
+                vendor: 'copilot',
+                family: preferredModel
+            });
+
+            if (models.length === 0) {
+                throw new Error('No language models available');
+            }
+
+            // Prepare messages for the chat
+            const messages: vscode.LanguageModelChatMessage[] = [
+                vscode.LanguageModelChatMessage.User(systemPrompt),
+                ...this._chatHistory.slice(-10).map(msg => // Keep last 10 messages for context
+                    msg.role === 'user'
+                        ? vscode.LanguageModelChatMessage.User(msg.content)
+                        : vscode.LanguageModelChatMessage.Assistant(msg.content)
+                )
+            ];
+
+            // Make the request
+            const chatRequest = await models[0].sendRequest(messages, {}, new vscode.CancellationTokenSource().token);
+
+            let response = '';
+            for await (const fragment of chatRequest.text) {
+                response += fragment;
+            }
+
+            return response.trim() || this._generateWuWeiResponse(userMessage);
+        } catch (error) {
+            console.error('Wu Wei: Language model request failed:', error);
+            throw error;
+        }
     }
 
     private _generateWuWeiResponse(userMessage: string): string {
-        // Simple responses following wu wei philosophy
-        // This is where you'll later integrate with the Language Model API
+        // Fallback responses following wu wei philosophy
         const responses = [
             "Like water, let the solution flow naturally... 🌊",
             "In effortless action, find the path forward. 🍃",
@@ -111,6 +199,7 @@ export class WuWeiChatPanel {
     }
 
     private _clearChat() {
+        this._chatHistory = [];
         this._panel.webview.postMessage({
             command: 'clearMessages'
         });
@@ -274,6 +363,48 @@ export class WuWeiChatPanel {
             font-size: 14px;
             opacity: 0.8;
         }
+        
+        .thinking-indicator {
+            align-self: flex-start;
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .thinking-dots {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .thinking-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--vscode-input-foreground);
+            opacity: 0.4;
+            animation: thinking 1.4s ease-in-out infinite both;
+        }
+        
+        .thinking-dot:nth-child(1) { animation-delay: -0.32s; }
+        .thinking-dot:nth-child(2) { animation-delay: -0.16s; }
+        .thinking-dot:nth-child(3) { animation-delay: 0s; }
+        
+        @keyframes thinking {
+            0%, 80%, 100% {
+                opacity: 0.4;
+                transform: scale(1);
+            }
+            40% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
     </style>
 </head>
 <body>
@@ -287,6 +418,14 @@ export class WuWeiChatPanel {
             <div class="empty-state-icon">🌊</div>
             <div class="empty-state-text">Welcome to Wu Wei Chat</div>
             <div class="empty-state-subtitle">Effortless conversation flows like water</div>
+        </div>
+        <div class="thinking-indicator" id="thinkingIndicator">
+            <span>Wu Wei is contemplating...</span>
+            <div class="thinking-dots">
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+                <div class="thinking-dot"></div>
+            </div>
         </div>
     </div>
     
@@ -307,8 +446,10 @@ export class WuWeiChatPanel {
         const sendBtn = document.getElementById('sendBtn');
         const clearBtn = document.getElementById('clearBtn');
         const emptyState = document.getElementById('emptyState');
+        const thinkingIndicator = document.getElementById('thinkingIndicator');
         
         let messages = [];
+        let isThinking = false;
 
         // Auto-resize textarea
         messageInput.addEventListener('input', function() {
@@ -374,7 +515,35 @@ export class WuWeiChatPanel {
             messages = [];
             chatContainer.innerHTML = '';
             chatContainer.appendChild(emptyState);
+            chatContainer.appendChild(thinkingIndicator);
             emptyState.style.display = 'flex';
+            thinkingIndicator.style.display = 'none';
+            isThinking = false;
+        }
+
+        function showThinking() {
+            if (messages.length === 0) {
+                emptyState.style.display = 'none';
+            }
+            thinkingIndicator.style.display = 'flex';
+            isThinking = true;
+            
+            // Disable send button while thinking
+            sendBtn.disabled = true;
+            messageInput.disabled = true;
+            
+            // Scroll to bottom
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideThinking() {
+            thinkingIndicator.style.display = 'none';
+            isThinking = false;
+            
+            // Re-enable send button
+            sendBtn.disabled = false;
+            messageInput.disabled = false;
+            messageInput.focus();
         }
 
         // Listen for messages from the extension
@@ -387,6 +556,12 @@ export class WuWeiChatPanel {
                     break;
                 case 'clearMessages':
                     clearMessages();
+                    break;
+                case 'showThinking':
+                    showThinking();
+                    break;
+                case 'hideThinking':
+                    hideThinking();
                     break;
             }
         });
