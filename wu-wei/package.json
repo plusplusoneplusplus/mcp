@@ -19,7 +19,8 @@
         "efficiency"
     ],
     "activationEvents": [
-        "onCommand:wu-wei.hello"
+        "onCommand:wu-wei.hello",
+        "onCommand:wu-wei.openChat"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -28,6 +29,12 @@
                 "command": "wu-wei.hello",
                 "title": "Wu Wei: Hello World",
                 "category": "Wu Wei"
+            },
+            {
+                "command": "wu-wei.openChat",
+                "title": "Wu Wei: Open Chat",
+                "category": "Wu Wei",
+                "icon": "$(comment-discussion)"
             }
         ],
         "configuration": {
