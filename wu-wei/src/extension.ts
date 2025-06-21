@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { WuWeiChatPanel } from './chatPanel';
 
 /**
  * Wu Wei Extension - Effortless Work Automation
@@ -18,7 +19,12 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Wu Wei: Effortless automation begins - 无为而治');
     });
 
-    context.subscriptions.push(helloCommand);
+    // Register the chat command
+    const chatCommand = vscode.commands.registerCommand('wu-wei.openChat', () => {
+        WuWeiChatPanel.createOrShow(context.extensionUri);
+    });
+
+    context.subscriptions.push(helloCommand, chatCommand);
 
     // Initialize automation systems
     initializeAutomation(context);

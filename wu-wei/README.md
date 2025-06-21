@@ -18,6 +18,7 @@ Transform your daily work through automation that:
 
 ### Current
 - Basic extension foundation with Wu Wei principles
+- **Wu Wei Chat Interface**: Natural conversation flow for automation guidance
 - Configuration system for automation preferences
 - Extensible architecture for future automation modules
 
@@ -33,7 +34,9 @@ Transform your daily work through automation that:
 1. Clone or download this extension
 2. Open in VS Code
 3. Press `F5` to run in development mode
-4. Test the command: `Ctrl+Shift+P` → "Wu Wei: Hello World"
+4. Test the commands:
+   - `Ctrl+Shift+P` → "Wu Wei: Hello World"
+   - `Ctrl+Shift+P` → "Wu Wei: Open Chat" (Start natural conversation)
 
 ## Development
 
