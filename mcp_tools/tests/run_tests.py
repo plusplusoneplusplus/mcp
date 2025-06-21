@@ -13,8 +13,8 @@ def main():
 
     print(f"\n=== Running MCP Tools Tests ===\n")
 
-    # Run pytest on the tests directory
-    cmd = [sys.executable, "-m", "pytest", str(script_dir), "-v"]
+    # Run pytest on the tests directory using uv
+    cmd = ["uv", "run", "python", "-m", "pytest", str(script_dir), "-v"]
 
     try:
         result = subprocess.run(cmd, capture_output=False)
