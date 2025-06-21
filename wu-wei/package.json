@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "publisher": "your-publisher-name",
     "engines": {
-        "vscode": "^1.74.0"
+        "vscode": "^1.85.0"
     },
     "categories": [
         "Productivity",
@@ -44,6 +44,21 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Enable Wu Wei automation features"
+                },
+                "wu-wei.preferredModel": {
+                    "type": "string",
+                    "default": "gpt-4o",
+                    "description": "Preferred language model for Wu Wei chat",
+                    "enum": [
+                        "gpt-4o",
+                        "gpt-3.5-turbo",
+                        "claude-3-sonnet"
+                    ]
+                },
+                "wu-wei.systemPrompt": {
+                    "type": "string",
+                    "default": "You are Wu Wei, an AI assistant that embodies the philosophy of 无为而治 (wu wei) - effortless action that flows naturally like water. You provide thoughtful, gentle guidance while maintaining harmony and balance. Your responses are wise, concise, and flow naturally without forcing solutions.",
+                    "description": "System prompt for Wu Wei chat assistant"
                 }
             }
         }
@@ -57,7 +72,7 @@
         "test": "node ./out/test/runTest.js"
     },
     "devDependencies": {
-        "@types/vscode": "^1.74.0",
+        "@types/vscode": "^1.85.0",
         "@types/node": "16.x",
         "@typescript-eslint/eslint-plugin": "^5.45.0",
         "@typescript-eslint/parser": "^5.45.0",
