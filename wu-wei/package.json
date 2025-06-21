@@ -1,0 +1,65 @@
+{
+    "name": "wu-wei",
+    "displayName": "Wu Wei",
+    "description": "Effortless work automation - 无为而治",
+    "version": "0.1.0",
+    "publisher": "your-publisher-name",
+    "engines": {
+        "vscode": "^1.74.0"
+    },
+    "categories": [
+        "Productivity",
+        "Other"
+    ],
+    "keywords": [
+        "automation",
+        "productivity",
+        "wu-wei",
+        "workflow",
+        "efficiency"
+    ],
+    "activationEvents": [
+        "onCommand:wu-wei.hello"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "wu-wei.hello",
+                "title": "Wu Wei: Hello World",
+                "category": "Wu Wei"
+            }
+        ],
+        "configuration": {
+            "title": "Wu Wei",
+            "properties": {
+                "wu-wei.enableAutomation": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable Wu Wei automation features"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.74.0",
+        "@types/node": "16.x",
+        "@typescript-eslint/eslint-plugin": "^5.45.0",
+        "@typescript-eslint/parser": "^5.45.0",
+        "eslint": "^8.28.0",
+        "typescript": "^4.9.4"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/your-username/wu-wei.git"
+    },
+    "license": "MIT"
+}
