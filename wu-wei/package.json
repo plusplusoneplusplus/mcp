@@ -92,6 +92,18 @@
                 "title": "Wu Wei: Export Debug Logs",
                 "category": "Wu Wei",
                 "icon": "$(save)"
+            },
+            {
+                "command": "wu-wei.testCline",
+                "title": "Wu Wei: Test Cline Integration",
+                "category": "Wu Wei",
+                "icon": "$(play)"
+            },
+            {
+                "command": "wu-wei.debugCline",
+                "title": "Wu Wei: Debug Cline Status",
+                "category": "Wu Wei",
+                "icon": "$(bug)"
             }
         ],
         "views": {

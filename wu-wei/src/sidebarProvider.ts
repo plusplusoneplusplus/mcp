@@ -427,6 +427,12 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
                 case 'newChat':
                     vscode.commands.executeCommand('wu-wei.newChat');
                     break;
+                case 'testCline':
+                    vscode.commands.executeCommand('wu-wei.testCline');
+                    break;
+                case 'debugCline':
+                    vscode.commands.executeCommand('wu-wei.debugCline');
+                    break;
             }
         });
     }
@@ -497,6 +503,27 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
             border: 1px solid var(--vscode-button-border, transparent);
         }
         
+        .secondary-btn {
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: 1px solid var(--vscode-button-border, transparent);
+        }
+        
+        .secondary-btn:hover {
+            background: var(--vscode-button-secondaryHoverBackground);
+        }
+        
+        .section-divider {
+            margin: 12px 0 8px 0;
+            padding-bottom: 4px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--vscode-descriptionForeground);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
         .philosophy {
             margin-top: 12px;
             padding: 8px;
@@ -518,6 +545,18 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
             <span>New Chat</span>
         </button>
         
+        <div class="section-divider">Cline Integration</div>
+        
+        <button class="action-btn secondary-btn" onclick="testCline()">
+            <span class="icon">▶️</span>
+            <span>Test Cline</span>
+        </button>
+        
+        <button class="action-btn secondary-btn" onclick="debugCline()">
+            <span class="icon">🐛</span>
+            <span>Debug Cline</span>
+        </button>
+        
         <div class="philosophy">
             "Wu wei - effortless action"<br>
             无为而治
@@ -529,6 +568,14 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
         
         function newChat() {
             vscode.postMessage({ command: 'newChat' });
+        }
+        
+        function testCline() {
+            vscode.postMessage({ command: 'testCline' });
+        }
+        
+        function debugCline() {
+            vscode.postMessage({ command: 'debugCline' });
         }
     </script>
 </body>
