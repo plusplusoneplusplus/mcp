@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wu Wei Agent Panel</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 12px;
+            background: var(--vscode-sideBar-background);
+            color: var(--vscode-sideBar-foreground);
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .agent-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .section {
+            background: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .section-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: var(--vscode-foreground);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .section-title .icon {
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-group select,
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            font-family: inherit;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-family: var(--vscode-editor-font-family);
+        }
+
+        .agent-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-button {
+            background: none;
+            border: none;
+            color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            font-size: 14px;
+            position: relative;
+            transition: background-color 0.2s ease;
+            min-width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .info-button:hover {
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--vscode-editorHoverWidget-background);
+            border: 1px solid var(--vscode-editorHoverWidget-border);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+            display: none;
+            max-width: 300px;
+            white-space: normal;
+        }
+
+        .info-button:hover .tooltip {
+            display: block;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background-color 0.1s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-primary {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .btn-secondary {
+            background-color: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--vscode-button-secondaryHoverBackground);
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .keyboard-hint {
+            color: var(--vscode-descriptionForeground);
+            font-size: 11px;
+            margin-top: 4px;
+            display: block;
+        }
+
+        .message-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            background-color: var(--vscode-editor-background);
+        }
+
+        .message-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            font-family: var(--vscode-editor-font-family);
+            font-size: 11px;
+        }
+
+        .message-item:last-child {
+            border-bottom: none;
+        }
+
+        .message-item.request {
+            background-color: var(--vscode-textCodeBlock-background);
+            border-left: 3px solid var(--vscode-charts-blue);
+        }
+
+        .message-item.response {
+            background-color: var(--vscode-editor-inactiveSelectionBackground);
+            border-left: 3px solid var(--vscode-charts-green);
+        }
+
+        .message-item.error {
+            background-color: var(--vscode-inputValidation-errorBackground);
+            border-left: 3px solid var(--vscode-inputValidation-errorBorder);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .message-type {
+            text-transform: uppercase;
+            font-size: 9px;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-weight: 700;
+        }
+
+        .message-type.request {
+            background-color: var(--vscode-charts-blue);
+            color: white;
+        }
+
+        .message-type.response {
+            background-color: var(--vscode-charts-green);
+            color: white;
+        }
+
+        .message-type.error {
+            background-color: var(--vscode-charts-red);
+            color: white;
+        }
+
+        .message-timestamp {
+            color: var(--vscode-descriptionForeground);
+            font-size: 10px;
+            font-weight: normal;
+        }
+
+        .message-content {
+            color: var(--vscode-foreground);
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: var(--vscode-editor-font-family);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .empty-state p {
+            margin: 0;
+            font-style: italic;
+            font-size: 12px;
+        }
+
+        .info-section {
+            background: var(--vscode-textCodeBlock-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            margin-bottom: 8px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+
+        .info-label {
+            font-weight: 500;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .status-active {
+            background-color: var(--vscode-charts-green);
+        }
+
+        .status-inactive {
+            background-color: var(--vscode-charts-red);
+        }
+
+        .status-unknown {
+            background-color: var(--vscode-charts-yellow);
+        }
+
+        /* Scrollbar styles */
+        .message-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .message-list::-webkit-scrollbar-track {
+            background: var(--vscode-scrollbarSlider-background);
+        }
+
+        .message-list::-webkit-scrollbar-thumb {
+            background: var(--vscode-scrollbarSlider-background);
+            border-radius: 4px;
+        }
+
+        .message-list::-webkit-scrollbar-thumb:hover {
+            background: var(--vscode-scrollbarSlider-hoverBackground);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="agent-container">
+        <!-- Agent Control Section -->
+        <div class="section">
+            <div class="section-title">
+                <span class="icon">🤖</span>
+                Agent Control
+            </div>
+
+            <div class="info-section">
+                <div class="info-row">
+                    <span class="info-label">Extension Version:</span>
+                    <span>{{VERSION}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">VS Code Version:</span>
+                    <span>{{VSCODE_VERSION}}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Agents Loaded:</span>
+                    <span id="agentCount">Loading...</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <div class="agent-selector">
+                    <select id="agentSelect">
+                        <option value="">Loading agents...</option>
+                    </select>
+                    <button class="info-button" id="infoButton" title="Agent Information">
+                        ℹ️
+                        <div class="tooltip" id="agentTooltip">Select an agent to see details</div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <select id="methodSelect">
+                    <option value="">Select an agent first</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <textarea id="paramsInput" placeholder='Hello, agent! How can you help me?'></textarea>
+                <small class="keyboard-hint">
+                    Press Ctrl+Enter to send
+                </small>
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" id="sendRequestBtn">
+                    <span>📤</span>
+                    Send (Ctrl+Enter)
+                </button>
+                <button class="btn btn-secondary" id="clearHistoryBtn">
+                    <span>🗑️</span>
+                    Clear History
+                </button>
+            </div>
+        </div>
+
+        <!-- Message History Section -->
+        <div class="section">
+            <div class="section-title">
+                <span class="icon">💬</span>
+                Message History
+                <span class="status-indicator status-active" id="historyStatus"></span>
+            </div>
+            <div class="message-list" id="messageList">
+                <div class="empty-state">
+                    <p>No messages yet. Send your first agent request!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const vscode = acquireVsCodeApi();
+        let agentCapabilities = [];
+        let messageHistory = [];
+
+        // DOM elements
+        const agentSelect = document.getElementById('agentSelect');
+        const methodSelect = document.getElementById('methodSelect');
+        const paramsInput = document.getElementById('paramsInput');
+        const agentTooltip = document.getElementById('agentTooltip');
+        const agentCount = document.getElementById('agentCount');
+        const messageList = document.getElementById('messageList');
+        const sendRequestBtn = document.getElementById('sendRequestBtn');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const historyStatus = document.getElementById('historyStatus');
+
+        // Event listeners
+        agentSelect.addEventListener('change', updateMethodSelect);
+        methodSelect.addEventListener('change', updatePlaceholder);
+        paramsInput.addEventListener('keydown', handleKeyDown);
+        sendRequestBtn.addEventListener('click', sendAgentRequest);
+        clearHistoryBtn.addEventListener('click', () => vscode.postMessage({ command: 'clearHistory' }));
+
+        // Handle messages from extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+
+            switch (message.command) {
+                case 'updateAgentCapabilities':
+                    agentCapabilities = message.capabilities;
+                    updateAgentSelect();
+                    updateAgentCount();
+                    break;
+                case 'updateMessageHistory':
+                    messageHistory = message.messages;
+                    updateMessageHistory();
+                    updateHistoryStatus();
+                    break;
+            }
+        });
+
+        function updateAgentCount() {
+            agentCount.textContent = agentCapabilities.length;
+        }
+
+        function updateHistoryStatus() {
+            if (messageHistory.length > 0) {
+                historyStatus.className = 'status-indicator status-active';
+                historyStatus.title = `${messageHistory.length} messages`;
+            } else {
+                historyStatus.className = 'status-indicator status-inactive';
+                historyStatus.title = 'No messages';
+            }
+        }
+
+        function updateAgentSelect() {
+            agentSelect.innerHTML = '';
+
+            if (agentCapabilities.length === 0) {
+                agentSelect.innerHTML = '<option value="">No agents available</option>';
+                return;
+            }
+
+            agentSelect.innerHTML = '<option value="">Select an agent</option>';
+            agentCapabilities.forEach(capability => {
+                const option = document.createElement('option');
+                option.value = capability.name;
+                option.textContent = `${capability.name} (v${capability.version})`;
+                agentSelect.appendChild(option);
+            });
+
+            // Auto-select GitHub Copilot if available
+            const copilotAgent = agentCapabilities.find(c => c.name === 'github-copilot');
+            if (copilotAgent) {
+                agentSelect.value = 'github-copilot';
+                updateMethodSelect();
+            }
+        }
+
+        function updateMethodSelect() {
+            const selectedAgent = agentSelect.value;
+            methodSelect.innerHTML = '';
+
+            if (!selectedAgent) {
+                methodSelect.innerHTML = '<option value="">Select an agent first</option>';
+                paramsInput.placeholder = 'Select an agent and method first';
+                agentTooltip.textContent = 'Select an agent to see details';
+                return;
+            }
+
+            const capability = agentCapabilities.find(c => c.name === selectedAgent);
+            if (!capability) {
+                methodSelect.innerHTML = '<option value="">Agent not found</option>';
+                return;
+            }
+
+            // Update tooltip with agent info
+            agentTooltip.textContent = `${capability.description || 'No description'} | Methods: ${capability.methods.join(', ')}`;
+
+            // Populate methods
+            methodSelect.innerHTML = '<option value="">Select a method</option>';
+            capability.methods.forEach(method => {
+                const option = document.createElement('option');
+                option.value = method;
+                option.textContent = method;
+                methodSelect.appendChild(option);
+            });
+
+            // Update placeholder based on selected agent
+            if (selectedAgent === 'github-copilot') {
+                paramsInput.placeholder = 'Ask a question or describe what you need help with...';
+
+                // Auto-select openAgent method for GitHub Copilot
+                const openAgentOption = Array.from(methodSelect.options).find(option => option.value === 'openAgent');
+                if (openAgentOption) {
+                    methodSelect.value = 'openAgent';
+                    updatePlaceholder();
+                }
+            } else if (selectedAgent === 'wu-wei-example') {
+                paramsInput.placeholder = 'Enter your message or use JSON: {"action": "test"}';
+            } else {
+                paramsInput.placeholder = 'Enter your message or question...';
+            }
+        }
+
+        function handleKeyDown(event) {
+            // Check for Ctrl+Enter (or Cmd+Enter on Mac)
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                sendAgentRequest();
+            }
+        }
+
+        function updatePlaceholder() {
+            const selectedAgent = agentSelect.value;
+            const selectedMethod = methodSelect.value;
+
+            if (!selectedAgent || !selectedMethod) {
+                return;
+            }
+
+            // Update placeholder based on agent and method
+            if (selectedAgent === 'github-copilot') {
+                if (selectedMethod === 'ask') {
+                    paramsInput.placeholder = 'Ask a question about your code or project...';
+                } else if (selectedMethod === 'openAgent') {
+                    paramsInput.placeholder = 'Describe what you want to do or ask about...';
+                }
+            } else if (selectedAgent === 'wu-wei-example') {
+                if (selectedMethod === 'echo') {
+                    paramsInput.placeholder = 'Enter a message to echo back...';
+                } else if (selectedMethod === 'status') {
+                    paramsInput.placeholder = 'No parameters needed (leave empty)';
+                } else if (selectedMethod === 'execute') {
+                    paramsInput.placeholder = 'Describe what to execute or use JSON: {"action": "test"}';
+                }
+            }
+        }
+
+        function sendAgentRequest() {
+            const agentName = agentSelect.value;
+            const method = methodSelect.value;
+            const paramsText = paramsInput.value.trim();
+
+            if (!agentName) {
+                alert('Please select an agent');
+                return;
+            }
+
+            if (!method) {
+                alert('Please select a method');
+                return;
+            }
+
+            let params = {};
+            if (paramsText) {
+                // Try to parse as JSON first
+                if (paramsText.startsWith('{') || paramsText.startsWith('[')) {
+                    try {
+                        params = JSON.parse(paramsText);
+                    } catch (error) {
+                        alert('Invalid JSON format. Please check your syntax or use plain text.');
+                        return;
+                    }
+                } else {
+                    // Treat as raw string and convert to appropriate parameter format
+                    // For most common cases, treat it as a message or question
+                    if (method === 'ask') {
+                        params = { question: paramsText };
+                    } else if (method === 'openAgent') {
+                        params = { query: paramsText };
+                    } else if (method === 'echo') {
+                        params = { message: paramsText };
+                    } else {
+                        // Generic fallback - use 'message' as the key
+                        params = { message: paramsText };
+                    }
+                }
+            }
+
+            vscode.postMessage({
+                command: 'sendAgentRequest',
+                agentName,
+                method,
+                params
+            });
+
+            // Clear input after sending
+            paramsInput.value = '';
+        }
+
+        function updateMessageHistory() {
+            if (messageHistory.length === 0) {
+                messageList.innerHTML = '<div class="empty-state"><p>No messages yet. Send your first agent request!</p></div>';
+                return;
+            }
+
+            messageList.innerHTML = messageHistory.map(message => {
+                const timestamp = new Date(message.timestamp).toLocaleString();
+
+                let content = '';
+                let typeClass = message.type;
+
+                if (message.type === 'request') {
+                    content = `Method: ${message.method}\nParams: ${JSON.stringify(message.params, null, 2)}`;
+                } else if (message.type === 'response') {
+                    if (message.error) {
+                        content = `Error: ${message.error.message}\nCode: ${message.error.code}`;
+                        if (message.error.data) {
+                            content += `\nData: ${JSON.stringify(message.error.data, null, 2)}`;
+                        }
+                        typeClass = 'error';
+                    } else {
+                        content = `Result: ${JSON.stringify(message.result, null, 2)}`;
+                    }
+                } else if (message.type === 'error') {
+                    content = `Error: ${message.error?.message || 'Unknown error'}\nCode: ${message.error?.code || 'N/A'}`;
+                }
+
+                return `
+                    <div class="message-item ${typeClass}">
+                        <div class="message-header">
+                            <span class="message-type ${typeClass}">${message.type}</span>
+                            <span class="message-timestamp">${timestamp}</span>
+                        </div>
+                        <div class="message-content">${content}</div>
+                    </div>
+                `;
+            }).join('');
+
+            // Scroll to bottom
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        // Request initial data
+        vscode.postMessage({ command: 'getAgentCapabilities' });
+    </script>
+</body>
+
+</html>
