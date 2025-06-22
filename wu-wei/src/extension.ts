@@ -34,6 +34,7 @@ export function deactivate() {
     console.log('Wu Wei extension deactivated - flowing like water');
 }
 
+
 /**
  * Initialize the automation systems
  * Following wu wei principles: set up the foundation, then let it flow naturally

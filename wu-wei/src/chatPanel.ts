@@ -18,6 +18,8 @@ export class WuWeiChatPanel {
     private readonly _extensionUri: vscode.Uri;
     private _disposables: vscode.Disposable[] = [];
     private _chatHistory: ChatMessage[] = [];
+    private _availableModels: vscode.LanguageModelChat[] = [];
+    private _currentModel: string = 'gpt-4o';
 
     public static createOrShow(extensionUri: vscode.Uri) {
         const column = vscode.window.activeTextEditor
@@ -69,11 +71,22 @@ export class WuWeiChatPanel {
                     case 'clearChat':
                         this._clearChat();
                         return;
+                    case 'selectModel':
+                        this._handleModelSelection(message.modelFamily);
+                        return;
+                    case 'requestModels':
+                        this._loadAvailableModels();
+                        return;
                 }
             },
             null,
             this._disposables
         );
+
+        // Load models immediately after setup
+        setTimeout(() => {
+            this._loadAvailableModels();
+        }, 100);
     }
 
     public dispose() {
@@ -149,11 +162,18 @@ export class WuWeiChatPanel {
                 'You are Wu Wei, an AI assistant that embodies the philosophy of 无为而治 (wu wei) - effortless action that flows naturally like water. You provide thoughtful, gentle guidance while maintaining harmony and balance. Your responses are wise, concise, and flow naturally without forcing solutions.'
             );
 
-            // Access language models
-            const models = await vscode.lm.selectChatModels({
-                vendor: 'copilot',
+            // Access language models - try preferred model first, then fallback to any available
+            let models = await vscode.lm.selectChatModels({
                 family: preferredModel
             });
+
+            // If preferred model not available, get any available model
+            if (models.length === 0) {
+                models = await vscode.lm.selectChatModels();
+                if (models.length > 0) {
+                    console.log(`Wu Wei: Preferred model '${preferredModel}' not available, using '${models[0].family}' instead`);
+                }
+            }
 
             if (models.length === 0) {
                 throw new Error('No language models available');
@@ -205,6 +225,55 @@ export class WuWeiChatPanel {
         });
     }
 
+    private async _handleModelSelection(modelFamily: string) {
+        try {
+            // Update configuration
+            const config = vscode.workspace.getConfiguration('wu-wei');
+            await config.update('preferredModel', modelFamily, vscode.ConfigurationTarget.Global);
+
+            this._currentModel = modelFamily;
+            console.log(`Wu Wei: Model changed to ${modelFamily}`);
+        } catch (error) {
+            console.error('Wu Wei: Error updating model preference:', error);
+        }
+    }
+
+    private async _loadAvailableModels() {
+        console.log('Wu Wei: Loading available models...');
+        try {
+            // Get all available models
+            this._availableModels = await vscode.lm.selectChatModels();
+            console.log(`Wu Wei: Found ${this._availableModels.length} models`);
+
+            const config = vscode.workspace.getConfiguration('wu-wei');
+            const currentModel = config.get<string>('preferredModel', 'gpt-4o');
+
+            const modelData = this._availableModels.map(model => ({
+                family: model.family,
+                vendor: model.vendor,
+                name: model.name,
+                maxInputTokens: model.maxInputTokens
+            }));
+
+            console.log('Wu Wei: Sending models to webview:', modelData);
+
+            // Send models to webview
+            this._panel.webview.postMessage({
+                command: 'updateModels',
+                models: modelData,
+                currentModel: currentModel
+            });
+        } catch (error) {
+            console.error('Wu Wei: Error loading available models:', error);
+            this._panel.webview.postMessage({
+                command: 'updateModels',
+                models: [],
+                currentModel: 'gpt-4o',
+                error: 'Failed to load models'
+            });
+        }
+    }
+
     private _update() {
         const webview = this._panel.webview;
         this._panel.webview.html = this._getHtmlForWebview(webview);
@@ -240,12 +309,63 @@ export class WuWeiChatPanel {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 12px;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
         
         .header h1 {
             font-size: 18px;
             font-weight: 600;
             color: var(--vscode-foreground);
+        }
+        
+        .model-selector {
+            background: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
+            border: 1px solid var(--vscode-dropdown-border);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            min-width: 120px;
+        }
+        
+        .model-selector:focus {
+            outline: 1px solid var(--vscode-focusBorder);
+        }
+        
+        .model-info {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 140px;
+        }
+        
+        .model-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .model-info-label {
+            opacity: 0.8;
+        }
+        
+        .model-info-value {
+            font-weight: 500;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .clear-btn {
@@ -409,8 +529,25 @@ export class WuWeiChatPanel {
 </head>
 <body>
     <div class="header">
-        <h1>Wu Wei Chat</h1>
-        <button class="clear-btn" id="clearBtn">Clear Chat</button>
+        <div class="header-left">
+            <h1>Wu Wei Chat</h1>
+            <select class="model-selector" id="modelSelector">
+                <option value="">Loading models...</option>
+            </select>
+            <div class="model-info" id="modelInfo" style="display: none;">
+                <div class="model-info-row">
+                    <span class="model-info-label">Context:</span>
+                    <span class="model-info-value" id="modelContextSize">-</span>
+                </div>
+                <div class="model-info-row">
+                    <span class="model-info-label">Vendor:</span>
+                    <span class="model-info-value" id="modelVendor">-</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="clear-btn" id="clearBtn">Clear Chat</button>
+        </div>
     </div>
     
     <div class="chat-container" id="chatContainer">
@@ -447,9 +584,11 @@ export class WuWeiChatPanel {
         const clearBtn = document.getElementById('clearBtn');
         const emptyState = document.getElementById('emptyState');
         const thinkingIndicator = document.getElementById('thinkingIndicator');
+        const modelSelector = document.getElementById('modelSelector');
         
         let messages = [];
         let isThinking = false;
+        let availableModels = [];
 
         // Auto-resize textarea
         messageInput.addEventListener('input', function() {
@@ -546,6 +685,85 @@ export class WuWeiChatPanel {
             messageInput.focus();
         }
 
+        // Model selector change handler
+        modelSelector.addEventListener('change', function() {
+            const selectedModel = this.value;
+            if (selectedModel) {
+                updateModelInfo(selectedModel);
+                vscode.postMessage({
+                    command: 'selectModel',
+                    modelFamily: selectedModel
+                });
+            }
+        });
+
+        // Update model info display
+        function updateModelInfo(selectedModelFamily) {
+            const modelInfo = document.getElementById('modelInfo');
+            const contextSize = document.getElementById('modelContextSize');
+            const vendor = document.getElementById('modelVendor');
+            
+            if (!selectedModelFamily || availableModels.length === 0) {
+                modelInfo.style.display = 'none';
+                return;
+            }
+            
+            const selectedModel = availableModels.find(model => model.family === selectedModelFamily);
+            if (selectedModel) {
+                // Format context size
+                const maxTokens = selectedModel.maxInputTokens;
+                const contextText = maxTokens ? 
+                    (maxTokens >= 1000 ? \`\${(maxTokens / 1000).toFixed(0)}k\` : maxTokens.toString()) : 
+                    'Unknown';
+                
+                contextSize.textContent = contextText;
+                vendor.textContent = selectedModel.vendor;
+                modelInfo.style.display = 'flex';
+            } else {
+                modelInfo.style.display = 'none';
+            }
+        }
+
+        // Update model selector
+        function updateModelSelector(models, currentModel, error) {
+            modelSelector.innerHTML = '';
+            
+            if (error) {
+                const errorOption = document.createElement('option');
+                errorOption.value = '';
+                errorOption.textContent = 'Error loading models';
+                errorOption.disabled = true;
+                modelSelector.appendChild(errorOption);
+                return;
+            }
+            
+            if (models.length === 0) {
+                const noModelsOption = document.createElement('option');
+                noModelsOption.value = '';
+                noModelsOption.textContent = 'No models available';
+                noModelsOption.disabled = true;
+                modelSelector.appendChild(noModelsOption);
+                return;
+            }
+            
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.family;
+                option.textContent = \`\${model.family} (\${model.vendor})\`;
+                if (model.family === currentModel) {
+                    option.selected = true;
+                }
+                modelSelector.appendChild(option);
+            });
+            
+            availableModels = models;
+            
+            // Update model info for currently selected model
+            if (currentModel && models.length > 0) {
+                updateModelInfo(currentModel);
+            }
+        }
+
         // Listen for messages from the extension
         window.addEventListener('message', event => {
             const message = event.data;
@@ -563,7 +781,15 @@ export class WuWeiChatPanel {
                 case 'hideThinking':
                     hideThinking();
                     break;
+                case 'updateModels':
+                    updateModelSelector(message.models, message.currentModel, message.error);
+                    break;
             }
+        });
+        
+        // Initialize: Request available models on load
+        vscode.postMessage({
+            command: 'requestModels'
         });
         
         // Focus input on load
