@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { WuWeiChatPanel } from './chatPanel';
+import { logger } from './logger';
 
 interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
@@ -28,7 +29,9 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
+        logger.info('Initializing Wu Wei Sidebar Provider');
         this.loadChatSessions();
+        logger.info(`Loaded ${this.chatSessions.length} chat sessions`);
     }
 
     refresh(): void {
@@ -68,6 +71,8 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
         const timestamp = new Date();
         const title = `Chat ${this.chatSessions.length + 1}`;
 
+        logger.chat('Creating new chat session', sessionId, { title, sessionCount: this.chatSessions.length });
+
         const newSession: ChatSession = {
             id: sessionId,
             title,
@@ -83,6 +88,7 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
         // Open the new chat with the specific session ID to switch to it
         WuWeiChatPanel.createOrShow(this.context.extensionUri, sessionId);
 
+        logger.chat('New chat session created successfully', sessionId, { title });
         vscode.window.showInformationMessage(`Wu Wei: New chat session "${title}" created 🌊`);
     }
 
@@ -90,22 +96,24 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
      * Delete a chat session
      */
     deleteChat(sessionId: string): void {
-        console.log(`Wu Wei: Attempting to delete session with ID: ${sessionId}`);
-        console.log(`Wu Wei: Current sessions:`, this.chatSessions.map(s => ({ id: s.id, title: s.title })));
+        logger.chat('Attempting to delete session', sessionId);
+        logger.debug('Current sessions', this.chatSessions.map(s => ({ id: s.id, title: s.title })));
 
         const sessionIndex = this.chatSessions.findIndex(s => s.id === sessionId);
-        console.log(`Wu Wei: Found session at index: ${sessionIndex}`);
+        logger.debug(`Found session at index: ${sessionIndex}`);
 
         if (sessionIndex >= 0) {
             const session = this.chatSessions[sessionIndex];
+            logger.chat('Deleting session', sessionId, { title: session.title, messageCount: session.chatHistory.length });
+
             this.chatSessions.splice(sessionIndex, 1);
             this.saveChatSessions();
             this.refresh();
 
             vscode.window.showInformationMessage(`Wu Wei: Chat session "${session.title}" deleted`);
-            console.log(`Wu Wei: Session "${session.title}" deleted successfully`);
+            logger.chat('Session deleted successfully', sessionId, { title: session.title });
         } else {
-            console.error(`Wu Wei: Could not find session with ID: ${sessionId}`);
+            logger.error(`Could not find session with ID: ${sessionId}`);
             vscode.window.showErrorMessage(`Wu Wei: Could not find session to delete`);
         }
     }
@@ -115,7 +123,12 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
      */
     async renameChat(sessionId: string): Promise<void> {
         const session = this.chatSessions.find(s => s.id === sessionId);
-        if (!session) return;
+        if (!session) {
+            logger.warn('Rename chat: session not found', { sessionId });
+            return;
+        }
+
+        logger.chat('Starting chat rename', sessionId, { currentTitle: session.title });
 
         const newTitle = await vscode.window.showInputBox({
             prompt: 'Enter new chat title',
@@ -132,11 +145,18 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
         });
 
         if (newTitle && newTitle.trim() !== session.title) {
+            const oldTitle = session.title;
             session.title = newTitle.trim();
             this.saveChatSessions();
             this.refresh();
 
+            logger.chat('Chat renamed successfully', sessionId, {
+                oldTitle,
+                newTitle: session.title
+            });
             vscode.window.showInformationMessage(`Wu Wei: Chat renamed to "${session.title}"`);
+        } else {
+            logger.chat('Chat rename cancelled or unchanged', sessionId);
         }
     }
 
@@ -144,9 +164,25 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
      * Open a chat session
      */
     openChat(sessionId: string): void {
-        const session = this.chatSessions.find(s => s.id === sessionId);
-        if (session) {
-            WuWeiChatPanel.createOrShow(this.context.extensionUri, sessionId);
+        try {
+            // Validate sessionId
+            if (!sessionId || typeof sessionId !== 'string') {
+                logger.error('Invalid sessionId provided to openChat', { sessionId });
+                vscode.window.showErrorMessage('Wu Wei: Invalid chat session ID');
+                return;
+            }
+
+            const session = this.chatSessions.find(s => s.id === sessionId);
+            if (session) {
+                logger.chat('Opening chat session', sessionId, { title: session.title });
+                WuWeiChatPanel.createOrShow(this.context.extensionUri, sessionId);
+            } else {
+                logger.warn('Open chat: session not found', { sessionId });
+                vscode.window.showErrorMessage('Wu Wei: Chat session not found');
+            }
+        } catch (error) {
+            logger.error('Error opening chat session', error);
+            vscode.window.showErrorMessage('Wu Wei: Error opening chat session');
         }
     }
 
@@ -168,6 +204,41 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
             session.timestamp = new Date();
             this.saveChatSessions();
             this.refresh();
+            logger.chat('Message added to session', sessionId, {
+                role: message.role,
+                messageLength: message.content.length,
+                totalMessages: session.chatHistory.length
+            });
+        } else {
+            logger.warn('Add message: session not found', { sessionId });
+        }
+    }
+
+    /**
+     * Update entire chat history for a session (bulk operation)
+     * This method avoids the recursive save issue during session switching
+     */
+    updateSessionChatHistory(sessionId: string, chatHistory: ChatMessage[]): void {
+        const session = this.chatSessions.find(s => s.id === sessionId);
+        if (session) {
+            session.chatHistory = [...chatHistory]; // Create a copy to avoid reference issues
+
+            // Update last message from the most recent message
+            const lastMessage = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1] : null;
+            session.lastMessage = lastMessage
+                ? (lastMessage.content.length > 50 ? lastMessage.content.substring(0, 47) + '...' : lastMessage.content)
+                : undefined;
+
+            session.timestamp = new Date();
+            this.saveChatSessions();
+            this.refresh();
+
+            logger.chat('Chat history updated for session', sessionId, {
+                messageCount: chatHistory.length,
+                lastMessageRole: lastMessage?.role
+            });
+        } else {
+            logger.warn('Update chat history: session not found', { sessionId });
         }
     }
 
@@ -176,7 +247,9 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
      */
     getChatHistory(sessionId: string): ChatMessage[] {
         const session = this.chatSessions.find(s => s.id === sessionId);
-        return session ? session.chatHistory : [];
+        const history = session ? session.chatHistory : [];
+        logger.debug('Retrieved chat history', { sessionId, messageCount: history.length });
+        return history;
     }
 
     /**
@@ -185,11 +258,18 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
     clearChatHistory(sessionId: string): void {
         const session = this.chatSessions.find(s => s.id === sessionId);
         if (session) {
+            const previousMessageCount = session.chatHistory.length;
             session.chatHistory = [];
             session.lastMessage = undefined;
             session.timestamp = new Date();
             this.saveChatSessions();
             this.refresh();
+            logger.chat('Chat history cleared', sessionId, {
+                previousMessageCount,
+                title: session.title
+            });
+        } else {
+            logger.warn('Clear history: session not found', { sessionId });
         }
     }
 
@@ -205,8 +285,9 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
                 timestamp: new Date(session.timestamp),
                 chatHistory: session.chatHistory || [] // Ensure chatHistory exists
             }));
+            logger.debug('Chat sessions loaded successfully', { count: this.chatSessions.length });
         } catch (error) {
-            console.error('Wu Wei: Error loading chat sessions:', error);
+            logger.error('Error loading chat sessions', error);
             this.chatSessions = [];
         }
     }
@@ -214,8 +295,9 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
     private saveChatSessions(): void {
         try {
             this.context.globalState.update('wuWeiChatSessions', this.chatSessions);
+            logger.debug('Chat sessions saved successfully', { count: this.chatSessions.length });
         } catch (error) {
-            console.error('Wu Wei: Error saving chat sessions:', error);
+            logger.error('Error saving chat sessions', error);
         }
     }
 
@@ -324,6 +406,12 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'refreshChats':
                     vscode.commands.executeCommand('wu-wei.refreshChats');
+                    break;
+                case 'showLogs':
+                    vscode.commands.executeCommand('wu-wei.showLogs');
+                    break;
+                case 'clearLogs':
+                    vscode.commands.executeCommand('wu-wei.clearLogs');
                     break;
             }
         });
@@ -443,6 +531,18 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
             <span>Refresh Sessions</span>
         </button>
         
+        <div class="divider"></div>
+        
+        <button class="action-btn secondary-btn" onclick="showLogs()">
+            <span class="icon">📄</span>
+            <span>Show Output Logs</span>
+        </button>
+        
+        <button class="action-btn secondary-btn" onclick="clearLogs()">
+            <span class="icon">🗑️</span>
+            <span>Clear Logs</span>
+        </button>
+        
         <div class="philosophy">
             "Wu wei - effortless action"<br>
             无为而治
@@ -462,6 +562,14 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
         
         function refreshChats() {
             vscode.postMessage({ command: 'refreshChats' });
+        }
+        
+        function showLogs() {
+            vscode.postMessage({ command: 'showLogs' });
+        }
+        
+        function clearLogs() {
+            vscode.postMessage({ command: 'clearLogs' });
         }
     </script>
 </body>
