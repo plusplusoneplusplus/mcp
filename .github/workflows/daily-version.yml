@@ -8,11 +8,14 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Required for accessing git tags
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install uv
         run: |
