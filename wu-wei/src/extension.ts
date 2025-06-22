@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
-import { WuWeiChatPanel } from './chatPanel';
-import { WuWeiSidebarProvider, WuWeiActionsViewProvider } from './sidebarProvider';
 import { WuWeiDebugPanelProvider } from './debugPanel';
 import { WuWeiAgentPanelProvider } from './agentPanel';
+import { UnifiedWuWeiChatProvider } from './unifiedChatProvider';
 import { logger } from './logger';
 
 /**
@@ -18,38 +17,24 @@ import { logger } from './logger';
 export function activate(context: vscode.ExtensionContext) {
     logger.lifecycle('activate', 'Wu Wei extension is now active - 无为而治');
 
-    // Create the sidebar provider
-    const sidebarProvider = new WuWeiSidebarProvider(context);
-    const actionsProvider = new WuWeiActionsViewProvider(context);
+    // Create the providers
+    const unifiedChatProvider = new UnifiedWuWeiChatProvider(context);
     const debugPanelProvider = new WuWeiDebugPanelProvider(context);
     const agentPanelProvider = new WuWeiAgentPanelProvider(context);
 
-    logger.info('Sidebar, actions, debug, and agent providers created');
+    logger.info('Unified chat, debug, and agent providers created');
 
-    // Register tree data provider
-    const treeDataProvider = vscode.window.registerTreeDataProvider('wu-wei.chatSessions', sidebarProvider);
-    logger.info('Tree data provider registered for chat sessions');
-
-    // Register actions view provider
-    const actionsViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.actions', actionsProvider);
-    logger.info('Webview provider registered for actions panel');
-
-    // Register debug panel provider
+    // Register webview providers
+    const chatViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.chat', unifiedChatProvider);
     const debugViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.debug', debugPanelProvider);
-    logger.info('Webview provider registered for debug panel');
-
-    // Register agent panel provider
     const agentViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.agent', agentPanelProvider);
-    logger.info('Webview provider registered for agent panel');
 
-    // Connect sidebar provider to chat panel
-    WuWeiChatPanel.setSidebarProvider(sidebarProvider);
-    logger.info('Sidebar provider connected to chat panel');
+    logger.info('All webview providers registered');
 
     // Update context based on chat sessions
     const updateContext = () => {
-        const hasChats = sidebarProvider.getSessionCount() > 0;
-        vscode.commands.executeCommand('setContext', 'wu-wei.hasNoChats', !hasChats);
+        // For now, we'll assume there are always chats available with unified provider
+        vscode.commands.executeCommand('setContext', 'wu-wei.hasNoChats', false);
     };
     updateContext();
 
@@ -59,60 +44,22 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Wu Wei: Effortless automation begins - 无为而治');
     });
 
-    // Register the chat command
+    // Register the chat command - now focuses the unified chat view
     const chatCommand = vscode.commands.registerCommand('wu-wei.openChat', () => {
-        logger.chat('Opening chat panel');
-        WuWeiChatPanel.createOrShow(context.extensionUri);
+        logger.chat('Focusing chat view');
+        vscode.commands.executeCommand('wu-wei.chat.focus');
     });
 
-    // Register new chat command
+    // Register new chat command - handled by unified provider
     const newChatCommand = vscode.commands.registerCommand('wu-wei.newChat', () => {
-        logger.chat('Creating new chat session');
-        sidebarProvider.createNewChat();
-        updateContext();
+        logger.chat('Creating new chat session via unified provider');
+        vscode.commands.executeCommand('wu-wei.chat.focus');
     });
 
     // Register refresh chats command
     const refreshChatsCommand = vscode.commands.registerCommand('wu-wei.refreshChats', () => {
         logger.chat('Refreshing chat sessions');
-        sidebarProvider.refresh();
-        updateContext();
-    });
-
-    // Register open chat session command
-    const openChatSessionCommand = vscode.commands.registerCommand('wu-wei.openChatSession', (sessionIdOrItem: string | any) => {
-        // Handle both direct sessionId strings and tree item objects
-        const sessionId = typeof sessionIdOrItem === 'string' ? sessionIdOrItem : sessionIdOrItem?.sessionId || sessionIdOrItem?.id;
-
-        logger.chat('Opening chat session command called', sessionId, {
-            argumentType: typeof sessionIdOrItem,
-            argumentValue: sessionIdOrItem
-        });
-
-        if (!sessionId) {
-            logger.error('No valid session ID found in openChatSession command', { argument: sessionIdOrItem });
-            vscode.window.showErrorMessage('Wu Wei: Invalid chat session ID');
-            return;
-        }
-
-        sidebarProvider.openChat(sessionId);
-    });
-
-    // Register delete chat session command
-    const deleteChatSessionCommand = vscode.commands.registerCommand('wu-wei.deleteChatSession', (item: any) => {
-        logger.debug('Delete command called with item', item);
-        const sessionId = item?.sessionId || item?.id || item;
-        logger.chat('Deleting chat session', sessionId);
-        sidebarProvider.deleteChat(sessionId);
-        updateContext();
-    });
-
-    // Register rename chat session command
-    const renameChatSessionCommand = vscode.commands.registerCommand('wu-wei.renameChatSession', async (item: any) => {
-        logger.debug('Rename command called with item', item);
-        const sessionId = item?.sessionId || item?.id || item;
-        logger.chat('Renaming chat session', sessionId);
-        await sidebarProvider.renameChat(sessionId);
+        vscode.commands.executeCommand('wu-wei.chat.focus');
     });
 
     // Register show logs command
@@ -167,7 +114,16 @@ export function activate(context: vscode.ExtensionContext) {
 
             // Check VSCode version
             const vscodeVersion = vscode.version;
-            logger.info(`VSCode Version: ${vscodeVersion}`);
+            const versionParts = vscodeVersion.split('.');
+            const majorVersion = parseInt(versionParts[0]);
+            const minorVersion = parseInt(versionParts[1]);
+
+            if (majorVersion < 1 || (majorVersion === 1 && minorVersion < 90)) {
+                logger.warn(`VS Code version ${vscodeVersion} may not support Language Model API. Recommended: 1.90+`);
+                vscode.window.showWarningMessage(`Wu Wei: VS Code ${vscodeVersion} may not support language models. Please update to 1.90+`);
+            } else {
+                logger.info(`VS Code version ${vscodeVersion} supports Language Model API`);
+            }
 
             // Check if language model API exists
             logger.info(`Language Model API Available: ${!!vscode.lm}`);
@@ -236,13 +192,9 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage('Wu Wei: Failed to fetch models. Check Output panel for details.');
             }
 
-            // Get current Wu Wei chat panel state if it exists
-            if (WuWeiChatPanel.currentPanel) {
-                logger.info('Wu Wei Chat Panel is currently open');
-                // Could add more panel-specific debugging here
-            } else {
-                logger.info('Wu Wei Chat Panel is not currently open');
-            }
+            // Get current Wu Wei unified chat provider state
+            const modelState = unifiedChatProvider.getModelState();
+            logger.info('Wu Wei Unified Chat Provider state:', JSON.stringify(modelState, null, 2));
 
             logger.info('='.repeat(80));
             logger.info('WU WEI MODEL DEBUGGING SESSION COMPLETED');
@@ -257,15 +209,12 @@ export function activate(context: vscode.ExtensionContext) {
     // Register force reload models command
     const forceReloadModelsCommand = vscode.commands.registerCommand('wu-wei.forceReloadModels', async () => {
         logger.info('Force reload models command executed');
-
-        if (WuWeiChatPanel.currentPanel) {
-            logger.info('Chat panel exists, forcing model reload...');
-            // Access the private method through the class - this is for debugging purposes
-            (WuWeiChatPanel.currentPanel as any)._loadAvailableModels();
-            vscode.window.showInformationMessage('Wu Wei: Model reload initiated. Check Output panel for progress.');
-        } else {
-            logger.warn('No chat panel currently open to reload models');
-            vscode.window.showWarningMessage('Wu Wei: No chat panel open. Open a chat first.');
+        try {
+            await unifiedChatProvider.forceReloadModels();
+            vscode.window.showInformationMessage('Wu Wei: Models reloaded. Check Output panel for details.');
+        } catch (error) {
+            logger.error('Failed to reload models:', error);
+            vscode.window.showErrorMessage('Wu Wei: Failed to reload models. Check Output panel for details.');
         }
     });
 
@@ -286,17 +235,13 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(
-        treeDataProvider,
-        actionsViewProvider,
+        chatViewProvider,
         debugViewProvider,
         agentViewProvider,
         helloCommand,
         chatCommand,
         newChatCommand,
         refreshChatsCommand,
-        openChatSessionCommand,
-        deleteChatSessionCommand,
-        renameChatSessionCommand,
         showLogsCommand,
         clearLogsCommand,
         exportLogsCommand,

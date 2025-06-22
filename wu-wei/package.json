@@ -20,8 +20,7 @@
     ],
     "activationEvents": [
         "onCommand:wu-wei.hello",
-        "onCommand:wu-wei.openChat",
-        "onView:wu-wei.chatSessions"
+        "onCommand:wu-wei.openChat"
     ],
     "capabilities": {
         "virtualWorkspaces": true,
@@ -29,9 +28,7 @@
             "supported": true
         }
     },
-    "enabledApiProposals": [
-        "languageModels"
-    ],
+    "enabledApiProposals": [],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [
@@ -57,23 +54,6 @@
                 "title": "Wu Wei: Refresh Chats",
                 "category": "Wu Wei",
                 "icon": "$(refresh)"
-            },
-            {
-                "command": "wu-wei.openChatSession",
-                "title": "Wu Wei: Open Chat Session",
-                "category": "Wu Wei"
-            },
-            {
-                "command": "wu-wei.deleteChatSession",
-                "title": "Wu Wei: Delete Chat Session",
-                "category": "Wu Wei",
-                "icon": "$(trash)"
-            },
-            {
-                "command": "wu-wei.renameChatSession",
-                "title": "Wu Wei: Rename Chat Session",
-                "category": "Wu Wei",
-                "icon": "$(edit)"
             },
             {
                 "command": "wu-wei.showLogs",
@@ -121,13 +101,8 @@
         "views": {
             "wu-wei": [
                 {
-                    "id": "wu-wei.chatSessions",
-                    "name": "Chat Sessions",
-                    "when": "true"
-                },
-                {
-                    "id": "wu-wei.actions",
-                    "name": "Actions",
+                    "id": "wu-wei.chat",
+                    "name": "Chat",
                     "type": "webview",
                     "when": "true"
                 },
@@ -155,22 +130,16 @@
             ]
         },
         "menus": {
-            "view/title": [],
-            "view/item/context": [
+            "view/title": [
                 {
-                    "command": "wu-wei.openChatSession",
-                    "when": "view == wu-wei.chatSessions && viewItem == chatSession",
-                    "group": "inline@1"
+                    "command": "wu-wei.newChat",
+                    "when": "view == wu-wei.chat",
+                    "group": "navigation@1"
                 },
                 {
-                    "command": "wu-wei.renameChatSession",
-                    "when": "view == wu-wei.chatSessions && viewItem == chatSession",
-                    "group": "inline@2"
-                },
-                {
-                    "command": "wu-wei.deleteChatSession",
-                    "when": "view == wu-wei.chatSessions && viewItem == chatSession",
-                    "group": "inline@3"
+                    "command": "wu-wei.refreshChats",
+                    "when": "view == wu-wei.chat",
+                    "group": "navigation@2"
                 }
             ]
         },
