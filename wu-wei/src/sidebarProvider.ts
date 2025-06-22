@@ -407,12 +407,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
                 case 'refreshChats':
                     vscode.commands.executeCommand('wu-wei.refreshChats');
                     break;
-                case 'showLogs':
-                    vscode.commands.executeCommand('wu-wei.showLogs');
-                    break;
-                case 'clearLogs':
-                    vscode.commands.executeCommand('wu-wei.clearLogs');
-                    break;
             }
         });
     }
@@ -531,18 +525,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
             <span>Refresh Sessions</span>
         </button>
         
-        <div class="divider"></div>
-        
-        <button class="action-btn secondary-btn" onclick="showLogs()">
-            <span class="icon">📄</span>
-            <span>Show Output Logs</span>
-        </button>
-        
-        <button class="action-btn secondary-btn" onclick="clearLogs()">
-            <span class="icon">🗑️</span>
-            <span>Clear Logs</span>
-        </button>
-        
         <div class="philosophy">
             "Wu wei - effortless action"<br>
             无为而治
@@ -562,14 +544,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
         
         function refreshChats() {
             vscode.postMessage({ command: 'refreshChats' });
-        }
-        
-        function showLogs() {
-            vscode.postMessage({ command: 'showLogs' });
-        }
-        
-        function clearLogs() {
-            vscode.postMessage({ command: 'clearLogs' });
         }
     </script>
 </body>

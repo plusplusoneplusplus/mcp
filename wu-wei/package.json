@@ -77,6 +77,12 @@
                 "title": "Wu Wei: Clear Output Logs",
                 "category": "Wu Wei",
                 "icon": "$(clear-all)"
+            },
+            {
+                "command": "wu-wei.exportLogs",
+                "title": "Wu Wei: Export Debug Logs",
+                "category": "Wu Wei",
+                "icon": "$(save)"
             }
         ],
         "views": {
@@ -89,6 +95,12 @@
                 {
                     "id": "wu-wei.actions",
                     "name": "Actions",
+                    "type": "webview",
+                    "when": "true"
+                },
+                {
+                    "id": "wu-wei.debug",
+                    "name": "Debug",
                     "type": "webview",
                     "when": "true"
                 }

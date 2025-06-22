@@ -398,6 +398,9 @@ export class WuWeiChatPanel {
                 }
             }
 
+            // Restore model selection after loading messages
+            await this._restoreModelSelection();
+
             // Update panel title with session info
             const session = WuWeiChatPanel._sidebarProvider.getChatSession(sessionId);
             if (session) {
@@ -417,6 +420,33 @@ export class WuWeiChatPanel {
     private _update() {
         const webview = this._panel.webview;
         this._panel.webview.html = this._getHtmlForWebview(webview);
+    }
+
+    private async _restoreModelSelection(): Promise<void> {
+        try {
+            // Get current model from configuration
+            const config = vscode.workspace.getConfiguration('wu-wei');
+            const currentModel = config.get<string>('preferredModel', 'gpt-4o');
+
+            // Get available models data
+            const modelData = this._availableModels.map(model => ({
+                family: model.family,
+                vendor: model.vendor,
+                name: model.name,
+                maxInputTokens: model.maxInputTokens
+            }));
+
+            console.log('Wu Wei: Restoring model selection after session switch');
+
+            // Send updated models with current selection to webview
+            await this._postMessageToWebview({
+                command: 'updateModels',
+                models: modelData,
+                currentModel: currentModel
+            });
+        } catch (error) {
+            console.error('Wu Wei: Error restoring model selection:', error);
+        }
     }
 
     private async _postMessageToWebview(message: any): Promise<void> {
