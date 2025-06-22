@@ -27,23 +27,19 @@ export function activate(context: vscode.ExtensionContext) {
     logger.info('Sidebar, actions, debug, and agent providers created');
 
     // Register tree data provider
-    vscode.window.registerTreeDataProvider('wu-wei.chatSessions', sidebarProvider);
+    const treeDataProvider = vscode.window.registerTreeDataProvider('wu-wei.chatSessions', sidebarProvider);
     logger.info('Tree data provider registered for chat sessions');
 
     // Register actions view provider
-    vscode.window.registerWebviewViewProvider('wu-wei.actions', actionsProvider);
+    const actionsViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.actions', actionsProvider);
     logger.info('Webview provider registered for actions panel');
 
     // Register debug panel provider
-    vscode.window.registerWebviewViewProvider('wu-wei.debug', debugPanelProvider);
+    const debugViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.debug', debugPanelProvider);
     logger.info('Webview provider registered for debug panel');
 
     // Register agent panel provider
-    vscode.window.registerWebviewViewProvider('wu-wei.agent', agentPanelProvider);
-    logger.info('Webview provider registered for agent panel');
-
-    // Register agent panel provider
-    vscode.window.registerWebviewViewProvider('wu-wei.agent', agentPanelProvider);
+    const agentViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.agent', agentPanelProvider);
     logger.info('Webview provider registered for agent panel');
 
     // Connect sidebar provider to chat panel
@@ -290,6 +286,10 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(
+        treeDataProvider,
+        actionsViewProvider,
+        debugViewProvider,
+        agentViewProvider,
         helloCommand,
         chatCommand,
         newChatCommand,

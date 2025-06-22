@@ -203,6 +203,102 @@ export class WuWeiExampleAgent extends AbstractAgent {
 }
 
 /**
+ * GitHub Copilot Agent implementation
+ * Uses VSCode's workbench.action.chat.openAgent command to interact with Copilot
+ */
+export class GitHubCopilotAgent extends AbstractAgent {
+    constructor() {
+        super({
+            name: 'github-copilot',
+            version: '1.0.0',
+            methods: ['openAgent', 'ask'],
+            description: 'GitHub Copilot agent for AI-powered coding assistance',
+            metadata: {
+                supportsStreaming: true,
+                requiresWorkspace: true,
+                agentId: '@workspace'
+            }
+        });
+    }
+
+    protected async executeMethod(method: string, params: any): Promise<any> {
+        // Import vscode dynamically to avoid issues during testing
+        const vscode = await import('vscode');
+
+        switch (method) {
+            case 'openAgent':
+                return await this.handleOpenAgent(params, vscode);
+
+            case 'ask':
+                return await this.handleAskRequest(params, vscode);
+
+            default:
+                throw new Error(`Unsupported method: ${method}`);
+        }
+    } private async handleOpenAgent(params: any, vscode: typeof import('vscode')): Promise<any> {
+        try {
+            const agentId = params.agentId || '@workspace';
+            const query = params.query || params.message || '';
+
+            // First, open a new chat to ensure we start fresh
+            await vscode.commands.executeCommand('workbench.action.chat.newChat');
+
+            // Wait a moment for the chat to initialize
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Then open the agent with the query
+            await vscode.commands.executeCommand('workbench.action.chat.openAgent', {
+                query: query ? `${agentId} ${query}` : agentId,
+                isPartialQuery: !query
+            });
+
+            return {
+                success: true,
+                message: 'New chat opened and agent request sent successfully',
+                agentId,
+                query,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            throw new Error(`Failed to open agent: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    } private async handleAskRequest(params: any, vscode: typeof import('vscode')): Promise<any> {
+        try {
+            const question = params.question || params.message || '';
+            const context = params.context || '';
+
+            if (!question) {
+                throw new Error('Question is required for ask request');
+            }
+
+            // First, open a new chat to ensure we start fresh
+            await vscode.commands.executeCommand('workbench.action.chat.newChat');
+
+            // Wait a moment for the chat to initialize
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const fullQuery = context ? `@workspace ${question} Context: ${context}` : `@workspace ${question}`;
+
+            // Then execute the ask command
+            await vscode.commands.executeCommand('workbench.action.chat.openAgent', {
+                query: fullQuery,
+                isPartialQuery: false
+            });
+
+            return {
+                success: true,
+                message: 'New chat opened and ask request sent successfully',
+                question,
+                context,
+                timestamp: new Date().toISOString()
+            };
+        } catch (error) {
+            throw new Error(`Failed to process ask request: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+}
+
+/**
  * Agent registry for managing multiple agents
  */
 export class AgentRegistry {

@@ -6,6 +6,7 @@ import {
     AgentResponse,
     AgentRegistry,
     WuWeiExampleAgent,
+    GitHubCopilotAgent,
     AgentMessage
 } from './agentInterface';
 
@@ -28,11 +29,22 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         const exampleAgent = new WuWeiExampleAgent();
         this._agentRegistry.registerAgent(exampleAgent);
 
+        // Register GitHub Copilot agent
+        const copilotAgent = new GitHubCopilotAgent();
+        this._agentRegistry.registerAgent(copilotAgent);
+
         // Activate the example agent
         exampleAgent.activate().then(() => {
             logger.info('Example agent activated');
         }).catch(error => {
             logger.error('Failed to activate example agent', error);
+        });
+
+        // Activate the GitHub Copilot agent
+        copilotAgent.activate().then(() => {
+            logger.info('GitHub Copilot agent activated');
+        }).catch(error => {
+            logger.error('Failed to activate GitHub Copilot agent', error);
         });
     }
 
@@ -57,9 +69,6 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
             switch (message.command) {
                 case 'sendAgentRequest':
                     await this.handleAgentRequest(message.agentName, message.method, message.params);
-                    break;
-                case 'refreshAgents':
-                    this.refreshAgentList();
                     break;
                 case 'clearHistory':
                     this.clearMessageHistory();
@@ -173,12 +182,6 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
             command: 'updateMessageHistory',
             messages: this._messageHistory
         });
-    }
-
-    private refreshAgentList(): void {
-        logger.info('Refreshing agent list');
-        this.sendAgentCapabilities();
-        vscode.window.showInformationMessage('Wu Wei: Agent list refreshed');
     }
 
     private clearMessageHistory(): void {
@@ -429,13 +432,15 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         </div>
 
         <div class="form-group">
-            <label for="paramsInput">Parameters (JSON):</label>
-            <textarea id="paramsInput" placeholder='{"message": "Hello, agent!"}'></textarea>
+            <label for="paramsInput">Parameters:</label>
+            <textarea id="paramsInput" placeholder='Hello, agent! How can you help me?'></textarea>
+            <small style="color: var(--vscode-descriptionForeground); font-size: 0.8em; margin-top: 4px; display: block;">
+                Enter your message or question as plain text. For advanced usage, you can use JSON format. Press Ctrl+Enter to send.
+            </small>
         </div>
 
         <div class="button-group">
             <button class="btn btn-primary" id="sendRequestBtn">Send Request</button>
-            <button class="btn btn-secondary" id="refreshBtn">Refresh Agents</button>
             <button class="btn btn-secondary" id="clearHistoryBtn">Clear History</button>
         </div>
     </div>
@@ -461,13 +466,13 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         const capabilityInfo = document.getElementById('capabilityInfo');
         const messageList = document.getElementById('messageList');
         const sendRequestBtn = document.getElementById('sendRequestBtn');
-        const refreshBtn = document.getElementById('refreshBtn');
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
         // Event listeners
         agentSelect.addEventListener('change', updateMethodSelect);
+        methodSelect.addEventListener('change', updatePlaceholder);
+        paramsInput.addEventListener('keydown', handleKeyDown);
         sendRequestBtn.addEventListener('click', sendAgentRequest);
-        refreshBtn.addEventListener('click', () => vscode.postMessage({ command: 'refreshAgents' }));
         clearHistoryBtn.addEventListener('click', () => vscode.postMessage({ command: 'clearHistory' }));
 
         // Handle messages from extension
@@ -501,6 +506,13 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
                 option.textContent = \`\${capability.name} (v\${capability.version})\`;
                 agentSelect.appendChild(option);
             });
+
+            // Auto-select GitHub Copilot if available
+            const copilotAgent = agentCapabilities.find(c => c.name === 'github-copilot');
+            if (copilotAgent) {
+                agentSelect.value = 'github-copilot';
+                updateMethodSelect();
+            }
         }
 
         function updateMethodSelect() {
@@ -510,6 +522,7 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
 
             if (!selectedAgent) {
                 methodSelect.innerHTML = '<option value="">Select an agent first</option>';
+                paramsInput.placeholder = 'Select an agent and method first';
                 return;
             }
 
@@ -534,6 +547,56 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
                 option.textContent = method;
                 methodSelect.appendChild(option);
             });
+
+            // Update placeholder based on selected agent
+            if (selectedAgent === 'github-copilot') {
+                paramsInput.placeholder = 'Ask a question or describe what you need help with...';
+                
+                // Auto-select openAgent method for GitHub Copilot
+                const openAgentOption = Array.from(methodSelect.options).find(option => option.value === 'openAgent');
+                if (openAgentOption) {
+                    methodSelect.value = 'openAgent';
+                    updatePlaceholder();
+                }
+            } else if (selectedAgent === 'wu-wei-example') {
+                paramsInput.placeholder = 'Enter your message or use JSON: {"action": "test"}';
+            } else {
+                paramsInput.placeholder = 'Enter your message or question...';
+            }
+        }
+
+        function handleKeyDown(event) {
+            // Check for Ctrl+Enter (or Cmd+Enter on Mac)
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                sendAgentRequest();
+            }
+        }
+
+        function updatePlaceholder() {
+            const selectedAgent = agentSelect.value;
+            const selectedMethod = methodSelect.value;
+
+            if (!selectedAgent || !selectedMethod) {
+                return;
+            }
+
+            // Update placeholder based on agent and method
+            if (selectedAgent === 'github-copilot') {
+                if (selectedMethod === 'ask') {
+                    paramsInput.placeholder = 'Ask a question about your code or project...';
+                } else if (selectedMethod === 'openAgent') {
+                    paramsInput.placeholder = 'Describe what you want to do or ask about...';
+                }
+            } else if (selectedAgent === 'wu-wei-example') {
+                if (selectedMethod === 'echo') {
+                    paramsInput.placeholder = 'Enter a message to echo back...';
+                } else if (selectedMethod === 'status') {
+                    paramsInput.placeholder = 'No parameters needed (leave empty)';
+                } else if (selectedMethod === 'execute') {
+                    paramsInput.placeholder = 'Describe what to execute or use JSON: {"action": "test"}';
+                }
+            }
         }
 
         function sendAgentRequest() {
@@ -553,11 +616,27 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
 
             let params = {};
             if (paramsText) {
-                try {
-                    params = JSON.parse(paramsText);
-                } catch (error) {
-                    alert('Invalid JSON in parameters field');
-                    return;
+                // Try to parse as JSON first
+                if (paramsText.startsWith('{') || paramsText.startsWith('[')) {
+                    try {
+                        params = JSON.parse(paramsText);
+                    } catch (error) {
+                        alert('Invalid JSON format. Please check your syntax or use plain text.');
+                        return;
+                    }
+                } else {
+                    // Treat as raw string and convert to appropriate parameter format
+                    // For most common cases, treat it as a message or question
+                    if (method === 'ask') {
+                        params = { question: paramsText };
+                    } else if (method === 'openAgent') {
+                        params = { query: paramsText };
+                    } else if (method === 'echo') {
+                        params = { message: paramsText };
+                    } else {
+                        // Generic fallback - use 'message' as the key
+                        params = { message: paramsText };
+                    }
                 }
             }
 
