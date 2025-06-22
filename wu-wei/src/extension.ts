@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { WuWeiChatPanel } from './chatPanel';
 import { WuWeiSidebarProvider, WuWeiActionsViewProvider } from './sidebarProvider';
+import { logger } from './logger';
 
 /**
  * Wu Wei Extension - Effortless Work Automation
@@ -13,20 +14,25 @@ import { WuWeiSidebarProvider, WuWeiActionsViewProvider } from './sidebarProvide
  */
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Wu Wei extension is now active - 无为而治');
+    logger.lifecycle('activate', 'Wu Wei extension is now active - 无为而治');
 
     // Create the sidebar provider
     const sidebarProvider = new WuWeiSidebarProvider(context);
     const actionsProvider = new WuWeiActionsViewProvider(context);
 
+    logger.info('Sidebar and actions providers created');
+
     // Register tree data provider
     vscode.window.registerTreeDataProvider('wu-wei.chatSessions', sidebarProvider);
+    logger.info('Tree data provider registered for chat sessions');
 
     // Register actions view provider
     vscode.window.registerWebviewViewProvider('wu-wei.actions', actionsProvider);
+    logger.info('Webview provider registered for actions panel');
 
     // Connect sidebar provider to chat panel
     WuWeiChatPanel.setSidebarProvider(sidebarProvider);
+    logger.info('Sidebar provider connected to chat panel');
 
     // Update context based on chat sessions
     const updateContext = () => {
@@ -37,46 +43,64 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register the hello world command
     const helloCommand = vscode.commands.registerCommand('wu-wei.hello', () => {
+        logger.info('Hello command executed');
         vscode.window.showInformationMessage('Wu Wei: Effortless automation begins - 无为而治');
     });
 
     // Register the chat command
     const chatCommand = vscode.commands.registerCommand('wu-wei.openChat', () => {
+        logger.chat('Opening chat panel');
         WuWeiChatPanel.createOrShow(context.extensionUri);
     });
 
     // Register new chat command
     const newChatCommand = vscode.commands.registerCommand('wu-wei.newChat', () => {
+        logger.chat('Creating new chat session');
         sidebarProvider.createNewChat();
         updateContext();
     });
 
     // Register refresh chats command
     const refreshChatsCommand = vscode.commands.registerCommand('wu-wei.refreshChats', () => {
+        logger.chat('Refreshing chat sessions');
         sidebarProvider.refresh();
         updateContext();
     });
 
     // Register open chat session command
     const openChatSessionCommand = vscode.commands.registerCommand('wu-wei.openChatSession', (sessionId: string) => {
+        logger.chat('Opening chat session', sessionId);
         sidebarProvider.openChat(sessionId);
     });
 
     // Register delete chat session command
     const deleteChatSessionCommand = vscode.commands.registerCommand('wu-wei.deleteChatSession', (item: any) => {
-        console.log('Wu Wei: Delete command called with item:', item);
+        logger.debug('Delete command called with item', item);
         const sessionId = item?.sessionId || item?.id || item;
-        console.log('Wu Wei: Extracted sessionId for deletion:', sessionId);
+        logger.chat('Deleting chat session', sessionId);
         sidebarProvider.deleteChat(sessionId);
         updateContext();
     });
 
     // Register rename chat session command
     const renameChatSessionCommand = vscode.commands.registerCommand('wu-wei.renameChatSession', async (item: any) => {
-        console.log('Wu Wei: Rename command called with item:', item);
+        logger.debug('Rename command called with item', item);
         const sessionId = item?.sessionId || item?.id || item;
-        console.log('Wu Wei: Extracted sessionId for rename:', sessionId);
+        logger.chat('Renaming chat session', sessionId);
         await sidebarProvider.renameChat(sessionId);
+    });
+
+    // Register show logs command
+    const showLogsCommand = vscode.commands.registerCommand('wu-wei.showLogs', () => {
+        logger.info('Show logs command executed');
+        logger.show();
+    });
+
+    // Register clear logs command
+    const clearLogsCommand = vscode.commands.registerCommand('wu-wei.clearLogs', () => {
+        logger.info('Clear logs command executed');
+        logger.clear();
+        vscode.window.showInformationMessage('Wu Wei: Output logs cleared');
     });
 
     context.subscriptions.push(
@@ -86,29 +110,44 @@ export function activate(context: vscode.ExtensionContext) {
         refreshChatsCommand,
         openChatSessionCommand,
         deleteChatSessionCommand,
-        renameChatSessionCommand
+        renameChatSessionCommand,
+        showLogsCommand,
+        clearLogsCommand,
+        logger
     );
+
+    logger.info('All commands registered successfully');
 
     // Initialize automation systems
     initializeAutomation(context);
+
+    logger.lifecycle('activate', 'Wu Wei extension activation completed');
 }
 
 export function deactivate() {
-    console.log('Wu Wei extension deactivated - flowing like water');
+    logger.lifecycle('deactivate', 'Wu Wei extension deactivated - flowing like water');
+    logger.dispose();
 }
-
 
 /**
  * Initialize the automation systems
  * Following wu wei principles: set up the foundation, then let it flow naturally
  */
 function initializeAutomation(context: vscode.ExtensionContext) {
-    // Check if automation is enabled
-    const config = vscode.workspace.getConfiguration('wu-wei');
-    const automationEnabled = config.get<boolean>('enableAutomation', true);
+    try {
+        // Check if automation is enabled
+        const config = vscode.workspace.getConfiguration('wu-wei');
+        const automationEnabled = config.get<boolean>('enableAutomation', true);
 
-    if (automationEnabled) {
-        console.log('Wu Wei automation systems initialized');
-        // Future: Register automation providers here
+        logger.automation('Checking automation configuration', { enabled: automationEnabled });
+
+        if (automationEnabled) {
+            logger.automation('Wu Wei automation systems initialized');
+            // Future: Register automation providers here
+        } else {
+            logger.automation('Wu Wei automation systems disabled by configuration');
+        }
+    } catch (error) {
+        logger.error('Failed to initialize automation systems', error);
     }
 }

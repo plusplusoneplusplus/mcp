@@ -21,6 +21,7 @@ export class WuWeiChatPanel {
     private _availableModels: vscode.LanguageModelChat[] = [];
     private _currentModel: string = 'gpt-4o';
     private _currentSessionId?: string;
+    private _isSessionSwitching: boolean = false;
     private static _sidebarProvider?: any;
 
     public static createOrShow(extensionUri: vscode.Uri, sessionId?: string) {
@@ -31,7 +32,7 @@ export class WuWeiChatPanel {
         // If we already have a panel, reuse it and switch session
         if (WuWeiChatPanel.currentPanel) {
             WuWeiChatPanel.currentPanel._panel.reveal(column);
-            if (sessionId) {
+            if (sessionId && !WuWeiChatPanel.currentPanel._isSessionSwitching) {
                 WuWeiChatPanel.currentPanel._switchToSession(sessionId);
             }
             return;
@@ -100,7 +101,9 @@ export class WuWeiChatPanel {
         // If a sessionId was provided, switch to that session after a brief delay
         if (sessionId) {
             setTimeout(() => {
-                this._switchToSession(sessionId);
+                this._switchToSession(sessionId).catch(error => {
+                    console.error('Wu Wei: Error switching to session during initialization:', error);
+                });
             }, 200);
         }
     }
@@ -308,58 +311,124 @@ export class WuWeiChatPanel {
         }
     }
 
-    private _switchToSession(sessionId: string) {
-        if (WuWeiChatPanel._sidebarProvider) {
-            // Save current session history if we have one
-            if (this._currentSessionId && this._chatHistory.length > 0) {
-                this._saveChatHistoryToSession(this._currentSessionId);
-            }
+    private async _switchToSession(sessionId: string): Promise<void> {
+        // Prevent multiple simultaneous session switches
+        if (this._isSessionSwitching) {
+            console.log('Wu Wei: Session switch already in progress, ignoring request');
+            return;
+        }
 
-            // Load new session
-            this._currentSessionId = sessionId;
-            this._loadChatHistoryFromSession(sessionId);
+        // Validate sessionId
+        if (!sessionId || typeof sessionId !== 'string') {
+            console.error('Wu Wei: Invalid session ID provided to _switchToSession:', sessionId);
+            return;
+        }
+
+        this._isSessionSwitching = true;
+
+        try {
+            if (WuWeiChatPanel._sidebarProvider) {
+                console.log(`Wu Wei: Switching to session ${sessionId}`);
+
+                // Save current session history if we have one
+                if (this._currentSessionId && this._currentSessionId !== sessionId && this._chatHistory.length > 0) {
+                    await this._saveChatHistoryToSession(this._currentSessionId);
+                }
+
+                // Load new session
+                this._currentSessionId = sessionId;
+                await this._loadChatHistoryFromSession(sessionId);
+
+                console.log(`Wu Wei: Successfully switched to session ${sessionId}`);
+            } else {
+                console.warn('Wu Wei: Sidebar provider not available for session switching');
+            }
+        } catch (error) {
+            console.error('Wu Wei: Error during session switch:', error);
+            // Reset session switching flag even on error
+        } finally {
+            this._isSessionSwitching = false;
         }
     }
 
-    private _saveChatHistoryToSession(sessionId: string) {
-        if (WuWeiChatPanel._sidebarProvider && this._chatHistory.length > 0) {
-            // Save each message to the session
-            for (const message of this._chatHistory) {
-                WuWeiChatPanel._sidebarProvider.addMessageToSession(sessionId, message);
+    private async _saveChatHistoryToSession(sessionId: string): Promise<void> {
+        try {
+            if (WuWeiChatPanel._sidebarProvider && this._chatHistory.length > 0) {
+                console.log(`Wu Wei: Saving ${this._chatHistory.length} messages to session ${sessionId}`);
+
+                // Use the bulk update method to avoid recursive saves
+                WuWeiChatPanel._sidebarProvider.updateSessionChatHistory(sessionId, this._chatHistory);
+
+                console.log(`Wu Wei: Successfully saved chat history to session ${sessionId}`);
             }
+        } catch (error) {
+            console.error('Wu Wei: Error saving chat history to session:', error);
         }
     }
 
-    private _loadChatHistoryFromSession(sessionId: string) {
-        if (WuWeiChatPanel._sidebarProvider) {
+    private async _loadChatHistoryFromSession(sessionId: string): Promise<void> {
+        try {
+            if (!WuWeiChatPanel._sidebarProvider) {
+                console.warn('Wu Wei: Sidebar provider not available for loading chat history');
+                return;
+            }
+
             const history = WuWeiChatPanel._sidebarProvider.getChatHistory(sessionId);
-            this._chatHistory = history;
+            this._chatHistory = Array.isArray(history) ? history : [];
+
+            console.log(`Wu Wei: Loading ${this._chatHistory.length} messages from session ${sessionId}`);
 
             // Clear current messages in webview
-            this._panel.webview.postMessage({
+            await this._postMessageToWebview({
                 command: 'clearMessages'
             });
 
-            // Load messages into webview
-            for (const message of history) {
-                this._panel.webview.postMessage({
+            // Load messages into webview with a small delay to ensure UI is ready
+            for (let i = 0; i < this._chatHistory.length; i++) {
+                const message = this._chatHistory[i];
+                await this._postMessageToWebview({
                     command: 'addMessage',
                     message: message.content,
                     isUser: message.role === 'user'
                 });
+
+                // Small delay between messages to prevent UI blocking
+                if (i % 10 === 0 && i > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
             }
 
             // Update panel title with session info
             const session = WuWeiChatPanel._sidebarProvider.getChatSession(sessionId);
             if (session) {
                 this._panel.title = `Wu Wei Chat - ${session.title}`;
+            } else {
+                console.warn(`Wu Wei: Session ${sessionId} not found when updating panel title`);
             }
+
+            console.log(`Wu Wei: Successfully loaded chat history for session ${sessionId}`);
+        } catch (error) {
+            console.error('Wu Wei: Error loading chat history from session:', error);
+            // Ensure we have a valid chat history array even on error
+            this._chatHistory = [];
         }
     }
 
     private _update() {
         const webview = this._panel.webview;
         this._panel.webview.html = this._getHtmlForWebview(webview);
+    }
+
+    private async _postMessageToWebview(message: any): Promise<void> {
+        try {
+            const result = this._panel.webview.postMessage(message);
+            // VSCode's postMessage returns a Thenable<boolean>, so we can await it
+            if (result && typeof result.then === 'function') {
+                await result;
+            }
+        } catch (error) {
+            console.error('Wu Wei: Error posting message to webview:', error);
+        }
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {

@@ -65,6 +65,18 @@
                 "title": "Wu Wei: Rename Chat Session",
                 "category": "Wu Wei",
                 "icon": "$(edit)"
+            },
+            {
+                "command": "wu-wei.showLogs",
+                "title": "Wu Wei: Show Output Logs",
+                "category": "Wu Wei",
+                "icon": "$(output)"
+            },
+            {
+                "command": "wu-wei.clearLogs",
+                "title": "Wu Wei: Clear Output Logs",
+                "category": "Wu Wei",
+                "icon": "$(clear-all)"
             }
         ],
         "views": {
