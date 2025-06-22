@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { WuWeiChatPanel } from './chatPanel';
 import { WuWeiSidebarProvider, WuWeiActionsViewProvider } from './sidebarProvider';
+import { WuWeiDebugPanelProvider } from './debugPanel';
 import { logger } from './logger';
 
 /**
@@ -19,8 +20,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Create the sidebar provider
     const sidebarProvider = new WuWeiSidebarProvider(context);
     const actionsProvider = new WuWeiActionsViewProvider(context);
+    const debugPanelProvider = new WuWeiDebugPanelProvider(context);
 
-    logger.info('Sidebar and actions providers created');
+    logger.info('Sidebar, actions, and debug providers created');
 
     // Register tree data provider
     vscode.window.registerTreeDataProvider('wu-wei.chatSessions', sidebarProvider);
@@ -29,6 +31,10 @@ export function activate(context: vscode.ExtensionContext) {
     // Register actions view provider
     vscode.window.registerWebviewViewProvider('wu-wei.actions', actionsProvider);
     logger.info('Webview provider registered for actions panel');
+
+    // Register debug panel provider
+    vscode.window.registerWebviewViewProvider('wu-wei.debug', debugPanelProvider);
+    logger.info('Webview provider registered for debug panel');
 
     // Connect sidebar provider to chat panel
     WuWeiChatPanel.setSidebarProvider(sidebarProvider);
@@ -68,8 +74,21 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Register open chat session command
-    const openChatSessionCommand = vscode.commands.registerCommand('wu-wei.openChatSession', (sessionId: string) => {
-        logger.chat('Opening chat session', sessionId);
+    const openChatSessionCommand = vscode.commands.registerCommand('wu-wei.openChatSession', (sessionIdOrItem: string | any) => {
+        // Handle both direct sessionId strings and tree item objects
+        const sessionId = typeof sessionIdOrItem === 'string' ? sessionIdOrItem : sessionIdOrItem?.sessionId || sessionIdOrItem?.id;
+
+        logger.chat('Opening chat session command called', sessionId, {
+            argumentType: typeof sessionIdOrItem,
+            argumentValue: sessionIdOrItem
+        });
+
+        if (!sessionId) {
+            logger.error('No valid session ID found in openChatSession command', { argument: sessionIdOrItem });
+            vscode.window.showErrorMessage('Wu Wei: Invalid chat session ID');
+            return;
+        }
+
         sidebarProvider.openChat(sessionId);
     });
 
@@ -103,6 +122,29 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Wu Wei: Output logs cleared');
     });
 
+    // Register export logs command
+    const exportLogsCommand = vscode.commands.registerCommand('wu-wei.exportLogs', async () => {
+        logger.info('Export logs command executed');
+
+        try {
+            const uri = await vscode.window.showSaveDialog({
+                defaultUri: vscode.Uri.file(`wu-wei-logs-${new Date().toISOString().split('T')[0]}.txt`),
+                filters: {
+                    'Text Files': ['txt'],
+                    'All Files': ['*']
+                }
+            });
+
+            if (uri) {
+                vscode.window.showInformationMessage('Wu Wei: Log export feature coming soon');
+                logger.info('Log export requested to', uri.fsPath);
+            }
+        } catch (error) {
+            logger.error('Error in export logs command', error);
+            vscode.window.showErrorMessage('Wu Wei: Failed to export logs');
+        }
+    });
+
     context.subscriptions.push(
         helloCommand,
         chatCommand,
@@ -113,6 +155,7 @@ export function activate(context: vscode.ExtensionContext) {
         renameChatSessionCommand,
         showLogsCommand,
         clearLogsCommand,
+        exportLogsCommand,
         logger
     );
 
