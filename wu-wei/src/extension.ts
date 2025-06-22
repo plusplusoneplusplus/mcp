@@ -3,7 +3,6 @@ import { WuWeiChatPanel } from './chatPanel';
 import { WuWeiSidebarProvider, WuWeiActionsViewProvider } from './sidebarProvider';
 import { WuWeiDebugPanelProvider } from './debugPanel';
 import { logger } from './logger';
-import { ClineIntegration } from './commands/clineIntegration';
 
 /**
  * Wu Wei Extension - Effortless Work Automation
@@ -264,19 +263,6 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // Register Cline integration test command
-    const testClineCommand = vscode.commands.registerCommand('wu-wei.testCline', async () => {
-        logger.info('Test Cline integration command executed');
-        await ClineIntegration.testClineIntegration();
-    });
-
-    // Register Cline debug command
-    const debugClineCommand = vscode.commands.registerCommand('wu-wei.debugCline', async () => {
-        logger.info('Debug Cline status command executed');
-        await ClineIntegration.debugClineStatus();
-        logger.show(); // Show the output panel to see debug info
-    });
-
     context.subscriptions.push(
         helloCommand,
         chatCommand,
@@ -290,8 +276,6 @@ export function activate(context: vscode.ExtensionContext) {
         exportLogsCommand,
         debugModelsCommand,
         forceReloadModelsCommand,
-        testClineCommand,
-        debugClineCommand,
         logger
     );
 
