@@ -8,7 +8,7 @@ echo "Installing local packages in development mode..."
 
 # Check if uv is available
 if command -v uv &> /dev/null; then
-    INSTALL_CMD="uv pip install -e"
+    INSTALL_CMD="uv add --editable"
     echo "Using uv for installation"
 else
     INSTALL_CMD="pip install -e"
@@ -36,4 +36,4 @@ playwright install msedge
 echo ""
 echo "Installation complete! You can now run:"
 echo "  - Python scripts directly"
-echo "  - 'python -m server.main' to start the server" 
+echo "  - 'python -m server.main' to start the server"

@@ -116,11 +116,12 @@ case "$GROUP_NAME" in
         ;;
 
     "utils-group-1")
-        echo -e "${BLUE}Running utils group 1: html_to_markdown, vector_store, secret_scanner${NC}"
+        echo -e "${BLUE}Running utils group 1: html_to_markdown, vector_store, secret_scanner, memory${NC}"
         echo ""
         run_component_tests "utils.html_to_markdown" "utils/html_to_markdown/tests" "$TEST_PATTERN"
         run_component_tests "utils.vector_store" "utils/vector_store/tests" "$TEST_PATTERN"
         run_component_tests "utils.secret_scanner" "utils/secret_scanner/tests" "$TEST_PATTERN"
+        run_component_tests "utils.memory" "utils/memory/tests" "$TEST_PATTERN"
         ;;
 
     "utils-group-2")

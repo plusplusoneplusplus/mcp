@@ -25,7 +25,7 @@ def main():
     for test_file in test_files:
         print(f"\n--- Running {test_file.name} ---\n")
         result = subprocess.run(
-            [sys.executable, str(test_file)], capture_output=True, text=True
+            ["uv", "run", "python", str(test_file)], capture_output=True, text=True
         )
 
         # Print output
