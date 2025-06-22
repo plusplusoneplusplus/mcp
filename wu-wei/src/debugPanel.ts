@@ -224,6 +224,15 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
             border-radius: 3px;
         }
         
+        .help-text code {
+            font-family: var(--vscode-editor-font-family, 'SF Mono', Consolas, monospace);
+            background: var(--vscode-textCodeBlock-background);
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-size: 10px;
+            font-style: normal;
+        }
+        
         .divider {
             height: 1px;
             background: var(--vscode-panel-border);
@@ -337,8 +346,8 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
             <div class="command-executor">
                 <textarea 
                     id="commandInput" 
-                    placeholder="Enter VS Code commands, one per line&#10;Examples:&#10;workbench.action.files.save&#10;editor.action.formatDocument&#10;workbench.action.openSettings"
-                    rows="4"
+                    placeholder="Enter VS Code commands, one per line&#10;Examples:&#10;workbench.action.files.newUntitledFile&#10;insertText:Hello World (uses copy-paste)&#10;workbench.action.focusActiveEditorGroup&#10;type[{text:&quot;console.log('test');&quot;}]&#10;editor.action.clipboardPasteAction&#10;workbench.action.files.save"
+                    rows="6"
                     class="command-textarea"
                 ></textarea>
                 
@@ -364,7 +373,15 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
             </div>
             
             <div class="help-text">
-                Enter VS Code commands to execute, one per line. Use the Command Palette (Cmd+Shift+P) to find command IDs.
+                Enter VS Code commands to execute, one per line. Supported formats:<br>
+                • Standard commands: <code>workbench.action.files.save</code><br>
+                • Text insertion: <code>type[{text:"Hello"}]</code> or <code>insertText:Hello</code> (uses copy-paste)<br>
+                • Commands with args: <code>command:{arg1:"value1",arg2:value2}</code><br>
+                💡 Text insertion now uses clipboard copy-paste for universal compatibility!<br>
+                Works in: editors, chat inputs, search boxes, terminals, and most text fields.<br>
+                Example: Click in any text area → <code>insertText:Your text here</code><br>
+                Commands execute sequentially with a 300ms delay between each.<br>
+                Use the Command Palette (Cmd+Shift+P) to find command IDs.
             </div>
         </div>
         
@@ -586,17 +603,18 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
 
             const results: Array<{ command: string; success: boolean; message?: string }> = [];
 
-            for (const command of commands) {
+            for (let i = 0; i < commands.length; i++) {
+                const command = commands[i];
                 try {
                     logger.debug('Executing command:', command);
 
-                    // Execute the VS Code command
-                    await vscode.commands.executeCommand(command);
+                    // Parse and execute the command
+                    const result = await this.parseAndExecuteCommand(command);
 
                     results.push({
                         command,
                         success: true,
-                        message: 'Command executed successfully'
+                        message: result || 'Command executed successfully'
                     });
 
                     logger.debug('Command executed successfully:', command);
@@ -610,6 +628,12 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
                     });
 
                     logger.error('Command execution failed', { command, error });
+                }
+
+                // Add delay between commands (except after the last command)
+                if (i < commands.length - 1) {
+                    logger.debug('Waiting 300ms before next command...');
+                    await new Promise(resolve => setTimeout(resolve, 300));
                 }
             }
 
@@ -647,6 +671,158 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
                         message: 'Failed to process command execution request'
                     }]
                 });
+            }
+        }
+    }
+
+    private async parseAndExecuteCommand(command: string): Promise<string | undefined> {
+        // Handle different command formats
+
+        // 1. Handle type[{text:"abc"}] format for text insertion
+        const typeMatch = command.match(/^type\[\{text:"([^"]+)"\}\]$/);
+        if (typeMatch) {
+            const text = typeMatch[1];
+            return await this.executeTypeCommand(text);
+        }
+
+        // 2. Handle type:{text} format for text insertion
+        const typeSimpleMatch = command.match(/^type:(.+)$/);
+        if (typeSimpleMatch) {
+            const text = typeSimpleMatch[1];
+            return await this.executeTypeCommand(text);
+        }
+
+        // 3. Handle insertText:text format for text insertion
+        const insertTextMatch = command.match(/^insertText:(.+)$/);
+        if (insertTextMatch) {
+            const text = insertTextMatch[1];
+            return await this.executeTypeCommand(text);
+        }
+
+        // 3a. Handle clipboard commands
+        const clipboardCopyMatch = command.match(/^clipboard:copy:(.+)$/);
+        if (clipboardCopyMatch) {
+            const text = clipboardCopyMatch[1];
+            await vscode.env.clipboard.writeText(text);
+            return `Copied to clipboard: "${text}"`;
+        }
+
+        const clipboardPasteMatch = command.match(/^clipboard:paste$/);
+        if (clipboardPasteMatch) {
+            await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+            const clipboardText = await vscode.env.clipboard.readText();
+            return `Pasted from clipboard: "${clipboardText.substring(0, 50)}${clipboardText.length > 50 ? '...' : ''}"`;
+        }
+
+        // 4. Handle commands with arguments in JSON format: command:{arg1:value1,arg2:value2}
+        const commandWithArgsMatch = command.match(/^([^:]+):\{(.+)\}$/);
+        if (commandWithArgsMatch) {
+            const commandName = commandWithArgsMatch[1];
+            const argsString = commandWithArgsMatch[2];
+
+            try {
+                // Simple parser for key:value pairs
+                const args: any = {};
+                const pairs = argsString.split(',');
+                for (const pair of pairs) {
+                    const [key, value] = pair.split(':').map(s => s.trim());
+                    if (key && value) {
+                        // Try to parse as JSON value, fallback to string
+                        try {
+                            args[key] = JSON.parse(value);
+                        } catch {
+                            args[key] = value.replace(/^["']|["']$/g, ''); // Remove quotes
+                        }
+                    }
+                }
+
+                await vscode.commands.executeCommand(commandName, args);
+                return `Executed ${commandName} with arguments: ${JSON.stringify(args)}`;
+            } catch (error) {
+                throw new Error(`Failed to parse command arguments: ${error}`);
+            }
+        }
+
+        // 5. Handle commands with single argument: command:argument
+        const commandWithArgMatch = command.match(/^([^:]+):(.+)$/);
+        if (commandWithArgMatch) {
+            const commandName = commandWithArgMatch[1];
+            const arg = commandWithArgMatch[2];
+
+            // Try to parse as JSON, fallback to string
+            let parsedArg;
+            try {
+                parsedArg = JSON.parse(arg);
+            } catch {
+                parsedArg = arg;
+            }
+
+            await vscode.commands.executeCommand(commandName, parsedArg);
+            return `Executed ${commandName} with argument: ${arg}`;
+        }
+
+        // 6. Handle standard VS Code commands without arguments
+        await vscode.commands.executeCommand(command);
+        return undefined; // Will use default success message
+    }
+
+    private async executeTypeCommand(text: string): Promise<string> {
+        try {
+            // Use the universal copy-paste approach which works everywhere
+            // This is much more reliable than the 'type' command
+
+            // Step 1: Save current clipboard content (to restore later)
+            let originalClipboard = '';
+            try {
+                originalClipboard = await vscode.env.clipboard.readText();
+            } catch {
+                // If we can't read clipboard, that's okay, we'll just proceed
+            }
+
+            // Step 2: Copy our text to clipboard
+            await vscode.env.clipboard.writeText(text);
+
+            // Step 3: Paste using the standard paste command (Ctrl+V equivalent)
+            await vscode.commands.executeCommand('editor.action.clipboardPasteAction');
+
+            // Step 4: Small delay before restoring clipboard
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Step 5: Restore original clipboard content (if we had any)
+            if (originalClipboard) {
+                try {
+                    await vscode.env.clipboard.writeText(originalClipboard);
+                } catch {
+                    // If restoration fails, that's okay
+                }
+            }
+
+            return `Inserted text: "${text}" (using clipboard copy-paste)`;
+
+        } catch (error) {
+            logger.debug('Clipboard copy-paste failed, trying fallback methods', { error });
+
+            // Fallback: Try direct editor insertion if we have an active editor
+            try {
+                const activeEditor = vscode.window.activeTextEditor;
+                if (activeEditor) {
+                    const position = activeEditor.selection.active;
+                    await activeEditor.edit(editBuilder => {
+                        editBuilder.insert(position, text);
+                    });
+                    return `Inserted text: "${text}" (using editor.edit fallback)`;
+                }
+
+                // If no active editor, provide helpful error message
+                throw new Error(`Text insertion failed. Please:
+1. Click in a text area, editor, or input field first
+2. Then run the text insertion command
+3. Make sure the target accepts text input
+
+The copy-paste method works in most contexts but requires a focused text input.`);
+
+            } catch (fallbackError) {
+                throw new Error(`All text insertion methods failed: ${error}. Fallback error: ${fallbackError}`);
             }
         }
     }
