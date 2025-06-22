@@ -48,12 +48,7 @@
                 "wu-wei.preferredModel": {
                     "type": "string",
                     "default": "gpt-4o",
-                    "description": "Preferred language model for Wu Wei chat",
-                    "enum": [
-                        "gpt-4o",
-                        "gpt-3.5-turbo",
-                        "claude-3-sonnet"
-                    ]
+                    "description": "Preferred language model for Wu Wei chat (use 'Wu Wei: Select Language Model' command to choose from available models)"
                 },
                 "wu-wei.systemPrompt": {
                     "type": "string",
