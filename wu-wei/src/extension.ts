@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { WuWeiChatPanel } from './chatPanel';
 import { WuWeiSidebarProvider, WuWeiActionsViewProvider } from './sidebarProvider';
 import { WuWeiDebugPanelProvider } from './debugPanel';
+import { WuWeiAgentPanelProvider } from './agentPanel';
 import { logger } from './logger';
 
 /**
@@ -21,8 +22,9 @@ export function activate(context: vscode.ExtensionContext) {
     const sidebarProvider = new WuWeiSidebarProvider(context);
     const actionsProvider = new WuWeiActionsViewProvider(context);
     const debugPanelProvider = new WuWeiDebugPanelProvider(context);
+    const agentPanelProvider = new WuWeiAgentPanelProvider(context);
 
-    logger.info('Sidebar, actions, and debug providers created');
+    logger.info('Sidebar, actions, debug, and agent providers created');
 
     // Register tree data provider
     vscode.window.registerTreeDataProvider('wu-wei.chatSessions', sidebarProvider);
@@ -35,6 +37,14 @@ export function activate(context: vscode.ExtensionContext) {
     // Register debug panel provider
     vscode.window.registerWebviewViewProvider('wu-wei.debug', debugPanelProvider);
     logger.info('Webview provider registered for debug panel');
+
+    // Register agent panel provider
+    vscode.window.registerWebviewViewProvider('wu-wei.agent', agentPanelProvider);
+    logger.info('Webview provider registered for agent panel');
+
+    // Register agent panel provider
+    vscode.window.registerWebviewViewProvider('wu-wei.agent', agentPanelProvider);
+    logger.info('Webview provider registered for agent panel');
 
     // Connect sidebar provider to chat panel
     WuWeiChatPanel.setSidebarProvider(sidebarProvider);
@@ -263,6 +273,22 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Register send agent request command
+    const sendAgentRequestCommand = vscode.commands.registerCommand('wu-wei.sendAgentRequest', () => {
+        logger.info('Send agent request command executed');
+        vscode.window.showInformationMessage('Wu Wei: Use the Agent Panel to send requests');
+    });
+
+    // Register refresh agents command
+    const refreshAgentsCommand = vscode.commands.registerCommand('wu-wei.refreshAgents', () => {
+        logger.info('Refresh agents command executed');
+        if (agentPanelProvider) {
+            vscode.window.showInformationMessage('Wu Wei: Agent list refreshed');
+        } else {
+            vscode.window.showWarningMessage('Wu Wei: Agent panel not initialized');
+        }
+    });
+
     context.subscriptions.push(
         helloCommand,
         chatCommand,
@@ -276,6 +302,8 @@ export function activate(context: vscode.ExtensionContext) {
         exportLogsCommand,
         debugModelsCommand,
         forceReloadModelsCommand,
+        sendAgentRequestCommand,
+        refreshAgentsCommand,
         logger
     );
 

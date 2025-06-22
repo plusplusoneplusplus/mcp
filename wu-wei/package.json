@@ -92,6 +92,30 @@
                 "title": "Wu Wei: Export Debug Logs",
                 "category": "Wu Wei",
                 "icon": "$(save)"
+            },
+            {
+                "command": "wu-wei.debugModels",
+                "title": "Wu Wei: Debug Language Models",
+                "category": "Wu Wei",
+                "icon": "$(debug)"
+            },
+            {
+                "command": "wu-wei.forceReloadModels",
+                "title": "Wu Wei: Force Reload Language Models",
+                "category": "Wu Wei",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "wu-wei.sendAgentRequest",
+                "title": "Wu Wei: Send Agent Request",
+                "category": "Wu Wei",
+                "icon": "$(send)"
+            },
+            {
+                "command": "wu-wei.refreshAgents",
+                "title": "Wu Wei: Refresh Agents",
+                "category": "Wu Wei",
+                "icon": "$(refresh)"
             }
         ],
         "views": {
@@ -110,6 +134,12 @@
                 {
                     "id": "wu-wei.debug",
                     "name": "Debug",
+                    "type": "webview",
+                    "when": "true"
+                },
+                {
+                    "id": "wu-wei.agent",
+                    "name": "Agent Panel",
                     "type": "webview",
                     "when": "true"
                 }
