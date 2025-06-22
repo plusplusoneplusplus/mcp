@@ -125,18 +125,7 @@
             ]
         },
         "menus": {
-            "view/title": [
-                {
-                    "command": "wu-wei.newChat",
-                    "when": "view == wu-wei.chatSessions",
-                    "group": "navigation@1"
-                },
-                {
-                    "command": "wu-wei.refreshChats",
-                    "when": "view == wu-wei.chatSessions",
-                    "group": "navigation@2"
-                }
-            ],
+            "view/title": [],
             "view/item/context": [
                 {
                     "command": "wu-wei.openChatSession",
