@@ -14,6 +14,7 @@ interface ChatSession {
     timestamp: Date;
     lastMessage?: string;
     chatHistory: ChatMessage[];
+    selectedModel?: string; // Store the model selected for this session
 }
 
 /**
@@ -319,6 +320,31 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
      */
     getSessionCount(): number {
         return this.chatSessions.length;
+    }
+
+    /**
+     * Get the selected model for a session
+     */
+    getSessionModel(sessionId: string): string | undefined {
+        const session = this.chatSessions.find(s => s.id === sessionId);
+        return session?.selectedModel;
+    }
+
+    /**
+     * Set the selected model for a session
+     */
+    setSessionModel(sessionId: string, modelFamily: string): void {
+        const session = this.chatSessions.find(s => s.id === sessionId);
+        if (session) {
+            session.selectedModel = modelFamily;
+            this.saveChatSessions();
+            logger.chat('Model updated for session', sessionId, {
+                model: modelFamily,
+                title: session.title
+            });
+        } else {
+            logger.warn('Set session model: session not found', { sessionId, modelFamily });
+        }
     }
 }
 

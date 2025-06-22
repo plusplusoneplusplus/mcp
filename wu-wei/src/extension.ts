@@ -145,6 +145,122 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Register debug models command
+    const debugModelsCommand = vscode.commands.registerCommand('wu-wei.debugModels', async () => {
+        logger.info('Debug models command executed');
+
+        try {
+            // Show debug output channel first
+            logger.show();
+
+            logger.info('='.repeat(80));
+            logger.info('WU WEI MODEL DEBUGGING SESSION STARTED');
+            logger.info('='.repeat(80));
+
+            // Check VSCode version
+            const vscodeVersion = vscode.version;
+            logger.info(`VSCode Version: ${vscodeVersion}`);
+
+            // Check if language model API exists
+            logger.info(`Language Model API Available: ${!!vscode.lm}`);
+
+            if (!vscode.lm) {
+                logger.error('VSCode Language Model API is not available. Please ensure VSCode 1.90+ is installed.');
+                vscode.window.showErrorMessage('Wu Wei: Language Model API not available. Please update VSCode to 1.90+');
+                return;
+            }
+
+            // Check installed extensions
+            const extensions = vscode.extensions.all;
+            const languageModelExtensions = extensions.filter(ext =>
+                ext.id.includes('copilot') ||
+                ext.id.includes('gpt') ||
+                ext.id.includes('claude') ||
+                ext.packageJSON?.contributes?.languageModels
+            );
+
+            logger.info(`Total Extensions Installed: ${extensions.length}`);
+            logger.info(`Language Model Related Extensions: ${languageModelExtensions.length}`);
+
+            languageModelExtensions.forEach(ext => {
+                logger.info(`  - ${ext.id} (${ext.packageJSON?.displayName || 'Unknown'}) - Active: ${ext.isActive}`);
+                if (ext.packageJSON?.contributes?.languageModels) {
+                    logger.info(`    Contributes Language Models: ${JSON.stringify(ext.packageJSON.contributes.languageModels, null, 2)}`);
+                }
+            });
+
+            // Try to get models with detailed logging
+            logger.info('Attempting to fetch language models...');
+
+            const startTime = Date.now();
+            try {
+                const models = await vscode.lm.selectChatModels();
+                const endTime = Date.now();
+
+                logger.info(`Model fetch completed in ${endTime - startTime}ms`);
+                logger.info(`Found ${models.length} models:`);
+
+                models.forEach((model, index) => {
+                    logger.info(`  Model ${index + 1}:`);
+                    logger.info(`    Family: ${model.family}`);
+                    logger.info(`    Vendor: ${model.vendor}`);
+                    logger.info(`    Name: ${model.name}`);
+                    logger.info(`    ID: ${model.id}`);
+                    logger.info(`    Max Input Tokens: ${model.maxInputTokens}`);
+                    logger.info(`    String Representation: ${model.toString()}`);
+                });
+
+                if (models.length === 0) {
+                    logger.warn('No models found. This could indicate:');
+                    logger.warn('  1. No language model extensions are installed (e.g., GitHub Copilot)');
+                    logger.warn('  2. Extensions are installed but not activated');
+                    logger.warn('  3. Extensions are not properly configured');
+                    logger.warn('  4. You need to sign in to the language model service');
+
+                    vscode.window.showWarningMessage('Wu Wei: No language models found. Check the Output panel for details.');
+                } else {
+                    vscode.window.showInformationMessage(`Wu Wei: Found ${models.length} language models. Check Output panel for details.`);
+                }
+
+            } catch (modelError) {
+                const endTime = Date.now();
+                logger.error(`Model fetch failed after ${endTime - startTime}ms`, modelError);
+                vscode.window.showErrorMessage('Wu Wei: Failed to fetch models. Check Output panel for details.');
+            }
+
+            // Get current Wu Wei chat panel state if it exists
+            if (WuWeiChatPanel.currentPanel) {
+                logger.info('Wu Wei Chat Panel is currently open');
+                // Could add more panel-specific debugging here
+            } else {
+                logger.info('Wu Wei Chat Panel is not currently open');
+            }
+
+            logger.info('='.repeat(80));
+            logger.info('WU WEI MODEL DEBUGGING SESSION COMPLETED');
+            logger.info('='.repeat(80));
+
+        } catch (error) {
+            logger.error('Error in debug models command', error);
+            vscode.window.showErrorMessage('Wu Wei: Debug models command failed');
+        }
+    });
+
+    // Register force reload models command
+    const forceReloadModelsCommand = vscode.commands.registerCommand('wu-wei.forceReloadModels', async () => {
+        logger.info('Force reload models command executed');
+
+        if (WuWeiChatPanel.currentPanel) {
+            logger.info('Chat panel exists, forcing model reload...');
+            // Access the private method through the class - this is for debugging purposes
+            (WuWeiChatPanel.currentPanel as any)._loadAvailableModels();
+            vscode.window.showInformationMessage('Wu Wei: Model reload initiated. Check Output panel for progress.');
+        } else {
+            logger.warn('No chat panel currently open to reload models');
+            vscode.window.showWarningMessage('Wu Wei: No chat panel open. Open a chat first.');
+        }
+    });
+
     context.subscriptions.push(
         helloCommand,
         chatCommand,
@@ -156,6 +272,8 @@ export function activate(context: vscode.ExtensionContext) {
         showLogsCommand,
         clearLogsCommand,
         exportLogsCommand,
+        debugModelsCommand,
+        forceReloadModelsCommand,
         logger
     );
 

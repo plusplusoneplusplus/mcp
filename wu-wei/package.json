@@ -5,7 +5,7 @@
     "version": "0.1.0",
     "publisher": "your-publisher-name",
     "engines": {
-        "vscode": "^1.85.0"
+        "vscode": "^1.90.0"
     },
     "categories": [
         "Productivity",
@@ -22,6 +22,15 @@
         "onCommand:wu-wei.hello",
         "onCommand:wu-wei.openChat",
         "onView:wu-wei.chatSessions"
+    ],
+    "capabilities": {
+        "virtualWorkspaces": true,
+        "untrustedWorkspaces": {
+            "supported": true
+        }
+    },
+    "enabledApiProposals": [
+        "languageModels"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -176,7 +185,7 @@
         "test": "node ./out/test/runTest.js"
     },
     "devDependencies": {
-        "@types/vscode": "^1.85.0",
+        "@types/vscode": "^1.90.0",
         "@types/node": "16.x",
         "@typescript-eslint/eslint-plugin": "^5.45.0",
         "@typescript-eslint/parser": "^5.45.0",

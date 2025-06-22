@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { logger } from './logger';
 
 interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
@@ -22,6 +23,8 @@ export class WuWeiChatPanel {
     private _currentModel: string = 'gpt-4o';
     private _currentSessionId?: string;
     private _isSessionSwitching: boolean = false;
+    private _isLoadingModels: boolean = false;
+    private _modelsLoaded: boolean = false;
     private static _sidebarProvider?: any;
 
     public static createOrShow(extensionUri: vscode.Uri, sessionId?: string) {
@@ -123,6 +126,17 @@ export class WuWeiChatPanel {
     }
 
     private async _handleUserMessage(message: string) {
+        // Check if models are available before processing
+        if (!this._modelsLoaded || this._availableModels.length === 0) {
+            console.log('Wu Wei: Cannot process message - models not loaded');
+            this._panel.webview.postMessage({
+                command: 'addMessage',
+                message: 'Language models are not available. Please ensure GitHub Copilot or another compatible extension is installed and configured.',
+                isUser: false
+            });
+            return;
+        }
+
         // Add user message to history
         const userMessage = {
             role: 'user' as const,
@@ -192,9 +206,30 @@ export class WuWeiChatPanel {
 
     private async _generateAIResponse(userMessage: string): Promise<string> {
         try {
-            // Get configuration
+            // Get session-specific model or fall back to global preference
+            let preferredModel: string;
+
+            if (this._currentSessionId && WuWeiChatPanel._sidebarProvider) {
+                // Try to get session-specific model
+                const sessionModel = WuWeiChatPanel._sidebarProvider.getSessionModel(this._currentSessionId);
+                if (sessionModel) {
+                    preferredModel = sessionModel;
+                    console.log(`Wu Wei: Using session model '${sessionModel}' for generation`);
+                } else {
+                    // Fall back to global preference
+                    const config = vscode.workspace.getConfiguration('wu-wei');
+                    preferredModel = config.get<string>('preferredModel', 'gpt-4o');
+                    console.log(`Wu Wei: No session model, using global preference '${preferredModel}' for generation`);
+                }
+            } else {
+                // Fall back to global preference
+                const config = vscode.workspace.getConfiguration('wu-wei');
+                preferredModel = config.get<string>('preferredModel', 'gpt-4o');
+                console.log(`Wu Wei: No session context, using global preference '${preferredModel}' for generation`);
+            }
+
+            // Get system prompt from configuration
             const config = vscode.workspace.getConfiguration('wu-wei');
-            const preferredModel = config.get<string>('preferredModel', 'gpt-4o');
             const systemPrompt = config.get<string>('systemPrompt',
                 'You are Wu Wei, an AI assistant that embodies the philosophy of 无为而治 (wu wei) - effortless action that flows naturally like water. You provide thoughtful, gentle guidance while maintaining harmony and balance. Your responses are wise, concise, and flow naturally without forcing solutions.'
             );
@@ -264,26 +299,118 @@ export class WuWeiChatPanel {
 
     private async _handleModelSelection(modelFamily: string) {
         try {
-            // Update configuration
-            const config = vscode.workspace.getConfiguration('wu-wei');
-            await config.update('preferredModel', modelFamily, vscode.ConfigurationTarget.Global);
-
             this._currentModel = modelFamily;
-            console.log(`Wu Wei: Model changed to ${modelFamily}`);
+            console.log(`Wu Wei: Model changed to ${modelFamily} for session ${this._currentSessionId}`);
+
+            // Save model selection to current session if we have one
+            if (this._currentSessionId && WuWeiChatPanel._sidebarProvider) {
+                WuWeiChatPanel._sidebarProvider.setSessionModel(this._currentSessionId, modelFamily);
+            } else {
+                // Fallback to global preference if no session
+                const config = vscode.workspace.getConfiguration('wu-wei');
+                await config.update('preferredModel', modelFamily, vscode.ConfigurationTarget.Global);
+            }
+
+            // Update the webview to reflect the new model selection
+            await this._updateModelSelectionInWebview(modelFamily);
         } catch (error) {
             console.error('Wu Wei: Error updating model preference:', error);
         }
     }
 
     private async _loadAvailableModels() {
-        console.log('Wu Wei: Loading available models...');
+        const loadingId = `loading-${Date.now()}`;
+
+        logger.debug(`[${loadingId}] Model loading requested`, {
+            isLoadingModels: this._isLoadingModels,
+            modelsLoaded: this._modelsLoaded,
+            availableModelsCount: this._availableModels.length,
+            currentSessionId: this._currentSessionId
+        });
+
+        if (this._isLoadingModels) {
+            logger.warn(`[${loadingId}] Model loading already in progress, skipping...`);
+            console.log('Wu Wei: Model loading already in progress, skipping...');
+            return;
+        }
+
+        this._isLoadingModels = true;
+        this._modelsLoaded = false;
+
+        logger.info(`[${loadingId}] Starting model loading process`);
+        console.log('Wu Wei: Starting to load available models...');
+
+        // Notify webview that we're loading models
         try {
-            // Get all available models
-            this._availableModels = await vscode.lm.selectChatModels();
-            console.log(`Wu Wei: Found ${this._availableModels.length} models`);
+            await this._postMessageToWebview({
+                command: 'setLoadingState',
+                loading: true,
+                message: 'Loading language models...'
+            });
+            logger.debug(`[${loadingId}] Loading state sent to webview`);
+        } catch (webviewError) {
+            logger.error(`[${loadingId}] Failed to send loading state to webview`, webviewError);
+        }
+
+        try {
+            // Check VSCode version compatibility
+            const vscodeVersion = vscode.version;
+            logger.debug(`[${loadingId}] VSCode version: ${vscodeVersion}`);
+
+            // Check if language model API is available
+            if (!vscode.lm) {
+                const errorMsg = `VSCode Language Model API not available. VSCode version: ${vscodeVersion}. Please ensure you have VSCode 1.90+ and the required extensions installed.`;
+                logger.error(`[${loadingId}] ${errorMsg}`);
+                throw new Error(errorMsg);
+            }
+
+            logger.debug(`[${loadingId}] VSCode Language Model API is available, querying for models...`);
+            console.log('Wu Wei: VSCode Language Model API is available, querying for models...');
+
+            // Check if any extensions that provide language models are installed
+            const extensions = vscode.extensions.all;
+            const languageModelExtensions = extensions.filter(ext =>
+                ext.id.includes('copilot') ||
+                ext.id.includes('gpt') ||
+                ext.id.includes('claude') ||
+                ext.packageJSON?.contributes?.languageModels
+            );
+
+            logger.debug(`[${loadingId}] Found ${languageModelExtensions.length} potential language model extensions`, {
+                extensions: languageModelExtensions.map(ext => ({
+                    id: ext.id,
+                    displayName: ext.packageJSON?.displayName,
+                    isActive: ext.isActive
+                }))
+            });
+
+            // Get all available models with timeout
+            logger.debug(`[${loadingId}] Calling vscode.lm.selectChatModels()...`);
+            const modelsPromise = vscode.lm.selectChatModels();
+            const timeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => {
+                    logger.error(`[${loadingId}] Model loading timeout after 30 seconds`);
+                    reject(new Error('Model loading timeout (30s)'));
+                }, 30000)
+            );
+
+            this._availableModels = await Promise.race([modelsPromise, timeoutPromise]);
+
+            logger.info(`[${loadingId}] Successfully found ${this._availableModels.length} models`, {
+                models: this._availableModels.map(model => ({
+                    family: model.family,
+                    vendor: model.vendor,
+                    name: model.name,
+                    maxInputTokens: model.maxInputTokens,
+                    id: model.id
+                }))
+            });
+            console.log(`Wu Wei: Successfully found ${this._availableModels.length} models`);
 
             const config = vscode.workspace.getConfiguration('wu-wei');
             const currentModel = config.get<string>('preferredModel', 'gpt-4o');
+
+            logger.debug(`[${loadingId}] Current preferred model from config: ${currentModel}`);
 
             const modelData = this._availableModels.map(model => ({
                 family: model.family,
@@ -292,22 +419,79 @@ export class WuWeiChatPanel {
                 maxInputTokens: model.maxInputTokens
             }));
 
-            console.log('Wu Wei: Sending models to webview:', modelData);
+            logger.debug(`[${loadingId}] Model data prepared for webview`, { modelData });
+            console.log('Wu Wei: Model data prepared:', modelData);
+
+            // If no models available, show helpful message
+            if (this._availableModels.length === 0) {
+                const noModelsError = 'No language models available. Please install GitHub Copilot or another compatible extension.';
+                logger.warn(`[${loadingId}] ${noModelsError}`, {
+                    vscodeVersion,
+                    installedExtensions: languageModelExtensions.length,
+                    apiAvailable: !!vscode.lm
+                });
+                console.log('Wu Wei: No models found, sending error to webview');
+
+                await this._postMessageToWebview({
+                    command: 'updateModels',
+                    models: [],
+                    currentModel: currentModel,
+                    loading: false,
+                    error: noModelsError
+                });
+                return;
+            }
 
             // Send models to webview
-            this._panel.webview.postMessage({
+            logger.debug(`[${loadingId}] Sending successful model data to webview`);
+            console.log('Wu Wei: Sending successful model data to webview');
+
+            await this._postMessageToWebview({
                 command: 'updateModels',
                 models: modelData,
-                currentModel: currentModel
+                currentModel: currentModel,
+                loading: false
             });
+
+            this._modelsLoaded = true;
+            logger.info(`[${loadingId}] Model loading completed successfully`, {
+                modelsCount: this._availableModels.length,
+                currentModel,
+                modelsLoaded: this._modelsLoaded
+            });
+            console.log('Wu Wei: Model loading completed successfully');
+
         } catch (error) {
-            console.error('Wu Wei: Error loading available models:', error);
-            this._panel.webview.postMessage({
-                command: 'updateModels',
-                models: [],
-                currentModel: 'gpt-4o',
-                error: 'Failed to load models'
+            const errorMessage = error instanceof Error ? error.message : 'Failed to load models';
+            logger.error(`[${loadingId}] Error loading available models`, {
+                error: errorMessage,
+                stack: error instanceof Error ? error.stack : undefined,
+                vscodeVersion: vscode.version,
+                lmApiAvailable: !!vscode.lm
             });
+            console.error('Wu Wei: Error loading available models:', error);
+
+            console.log('Wu Wei: Sending error to webview:', errorMessage);
+            try {
+                await this._postMessageToWebview({
+                    command: 'updateModels',
+                    models: [],
+                    currentModel: 'gpt-4o',
+                    loading: false,
+                    error: errorMessage
+                });
+                logger.debug(`[${loadingId}] Error state sent to webview`);
+            } catch (webviewError) {
+                logger.error(`[${loadingId}] Failed to send error state to webview`, webviewError);
+            }
+        } finally {
+            this._isLoadingModels = false;
+            logger.debug(`[${loadingId}] Model loading process finished`, {
+                modelsLoaded: this._modelsLoaded,
+                availableModelsCount: this._availableModels.length,
+                isLoadingModels: this._isLoadingModels
+            });
+            console.log('Wu Wei: Model loading process finished');
         }
     }
 
@@ -424,9 +608,30 @@ export class WuWeiChatPanel {
 
     private async _restoreModelSelection(): Promise<void> {
         try {
-            // Get current model from configuration
-            const config = vscode.workspace.getConfiguration('wu-wei');
-            const currentModel = config.get<string>('preferredModel', 'gpt-4o');
+            // Get session-specific model or fall back to global preference
+            let currentModel: string;
+
+            if (this._currentSessionId && WuWeiChatPanel._sidebarProvider) {
+                // Try to get session-specific model
+                const sessionModel = WuWeiChatPanel._sidebarProvider.getSessionModel(this._currentSessionId);
+                if (sessionModel) {
+                    currentModel = sessionModel;
+                    console.log(`Wu Wei: Using session-specific model: ${sessionModel} for session ${this._currentSessionId}`);
+                } else {
+                    // Fall back to global preference
+                    const config = vscode.workspace.getConfiguration('wu-wei');
+                    currentModel = config.get<string>('preferredModel', 'gpt-4o');
+                    console.log(`Wu Wei: No session model found, using global preference: ${currentModel}`);
+                }
+            } else {
+                // Fall back to global preference
+                const config = vscode.workspace.getConfiguration('wu-wei');
+                currentModel = config.get<string>('preferredModel', 'gpt-4o');
+                console.log(`Wu Wei: No session context, using global preference: ${currentModel}`);
+            }
+
+            // Update internal state
+            this._currentModel = currentModel;
 
             // Get available models data
             const modelData = this._availableModels.map(model => ({
@@ -446,6 +651,29 @@ export class WuWeiChatPanel {
             });
         } catch (error) {
             console.error('Wu Wei: Error restoring model selection:', error);
+        }
+    }
+
+    private async _updateModelSelectionInWebview(selectedModelFamily: string): Promise<void> {
+        try {
+            // Get available models data
+            const modelData = this._availableModels.map(model => ({
+                family: model.family,
+                vendor: model.vendor,
+                name: model.name,
+                maxInputTokens: model.maxInputTokens
+            }));
+
+            console.log(`Wu Wei: Updating webview with model selection: ${selectedModelFamily}`);
+
+            // Send updated models with new selection to webview
+            await this._postMessageToWebview({
+                command: 'updateModels',
+                models: modelData,
+                currentModel: selectedModelFamily
+            });
+        } catch (error) {
+            console.error('Wu Wei: Error updating model selection in webview:', error);
         }
     }
 
@@ -946,6 +1174,34 @@ export class WuWeiChatPanel {
             }
         }
 
+        // Handle loading state
+        function setLoadingState(loading, message) {
+            if (loading) {
+                // Disable input while loading
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+                messageInput.placeholder = message || 'Loading...';
+                
+                // Show loading in model selector
+                modelSelector.innerHTML = '<option value="">Loading models...</option>';
+                
+                console.log('Wu Wei UI: Set loading state - ' + (message || 'Loading...'));
+            } else {
+                // Re-enable input after loading (if models are available)
+                const hasModels = availableModels.length > 0;
+                messageInput.disabled = !hasModels;
+                sendBtn.disabled = !hasModels;
+                
+                if (hasModels) {
+                    messageInput.placeholder = 'Enter your message... (Shift+Enter for new line)';
+                } else {
+                    messageInput.placeholder = 'Language models not available - check setup';
+                }
+                
+                console.log('Wu Wei UI: Cleared loading state - models available: ' + hasModels);
+            }
+        }
+
         // Listen for messages from the extension
         window.addEventListener('message', event => {
             const message = event.data;
@@ -965,6 +1221,12 @@ export class WuWeiChatPanel {
                     break;
                 case 'updateModels':
                     updateModelSelector(message.models, message.currentModel, message.error);
+                    if (!message.loading) {
+                        setLoadingState(false);
+                    }
+                    break;
+                case 'setLoadingState':
+                    setLoadingState(message.loading, message.message);
                     break;
             }
         });
