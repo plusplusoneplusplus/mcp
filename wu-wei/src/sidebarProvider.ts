@@ -80,8 +80,8 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
         this.saveChatSessions();
         this.refresh();
 
-        // Open the new chat
-        WuWeiChatPanel.createOrShow(this.context.extensionUri);
+        // Open the new chat with the specific session ID to switch to it
+        WuWeiChatPanel.createOrShow(this.context.extensionUri, sessionId);
 
         vscode.window.showInformationMessage(`Wu Wei: New chat session "${title}" created 🌊`);
     }
@@ -90,7 +90,12 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
      * Delete a chat session
      */
     deleteChat(sessionId: string): void {
+        console.log(`Wu Wei: Attempting to delete session with ID: ${sessionId}`);
+        console.log(`Wu Wei: Current sessions:`, this.chatSessions.map(s => ({ id: s.id, title: s.title })));
+
         const sessionIndex = this.chatSessions.findIndex(s => s.id === sessionId);
+        console.log(`Wu Wei: Found session at index: ${sessionIndex}`);
+
         if (sessionIndex >= 0) {
             const session = this.chatSessions[sessionIndex];
             this.chatSessions.splice(sessionIndex, 1);
@@ -98,6 +103,10 @@ export class WuWeiSidebarProvider implements vscode.TreeDataProvider<ChatSession
             this.refresh();
 
             vscode.window.showInformationMessage(`Wu Wei: Chat session "${session.title}" deleted`);
+            console.log(`Wu Wei: Session "${session.title}" deleted successfully`);
+        } else {
+            console.error(`Wu Wei: Could not find session with ID: ${sessionId}`);
+            vscode.window.showErrorMessage(`Wu Wei: Could not find session to delete`);
         }
     }
 
@@ -248,6 +257,9 @@ export class ChatSessionItem extends vscode.TreeItem {
         this.description = this.getDescription();
         this.contextValue = 'chatSession';
 
+        // Store sessionId as a property that can be accessed by context menu commands
+        this.id = this.sessionId;
+
         // Set icon
         this.iconPath = new vscode.ThemeIcon('comment-discussion');
 
@@ -257,6 +269,8 @@ export class ChatSessionItem extends vscode.TreeItem {
             title: 'Open Chat',
             arguments: [this.sessionId]
         };
+
+        console.log(`Wu Wei: Created ChatSessionItem with ID: ${this.sessionId}, title: ${this.title}`);
     }
 
     private getTooltip(): string {

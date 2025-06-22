@@ -63,13 +63,19 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Register delete chat session command
-    const deleteChatSessionCommand = vscode.commands.registerCommand('wu-wei.deleteChatSession', (sessionId: string) => {
+    const deleteChatSessionCommand = vscode.commands.registerCommand('wu-wei.deleteChatSession', (item: any) => {
+        console.log('Wu Wei: Delete command called with item:', item);
+        const sessionId = item?.sessionId || item?.id || item;
+        console.log('Wu Wei: Extracted sessionId for deletion:', sessionId);
         sidebarProvider.deleteChat(sessionId);
         updateContext();
     });
 
     // Register rename chat session command
-    const renameChatSessionCommand = vscode.commands.registerCommand('wu-wei.renameChatSession', async (sessionId: string) => {
+    const renameChatSessionCommand = vscode.commands.registerCommand('wu-wei.renameChatSession', async (item: any) => {
+        console.log('Wu Wei: Rename command called with item:', item);
+        const sessionId = item?.sessionId || item?.id || item;
+        console.log('Wu Wei: Extracted sessionId for rename:', sessionId);
         await sidebarProvider.renameChat(sessionId);
     });
 

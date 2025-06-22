@@ -96,6 +96,13 @@ export class WuWeiChatPanel {
         setTimeout(() => {
             this._loadAvailableModels();
         }, 100);
+
+        // If a sessionId was provided, switch to that session after a brief delay
+        if (sessionId) {
+            setTimeout(() => {
+                this._switchToSession(sessionId);
+            }, 200);
+        }
     }
 
     public dispose() {
