@@ -211,44 +211,12 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-foreground);
             background-color: var(--vscode-editor-background);
             margin: 0;
-            padding: 20px;
+            padding: 16px;
             line-height: 1.6;
         }
 
-        .header {
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid var(--vscode-panel-border);
-        }
-
-        .header h2 {
-            margin: 0 0 5px 0;
-            color: var(--vscode-foreground);
-        }
-
-        .header p {
-            margin: 0;
-            color: var(--vscode-descriptionForeground);
-            font-size: 0.9em;
-        }
-
-        .agent-form {
-            margin-bottom: 20px;
-            padding: 15px;
-            background-color: var(--vscode-editor-inactiveSelectionBackground);
-            border-radius: 6px;
-            border: 1px solid var(--vscode-panel-border);
-        }
-
         .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: var(--vscode-foreground);
+            margin-bottom: 12px;
         }
 
         .form-group select,
@@ -303,15 +271,6 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
 
         .btn-secondary:hover {
             background-color: var(--vscode-button-secondaryHoverBackground);
-        }
-
-        .message-history {
-            margin-top: 20px;
-        }
-
-        .message-history h3 {
-            margin: 0 0 15px 0;
-            color: var(--vscode-foreground);
         }
 
         .message-list {
@@ -399,54 +358,102 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
             font-style: italic;
         }
 
-        .capability-info {
-            margin-bottom: 10px;
-            padding: 8px;
-            background-color: var(--vscode-textCodeBlock-background);
-            border-radius: 4px;
-            font-size: 0.85em;
+        .agent-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            background-color: var(--vscode-sideBar-background);
+        }
+
+        .section-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--vscode-foreground);
+        }
+
+        .agent-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .info-button {
+            background: none;
+            border: none;
             color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            font-size: 14px;
+            position: relative;
+            transition: background-color 0.2s ease;
+        }
+
+        .info-button:hover {
+            background-color: var(--vscode-toolbar-hoverBackground);
+        }
+
+        .tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--vscode-editorHoverWidget-background);
+            border: 1px solid var(--vscode-editorHoverWidget-border);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 0.8em;
+            white-space: nowrap;
+            z-index: 1000;
+            margin-bottom: 5px;
+            display: none;
+        }
+
+        .info-button:hover .tooltip {
+            display: block;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2>🤖 Wu Wei Agent Panel</h2>
-        <p>Trigger agents with messages using MCP/A2A interface patterns</p>
-    </div>
-
-    <div class="agent-form">
+    <div class="agent-section">
+        <div class="section-title">Agent Control</div>
+        
         <div class="form-group">
-            <label for="agentSelect">Select Agent:</label>
-            <select id="agentSelect">
-                <option value="">Loading agents...</option>
-            </select>
-            <div id="capabilityInfo" class="capability-info" style="display: none;"></div>
+            <div class="agent-selector">
+                <select id="agentSelect">
+                    <option value="">Loading agents...</option>
+                </select>
+                <button class="info-button" id="infoButton" title="Agent Information">
+                    ℹ️
+                    <div class="tooltip" id="agentTooltip">Select an agent to see details</div>
+                </button>
+            </div>
         </div>
 
         <div class="form-group">
-            <label for="methodSelect">Method:</label>
             <select id="methodSelect">
                 <option value="">Select an agent first</option>
             </select>
         </div>
 
         <div class="form-group">
-            <label for="paramsInput">Parameters:</label>
             <textarea id="paramsInput" placeholder='Hello, agent! How can you help me?'></textarea>
             <small style="color: var(--vscode-descriptionForeground); font-size: 0.8em; margin-top: 4px; display: block;">
-                Enter your message or question as plain text. For advanced usage, you can use JSON format. Press Ctrl+Enter to send.
+                Press Ctrl+Enter to send
             </small>
         </div>
 
         <div class="button-group">
-            <button class="btn btn-primary" id="sendRequestBtn">Send Request</button>
+            <button class="btn btn-primary" id="sendRequestBtn">Send (Ctrl+Enter)</button>
             <button class="btn btn-secondary" id="clearHistoryBtn">Clear History</button>
         </div>
     </div>
 
-    <div class="message-history">
-        <h3>Message History</h3>
+    <div class="agent-section">
+        <div class="section-title">Message History</div>
         <div class="message-list" id="messageList">
             <div class="empty-state">
                 <p>No messages yet. Send your first agent request!</p>
@@ -463,7 +470,7 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         const agentSelect = document.getElementById('agentSelect');
         const methodSelect = document.getElementById('methodSelect');
         const paramsInput = document.getElementById('paramsInput');
-        const capabilityInfo = document.getElementById('capabilityInfo');
+        const agentTooltip = document.getElementById('agentTooltip');
         const messageList = document.getElementById('messageList');
         const sendRequestBtn = document.getElementById('sendRequestBtn');
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
@@ -518,11 +525,11 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         function updateMethodSelect() {
             const selectedAgent = agentSelect.value;
             methodSelect.innerHTML = '';
-            capabilityInfo.style.display = 'none';
 
             if (!selectedAgent) {
                 methodSelect.innerHTML = '<option value="">Select an agent first</option>';
                 paramsInput.placeholder = 'Select an agent and method first';
+                agentTooltip.textContent = 'Select an agent to see details';
                 return;
             }
 
@@ -532,12 +539,8 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
                 return;
             }
 
-            // Show capability info
-            capabilityInfo.innerHTML = \`
-                <strong>\${capability.name}</strong> - \${capability.description || 'No description'}
-                <br>Methods: \${capability.methods.join(', ')}
-            \`;
-            capabilityInfo.style.display = 'block';
+            // Update tooltip with agent info
+            agentTooltip.textContent = \`\${capability.description || 'No description'} | Methods: \${capability.methods.join(', ')}\`;
 
             // Populate methods
             methodSelect.innerHTML = '<option value="">Select a method</option>';
