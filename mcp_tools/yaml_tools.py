@@ -16,7 +16,7 @@ from mcp_tools.plugin import register_tool, registry
 from mcp_tools.dependency import injector
 from utils.secret_scanner import redact_secrets
 from utils.output_processor import OutputLimiter
-from mcp_tools.concurrency_manager import get_concurrency_manager, parse_concurrency_config
+from utils.concurrency import get_concurrency_manager, parse_concurrency_config
 
 # Configuration
 DEFAULT_WAIT_FOR_QUERY = True  # Default wait for task
@@ -949,7 +949,7 @@ def load_yaml_tools() -> List[Type[ToolInterface]]:
                     yaml_tool_classes.append(tool_class)
                     successful_tools.append(name)
                     logger.info(f"Successfully registered YAML tool: {name}")
-                    
+
                     # Register concurrency configuration if present
                     concurrency_config = tool_data.get("concurrency")
                     if concurrency_config:
