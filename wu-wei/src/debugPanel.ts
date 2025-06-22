@@ -42,6 +42,10 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
                     console.log('[Wu Wei Extension] refreshDebugInfo command received');
                     this.refreshDebugInfo();
                     break;
+                case 'runCommands':
+                    console.log('[Wu Wei Extension] runCommands command received');
+                    this.runCommands(message.commands);
+                    break;
                 default:
                     console.log('[Wu Wei Extension] Unknown command received:', message.command);
             }
@@ -225,6 +229,75 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
             background: var(--vscode-panel-border);
             margin: 8px 0;
         }
+        
+        .command-executor {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .command-textarea {
+            width: 100%;
+            min-height: 80px;
+            background: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 4px;
+            padding: 8px;
+            font-family: var(--vscode-editor-font-family, 'SF Mono', Consolas, monospace);
+            font-size: 11px;
+            line-height: 1.4;
+            resize: vertical;
+            outline: none;
+        }
+        
+        .command-textarea:focus {
+            border-color: var(--vscode-focusBorder);
+            box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+        }
+        
+        .command-textarea::placeholder {
+            color: var(--vscode-input-placeholderForeground);
+        }
+        
+        .command-actions {
+            display: flex;
+            gap: 6px;
+        }
+        
+        .command-output {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--vscode-panel-border);
+        }
+        
+        .command-result {
+            padding: 4px 0;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            font-size: 11px;
+        }
+        
+        .command-result:last-child {
+            border-bottom: none;
+        }
+        
+        .command-result-success {
+            color: var(--vscode-testing-iconPassed);
+        }
+        
+        .command-result-error {
+            color: var(--vscode-testing-iconFailed);
+        }
+        
+        .command-result-command {
+            font-weight: 500;
+            color: var(--vscode-foreground);
+        }
+        
+        .command-result-message {
+            color: var(--vscode-descriptionForeground);
+            margin-left: 12px;
+        }
     </style>
 </head>
 <body>
@@ -252,6 +325,46 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
                     <span class="icon">🗑️</span>
                     <span>Clear All Logs</span>
                 </button>
+            </div>
+        </div>
+        
+        <!-- Command Execution Section -->
+        <div class="section">
+            <div class="section-title">
+                <span class="icon">⚡</span>
+                Run VS Code Commands
+            </div>
+            <div class="command-executor">
+                <textarea 
+                    id="commandInput" 
+                    placeholder="Enter VS Code commands, one per line&#10;Examples:&#10;workbench.action.files.save&#10;editor.action.formatDocument&#10;workbench.action.openSettings"
+                    rows="4"
+                    class="command-textarea"
+                ></textarea>
+                
+                <div class="command-actions">
+                    <button class="debug-btn primary" onclick="runCommands()">
+                        <span class="icon">▶️</span>
+                        <span>Execute Commands</span>
+                    </button>
+                    
+                    <button class="debug-btn" onclick="clearCommands()">
+                        <span class="icon">🧹</span>
+                        <span>Clear</span>
+                    </button>
+                </div>
+                
+                <div class="command-output" id="commandOutput" style="display: none;">
+                    <div class="section-title" style="margin-bottom: 4px; font-size: 12px;">
+                        <span class="icon">📤</span>
+                        Execution Results
+                    </div>
+                    <div class="debug-info" id="commandResults"></div>
+                </div>
+            </div>
+            
+            <div class="help-text">
+                Enter VS Code commands to execute, one per line. Use the Command Palette (Cmd+Shift+P) to find command IDs.
             </div>
         </div>
         
@@ -339,9 +452,92 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
             }
         }
         
+        function runCommands() {
+            const commandInput = document.getElementById('commandInput');
+            const commandText = commandInput.value.trim();
+            
+            if (!commandText) {
+                alert('Please enter at least one command to execute.');
+                return;
+            }
+            
+            // Split commands by lines and filter out empty lines
+            const commands = commandText
+                .split('\\n')
+                .map(cmd => cmd.trim())
+                .filter(cmd => cmd.length > 0);
+            
+            if (commands.length === 0) {
+                alert('No valid commands found. Please enter commands separated by line breaks.');
+                return;
+            }
+            
+            console.log('[Wu Wei Frontend] Executing commands:', commands);
+            
+            // Show loading state
+            const outputSection = document.getElementById('commandOutput');
+            const resultsDiv = document.getElementById('commandResults');
+            outputSection.style.display = 'block';
+            resultsDiv.innerHTML = '<div class="command-result">⏳ Executing commands...</div>';
+            
+            // Send commands to backend
+            vscode.postMessage({ 
+                command: 'runCommands', 
+                commands: commands 
+            });
+        }
+        
+        function clearCommands() {
+            const commandInput = document.getElementById('commandInput');
+            commandInput.value = '';
+            
+            const outputSection = document.getElementById('commandOutput');
+            outputSection.style.display = 'none';
+        }
+        
+        // Function to update command results (called from backend)
+        function updateCommandResults(results) {
+            const resultsDiv = document.getElementById('commandResults');
+            const outputSection = document.getElementById('commandOutput');
+            
+            if (!results || results.length === 0) {
+                resultsDiv.innerHTML = '<div class="command-result command-result-error">No results received</div>';
+                return;
+            }
+            
+            let html = '';
+            results.forEach((result, index) => {
+                const statusClass = result.success ? 'command-result-success' : 'command-result-error';
+                const statusIcon = result.success ? '✅' : '❌';
+                
+                html += \`
+                    <div class="command-result">
+                        <div class="command-result-command">\${statusIcon} \${result.command}</div>
+                        \${result.message ? \`<div class="command-result-message">\${result.message}</div>\` : ''}
+                    </div>
+                \`;
+            });
+            
+            resultsDiv.innerHTML = html;
+            outputSection.style.display = 'block';
+        }
+        
         // Initialize on load
         document.addEventListener('DOMContentLoaded', () => {
             refreshDebugInfo();
+        });
+        
+        // Listen for messages from the extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+            
+            switch (message.command) {
+                case 'updateCommandResults':
+                    updateCommandResults(message.results);
+                    break;
+                default:
+                    console.log('[Wu Wei Frontend] Unknown message from extension:', message);
+            }
         });
     </script>
 </body>
@@ -381,6 +577,77 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
             // You could send updated data to the webview here
             // For now, the webview handles its own refresh
             logger.debug('Debug panel refreshed');
+        }
+    }
+
+    private async runCommands(commands: string[]): Promise<void> {
+        try {
+            logger.info('Run commands requested from debug panel', { commandCount: commands.length, commands });
+
+            const results: Array<{ command: string; success: boolean; message?: string }> = [];
+
+            for (const command of commands) {
+                try {
+                    logger.debug('Executing command:', command);
+
+                    // Execute the VS Code command
+                    await vscode.commands.executeCommand(command);
+
+                    results.push({
+                        command,
+                        success: true,
+                        message: 'Command executed successfully'
+                    });
+
+                    logger.debug('Command executed successfully:', command);
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+                    results.push({
+                        command,
+                        success: false,
+                        message: `Error: ${errorMessage}`
+                    });
+
+                    logger.error('Command execution failed', { command, error });
+                }
+            }
+
+            // Send results back to webview
+            if (this._view) {
+                await this._view.webview.postMessage({
+                    command: 'updateCommandResults',
+                    results: results
+                });
+            }
+
+            // Show summary notification
+            const successCount = results.filter(r => r.success).length;
+            const failCount = results.length - successCount;
+
+            if (failCount === 0) {
+                vscode.window.showInformationMessage(`Wu Wei: Successfully executed ${successCount} command(s)`);
+            } else if (successCount === 0) {
+                vscode.window.showErrorMessage(`Wu Wei: Failed to execute ${failCount} command(s)`);
+            } else {
+                vscode.window.showWarningMessage(`Wu Wei: Executed ${successCount} command(s), ${failCount} failed`);
+            }
+
+        } catch (error) {
+            logger.error('Error in runCommands', error);
+            vscode.window.showErrorMessage('Wu Wei: Failed to execute commands');
+
+            // Send error to webview
+            if (this._view) {
+                await this._view.webview.postMessage({
+                    command: 'updateCommandResults',
+                    results: [{
+                        command: 'System Error',
+                        success: false,
+                        message: 'Failed to process command execution request'
+                    }]
+                });
+            }
         }
     }
 
