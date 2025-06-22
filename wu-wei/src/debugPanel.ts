@@ -24,19 +24,26 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(message => {
+            console.log('[Wu Wei Extension] Received message from webview:', message);
             switch (message.command) {
                 case 'showLogs':
+                    console.log('[Wu Wei Extension] showLogs command received');
                     vscode.commands.executeCommand('wu-wei.showLogs');
                     break;
                 case 'clearLogs':
+                    console.log('[Wu Wei Extension] clearLogs command received');
                     vscode.commands.executeCommand('wu-wei.clearLogs');
                     break;
                 case 'exportLogs':
+                    console.log('[Wu Wei Extension] exportLogs command received');
                     this.exportLogs();
                     break;
                 case 'refreshDebugInfo':
+                    console.log('[Wu Wei Extension] refreshDebugInfo command received');
                     this.refreshDebugInfo();
                     break;
+                default:
+                    console.log('[Wu Wei Extension] Unknown command received:', message.command);
             }
         });
 
@@ -308,6 +315,7 @@ export class WuWeiDebugPanelProvider implements vscode.WebviewViewProvider {
         const vscode = acquireVsCodeApi();
         
         function showLogs() {
+            console.log('[Wu Wei Frontend] showLogs button clicked');
             vscode.postMessage({ command: 'showLogs' });
         }
         

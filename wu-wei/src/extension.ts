@@ -112,8 +112,10 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register show logs command
     const showLogsCommand = vscode.commands.registerCommand('wu-wei.showLogs', () => {
-        logger.info('Show logs command executed');
+        console.log('[Wu Wei Extension] wu-wei.showLogs command executed');
+        logger.info('Show logs command executed from debug panel');
         logger.show();
+        vscode.window.showInformationMessage('Wu Wei: Output panel opened - check the "Wu Wei" channel');
     });
 
     // Register clear logs command
