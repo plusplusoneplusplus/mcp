@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { WuWeiChatPanel } from './chatPanel';
+import { WuWeiSidebarProvider, WuWeiActionsViewProvider } from './sidebarProvider';
 
 /**
  * Wu Wei Extension - Effortless Work Automation
@@ -14,6 +15,26 @@ import { WuWeiChatPanel } from './chatPanel';
 export function activate(context: vscode.ExtensionContext) {
     console.log('Wu Wei extension is now active - 无为而治');
 
+    // Create the sidebar provider
+    const sidebarProvider = new WuWeiSidebarProvider(context);
+    const actionsProvider = new WuWeiActionsViewProvider(context);
+
+    // Register tree data provider
+    vscode.window.registerTreeDataProvider('wu-wei.chatSessions', sidebarProvider);
+
+    // Register actions view provider
+    vscode.window.registerWebviewViewProvider('wu-wei.actions', actionsProvider);
+
+    // Connect sidebar provider to chat panel
+    WuWeiChatPanel.setSidebarProvider(sidebarProvider);
+
+    // Update context based on chat sessions
+    const updateContext = () => {
+        const hasChats = sidebarProvider.getSessionCount() > 0;
+        vscode.commands.executeCommand('setContext', 'wu-wei.hasNoChats', !hasChats);
+    };
+    updateContext();
+
     // Register the hello world command
     const helloCommand = vscode.commands.registerCommand('wu-wei.hello', () => {
         vscode.window.showInformationMessage('Wu Wei: Effortless automation begins - 无为而治');
@@ -24,7 +45,43 @@ export function activate(context: vscode.ExtensionContext) {
         WuWeiChatPanel.createOrShow(context.extensionUri);
     });
 
-    context.subscriptions.push(helloCommand, chatCommand);
+    // Register new chat command
+    const newChatCommand = vscode.commands.registerCommand('wu-wei.newChat', () => {
+        sidebarProvider.createNewChat();
+        updateContext();
+    });
+
+    // Register refresh chats command
+    const refreshChatsCommand = vscode.commands.registerCommand('wu-wei.refreshChats', () => {
+        sidebarProvider.refresh();
+        updateContext();
+    });
+
+    // Register open chat session command
+    const openChatSessionCommand = vscode.commands.registerCommand('wu-wei.openChatSession', (sessionId: string) => {
+        sidebarProvider.openChat(sessionId);
+    });
+
+    // Register delete chat session command
+    const deleteChatSessionCommand = vscode.commands.registerCommand('wu-wei.deleteChatSession', (sessionId: string) => {
+        sidebarProvider.deleteChat(sessionId);
+        updateContext();
+    });
+
+    // Register rename chat session command
+    const renameChatSessionCommand = vscode.commands.registerCommand('wu-wei.renameChatSession', async (sessionId: string) => {
+        await sidebarProvider.renameChat(sessionId);
+    });
+
+    context.subscriptions.push(
+        helloCommand,
+        chatCommand,
+        newChatCommand,
+        refreshChatsCommand,
+        openChatSessionCommand,
+        deleteChatSessionCommand,
+        renameChatSessionCommand
+    );
 
     // Initialize automation systems
     initializeAutomation(context);

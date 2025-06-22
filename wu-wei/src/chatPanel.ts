@@ -20,15 +20,20 @@ export class WuWeiChatPanel {
     private _chatHistory: ChatMessage[] = [];
     private _availableModels: vscode.LanguageModelChat[] = [];
     private _currentModel: string = 'gpt-4o';
+    private _currentSessionId?: string;
+    private static _sidebarProvider?: any;
 
-    public static createOrShow(extensionUri: vscode.Uri) {
+    public static createOrShow(extensionUri: vscode.Uri, sessionId?: string) {
         const column = vscode.window.activeTextEditor
             ? vscode.window.activeTextEditor.viewColumn
             : undefined;
 
-        // If we already have a panel, show it
+        // If we already have a panel, reuse it and switch session
         if (WuWeiChatPanel.currentPanel) {
             WuWeiChatPanel.currentPanel._panel.reveal(column);
+            if (sessionId) {
+                WuWeiChatPanel.currentPanel._switchToSession(sessionId);
+            }
             return;
         }
 
@@ -43,14 +48,18 @@ export class WuWeiChatPanel {
             }
         );
 
-        WuWeiChatPanel.currentPanel = new WuWeiChatPanel(panel, extensionUri);
+        WuWeiChatPanel.currentPanel = new WuWeiChatPanel(panel, extensionUri, sessionId);
+    }
+
+    public static setSidebarProvider(provider: any) {
+        WuWeiChatPanel._sidebarProvider = provider;
     }
 
     public static revive(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
         WuWeiChatPanel.currentPanel = new WuWeiChatPanel(panel, extensionUri);
     }
 
-    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
+    private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, sessionId?: string) {
         this._panel = panel;
         this._extensionUri = extensionUri;
 
@@ -105,11 +114,17 @@ export class WuWeiChatPanel {
 
     private async _handleUserMessage(message: string) {
         // Add user message to history
-        this._chatHistory.push({
-            role: 'user',
+        const userMessage = {
+            role: 'user' as const,
             content: message,
             timestamp: new Date()
-        });
+        };
+        this._chatHistory.push(userMessage);
+
+        // Save to current session if we have one
+        if (this._currentSessionId && WuWeiChatPanel._sidebarProvider) {
+            WuWeiChatPanel._sidebarProvider.addMessageToSession(this._currentSessionId, userMessage);
+        }
 
         // Show thinking indicator
         this._panel.webview.postMessage({
@@ -120,11 +135,17 @@ export class WuWeiChatPanel {
             const response = await this._generateAIResponse(message);
 
             // Add AI response to history
-            this._chatHistory.push({
-                role: 'assistant',
+            const assistantMessage = {
+                role: 'assistant' as const,
                 content: response,
                 timestamp: new Date()
-            });
+            };
+            this._chatHistory.push(assistantMessage);
+
+            // Save to current session if we have one
+            if (this._currentSessionId && WuWeiChatPanel._sidebarProvider) {
+                WuWeiChatPanel._sidebarProvider.addMessageToSession(this._currentSessionId, assistantMessage);
+            }
 
             this._panel.webview.postMessage({
                 command: 'addMessage',
@@ -135,11 +156,17 @@ export class WuWeiChatPanel {
             console.error('Wu Wei: Error generating AI response:', error);
             const fallbackResponse = this._generateWuWeiResponse(message);
 
-            this._chatHistory.push({
-                role: 'assistant',
+            const assistantMessage = {
+                role: 'assistant' as const,
                 content: fallbackResponse,
                 timestamp: new Date()
-            });
+            };
+            this._chatHistory.push(assistantMessage);
+
+            // Save to current session if we have one
+            if (this._currentSessionId && WuWeiChatPanel._sidebarProvider) {
+                WuWeiChatPanel._sidebarProvider.addMessageToSession(this._currentSessionId, assistantMessage);
+            }
 
             this._panel.webview.postMessage({
                 command: 'addMessage',
@@ -271,6 +298,55 @@ export class WuWeiChatPanel {
                 currentModel: 'gpt-4o',
                 error: 'Failed to load models'
             });
+        }
+    }
+
+    private _switchToSession(sessionId: string) {
+        if (WuWeiChatPanel._sidebarProvider) {
+            // Save current session history if we have one
+            if (this._currentSessionId && this._chatHistory.length > 0) {
+                this._saveChatHistoryToSession(this._currentSessionId);
+            }
+
+            // Load new session
+            this._currentSessionId = sessionId;
+            this._loadChatHistoryFromSession(sessionId);
+        }
+    }
+
+    private _saveChatHistoryToSession(sessionId: string) {
+        if (WuWeiChatPanel._sidebarProvider && this._chatHistory.length > 0) {
+            // Save each message to the session
+            for (const message of this._chatHistory) {
+                WuWeiChatPanel._sidebarProvider.addMessageToSession(sessionId, message);
+            }
+        }
+    }
+
+    private _loadChatHistoryFromSession(sessionId: string) {
+        if (WuWeiChatPanel._sidebarProvider) {
+            const history = WuWeiChatPanel._sidebarProvider.getChatHistory(sessionId);
+            this._chatHistory = history;
+
+            // Clear current messages in webview
+            this._panel.webview.postMessage({
+                command: 'clearMessages'
+            });
+
+            // Load messages into webview
+            for (const message of history) {
+                this._panel.webview.postMessage({
+                    command: 'addMessage',
+                    message: message.content,
+                    isUser: message.role === 'user'
+                });
+            }
+
+            // Update panel title with session info
+            const session = WuWeiChatPanel._sidebarProvider.getChatSession(sessionId);
+            if (session) {
+                this._panel.title = `Wu Wei Chat - ${session.title}`;
+            }
         }
     }
 
