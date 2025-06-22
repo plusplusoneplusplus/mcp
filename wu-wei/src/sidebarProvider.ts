@@ -427,12 +427,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
                 case 'newChat':
                     vscode.commands.executeCommand('wu-wei.newChat');
                     break;
-                case 'openChat':
-                    vscode.commands.executeCommand('wu-wei.openChat');
-                    break;
-                case 'refreshChats':
-                    vscode.commands.executeCommand('wu-wei.refreshChats');
-                    break;
             }
         });
     }
@@ -503,21 +497,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
             border: 1px solid var(--vscode-button-border, transparent);
         }
         
-        .secondary-btn {
-            background: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
-        }
-        
-        .secondary-btn:hover {
-            background: var(--vscode-button-secondaryHoverBackground);
-        }
-        
-        .divider {
-            height: 1px;
-            background: var(--vscode-panel-border);
-            margin: 4px 0;
-        }
-        
         .philosophy {
             margin-top: 12px;
             padding: 8px;
@@ -539,18 +518,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
             <span>New Chat</span>
         </button>
         
-        <button class="action-btn secondary-btn" onclick="openChat()">
-            <span class="icon">💬</span>
-            <span>Open Chat Panel</span>
-        </button>
-        
-        <div class="divider"></div>
-        
-        <button class="action-btn secondary-btn" onclick="refreshChats()">
-            <span class="icon">🔄</span>
-            <span>Refresh Sessions</span>
-        </button>
-        
         <div class="philosophy">
             "Wu wei - effortless action"<br>
             无为而治
@@ -562,14 +529,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
         
         function newChat() {
             vscode.postMessage({ command: 'newChat' });
-        }
-        
-        function openChat() {
-            vscode.postMessage({ command: 'openChat' });
-        }
-        
-        function refreshChats() {
-            vscode.postMessage({ command: 'refreshChats' });
         }
     </script>
 </body>
