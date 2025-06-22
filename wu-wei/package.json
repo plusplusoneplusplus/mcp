@@ -19,8 +19,7 @@
         "efficiency"
     ],
     "activationEvents": [
-        "onCommand:wu-wei.hello",
-        "onCommand:wu-wei.openChat"
+        "onStartupFinished"
     ],
     "capabilities": {
         "virtualWorkspaces": true,
@@ -104,19 +103,22 @@
                     "id": "wu-wei.chat",
                     "name": "Chat",
                     "type": "webview",
-                    "when": "true"
-                },
-                {
-                    "id": "wu-wei.debug",
-                    "name": "Debug",
-                    "type": "webview",
-                    "when": "true"
+                    "when": "true",
+                    "icon": "$(comment-discussion)"
                 },
                 {
                     "id": "wu-wei.agent",
                     "name": "Agent Panel",
                     "type": "webview",
-                    "when": "true"
+                    "when": "true",
+                    "icon": "$(robot)"
+                },
+                {
+                    "id": "wu-wei.debug",
+                    "name": "Debug",
+                    "type": "webview",
+                    "when": "true",
+                    "icon": "$(debug)"
                 }
             ]
         },

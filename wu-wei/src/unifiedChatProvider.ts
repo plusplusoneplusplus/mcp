@@ -27,10 +27,38 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
     private availableModels: vscode.LanguageModelChat[] = [];
     private isLoadingModels: boolean = false;
     private modelsLoaded: boolean = false;
+    private modelChangeListener: vscode.Disposable | undefined;
+    private debounceTimer: NodeJS.Timeout | undefined;
 
     constructor(private readonly context: vscode.ExtensionContext) {
         this.loadChatSessions();
         logger.info(`Unified Chat Provider: Loaded ${this.chatSessions.length} chat sessions`);
+
+        // Listen for changes in available language models
+        if (vscode.lm) {
+            this.modelChangeListener = vscode.lm.onDidChangeChatModels(() => {
+                logger.info('Language models changed event received.');
+
+                // Debounce the reload request
+                if (this.debounceTimer) {
+                    clearTimeout(this.debounceTimer);
+                }
+
+                this.debounceTimer = setTimeout(() => {
+                    logger.info('Debounced model reload triggered.');
+                    if (this._view?.visible) {
+                        this.loadAvailableModels();
+                    }
+                }, 500); // 500ms debounce interval
+            });
+        }
+    }
+
+    public dispose() {
+        this.modelChangeListener?.dispose();
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
     }
 
     public resolveWebviewView(
@@ -74,13 +102,14 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
                 case 'clearChat':
                     this.clearCurrentChat();
                     break;
+                case 'runDiagnostics':
+                    this.runDiagnostics();
+                    break;
             }
         });
 
-        // Load models after webview is ready
-        setTimeout(() => {
-            this.loadAvailableModels();
-        }, 100);
+        // Load models immediately, and the event listener will catch any later changes.
+        this.loadAvailableModels();
 
         // Update webview with current state
         this.updateWebview();
@@ -293,7 +322,15 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
             }
 
             logger.info('Language Model API is available, attempting to select models...');
-            this.availableModels = await vscode.lm.selectChatModels();
+
+            // Add timeout to the model selection
+            const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('Model loading timed out after 10 seconds')), 10000);
+            });
+
+            const modelsPromise = vscode.lm.selectChatModels();
+
+            this.availableModels = await Promise.race([modelsPromise, timeoutPromise]);
             this.modelsLoaded = true;
 
             logger.info(`Successfully loaded ${this.availableModels.length} language models`);
@@ -315,7 +352,11 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
                     models: [],
                     currentModel: currentModel,
                     loading: false,
-                    error: 'No language models available. Please install GitHub Copilot or another compatible extension.'
+                    error: {
+                        message: 'No language models available.',
+                        details: 'Please install and enable a compatible extension like GitHub Copilot, and ensure you are signed in. You may also need to restart VS Code after installing the extension.',
+                        actionable: true
+                    }
                 });
             } else {
                 this.postMessageToWebview({
@@ -331,12 +372,31 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error loading models';
             logger.error('Failed to load models:', errorMessage);
 
+            let userFriendlyMessage = 'Failed to load language models.';
+            let details = errorMessage;
+
+            // Provide specific guidance based on error type
+            if (errorMessage.includes('timed out')) {
+                userFriendlyMessage = 'Model loading timed out.';
+                details = 'This may indicate a network issue or that language model extensions are not properly configured. Try restarting VS Code and ensuring you\'re signed in to your language model service.';
+            } else if (errorMessage.includes('not available')) {
+                userFriendlyMessage = 'Language Model API not available.';
+                details = 'Please ensure you have VS Code 1.90+ installed. If you have the correct version, try restarting VS Code.';
+            } else if (errorMessage.includes('ENOTFOUND') || errorMessage.includes('network')) {
+                userFriendlyMessage = 'Network error while loading models.';
+                details = 'Check your internet connection and try again. If using a corporate network, you may need to configure proxy settings.';
+            }
+
             this.postMessageToWebview({
                 command: 'updateModels',
                 models: [],
                 currentModel: 'gpt-4o',
                 loading: false,
-                error: errorMessage
+                error: {
+                    message: userFriendlyMessage,
+                    details: details,
+                    actionable: true
+                }
             });
         } finally {
             this.isLoadingModels = false;
@@ -425,6 +485,145 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
             availableModelsCount: this.availableModels.length,
             models: this.availableModels.map(m => ({ family: m.family, vendor: m.vendor }))
         };
+    }
+
+    /**
+     * Comprehensive troubleshooting method to help users diagnose issues
+     */
+    public async runDiagnostics(): Promise<void> {
+        logger.show();
+        logger.info('='.repeat(80));
+        logger.info('WU WEI COMPREHENSIVE DIAGNOSTICS');
+        logger.info('='.repeat(80));
+
+        try {
+            // 1. Check VS Code version
+            const vscodeVersion = vscode.version;
+            logger.info(`VS Code Version: ${vscodeVersion}`);
+
+            const versionParts = vscodeVersion.split('.');
+            const majorVersion = parseInt(versionParts[0]);
+            const minorVersion = parseInt(versionParts[1]);
+
+            if (majorVersion < 1 || (majorVersion === 1 && minorVersion < 90)) {
+                logger.error(`❌ VS Code version ${vscodeVersion} is too old. Language Model API requires 1.90+`);
+            } else {
+                logger.info(`✅ VS Code version ${vscodeVersion} supports Language Model API`);
+            }
+
+            // 2. Check Language Model API availability
+            logger.info(`Language Model API Available: ${!!vscode.lm ? '✅ Yes' : '❌ No'}`);
+
+            if (!vscode.lm) {
+                logger.error('❌ Language Model API is not available');
+                logger.info('Possible causes:');
+                logger.info('  - VS Code version is too old (need 1.90+)');
+                logger.info('  - Extension is not running in proper context');
+                return;
+            }
+
+            // 3. Check installed extensions
+            const extensions = vscode.extensions.all;
+            const languageModelExtensions = extensions.filter(ext =>
+                ext.id.toLowerCase().includes('copilot') ||
+                ext.id.toLowerCase().includes('github.copilot') ||
+                ext.id.toLowerCase().includes('claude') ||
+                ext.id.toLowerCase().includes('openai') ||
+                ext.packageJSON?.contributes?.languageModels
+            );
+
+            logger.info(`Total Extensions: ${extensions.length}`);
+            logger.info(`Language Model Extensions Found: ${languageModelExtensions.length}`);
+
+            if (languageModelExtensions.length === 0) {
+                logger.error('❌ No language model extensions found');
+                logger.info('Install one of these extensions:');
+                logger.info('  - GitHub Copilot (github.copilot)');
+                logger.info('  - GitHub Copilot Chat (github.copilot-chat)');
+            } else {
+                logger.info('✅ Language model extensions found:');
+                languageModelExtensions.forEach(ext => {
+                    const status = ext.isActive ? '✅ Active' : '⚠️  Inactive';
+                    logger.info(`  - ${ext.id} (${ext.packageJSON?.displayName || 'Unknown'}) - ${status}`);
+                });
+            }
+
+            // 4. Try to load models with detailed error reporting
+            logger.info('Attempting to load language models...');
+            const startTime = Date.now();
+
+            try {
+                const models = await Promise.race([
+                    vscode.lm.selectChatModels(),
+                    new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error('Timeout after 15 seconds')), 15000)
+                    )
+                ]);
+
+                const endTime = Date.now();
+                logger.info(`✅ Models loaded successfully in ${endTime - startTime}ms`);
+                logger.info(`Found ${models.length} models:`);
+
+                if (models.length === 0) {
+                    logger.error('❌ No models available');
+                    logger.info('Possible causes:');
+                    logger.info('  - Language model extension not signed in');
+                    logger.info('  - Extension needs activation (try using it first)');
+                    logger.info('  - Network connectivity issues');
+                    logger.info('  - Extension configuration problems');
+                } else {
+                    models.forEach((model, index) => {
+                        logger.info(`  ${index + 1}. ${model.family} (${model.vendor})`);
+                        logger.info(`     - Name: ${model.name}`);
+                        logger.info(`     - Max Input: ${model.maxInputTokens} tokens`);
+                    });
+                }
+
+            } catch (modelError) {
+                const endTime = Date.now();
+                logger.error(`❌ Model loading failed after ${endTime - startTime}ms`);
+                logger.error(`Error: ${modelError instanceof Error ? modelError.message : String(modelError)}`);
+
+                // Provide specific guidance
+                const errorStr = String(modelError);
+                if (errorStr.includes('Timeout')) {
+                    logger.info('💡 Troubleshooting timeout issues:');
+                    logger.info('  1. Check internet connection');
+                    logger.info('  2. Sign in to GitHub Copilot if using it');
+                    logger.info('  3. Try restarting VS Code');
+                    logger.info('  4. Check corporate firewall/proxy settings');
+                } else if (errorStr.includes('not authorized') || errorStr.includes('authentication')) {
+                    logger.info('💡 Authentication issue detected:');
+                    logger.info('  1. Sign in to your language model service');
+                    logger.info('  2. Check your subscription status');
+                    logger.info('  3. Try signing out and back in');
+                }
+            }
+
+            // 5. Check Wu Wei configuration
+            const config = vscode.workspace.getConfiguration('wu-wei');
+            const preferredModel = config.get<string>('preferredModel', 'gpt-4o');
+            const automationEnabled = config.get<boolean>('enableAutomation', true);
+
+            logger.info('Wu Wei Configuration:');
+            logger.info(`  - Preferred Model: ${preferredModel}`);
+            logger.info(`  - Automation Enabled: ${automationEnabled}`);
+
+            // 6. Check extension state
+            const modelState = this.getModelState();
+            logger.info('Extension State:');
+            logger.info(`  - Is Loading Models: ${modelState.isLoadingModels}`);
+            logger.info(`  - Models Loaded: ${modelState.modelsLoaded}`);
+            logger.info(`  - Available Models Count: ${modelState.availableModelsCount}`);
+            logger.info(`  - Chat Sessions: ${this.chatSessions.length}`);
+
+            logger.info('='.repeat(80));
+            logger.info('DIAGNOSTICS COMPLETED');
+            logger.info('='.repeat(80));
+
+        } catch (error) {
+            logger.error('❌ Diagnostics failed:', error);
+        }
     }
 
     private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -711,6 +910,37 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
             font-size: 11px;
             opacity: 0.8;
         }
+
+        .error-container {
+            padding: 12px 16px;
+            background-color: var(--vscode-errorForeground);
+            color: var(--vscode-input-foreground);
+            opacity: 0.8;
+        }
+
+        .error-title {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .error-details {
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .error-action-btn {
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: 1px solid var(--vscode-button-border);
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .error-action-btn:hover {
+            background: var(--vscode-button-secondaryHoverBackground);
+        }
     </style>
 </head>
 <body>
@@ -732,11 +962,13 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
             </div>
             
             <div class="error-message" id="errorMessage" style="display: none; color: var(--vscode-errorForeground); background: var(--vscode-inputValidation-errorBackground); border: 1px solid var(--vscode-inputValidation-errorBorder); padding: 8px; margin: 8px 16px; border-radius: 4px; font-size: 12px;">
-                <!-- Error messages will appear here -->
+                <div class="error-title" id="errorTitle">Error</div>
+                <div class="error-details" id="errorDetails">Error details</div>
+                <button class="error-action-btn" id="errorActionBtn" style="display: none;">Run Diagnostics</button>
             </div>
             
-            <div class="messages-container" id="messagesContainer">
-                <div class="empty-state" id="emptyState">
+            <div id="messagesContainer" class="messages-container">
+                <div id="emptyState" class="empty-state">
                     <div class="empty-icon">🌊</div>
                     <div class="empty-text">Select or create a chat</div>
                     <div class="empty-subtitle">Wu wei - effortless conversation</div>
@@ -820,6 +1052,10 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
                 });
             }
         }
+
+        document.getElementById('errorActionBtn').addEventListener('click', () => {
+            vscode.postMessage({ command: 'runDiagnostics' });
+        });
         
         function sendMessage() {
             const input = document.getElementById('messageInput');
@@ -922,19 +1158,22 @@ export class UnifiedWuWeiChatProvider implements vscode.WebviewViewProvider {
             }
             
             // Show error if any
+            const errorContainer = document.getElementById('errorMessage');
+            const errorTitle = document.getElementById('errorTitle');
+            const errorDetails = document.getElementById('errorDetails');
+            const errorActionBtn = document.getElementById('errorActionBtn');
+
             if (error) {
-                console.log('Showing error:', error);
-                const errorDiv = document.getElementById('errorMessage');
-                if (errorDiv) {
-                    errorDiv.textContent = error;
-                    errorDiv.style.display = 'block';
+                errorTitle.textContent = error.message || 'An error occurred.';
+                errorDetails.textContent = error.details || '';
+                if (error.actionable) {
+                    errorActionBtn.style.display = 'inline-block';
+                } else {
+                    errorActionBtn.style.display = 'none';
                 }
+                errorContainer.style.display = 'block';
             } else {
-                // Hide error div if no error
-                const errorDiv = document.getElementById('errorMessage');
-                if (errorDiv) {
-                    errorDiv.style.display = 'none';
-                }
+                errorContainer.style.display = 'none';
             }
             
             if (modelData.length === 0) {
