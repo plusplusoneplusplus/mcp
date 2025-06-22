@@ -427,12 +427,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
                 case 'newChat':
                     vscode.commands.executeCommand('wu-wei.newChat');
                     break;
-                case 'testCline':
-                    vscode.commands.executeCommand('wu-wei.testCline');
-                    break;
-                case 'debugCline':
-                    vscode.commands.executeCommand('wu-wei.debugCline');
-                    break;
             }
         });
     }
@@ -545,18 +539,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
             <span>New Chat</span>
         </button>
         
-        <div class="section-divider">Cline Integration</div>
-        
-        <button class="action-btn secondary-btn" onclick="testCline()">
-            <span class="icon">▶️</span>
-            <span>Test Cline</span>
-        </button>
-        
-        <button class="action-btn secondary-btn" onclick="debugCline()">
-            <span class="icon">🐛</span>
-            <span>Debug Cline</span>
-        </button>
-        
         <div class="philosophy">
             "Wu wei - effortless action"<br>
             无为而治
@@ -568,14 +550,6 @@ export class WuWeiActionsViewProvider implements vscode.WebviewViewProvider {
         
         function newChat() {
             vscode.postMessage({ command: 'newChat' });
-        }
-        
-        function testCline() {
-            vscode.postMessage({ command: 'testCline' });
-        }
-        
-        function debugCline() {
-            vscode.postMessage({ command: 'debugCline' });
         }
     </script>
 </body>
