@@ -20,7 +20,8 @@
     ],
     "activationEvents": [
         "onCommand:wu-wei.hello",
-        "onCommand:wu-wei.openChat"
+        "onCommand:wu-wei.openChat",
+        "onView:wu-wei.chatSessions"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -35,8 +36,92 @@
                 "title": "Wu Wei: Open Chat",
                 "category": "Wu Wei",
                 "icon": "$(comment-discussion)"
+            },
+            {
+                "command": "wu-wei.newChat",
+                "title": "Wu Wei: New Chat",
+                "category": "Wu Wei",
+                "icon": "$(add)"
+            },
+            {
+                "command": "wu-wei.refreshChats",
+                "title": "Wu Wei: Refresh Chats",
+                "category": "Wu Wei",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "wu-wei.openChatSession",
+                "title": "Wu Wei: Open Chat Session",
+                "category": "Wu Wei"
+            },
+            {
+                "command": "wu-wei.deleteChatSession",
+                "title": "Wu Wei: Delete Chat Session",
+                "category": "Wu Wei",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "wu-wei.renameChatSession",
+                "title": "Wu Wei: Rename Chat Session",
+                "category": "Wu Wei",
+                "icon": "$(edit)"
             }
         ],
+        "views": {
+            "wu-wei": [
+                {
+                    "id": "wu-wei.chatSessions",
+                    "name": "Chat Sessions",
+                    "when": "true"
+                },
+                {
+                    "id": "wu-wei.actions",
+                    "name": "Actions",
+                    "type": "webview",
+                    "when": "true"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "wu-wei",
+                    "title": "Wu Wei",
+                    "icon": "$(symbol-operator)"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "wu-wei.newChat",
+                    "when": "view == wu-wei.chatSessions",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "wu-wei.refreshChats",
+                    "when": "view == wu-wei.chatSessions",
+                    "group": "navigation@2"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "wu-wei.openChatSession",
+                    "when": "view == wu-wei.chatSessions && viewItem == chatSession",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "wu-wei.renameChatSession",
+                    "when": "view == wu-wei.chatSessions && viewItem == chatSession",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "wu-wei.deleteChatSession",
+                    "when": "view == wu-wei.chatSessions && viewItem == chatSession",
+                    "group": "inline@3"
+                }
+            ]
+        },
         "configuration": {
             "title": "Wu Wei",
             "properties": {
