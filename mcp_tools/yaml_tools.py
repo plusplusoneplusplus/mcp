@@ -112,30 +112,71 @@ class YamlToolBase(ToolInterface):
         if not self._command_executor:
             return {"success": False, "error": "Command executor not available"}
 
-        logger.info(f"Executing tool: {self._name}, type: {self._tool_type}")
+        # Import required modules for concurrency control
+        import uuid
+        from utils.concurrency import OperationContext
 
-        if self._tool_type == "script":
-            return await self._execute_script(arguments)
-        elif self._name == "execute_task":
-            return await self._execute_task(arguments)
-        elif self._name == "query_task_status" or self._name == "query_script_status":
-            return await self._query_status(arguments)
-        elif self._name == "list_tasks":
-            return await self._list_tasks()
-        elif self._name == "list_instructions":
-            return await self._list_instructions()
-        elif self._name == "get_instruction":
-            return await self._get_instruction(arguments)
-        else:
-            logger.warning(
-                f"Tool '{self._name}' with type '{self._tool_type}' is not fully implemented"
-            )
-            return [
-                {
-                    "type": "text",
-                    "text": f"Tool '{self._name}' is defined in YAML but not fully implemented",
-                }
-            ]
+        # Generate unique operation ID for this execution
+        operation_id = str(uuid.uuid4())
+        context = OperationContext(operation_id=operation_id, operation_type="tool_execution")
+        concurrency_manager = get_concurrency_manager()
+
+        # Check if operation can start (only if concurrency config exists)
+        check_result = concurrency_manager.can_start_operation(self._name, context)
+        if not check_result["allowed"]:
+            logger.warning(f"Concurrency limit exceeded for tool '{self._name}': {check_result}")
+            return {
+                "success": False,
+                "error": check_result["error"],
+                "message": check_result["message"],
+                "retry_after": check_result["retry_after"],
+                "current_operations": check_result["current_operations"],
+                "max_allowed": check_result["max_allowed"],
+                "tool_name": check_result["tool_name"]
+            }
+
+        # Start operation tracking
+        start_result = concurrency_manager.start_operation(self._name, context)
+        if not start_result["success"]:
+            logger.error(f"Failed to start operation tracking for tool '{self._name}': {start_result}")
+            return {"success": False, "error": "Failed to start operation tracking", "details": start_result}
+
+        logger.info(f"Executing tool: {self._name}, type: {self._tool_type}, operation_id: {operation_id}")
+
+        try:
+            # Execute the actual tool logic
+            if self._tool_type == "script":
+                result = await self._execute_script(arguments)
+            elif self._name == "execute_task":
+                result = await self._execute_task(arguments)
+            elif self._name == "query_task_status" or self._name == "query_script_status":
+                result = await self._query_status(arguments)
+            elif self._name == "list_tasks":
+                result = await self._list_tasks()
+            elif self._name == "list_instructions":
+                result = await self._list_instructions()
+            elif self._name == "get_instruction":
+                result = await self._get_instruction(arguments)
+            else:
+                logger.warning(
+                    f"Tool '{self._name}' with type '{self._tool_type}' is not fully implemented"
+                )
+                result = [
+                    {
+                        "type": "text",
+                        "text": f"Tool '{self._name}' is defined in YAML but not fully implemented",
+                    }
+                ]
+
+            return result
+
+        finally:
+            # Always cleanup operation tracking, regardless of success or failure
+            finish_result = concurrency_manager.finish_operation(operation_id)
+            if not finish_result["success"]:
+                logger.warning(f"Failed to finish operation tracking for '{operation_id}': {finish_result}")
+            else:
+                logger.debug(f"Finished operation tracking for '{operation_id}'")
 
     async def _execute_script(self, arguments: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Execute a script-based tool.
