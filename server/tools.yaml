@@ -35,7 +35,8 @@ tools:
           default: false
         timeout:
           type: number
-          description: Optional timeout in seconds for waiting
+          description: Optional timeout in seconds for waiting (default 120s)
+          default: 120
       required:
         - token
 
@@ -66,6 +67,14 @@ tools:
         token:
           type: string
           description: The token returned by execute_task
+        wait:
+          type: boolean
+          description: Whether to wait for the task to complete
+          default: true
+        timeout:
+          type: number
+          description: Optional timeout in seconds for waiting (default 120s)
+          default: 120
       required:
         - token
 
@@ -114,9 +123,14 @@ tools:
         token:
           type: string
           description: The token returned by async script execution
+        wait:
+          type: boolean
+          description: Whether to wait for the script to complete
+          default: true
         timeout:
           type: number
-          description: Optional timeout in seconds for waiting
+          description: Optional timeout in seconds for waiting (default 120s)
+          default: 120
       required:
         - token
 
