@@ -143,7 +143,8 @@ class ConcurrencyManager:
             # Remove from contexts
             del self._operation_contexts[operation_id]
 
-            duration = time_module.time() - context.start_time
+            # Calculate duration safely - start_time is guaranteed to be set in __post_init__
+            duration = time_module.time() - (context.start_time or time_module.time())
             logger.info(f"Finished tracking operation '{operation_id}' (duration: {duration:.2f}s)")
             return {"success": True}
 
@@ -167,7 +168,7 @@ class ConcurrencyManager:
                         {
                             "operation_id": ctx.operation_id,
                             "operation_type": ctx.operation_type,
-                            "duration": time_module.time() - ctx.start_time
+                            "duration": time_module.time() - (ctx.start_time or time_module.time())
                         }
                         for ctx in contexts
                     ]
@@ -175,19 +176,20 @@ class ConcurrencyManager:
             else:
                 # Return all active operations grouped by tool
                 result = {}
-                for tool_name, operations in self._active_operations.items():
+                for tool_name_key, operations in self._active_operations.items():
                     contexts = [self._operation_contexts[op_id] for op_id in operations]
-                    result[tool_name] = {
+                    tool_info = {
                         "count": len(operations),
                         "operations": [
                             {
                                 "operation_id": ctx.operation_id,
                                 "operation_type": ctx.operation_type,
-                                "duration": time_module.time() - ctx.start_time
+                                "duration": time_module.time() - (ctx.start_time or time_module.time())
                             }
                             for ctx in contexts
                         ]
                     }
+                    result[tool_name_key] = tool_info
                 return result
 
     def cleanup_stale_operations(self, max_age_seconds: float = 3600) -> Dict[str, Any]:
@@ -204,7 +206,9 @@ class ConcurrencyManager:
             stale_operations = []
 
             for operation_id, context in self._operation_contexts.items():
-                if current_time - context.start_time > max_age_seconds:
+                # Safe duration calculation
+                start_time = context.start_time or current_time
+                if current_time - start_time > max_age_seconds:
                     stale_operations.append(operation_id)
 
             # Remove stale operations
