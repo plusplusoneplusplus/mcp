@@ -35,6 +35,9 @@ from mcp_tools.dependency import injector, DependencyInjector
 # Import YAML tools system
 from mcp_tools.yaml_tools import YamlToolBase, discover_and_register_yaml_tools
 
+# Import tools
+from mcp_tools.kv_store import KVStoreTool
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -59,4 +62,6 @@ __all__ = [
     # YAML tools
     "YamlToolBase",
     "discover_and_register_yaml_tools",
+    # Tools
+    "KVStoreTool",
 ]
