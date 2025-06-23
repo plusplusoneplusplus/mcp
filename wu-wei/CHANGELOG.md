@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Unit testing infrastructure with Mocha and VS Code Test Runner
+- Basic extension activation and command registration tests
+- GitHub Actions CI/CD workflow for automated testing
+- Test coverage for core extension functionality
+- Testing documentation following Wu Wei philosophy
+
+### Development
+- Enhanced TypeScript configuration for testing
+- Added test scripts and development tooling
+- Automated linting and compilation in CI pipeline
+
 ## [0.1.0] - 2025-06-21
 
 ### Added

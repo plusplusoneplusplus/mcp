@@ -8,7 +8,12 @@
         ],
         "sourceMap": true,
         "rootDir": "src",
-        "strict": true
+        "strict": true,
+        "resolveJsonModule": true,
+        "types": [
+            "mocha",
+            "node"
+        ]
     },
     "exclude": [
         "node_modules",
