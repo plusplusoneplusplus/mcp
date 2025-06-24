@@ -1,8 +1,8 @@
 """
-Types used throughout the mcp_core package.
+Types used throughout the mcp_tools package.
 
-This module contains type definitions that were previously imported from mcp.types,
-making mcp_core self-contained and not dependent on the mcp package.
+This module contains type definitions that were previously in mcp_core,
+now consolidated into the mcp_tools package for better maintainability.
 """
 
 from typing import Dict, Any, List, Optional, Literal
@@ -12,8 +12,8 @@ from pydantic import BaseModel, ConfigDict
 class Annotations(BaseModel):
     """Annotations for content."""
 
-    audience: List[Literal["user", "assistant"]] = None
-    priority: float = None
+    audience: Optional[List[Literal["user", "assistant"]]] = None
+    priority: Optional[float] = None
 
     model_config = ConfigDict(extra="allow")
 
