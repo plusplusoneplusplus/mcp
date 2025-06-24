@@ -120,7 +120,7 @@ dev = [
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 upload_to_vcs_release = false
-build_command = false
+build_command = ""
 commit_message = "chore: release {version}"
 
 [tool.semantic_release.commit_parser_options]
