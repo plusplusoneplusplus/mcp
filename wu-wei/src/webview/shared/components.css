@@ -1,0 +1,111 @@
+/* Wu Wei Extension - Reusable Components */
+
+/* Button Components */
+.debug-btn {
+    background: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    border: 1px solid var(--vscode-button-border, transparent);
+    padding: 8px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.1s ease;
+}
+
+.debug-btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.debug-btn:active {
+    transform: translateY(1px);
+}
+
+.debug-btn.primary {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.debug-btn.primary:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.debug-btn.danger {
+    background: var(--vscode-errorForeground);
+    color: var(--vscode-editor-background);
+}
+
+.debug-btn.danger:hover {
+    opacity: 0.9;
+}
+
+.debug-btn .icon {
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+/* Info Display Components */
+.debug-info {
+    background: var(--vscode-textCodeBlock-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    padding: 8px;
+    font-family: var(--vscode-editor-font-family, 'SF Mono', Consolas, monospace);
+    font-size: 11px;
+    line-height: 1.3;
+}
+
+.debug-info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.debug-info-item:last-child {
+    border-bottom: none;
+}
+
+.debug-info-label {
+    color: var(--vscode-descriptionForeground);
+    min-width: 80px;
+}
+
+.debug-info-value {
+    color: var(--vscode-foreground);
+    font-weight: 500;
+}
+
+/* Input Components */
+.command-textarea {
+    width: 100%;
+    min-height: 80px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    padding: 8px;
+    font-family: var(--vscode-editor-font-family, 'SF Mono', Consolas, monospace);
+    font-size: 11px;
+    line-height: 1.4;
+    resize: vertical;
+    outline: none;
+}
+
+.command-textarea:focus {
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.command-textarea::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}

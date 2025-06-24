@@ -1,0 +1,58 @@
+/* Wu Wei Debug Panel - Specific Styles */
+
+.debug-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.debug-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.command-executor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.command-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.command-output {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--vscode-panel-border);
+}
+
+.command-result {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    font-size: 11px;
+}
+
+.command-result:last-child {
+    border-bottom: none;
+}
+
+.command-result-success {
+    color: var(--vscode-testing-iconPassed);
+}
+
+.command-result-error {
+    color: var(--vscode-testing-iconFailed);
+}
+
+.command-result-command {
+    font-weight: 500;
+    color: var(--vscode-foreground);
+}
+
+.command-result-message {
+    color: var(--vscode-descriptionForeground);
+    margin-left: 12px;
+}
