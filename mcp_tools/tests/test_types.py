@@ -19,7 +19,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 # Import from the types module (formerly from mcp_core)
-from mcp_tools.types import TextContent, Tool
+from mcp_tools.mcp_types import TextContent, Tool
 
 
 def test_text_content():

@@ -6,7 +6,7 @@ allowing server code to use the local implementation without directly depending 
 """
 
 # Import the types from mcp_tools (formerly mcp_core)
-from mcp_tools.types import TextContent, Tool
+from mcp_tools.mcp_types import TextContent, Tool
 
 # Re-export them for use in server/main.py
 __all__ = ["TextContent", "Tool"]

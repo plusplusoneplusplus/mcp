@@ -18,9 +18,9 @@ parent_dir = str(Path(__file__).resolve().parent.parent.parent)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-# Import from mcp_tools.types (formerly mcp_core.types)
-from mcp_tools.types import TextContent as ToolsTextContent
-from mcp_tools.types import Tool as ToolsTool
+# Import from mcp_tools.mcp_types (formerly mcp_core.types)
+from mcp_tools.mcp_types import TextContent as ToolsTextContent
+from mcp_tools.mcp_types import Tool as ToolsTool
 
 # Import from mcp.types
 from mcp.types import TextContent as McpTextContent
