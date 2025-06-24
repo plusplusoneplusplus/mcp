@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Test script to verify mcp_core types implementation
+# Test script to verify mcp_tools types implementation
 
 import os
 import sys
@@ -13,13 +13,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("types_test")
 
-# Add parent directory to path to allow importing mcp_core
+# Add parent directory to path to allow importing mcp_tools
 parent_dir = str(Path(__file__).resolve().parent.parent.parent)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-# Import from the new types module
-from mcp_core.types import TextContent, Tool
+# Import from the types module (formerly from mcp_core)
+from mcp_tools.mcp_types import TextContent, Tool
 
 
 def test_text_content():

@@ -38,6 +38,9 @@ from mcp_tools.yaml_tools import YamlToolBase, discover_and_register_yaml_tools
 # Import tools
 from mcp_tools.kv_store import KVStoreTool
 
+# Import types (formerly from mcp_core)
+from mcp_tools.mcp_types import TextContent, Tool, ToolResult, Annotations
+
 __version__ = "0.1.0"
 
 __all__ = [
@@ -64,4 +67,9 @@ __all__ = [
     "discover_and_register_yaml_tools",
     # Tools
     "KVStoreTool",
+    # Types (formerly from mcp_core)
+    "TextContent",
+    "Tool",
+    "ToolResult",
+    "Annotations",
 ]
