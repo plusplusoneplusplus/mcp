@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +29,21 @@ jobs:
           uv pip install python-semantic-release
 
       - name: Run semantic-release (version bump if needed)
+        id: semantic
         run: |
           source .venv/bin/activate
-          semantic-release version
+          NEW_VERSION=$(semantic-release version)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Pull Request
+        if: env.NEW_VERSION
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: release ${{ env.NEW_VERSION }}"
+          title: "chore: release ${{ env.NEW_VERSION }}"
+          body: "Automated version bump to ${{ env.NEW_VERSION }}"
+          branch: "release/${{ env.NEW_VERSION }}"
+          base: "main"
