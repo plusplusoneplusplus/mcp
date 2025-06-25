@@ -122,6 +122,9 @@ branch = "main"
 upload_to_vcs_release = false
 build_command = ""
 commit_message = "chore: release {version}"
+push = false
+commit = false
+tag = false
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["feat", "fix", "perf", "refactor"]
