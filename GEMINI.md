@@ -6,6 +6,10 @@
 - For installing packages, use `uv add` instead of `pip install`
 - For package management operations, use `uv` commands consistently
 
+## Pull Requests
+- Add editor information (e.g., gemini-cli) to the PR description.
+- Add "(Gemini)" at the end of the PR title.
+
 ## Examples:
 - Running tests: `uv run pytest tests/`
 - Running Python scripts: `uv run python script.py`
