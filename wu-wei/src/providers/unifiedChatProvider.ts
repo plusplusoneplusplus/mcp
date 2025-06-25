@@ -245,22 +245,21 @@ export class UnifiedChatProvider extends BaseWebviewProvider implements vscode.W
             this.saveChatSessions();
             this.updateWebviewState();
 
-            // Send message to webview
-            this._view?.webview.postMessage({
-                command: 'addMessage',
-                message: response,
-                isUser: false
-            });
-
         } catch (error) {
             logger.error('Error getting AI response', error);
 
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-            this._view?.webview.postMessage({
-                command: 'addMessage',
-                message: `Error: ${errorMessage}`,
-                isUser: false
-            });
+
+            // Add error message to chat history
+            const errorChatMessage: ChatMessage = {
+                role: 'assistant',
+                content: `Error: ${errorMessage}`,
+                timestamp: new Date()
+            };
+
+            currentSession.chatHistory.push(errorChatMessage);
+            this.saveChatSessions();
+            this.updateWebviewState();
         } finally {
             // Hide thinking indicator
             this._view?.webview.postMessage({ command: 'hideThinking' });
