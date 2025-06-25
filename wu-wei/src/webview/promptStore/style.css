@@ -1,0 +1,431 @@
+/**
+ * Styles for the Prompt Store webview
+ * Following wu wei principles: clean, natural design that flows harmoniously
+ */
+
+/* CSS Variables for theming */
+:root {
+    --vscode-foreground: var(--vscode-editor-foreground);
+    --vscode-background: var(--vscode-editor-background);
+    --vscode-border: var(--vscode-panel-border);
+    --vscode-hover: var(--vscode-list-hoverBackground);
+    --vscode-active: var(--vscode-list-activeSelectionBackground);
+    --vscode-input-bg: var(--vscode-input-background);
+    --vscode-input-border: var(--vscode-input-border);
+    --vscode-button-bg: var(--vscode-button-background);
+    --vscode-button-hover: var(--vscode-button-hoverBackground);
+    --vscode-error: var(--vscode-errorForeground);
+    --vscode-success: var(--vscode-testing-iconPassed);
+    --vscode-warning: var(--vscode-editorWarning-foreground);
+}
+
+/* Reset and base styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    background-color: var(--vscode-background);
+    color: var(--vscode-foreground);
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+
+/* Layout */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 100%;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--vscode-border);
+    background-color: var(--vscode-background);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header h2 {
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    background-color: var(--vscode-button-bg);
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+    min-width: 32px;
+    height: 32px;
+}
+
+.btn:hover {
+    background-color: var(--vscode-button-hover);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background-color: transparent;
+    border-color: var(--vscode-input-border);
+}
+
+.btn-secondary:hover {
+    background-color: var(--vscode-hover);
+}
+
+/* Search container */
+.search-container {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--vscode-border);
+}
+
+.search-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    background-color: var(--vscode-input-bg);
+    color: var(--vscode-foreground);
+    font-size: 0.9em;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+/* Filters */
+.filters {
+    display: flex;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--vscode-border);
+    background-color: var(--vscode-background);
+}
+
+.filter-select {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    background-color: var(--vscode-input-bg);
+    color: var(--vscode-foreground);
+    font-size: 0.85em;
+    outline: none;
+    cursor: pointer;
+}
+
+.filter-select:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+/* Prompts container */
+.prompts-container {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Prompt cards */
+.prompt-card {
+    border: 1px solid var(--vscode-border);
+    border-radius: 6px;
+    padding: 16px;
+    background-color: var(--vscode-background);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.prompt-card:hover {
+    background-color: var(--vscode-hover);
+    border-color: var(--vscode-focusBorder);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.prompt-card.invalid {
+    border-left: 4px solid var(--vscode-error);
+}
+
+/* Prompt header */
+.prompt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.prompt-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.prompt-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+.parameters-indicator {
+    font-size: 0.8em;
+    color: var(--vscode-descriptionForeground);
+    background-color: var(--vscode-badge-background);
+    padding: 2px 6px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+
+.validation-error {
+    color: var(--vscode-error);
+    font-size: 1.1em;
+}
+
+/* Prompt description */
+.prompt-description {
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 12px;
+    line-height: 1.4;
+    font-size: 0.9em;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Prompt footer */
+.prompt-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.prompt-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8em;
+    color: var(--vscode-descriptionForeground);
+}
+
+.prompt-info span {
+    display: flex;
+    align-items: center;
+}
+
+.category {
+    color: var(--vscode-symbolIcon-classForeground);
+    font-weight: 500;
+}
+
+.author {
+    color: var(--vscode-symbolIcon-functionForeground);
+}
+
+.modified {
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.75em;
+}
+
+/* Tags */
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.tag {
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* Loading and empty states */
+.loading,
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+.loading::before {
+    content: '';
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--vscode-descriptionForeground);
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+}
+
+/* Notifications */
+.notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    background-color: var(--vscode-notifications-background);
+    color: var(--vscode-notifications-foreground);
+    border: 1px solid var(--vscode-notifications-border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    max-width: 300px;
+    font-size: 0.9em;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification-error {
+    background-color: var(--vscode-inputValidation-errorBackground);
+    border-color: var(--vscode-inputValidation-errorBorder);
+    color: var(--vscode-errorForeground);
+}
+
+.notification-success {
+    background-color: var(--vscode-inputValidation-infoBackground);
+    border-color: var(--vscode-inputValidation-infoBorder);
+    color: var(--vscode-foreground);
+}
+
+/* Animations */
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive design */
+@media (max-width: 400px) {
+    .filters {
+        flex-direction: column;
+    }
+
+    .prompt-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .tags {
+        justify-content: flex-start;
+    }
+}
+
+/* Scrollbar styling */
+.prompts-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.prompts-container::-webkit-scrollbar-track {
+    background-color: var(--vscode-scrollbarSlider-background);
+}
+
+.prompts-container::-webkit-scrollbar-thumb {
+    background-color: var(--vscode-scrollbarSlider-background);
+    border-radius: 4px;
+}
+
+.prompts-container::-webkit-scrollbar-thumb:hover {
+    background-color: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+/* Focus styles for accessibility */
+.prompt-card:focus {
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: 2px;
+}
+
+.btn:focus {
+    outline: 2px solid var(--vscode-focusBorder);
+    outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .prompt-card {
+        border-width: 2px;
+    }
+
+    .btn {
+        border-width: 2px;
+    }
+}
+
+/* Print styles */
+@media print {
+
+    .header,
+    .search-container,
+    .filters {
+        display: none;
+    }
+
+    .prompt-card {
+        break-inside: avoid;
+        margin-bottom: 20px;
+    }
+}

@@ -101,6 +101,18 @@
                 "title": "Wu Wei: Show Detailed Model Information",
                 "category": "Wu Wei",
                 "icon": "$(info)"
+            },
+            {
+                "command": "wu-wei.refreshPrompts",
+                "title": "Wu Wei: Refresh Prompts",
+                "category": "Wu Wei",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "wu-wei.openPromptStore",
+                "title": "Wu Wei: Open Prompt Store",
+                "category": "Wu Wei",
+                "icon": "$(book)"
             }
         ],
         "views": {
@@ -111,6 +123,13 @@
                     "type": "webview",
                     "when": "true",
                     "icon": "$(comment-discussion)"
+                },
+                {
+                    "id": "wu-wei.promptStore",
+                    "name": "Prompt Store",
+                    "type": "webview",
+                    "when": "true",
+                    "icon": "$(book)"
                 },
                 {
                     "id": "wu-wei.agent",
@@ -148,6 +167,11 @@
                     "command": "wu-wei.refreshChats",
                     "when": "view == wu-wei.chat",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "wu-wei.refreshPrompts",
+                    "when": "view == wu-wei.promptStore",
+                    "group": "navigation@1"
                 }
             ]
         },
@@ -182,19 +206,23 @@
         "test:watch": "npm run test -- --watch",
         "clean": "rimraf out"
     },
+    "dependencies": {
+        "chokidar": "^3.6.0",
+        "yaml": "^2.8.0"
+    },
     "devDependencies": {
-        "@types/vscode": "^1.90.0",
+        "@types/glob": "^8.0.0",
+        "@types/mocha": "^10.0.0",
         "@types/node": "16.x",
+        "@types/vscode": "^1.90.0",
         "@typescript-eslint/eslint-plugin": "^5.45.0",
         "@typescript-eslint/parser": "^5.45.0",
-        "eslint": "^8.28.0",
-        "typescript": "^4.9.4",
         "@vscode/test-electron": "^2.3.0",
-        "mocha": "^10.0.0",
-        "@types/mocha": "^10.0.0",
+        "eslint": "^8.28.0",
         "glob": "^8.0.0",
-        "@types/glob": "^8.0.0",
-        "rimraf": "^5.0.0"
+        "mocha": "^10.0.0",
+        "rimraf": "^5.0.0",
+        "typescript": "^4.9.4"
     },
     "repository": {
         "type": "git",

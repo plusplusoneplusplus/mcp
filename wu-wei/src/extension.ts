@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { DebugPanelProvider } from './providers/debugPanelProvider';
 import { AgentPanelProvider } from './providers/agentPanelProvider';
 import { UnifiedChatProvider } from './providers/unifiedChatProvider';
+import { PromptStoreProvider } from './promptStore/PromptStoreProvider';
+import { PromptManager } from './promptStore/PromptManager';
 import { logger } from './logger';
 
 /**
@@ -22,14 +24,24 @@ export function activate(context: vscode.ExtensionContext) {
     const debugPanelProvider = new DebugPanelProvider(context);
     const agentPanelProvider = new AgentPanelProvider(context);
 
-    logger.info('Unified chat, debug, and agent providers created');
+    // Initialize prompt store
+    const promptManager = new PromptManager();
+    const promptStoreProvider = new PromptStoreProvider(context.extensionUri, promptManager);
+
+    logger.info('Unified chat, debug, agent, and prompt store providers created');
 
     // Register webview providers
     const chatViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.chat', unifiedChatProvider);
     const debugViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.debug', debugPanelProvider);
     const agentViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.agent', agentPanelProvider);
+    const promptStoreViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.promptStore', promptStoreProvider);
 
     logger.info('All webview providers registered');
+
+    // Initialize prompt manager
+    promptManager.initialize().catch(error => {
+        logger.error('Failed to initialize prompt manager', error);
+    });
 
     // Update context based on chat sessions
     const updateContext = () => {
@@ -141,10 +153,23 @@ export function activate(context: vscode.ExtensionContext) {
         await unifiedChatProvider.showDetailedModelInfo();
     });
 
+    // Register prompt store commands
+    const openPromptStoreCommand = vscode.commands.registerCommand('wu-wei.openPromptStore', () => {
+        logger.info('Open prompt store command executed');
+        vscode.commands.executeCommand('wu-wei.promptStore.focus');
+    });
+
+    const refreshPromptsCommand = vscode.commands.registerCommand('wu-wei.refreshPrompts', async () => {
+        logger.info('Refresh prompts command executed');
+        await promptManager.refreshPrompts();
+        vscode.window.showInformationMessage('Wu Wei: Prompts refreshed');
+    });
+
     context.subscriptions.push(
         chatViewProvider,
         debugViewProvider,
         agentViewProvider,
+        promptStoreViewProvider,
         helloCommand,
         chatCommand,
         newChatCommand,
@@ -157,6 +182,9 @@ export function activate(context: vscode.ExtensionContext) {
         sendAgentRequestCommand,
         refreshAgentsCommand,
         showModelDetailsCommand,
+        openPromptStoreCommand,
+        refreshPromptsCommand,
+        promptManager,
         logger
     );
 

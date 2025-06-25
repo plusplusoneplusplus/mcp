@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wu Wei - Prompt Store</title>
+</head>
+
+<body>
+    <div id="app">
+        <div class="header">
+            <h2>Prompt Store</h2>
+            <div class="actions">
+                <button id="refresh-btn" class="btn btn-secondary" title="Refresh prompts">
+                    <span class="codicon codicon-refresh"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search prompts..." class="search-input">
+        </div>
+
+        <div class="filters">
+            <select id="category-filter" class="filter-select">
+                <option value="">All Categories</option>
+            </select>
+            <select id="sort-filter" class="filter-select">
+                <option value="name">Sort by Name</option>
+                <option value="modified">Sort by Modified</option>
+                <option value="category">Sort by Category</option>
+                <option value="author">Sort by Author</option>
+            </select>
+        </div>
+
+        <div id="prompts-container" class="prompts-container">
+            <div class="loading">Loading prompts...</div>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+
+</html>
