@@ -3,6 +3,7 @@ import { WuWeiDebugPanelProvider } from './debugPanel';
 import { DebugPanelProvider } from './providers/debugPanelProvider';
 import { WuWeiAgentPanelProvider } from './agentPanel';
 import { UnifiedWuWeiChatProvider } from './unifiedChatProvider';
+import { UnifiedChatProvider } from './providers/unifiedChatProvider';
 import { logger } from './logger';
 
 /**
@@ -19,7 +20,9 @@ export function activate(context: vscode.ExtensionContext) {
     logger.lifecycle('activate', 'Wu Wei extension is now active - 无为而治');
 
     // Create the providers
-    const unifiedChatProvider = new UnifiedWuWeiChatProvider(context);
+    const unifiedChatProvider = new UnifiedChatProvider(context);
+    // Keep the old provider as fallback for now
+    const legacyUnifiedChatProvider = new UnifiedWuWeiChatProvider(context);
     // Use the new migrated debug panel provider
     const debugPanelProvider = new DebugPanelProvider(context);
     // Keep the old provider as fallback for now
@@ -107,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Register debug models command
     const debugModelsCommand = vscode.commands.registerCommand('wu-wei.debugModels', async () => {
         logger.info('Debug models command executed');
-        await unifiedChatProvider.runDiagnostics();
+        await unifiedChatProvider.showDetailedModelInfo();
     });
 
     // Register force reload models command
@@ -138,6 +141,12 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Register show detailed model info command
+    const showModelDetailsCommand = vscode.commands.registerCommand('wu-wei.showModelDetails', async () => {
+        logger.info('Show model details command executed');
+        await unifiedChatProvider.showDetailedModelInfo();
+    });
+
     context.subscriptions.push(
         chatViewProvider,
         debugViewProvider,
@@ -153,6 +162,7 @@ export function activate(context: vscode.ExtensionContext) {
         forceReloadModelsCommand,
         sendAgentRequestCommand,
         refreshAgentsCommand,
+        showModelDetailsCommand,
         logger
     );
 
