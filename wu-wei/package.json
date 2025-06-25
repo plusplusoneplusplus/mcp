@@ -113,6 +113,24 @@
                 "title": "Wu Wei: Open Prompt Store",
                 "category": "Wu Wei",
                 "icon": "$(book)"
+            },
+            {
+                "command": "wu-wei.promptStore.selectDirectory",
+                "title": "Wu Wei: Select Prompt Store Directory",
+                "category": "Wu Wei",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "wu-wei.promptStore.newPrompt",
+                "title": "Wu Wei: New Prompt",
+                "category": "Wu Wei",
+                "icon": "$(add)"
+            },
+            {
+                "command": "wu-wei.promptStore.refreshStore",
+                "title": "Wu Wei: Refresh Prompt Store",
+                "category": "Wu Wei",
+                "icon": "$(refresh)"
             }
         ],
         "views": {
@@ -172,6 +190,16 @@
                     "command": "wu-wei.refreshPrompts",
                     "when": "view == wu-wei.promptStore",
                     "group": "navigation@1"
+                },
+                {
+                    "command": "wu-wei.promptStore.selectDirectory",
+                    "when": "view == wu-wei.promptStore",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "wu-wei.promptStore.newPrompt",
+                    "when": "view == wu-wei.promptStore",
+                    "group": "navigation@3"
                 }
             ]
         },
@@ -192,6 +220,39 @@
                     "type": "string",
                     "default": "You are Wu Wei, an AI assistant that embodies the philosophy of 无为而治 (wu wei) - effortless action that flows naturally like water. You provide thoughtful, gentle guidance while maintaining harmony and balance. Your responses are wise, concise, and flow naturally without forcing solutions.",
                     "description": "System prompt for Wu Wei chat assistant"
+                },
+                "wu-wei.promptStore.rootDirectory": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Root directory for prompt collection",
+                    "scope": "window"
+                },
+                "wu-wei.promptStore.autoRefresh": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically refresh when files change"
+                },
+                "wu-wei.promptStore.showMetadataTooltips": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show metadata information in tooltips"
+                },
+                "wu-wei.promptStore.enableTemplates": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable prompt templates with parameters"
+                },
+                "wu-wei.promptStore.fileWatcher.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable file system monitoring"
+                },
+                "wu-wei.promptStore.fileWatcher.debounceMs": {
+                    "type": "number",
+                    "default": 500,
+                    "minimum": 100,
+                    "maximum": 5000,
+                    "description": "Debounce delay for file changes (ms)"
                 }
             }
         }

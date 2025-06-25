@@ -165,6 +165,70 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Wu Wei: Prompts refreshed');
     });
 
+    // Add missing prompt store commands
+    const selectDirectoryCommand = vscode.commands.registerCommand('wu-wei.promptStore.selectDirectory', async () => {
+        logger.info('Select prompt store directory command executed');
+
+        const result = await vscode.window.showOpenDialog({
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            title: 'Select Prompt Store Directory',
+            openLabel: 'Select Directory'
+        });
+
+        if (result && result[0]) {
+            const selectedPath = result[0].fsPath;
+            logger.info('Directory selected for prompt store', { path: selectedPath });
+
+            // Update the configuration
+            const config = vscode.workspace.getConfiguration('wu-wei.promptStore');
+            await config.update('rootDirectory', selectedPath, vscode.ConfigurationTarget.Workspace);
+
+            // Refresh prompts with new directory
+            await promptManager.refreshPrompts();
+
+            vscode.window.showInformationMessage(`Wu Wei: Prompt store directory set to: ${selectedPath}`);
+        } else {
+            logger.info('Directory selection cancelled');
+        }
+    });
+
+    const newPromptCommand = vscode.commands.registerCommand('wu-wei.promptStore.newPrompt', async () => {
+        logger.info('New prompt command executed');
+
+        const name = await vscode.window.showInputBox({
+            prompt: 'Enter prompt name',
+            validateInput: (value) => {
+                if (!value.trim()) return 'Name cannot be empty';
+                if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) return 'Name contains invalid characters';
+                return undefined;
+            }
+        });
+
+        if (name) {
+            try {
+                const prompt = await promptManager.createPrompt(name);
+                logger.info('New prompt created', { name, path: prompt.filePath });
+
+                // Open the new prompt file
+                const document = await vscode.workspace.openTextDocument(prompt.filePath);
+                await vscode.window.showTextDocument(document);
+
+                vscode.window.showInformationMessage(`Wu Wei: Created new prompt "${name}"`);
+            } catch (error) {
+                logger.error('Failed to create new prompt', { name, error });
+                vscode.window.showErrorMessage(`Failed to create prompt: ${error}`);
+            }
+        }
+    });
+
+    const refreshStoreCommand = vscode.commands.registerCommand('wu-wei.promptStore.refreshStore', async () => {
+        logger.info('Refresh prompt store command executed');
+        await promptManager.refreshPrompts();
+        vscode.window.showInformationMessage('Wu Wei: Prompt store refreshed');
+    });
+
     context.subscriptions.push(
         chatViewProvider,
         debugViewProvider,
@@ -184,6 +248,9 @@ export function activate(context: vscode.ExtensionContext) {
         showModelDetailsCommand,
         openPromptStoreCommand,
         refreshPromptsCommand,
+        selectDirectoryCommand,
+        newPromptCommand,
+        refreshStoreCommand,
         promptManager,
         logger
     );

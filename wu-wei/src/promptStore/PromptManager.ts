@@ -41,21 +41,44 @@ export class PromptManager {
      */
     public async initialize(): Promise<void> {
         try {
-            this.logger.info('Initializing Prompt Manager');
+            this.logger.info('🚀 Initializing Prompt Manager');
+
+            // Get current configuration from VS Code settings
+            const vscodeConfig = vscode.workspace.getConfiguration('wu-wei.promptStore');
+            const rootDirectory = vscodeConfig.get<string>('rootDirectory', '');
+            const autoRefresh = vscodeConfig.get<boolean>('autoRefresh', true);
+
+            this.logger.info('📋 Prompt Manager Configuration:', {
+                rootDirectory,
+                autoRefresh,
+                defaultWatchPaths: this.config.watchPaths,
+                filePatterns: this.config.filePatterns,
+                excludePatterns: this.config.excludePatterns
+            });
+
+            // Update config with VS Code settings
+            if (rootDirectory) {
+                this.config.watchPaths = [rootDirectory];
+                this.logger.info('📁 Using configured root directory:', { rootDirectory });
+            } else {
+                this.logger.info('📁 Using default watch paths:', { watchPaths: this.config.watchPaths });
+            }
 
             // Start file watcher
+            this.logger.info('👀 Starting file watcher for paths:', { watchPaths: this.config.watchPaths });
             await this.fileWatcher.startWatching(this.config.watchPaths);
 
             // Load initial prompts
+            this.logger.info('🔄 Loading initial prompts...');
             await this.refreshPrompts();
 
-            this.logger.info('Prompt Manager initialized successfully', {
+            this.logger.info('✅ Prompt Manager initialized successfully', {
                 promptCount: this.prompts.size,
                 watchPaths: this.config.watchPaths
             });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error('Failed to initialize Prompt Manager', { error: errorMessage });
+            this.logger.error('❌ Failed to initialize Prompt Manager', { error: errorMessage });
             throw error;
         }
     }
@@ -144,22 +167,64 @@ export class PromptManager {
      */
     public async refreshPrompts(): Promise<void> {
         try {
-            this.logger.info('Refreshing prompts from file system');
+            this.logger.info('🔄 Refreshing prompts from file system');
+
+            // Update configuration from VS Code settings
+            const vscodeConfig = vscode.workspace.getConfiguration('wu-wei.promptStore');
+            const rootDirectory = vscodeConfig.get<string>('rootDirectory', '');
+
+            if (rootDirectory) {
+                this.config.watchPaths = [rootDirectory];
+                this.logger.info('📁 Updated watch paths from configuration:', { rootDirectory });
+            }
 
             const newPrompts = new Map<string, Prompt>();
+            let totalFilesScanned = 0;
+            let totalPromptsLoaded = 0;
 
             for (const watchPath of this.config.watchPaths) {
                 const resolvedPath = this.resolvePath(watchPath);
+                this.logger.info(`🔍 Scanning directory: ${resolvedPath}`);
+
+                // Check if directory exists
+                try {
+                    const stats = await fs.stat(resolvedPath);
+                    if (!stats.isDirectory()) {
+                        this.logger.warn(`❌ Path is not a directory: ${resolvedPath}`);
+                        continue;
+                    }
+                    this.logger.info(`✅ Directory exists and is accessible: ${resolvedPath}`);
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    this.logger.warn(`❌ Cannot access directory: ${resolvedPath}`, { error: errorMessage });
+                    continue;
+                }
+
                 await this.loadPromptsFromPath(resolvedPath, newPrompts);
+
+                // Count files and prompts for this path
+                const files = await this.scanDirectory(resolvedPath);
+                totalFilesScanned += files.length;
+
+                // Count prompts loaded for this path  
+                const promptsForPath = Array.from(newPrompts.values()).filter(p =>
+                    p.filePath.startsWith(resolvedPath)
+                );
+                totalPromptsLoaded = newPrompts.size;
             }
 
             this.prompts = newPrompts;
             this.eventEmitter.fire(this.getAllPrompts());
 
-            this.logger.info('Prompts refreshed', { count: this.prompts.size });
+            this.logger.info('✅ Prompts refresh completed', {
+                totalFilesScanned,
+                totalPromptsLoaded,
+                promptCount: this.prompts.size,
+                watchPaths: this.config.watchPaths
+            });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error('Failed to refresh prompts', { error: errorMessage });
+            this.logger.error('❌ Failed to refresh prompts', { error: errorMessage });
         }
     }
 
@@ -194,14 +259,19 @@ export class PromptManager {
      * Scan directory for markdown files recursively
      */
     async scanDirectory(rootPath: string): Promise<string[]> {
+        this.logger.info(`🔍 Scanning directory: ${rootPath}`);
         const files: string[] = [];
         const stack = [rootPath];
+        let directoriesScanned = 0;
+        let filesFound = 0;
 
         while (stack.length > 0) {
             const currentPath = stack.pop()!;
+            directoriesScanned++;
 
             try {
                 const entries = await fs.readdir(currentPath, { withFileTypes: true });
+                this.logger.debug(`📂 Found ${entries.length} entries in ${currentPath}`);
 
                 for (const entry of entries) {
                     const fullPath = path.join(currentPath, entry.name);
@@ -210,22 +280,34 @@ export class PromptManager {
                     // Check if path should be excluded
                     if (FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) ||
                         FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
+                        this.logger.debug(`⏭️ Skipping excluded path: ${relativePath}`);
                         continue;
                     }
 
                     if (entry.isDirectory() && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns)) {
                         stack.push(fullPath);
+                        this.logger.debug(`📁 Adding directory to scan: ${fullPath}`);
                     } else if (entry.isFile() && FileUtils.isMarkdownFile(entry.name) && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns)) {
                         files.push(fullPath);
+                        filesFound++;
+                        this.logger.debug(`📄 Found markdown file: ${fullPath}`);
                     }
                 }
             } catch (error) {
-                this.logger.error(`Failed to scan directory ${currentPath}:`, error);
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                this.logger.error(`❌ Failed to scan directory ${currentPath}:`, { error: errorMessage });
                 // Continue with other directories instead of failing completely
             }
         }
 
-        this.logger.debug(`Scanned directory ${rootPath}, found ${files.length} markdown files`);
+        this.logger.info(`✅ Directory scan complete`, {
+            rootPath,
+            directoriesScanned,
+            markdownFilesFound: files.length,
+            filePatterns: this.config.filePatterns,
+            excludePatterns: this.config.excludePatterns
+        });
+
         return files;
     }
 
@@ -438,19 +520,47 @@ export class PromptManager {
      */
     private async loadPromptsFromPath(dirPath: string, prompts: Map<string, Prompt>): Promise<void> {
         try {
+            this.logger.info(`📚 Loading prompts from: ${dirPath}`);
             const files = await this.scanDirectory(dirPath);
 
+            if (files.length === 0) {
+                this.logger.info(`📭 No markdown files found in: ${dirPath}`);
+                return;
+            }
+
+            this.logger.info(`📄 Processing ${files.length} markdown files...`);
+            let successCount = 0;
+            let failCount = 0;
+
             const loadPromises = files.map(async (filePath) => {
-                const prompt = await this.loadPromptFromFile(filePath);
-                if (prompt) {
-                    prompts.set(prompt.id, prompt);
+                try {
+                    const prompt = await this.loadPromptFromFile(filePath);
+                    if (prompt) {
+                        prompts.set(prompt.id, prompt);
+                        successCount++;
+                        this.logger.debug(`✅ Loaded prompt: ${prompt.metadata.title} from ${filePath}`);
+                    } else {
+                        failCount++;
+                        this.logger.debug(`❌ Failed to parse prompt from ${filePath}`);
+                    }
+                } catch (error) {
+                    failCount++;
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    this.logger.warn(`❌ Error loading prompt from ${filePath}:`, { error: errorMessage });
                 }
             });
 
             await Promise.all(loadPromises);
+
+            this.logger.info(`📊 Prompt loading completed for ${dirPath}`, {
+                totalFiles: files.length,
+                successCount,
+                failCount,
+                promptsInMap: prompts.size
+            });
         } catch (error) {
-            // Directory might not exist, which is OK
-            this.logger.debug('Could not load prompts from path', { path: dirPath });
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`❌ Could not load prompts from path: ${dirPath}`, { error: errorMessage });
         }
     }
 
