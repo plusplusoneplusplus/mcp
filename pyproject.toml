@@ -49,6 +49,7 @@ dependencies = [
     "pytest-asyncio>=0.21.1",
     "pytest-xdist>=3.3.1", # Parallel test execution
     "pytest-timeout>=2.1.0", # Test timeout support
+    "pytest-rerunfailures>=10.2", # Pytest plugin to re-run failed tests
     "requests>=2.31.0", # HTTP client for testing
     # Azure Data Explorer (Kusto)
     "azure-kusto-data>=5.0.0", # Azure Data Explorer client

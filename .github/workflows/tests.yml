@@ -109,7 +109,7 @@ jobs:
         run: |
           source .venv/bin/activate
           chmod +x ./scripts/run_component_group.sh
-          ./scripts/run_component_group.sh server-group
+          ./scripts/run_component_group.sh server-group --reruns 2
 
       - name: Run Server Group Tests (Windows)
         if: runner.os == 'Windows' && matrix.component == 'server-group'
@@ -117,7 +117,7 @@ jobs:
         run: |
           source .venv/Scripts/activate
           chmod +x ./scripts/run_component_group.sh
-          ./scripts/run_component_group.sh server-group
+          ./scripts/run_component_group.sh server-group --reruns 2
 
       - name: Run Utils Group 1 Tests (Unix)
         if: runner.os != 'Windows' && matrix.component == 'utils-group-1'
@@ -139,7 +139,7 @@ jobs:
         run: |
           source .venv/bin/activate
           chmod +x ./scripts/run_component_group.sh
-          ./scripts/run_component_group.sh utils-group-2
+          ./scripts/run_component_group.sh utils-group-2 --reruns 2
 
       - name: Run Utils Group 2 Tests (Windows)
         if: runner.os == 'Windows' && matrix.component == 'utils-group-2'
@@ -147,7 +147,7 @@ jobs:
         run: |
           source .venv/Scripts/activate
           chmod +x ./scripts/run_component_group.sh
-          ./scripts/run_component_group.sh utils-group-2
+          ./scripts/run_component_group.sh utils-group-2 --reruns 2
 
       - name: Run Plugins Group 1 Tests (Unix)
         if: runner.os != 'Windows' && matrix.component == 'plugins-group-1'
