@@ -12,6 +12,11 @@ pytestmark = pytest.mark.asyncio
 
 github_io_url = "https://github.com/"
 
+@pytest.fixture(autouse=True)
+def require_playwright_browser(ensure_playwright_browser):
+    """Auto-use fixture to ensure all tests in this module have Playwright browsers."""
+    pass
+
 
 async def test_run_script_real():
     async with PlaywrightScriptRunner() as runner:

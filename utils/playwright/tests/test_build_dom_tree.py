@@ -6,6 +6,11 @@ from ..playwright_wrapper import PlaywrightWrapper
 
 pytestmark = pytest.mark.asyncio
 
+@pytest.fixture(autouse=True)
+def require_playwright_browser(ensure_playwright_browser):
+    """Auto-use fixture to ensure all tests in this module have Playwright browsers."""
+    pass
+
 # Get the directory of the current test file
 TEST_DIR = Path(__file__).parent
 FIXTURES_DIR = TEST_DIR / "test_fixtures"

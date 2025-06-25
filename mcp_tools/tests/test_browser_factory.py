@@ -7,7 +7,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from mcp_tools.browser.factory import BrowserClientFactory
 from mcp_tools.browser.selenium_client import SeleniumBrowserClient
 from mcp_tools.browser.interface import IBrowserClient
-from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
+
+# Import PlaywrightBrowserClient with proper error handling
+try:
+    from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    PlaywrightBrowserClient = None
 
 
 def test_factory_creates_correct_client_type():
@@ -33,6 +40,9 @@ def test_factory_creates_with_browser_type():
 
 def test_factory_default_parameters():
     """Test that factory uses correct defaults"""
+    if not PLAYWRIGHT_AVAILABLE:
+        pytest.skip("Playwright not available, skipping Playwright-specific test")
+
     # Create a client with default parameters
     client = BrowserClientFactory.create_client()
 
