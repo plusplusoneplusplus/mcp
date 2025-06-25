@@ -36,7 +36,7 @@ def mock_env_manager_with_token_command():
             "project": "test-project",
             "area_path": "TestArea\\SubArea",
             "iteration": "Sprint 1",
-            "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+            "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
             # No direct bearer_token - will use command
         }
 
@@ -47,7 +47,7 @@ def mock_env_manager_with_token_command():
                 "project": "test-project",
                 "area_path": "TestArea\\SubArea",
                 "iteration": "Sprint 1",
-                "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
                 # No direct bearer_token - will use command
             }
 
@@ -149,7 +149,7 @@ class TestBearerTokenCommand:
         # Verify that subprocess.run was called with the correct command
         mock_subprocess_run.assert_called_once()
         call_args = mock_subprocess_run.call_args
-        assert "az account get-access-token --resource https://dev.azure.com/" in call_args[0][0]
+        assert "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\"" in call_args[0][0]
 
     def test_static_token_loading_during_auth_headers(self, mock_executor, mock_env_manager_with_static_token):
         """Test that static bearer token works correctly."""
@@ -210,7 +210,7 @@ class TestBearerTokenCommand:
         """Test that create_work_item operation uses dynamic token loading."""
         # Mock get_current_username to avoid extra subprocess call on Windows
         mock_get_current_username.return_value = "testuser"
-        
+
         # Mock subprocess.run to simulate successful command execution
         mock_result = MagicMock()
         mock_result.returncode = 0
@@ -264,7 +264,7 @@ class TestBearerTokenCommandExecution:
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
         # Test the execute_bearer_token_command method directly
-        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --resource https://dev.azure.com/")
+        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\"")
 
         # Verify the token was extracted correctly
         assert token == "command-generated-token-456"
@@ -272,7 +272,7 @@ class TestBearerTokenCommandExecution:
         # Verify subprocess.run was called with correct parameters
         mock_subprocess_run.assert_called_once()
         call_args = mock_subprocess_run.call_args
-        assert "az account get-access-token --resource https://dev.azure.com/" in call_args[0][0]
+        assert "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\"" in call_args[0][0]
         assert call_args[1]["shell"] is True
         assert call_args[1]["capture_output"] is True
         assert call_args[1]["text"] is True
@@ -292,7 +292,7 @@ class TestBearerTokenCommandExecution:
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
         # Test the execute_bearer_token_command method with failure
-        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --resource https://dev.azure.com/")
+        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\"")
 
         # Verify that the function returns None for a command failure
         assert token is None
@@ -314,7 +314,7 @@ class TestBearerTokenCommandExecution:
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
         # Test the execute_bearer_token_command method with invalid JSON
-        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --resource https://dev.azure.com/")
+        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\"")
 
         # Verify that the function returns None for invalid JSON
         assert token is None
@@ -336,7 +336,7 @@ class TestBearerTokenCommandExecution:
         tool = AzureWorkItemTool(command_executor=mock_executor)
 
         # Test the execute_bearer_token_command method with missing accessToken
-        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --resource https://dev.azure.com/")
+        token = plugins.azrepo.azure_rest_utils.execute_bearer_token_command("az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\"")
 
         # Verify that the function returns None for missing accessToken
         assert token is None
@@ -355,7 +355,7 @@ class TestEndToEndBearerTokenWorkflow:
         """Test complete workflow of creating a work item using bearer token command."""
         # Mock get_current_username to avoid extra subprocess call on Windows
         mock_get_current_username.return_value = "testuser"
-        
+
         # Clear bearer token cache before test
         from plugins.azrepo.azure_rest_utils import clear_bearer_token_cache
         clear_bearer_token_cache()
@@ -375,7 +375,7 @@ class TestEndToEndBearerTokenWorkflow:
                 "project": "test-project",
                 "area_path": "TestArea\\SubArea",
                 "iteration": "Sprint 1",
-                "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
             }
 
             # Also patch the azure_rest_utils env_manager
@@ -385,7 +385,7 @@ class TestEndToEndBearerTokenWorkflow:
                     "project": "test-project",
                     "area_path": "TestArea\\SubArea",
                     "iteration": "Sprint 1",
-                    "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                    "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
                 }
 
                 # Create tool instance

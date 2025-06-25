@@ -223,7 +223,11 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(self.env_manager.get_project_name(), "test_project")
         self.assertEqual(self.env_manager.get_private_tool_root(), "/test/private")
         self.assertEqual(self.env_manager.get_path("data"), "/test/data")
-        self.assertEqual(self.env_manager.get_azrepo_parameters(), {"org": "test-org"})
+        expected_azrepo_params = {
+            "bearer_token_command": 'az account get-access-token --scope "499b84ac-1321-427f-aa17-267ca6975798/.default"',
+            "org": "test-org"
+        }
+        self.assertEqual(self.env_manager.get_azrepo_parameters(), expected_azrepo_params)
         self.assertEqual(self.env_manager.get_azrepo_parameter("org"), "test-org")
         self.assertIsNone(self.env_manager.get_azrepo_parameter("nonexistent"))
         self.assertEqual(
@@ -548,6 +552,33 @@ class TestEnvironmentManager(unittest.TestCase):
         self.assertEqual(params["git_root"], "/path/to/main")
         self.assertEqual(params["git_root_project_a"], "/path/to/project-a")
         self.assertEqual(params["git_root_project_b"], "/path/to/project-b")
+
+    def test_azrepo_default_settings(self):
+        """Test that azrepo default settings are applied correctly."""
+        # Clear any existing azrepo parameters
+        self.env_manager.azrepo_parameters = {}
+
+        # Get parameters should return defaults
+        params = self.env_manager.get_azrepo_parameters()
+        self.assertIn("bearer_token_command", params)
+        self.assertEqual(
+            params["bearer_token_command"],
+            'az account get-access-token --scope "499b84ac-1321-427f-aa17-267ca6975798/.default"'
+        )
+
+        # Test that configured values override defaults
+        self.env_manager.azrepo_parameters = {"bearer_token_command": "custom-command"}
+        params = self.env_manager.get_azrepo_parameters()
+        self.assertEqual(params["bearer_token_command"], "custom-command")
+
+        # Test that other parameters still work with defaults
+        self.env_manager.azrepo_parameters = {"org": "test-org"}
+        params = self.env_manager.get_azrepo_parameters()
+        self.assertEqual(params["org"], "test-org")
+        self.assertEqual(
+            params["bearer_token_command"],
+            'az account get-access-token --scope "499b84ac-1321-427f-aa17-267ca6975798/.default"'
+        )
 
     def test_backward_compatibility(self):
         """Test that existing functionality still works with only GIT_ROOT."""

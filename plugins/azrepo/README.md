@@ -56,7 +56,7 @@ AZREPO_ITERATION=your-iteration-path
 # Authentication (choose one method)
 AZREPO_BEARER_TOKEN=your-static-bearer-token
 # OR
-AZREPO_BEARER_TOKEN_COMMAND=az account get-access-token --query accessToken --output tsv
+AZREPO_BEARER_TOKEN_COMMAND=az account get-access-token --scope "499b84ac-1321-427f-aa17-267ca6975798/.default"
 
 # Pull Request Defaults
 AZREPO_PR_BRANCH_PREFIX=feature/

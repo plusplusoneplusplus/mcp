@@ -54,6 +54,12 @@ class EnvironmentManager:
         "job_history_max_age_days": (30, int),
     }
 
+    # Default Azure repo settings with their types
+    DEFAULT_AZREPO_SETTINGS = {
+        # Azure DevOps authentication settings
+        "bearer_token_command": ('az account get-access-token --scope "499b84ac-1321-427f-aa17-267ca6975798/.default"', str),
+    }
+
     # Create mapping dynamically - each setting can be set via its uppercase env var
     ENV_MAPPING = {setting.upper(): setting for setting in DEFAULT_SETTINGS.keys()}
 
@@ -437,9 +443,16 @@ class EnvironmentManager:
         return self.get_setting("private_tool_root")
 
     def get_azrepo_parameters(self) -> Dict[str, Any]:
-        """Get Azure repo parameters"""
-        # Return a copy to avoid modifying the original
-        return dict(self.azrepo_parameters)
+        """Get Azure repo parameters with defaults applied"""
+        # Start with default values
+        result = {}
+        for key, (default_value, _) in self.DEFAULT_AZREPO_SETTINGS.items():
+            result[key] = default_value
+
+        # Override with configured values
+        result.update(self.azrepo_parameters)
+
+        return result
 
     def get_azrepo_parameter(self, name: str, default: Any = None) -> Any:
         """Get a specific Azure repo parameter"""
@@ -481,6 +494,14 @@ class EnvironmentManager:
                 "type": type_class.__name__
             }
 
+        # Convert DEFAULT_AZREPO_SETTINGS to JSON-serializable format
+        default_azrepo_settings_serializable = {}
+        for key, (default_value, type_class) in self.DEFAULT_AZREPO_SETTINGS.items():
+            default_azrepo_settings_serializable[key] = {
+                "default_value": default_value,
+                "type": type_class.__name__
+            }
+
         return {
             "settings": dict(self.settings),
             "azrepo_parameters": dict(self.azrepo_parameters),
@@ -488,6 +509,7 @@ class EnvironmentManager:
             "additional_paths": dict(self.repository_info.additional_paths),
             "git_roots": dict(self.repository_info.git_roots),
             "default_settings": default_settings_serializable,
+            "default_azrepo_settings": default_azrepo_settings_serializable,
             "path_settings": list(self.PATH_SETTINGS),
             "env_mapping": dict(self.ENV_MAPPING)
         }
@@ -553,7 +575,16 @@ class EnvironmentManager:
                 param_name = setting_name[7:]
                 if param_name in self.azrepo_parameters:
                     del self.azrepo_parameters[param_name]
-                    return {"success": True, "message": f"Reset {setting_name} to default"}
+                    # Check if there's a default value to show
+                    default_msg = ""
+                    if param_name in self.DEFAULT_AZREPO_SETTINGS:
+                        default_value, _ = self.DEFAULT_AZREPO_SETTINGS[param_name]
+                        default_msg = f" (default: {default_value})"
+                    return {"success": True, "message": f"Reset {setting_name} to default{default_msg}"}
+                elif param_name in self.DEFAULT_AZREPO_SETTINGS:
+                    # Setting exists in defaults but not in current config, already at default
+                    default_value, _ = self.DEFAULT_AZREPO_SETTINGS[param_name]
+                    return {"success": True, "message": f"Setting {setting_name} is already at default value: {default_value}"}
                 else:
                     return {"success": False, "error": f"Setting {setting_name} not found"}
 
