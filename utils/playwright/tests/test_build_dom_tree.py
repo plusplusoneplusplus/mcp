@@ -39,7 +39,7 @@ async def load_test_page(browser, fixture_name):
     """Helper to load a test fixture page and evaluate the DOM tree using evaluate_dom_tree."""
     fixture_path = FIXTURES_DIR / f"{fixture_name}.html"
     url = f"file://{fixture_path.absolute()}"
-    await browser.open_page(url, wait_until="networkidle")
+    await browser.open_page(url, wait_until="domcontentloaded")
     return await browser.evaluate_dom_tree()
 
 
@@ -74,7 +74,7 @@ async def test_reddit_comments_dom_tree_logical_equivalence(browser):
     # Load actual DOM tree from the HTML fixture
     fixture_path = FIXTURES_DIR / "test_reddit_comments.html"
     url = f"file://{fixture_path.absolute()}"
-    await browser.open_page(url, wait_until="networkidle")
+    await browser.open_page(url, wait_until="domcontentloaded")
     actual = await browser.evaluate_dom_tree()
     # Normalize both
     norm_actual = normalize_dom_tree(actual)
