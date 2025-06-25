@@ -201,7 +201,8 @@
     display: flex;
     gap: 8px;
     margin-top: 14px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: center;
 }
 
 .btn {
@@ -427,14 +428,6 @@
 @media (max-width: 400px) {
     .form-row {
         flex-direction: column;
-    }
-
-    .button-group {
-        flex-direction: column;
-    }
-
-    .btn {
-        justify-content: center;
     }
 
     .info-grid {
