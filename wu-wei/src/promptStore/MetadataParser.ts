@@ -3,54 +3,174 @@
  * Following wu wei principles: gentle parsing that flows with the content
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { parse as parseYaml } from 'yaml';
-import { PromptMetadata, ValidationResult } from './types';
-import { FRONTMATTER_DELIMITERS, DEFAULT_METADATA_SCHEMA, VALIDATION_RULES } from './constants';
+import {
+    PromptMetadata,
+    ValidationResult,
+    ValidationError,
+    ValidationWarning,
+    ParsedPrompt,
+    ValidationRule,
+    MetadataCacheEntry,
+    Prompt
+} from './types';
+import {
+    FRONTMATTER_DELIMITERS,
+    DEFAULT_METADATA_SCHEMA,
+    VALIDATION_RULES
+} from './constants';
 import { WuWeiLogger } from '../logger';
 
 export class MetadataParser {
     private logger: WuWeiLogger;
+    private cache: Map<string, MetadataCacheEntry> = new Map();
 
     constructor() {
         this.logger = WuWeiLogger.getInstance();
     }
 
     /**
-     * Parse YAML frontmatter from markdown content
+     * Parse a prompt file and return complete parsing result
      */
-    public parseMetadata(content: string): { metadata: PromptMetadata | null; content: string } {
+    public async parseFile(filePath: string): Promise<ParsedPrompt> {
         try {
-            const { frontmatter, body } = this.extractFrontmatter(content);
+            // Check cache first
+            const stats = await fs.promises.stat(filePath);
+            const lastModified = stats.mtime.getTime();
 
-            if (!frontmatter) {
-                this.logger.info('No frontmatter found, using default metadata');
+            const cachedEntry = this.cache.get(filePath);
+            if (cachedEntry && cachedEntry.lastModified === lastModified) {
+                this.logger.debug('Using cached metadata for file', { filePath });
                 return {
-                    metadata: { ...DEFAULT_METADATA_SCHEMA } as PromptMetadata,
-                    content: body
+                    success: true,
+                    metadata: cachedEntry.metadata,
+                    content: cachedEntry.content,
+                    errors: cachedEntry.errors,
+                    warnings: cachedEntry.warnings
                 };
             }
 
-            const metadata = this.parseFrontmatter(frontmatter);
-            return {
-                metadata,
-                content: body
-            };
+            // Read and parse file
+            const content = await fs.promises.readFile(filePath, 'utf-8');
+            const parseResult = this.parseContent(content);
+
+            if (parseResult.success && parseResult.metadata) {
+                // Enhance metadata with file information
+                const enhancedMetadata = await this.enhanceMetadata(parseResult.metadata, filePath, stats);
+
+                // Create prompt object
+                const prompt: Prompt = {
+                    id: this.generatePromptId(filePath),
+                    filePath,
+                    fileName: path.basename(filePath),
+                    metadata: enhancedMetadata,
+                    content: parseResult.content || '',
+                    lastModified: stats.mtime,
+                    isValid: parseResult.errors.length === 0,
+                    validationErrors: parseResult.errors.map(e => e.message)
+                };
+
+                // Cache the result
+                this.cache.set(filePath, {
+                    metadata: enhancedMetadata,
+                    content: parseResult.content || '',
+                    lastModified,
+                    filePath,
+                    errors: parseResult.errors,
+                    warnings: parseResult.warnings
+                });
+
+                return {
+                    success: true,
+                    prompt,
+                    metadata: enhancedMetadata,
+                    content: parseResult.content,
+                    errors: parseResult.errors,
+                    warnings: parseResult.warnings
+                };
+            }
+
+            return parseResult;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error('Failed to parse metadata', { error: errorMessage });
+            this.logger.error('Failed to parse file', { filePath, error: errorMessage });
+
             return {
-                metadata: null,
-                content
+                success: false,
+                errors: [{
+                    field: 'file',
+                    message: `Failed to parse file: ${errorMessage}`,
+                    severity: 'error' as const
+                }],
+                warnings: []
             };
         }
     }
 
     /**
-     * Validate parsed metadata
+     * Parse content string and return metadata and content
+     */
+    public parseContent(content: string): ParsedPrompt {
+        try {
+            const { metadata: rawMetadata, content: bodyContent } = this.extractFrontmatter(content);
+
+            let metadata: PromptMetadata;
+            const errors: ValidationError[] = [];
+            const warnings: ValidationWarning[] = [];
+
+            if (rawMetadata) {
+                try {
+                    metadata = this.parseFrontmatter(rawMetadata);
+                } catch (yamlError) {
+                    const errorMessage = yamlError instanceof Error ? yamlError.message : String(yamlError);
+                    errors.push({
+                        field: 'frontmatter',
+                        message: `Invalid YAML syntax: ${errorMessage}`,
+                        severity: 'error'
+                    });
+                    metadata = this.getDefaultMetadata();
+                }
+            } else {
+                metadata = this.getDefaultMetadata();
+                this.logger.debug('No frontmatter found, using defaults');
+            }
+
+            // Validate metadata
+            const validationResult = this.validateMetadata(metadata);
+            errors.push(...validationResult.errors);
+            warnings.push(...validationResult.warnings);
+
+            return {
+                success: errors.length === 0,
+                metadata,
+                content: bodyContent,
+                errors,
+                warnings
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to parse content', { error: errorMessage });
+
+            return {
+                success: false,
+                errors: [{
+                    field: 'content',
+                    message: `Failed to parse content: ${errorMessage}`,
+                    severity: 'error' as const
+                }],
+                warnings: []
+            };
+        }
+    }
+
+    /**
+     * Validate parsed metadata against schema and rules
      */
     public validateMetadata(metadata: PromptMetadata): ValidationResult {
-        const errors: any[] = [];
-        const warnings: any[] = [];
+        const errors: ValidationError[] = [];
+        const warnings: ValidationWarning[] = [];
 
         // Validate title
         if (!metadata.title || metadata.title.trim().length === 0) {
@@ -64,6 +184,21 @@ export class MetadataParser {
                 field: 'title',
                 message: `Title exceeds maximum length of ${VALIDATION_RULES.TITLE.MAX_LENGTH}`,
                 severity: 'error'
+            });
+        } else if (!VALIDATION_RULES.TITLE.PATTERN.test(metadata.title)) {
+            warnings.push({
+                field: 'title',
+                message: 'Title contains special characters that may cause issues',
+                suggestion: 'Consider using only letters, numbers, spaces, and basic punctuation'
+            });
+        }
+
+        // Validate description
+        if (metadata.description && metadata.description.length > VALIDATION_RULES.DESCRIPTION.MAX_LENGTH) {
+            warnings.push({
+                field: 'description',
+                message: `Description is very long (${metadata.description.length} characters)`,
+                suggestion: `Consider keeping it under ${VALIDATION_RULES.DESCRIPTION.MAX_LENGTH} characters`
             });
         }
 
@@ -80,8 +215,73 @@ export class MetadataParser {
         if (metadata.tags && metadata.tags.length > VALIDATION_RULES.TAG.MAX_COUNT) {
             warnings.push({
                 field: 'tags',
-                message: `Too many tags (maximum ${VALIDATION_RULES.TAG.MAX_COUNT})`,
-                suggestion: 'Reduce the number of tags'
+                message: `Too many tags (${metadata.tags.length}, maximum ${VALIDATION_RULES.TAG.MAX_COUNT})`,
+                suggestion: 'Reduce the number of tags for better organization'
+            });
+        }
+
+        if (metadata.tags) {
+            metadata.tags.forEach((tag, index) => {
+                if (!VALIDATION_RULES.TAG.PATTERN.test(tag)) {
+                    warnings.push({
+                        field: `tags[${index}]`,
+                        message: `Tag "${tag}" contains invalid characters`,
+                        suggestion: 'Tags should only contain letters, numbers, hyphens, and underscores'
+                    });
+                }
+                if (tag.length > VALIDATION_RULES.TAG.MAX_LENGTH) {
+                    warnings.push({
+                        field: `tags[${index}]`,
+                        message: `Tag "${tag}" is too long`,
+                        suggestion: `Keep tags under ${VALIDATION_RULES.TAG.MAX_LENGTH} characters`
+                    });
+                }
+            });
+        }
+
+        // Validate version format
+        if (metadata.version && !VALIDATION_RULES.VERSION.PATTERN.test(metadata.version)) {
+            warnings.push({
+                field: 'version',
+                message: 'Version format should follow semantic versioning (e.g., 1.0.0)',
+                suggestion: 'Use format: major.minor.patch'
+            });
+        }
+
+        // Validate parameters
+        if (metadata.parameters) {
+            metadata.parameters.forEach((param, index) => {
+                if (!param.name || !VALIDATION_RULES.PARAMETER_NAME.PATTERN.test(param.name)) {
+                    errors.push({
+                        field: `parameters[${index}].name`,
+                        message: `Invalid parameter name: "${param.name}"`,
+                        severity: 'error'
+                    });
+                }
+                if (param.name && param.name.length > VALIDATION_RULES.PARAMETER_NAME.MAX_LENGTH) {
+                    warnings.push({
+                        field: `parameters[${index}].name`,
+                        message: `Parameter name "${param.name}" is too long`,
+                        suggestion: `Keep parameter names under ${VALIDATION_RULES.PARAMETER_NAME.MAX_LENGTH} characters`
+                    });
+                }
+            });
+        }
+
+        // Validate dates
+        if (metadata.created && isNaN(metadata.created.getTime())) {
+            warnings.push({
+                field: 'created',
+                message: 'Invalid created date format',
+                suggestion: 'Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)'
+            });
+        }
+
+        if (metadata.modified && isNaN(metadata.modified.getTime())) {
+            warnings.push({
+                field: 'modified',
+                message: 'Invalid modified date format',
+                suggestion: 'Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)'
             });
         }
 
@@ -95,11 +295,13 @@ export class MetadataParser {
     /**
      * Extract frontmatter and body from content
      */
-    private extractFrontmatter(content: string): { frontmatter: string | null; body: string } {
-        const lines = content.split('\n');
+    public extractFrontmatter(content: string): { metadata: string | null, content: string } {
+        // Handle different line endings
+        const normalizedContent = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = normalizedContent.split('\n');
 
-        if (lines[0] !== FRONTMATTER_DELIMITERS.START) {
-            return { frontmatter: null, body: content };
+        if (lines.length === 0 || lines[0] !== FRONTMATTER_DELIMITERS.START) {
+            return { metadata: null, content: normalizedContent };
         }
 
         let endIndex = -1;
@@ -111,35 +313,166 @@ export class MetadataParser {
         }
 
         if (endIndex === -1) {
-            return { frontmatter: null, body: content };
+            // Frontmatter started but never ended - treat as no frontmatter
+            return { metadata: null, content: normalizedContent };
         }
 
         const frontmatter = lines.slice(1, endIndex).join('\n');
         const body = lines.slice(endIndex + 1).join('\n').trim();
 
-        return { frontmatter, body };
+        return { metadata: frontmatter, content: body };
     }
 
     /**
-     * Parse YAML frontmatter
+     * Get default metadata values
+     */
+    public getDefaultMetadata(): PromptMetadata {
+        return {
+            title: 'Untitled Prompt',
+            description: '',
+            category: 'General',
+            tags: [],
+            author: process.env.USER || process.env.USERNAME || 'Unknown',
+            version: '1.0.0',
+            created: new Date(),
+            modified: new Date(),
+            parameters: [],
+            examples: []
+        };
+    }
+
+    /**
+     * Generate a unique ID for a prompt based on its file path
+     */
+    private generatePromptId(filePath: string): string {
+        const relativePath = path.relative(process.cwd(), filePath);
+        return relativePath.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    }
+
+    /**
+     * Enhance metadata with file system information
+     */
+    private async enhanceMetadata(
+        metadata: PromptMetadata,
+        filePath: string,
+        stats: fs.Stats
+    ): Promise<PromptMetadata> {
+        const enhanced = { ...metadata };
+
+        // Set title from filename if not provided
+        if (!enhanced.title || enhanced.title === 'Untitled Prompt') {
+            const baseName = path.basename(filePath, path.extname(filePath));
+            enhanced.title = baseName
+                .replace(/[-_]/g, ' ')
+                .replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        // Set dates from file system if not provided
+        if (!enhanced.created) {
+            enhanced.created = stats.birthtime;
+        }
+        if (!enhanced.modified) {
+            enhanced.modified = stats.mtime;
+        }
+
+        // Try to get author from git config if not provided
+        if (!enhanced.author || enhanced.author === 'Unknown') {
+            try {
+                const gitAuthor = await this.getGitAuthor(filePath);
+                if (gitAuthor) {
+                    enhanced.author = gitAuthor;
+                }
+            } catch (error) {
+                // Git not available or not in a git repo - use default
+            }
+        }
+
+        return enhanced;
+    }
+
+    /**
+     * Parse YAML frontmatter into metadata object
      */
     private parseFrontmatter(frontmatter: string): PromptMetadata {
         try {
             const parsed = parseYaml(frontmatter);
 
+            if (!parsed || typeof parsed !== 'object') {
+                this.logger.warn('Frontmatter is not a valid object');
+                return this.getDefaultMetadata();
+            }
+
             // Merge with defaults and ensure proper types
             const metadata: PromptMetadata = {
-                ...DEFAULT_METADATA_SCHEMA,
-                ...parsed,
-                created: parsed.created ? new Date(parsed.created) : new Date(),
-                modified: parsed.modified ? new Date(parsed.modified) : new Date()
+                ...this.getDefaultMetadata(),
+                ...parsed
             };
+
+            // Convert date strings to Date objects
+            if (parsed.created) {
+                metadata.created = new Date(parsed.created);
+            }
+            if (parsed.modified) {
+                metadata.modified = new Date(parsed.modified);
+            }
+
+            // Ensure arrays are arrays
+            if (parsed.tags && !Array.isArray(parsed.tags)) {
+                metadata.tags = [];
+                this.logger.warn('Tags field is not an array, using empty array');
+            }
+            if (parsed.parameters && !Array.isArray(parsed.parameters)) {
+                metadata.parameters = [];
+                this.logger.warn('Parameters field is not an array, using empty array');
+            }
+            if (parsed.examples && !Array.isArray(parsed.examples)) {
+                metadata.examples = [];
+                this.logger.warn('Examples field is not an array, using empty array');
+            }
 
             return metadata;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.warn('Failed to parse YAML frontmatter', { error: errorMessage });
-            return { ...DEFAULT_METADATA_SCHEMA } as PromptMetadata;
+            this.logger.error('Failed to parse YAML frontmatter', { error: errorMessage });
+            throw error;
         }
+    }
+
+    /**
+     * Try to get the git author for the file
+     */
+    private async getGitAuthor(filePath: string): Promise<string | null> {
+        try {
+            const { exec } = require('child_process');
+            const { promisify } = require('util');
+            const execAsync = promisify(exec);
+
+            const { stdout } = await execAsync('git config user.name', {
+                cwd: path.dirname(filePath),
+                timeout: 5000
+            });
+
+            return stdout.trim() || null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Clear the metadata cache
+     */
+    public clearCache(): void {
+        this.cache.clear();
+        this.logger.debug('Metadata cache cleared');
+    }
+
+    /**
+     * Get cache statistics
+     */
+    public getCacheStats(): { size: number; entries: string[] } {
+        return {
+            size: this.cache.size,
+            entries: Array.from(this.cache.keys())
+        };
     }
 }

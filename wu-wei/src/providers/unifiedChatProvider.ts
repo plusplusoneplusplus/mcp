@@ -278,7 +278,9 @@ export class UnifiedChatProvider extends BaseWebviewProvider implements vscode.W
     }
 
     private getSelectedModel(): vscode.LanguageModelChat | undefined {
-        if (!this.currentSessionId) return undefined;
+        if (!this.currentSessionId) {
+            return undefined;
+        }
 
         const session = this.chatSessions.find(s => s.id === this.currentSessionId);
         const selectedFamily = session?.selectedModel;
@@ -581,7 +583,9 @@ export class UnifiedChatProvider extends BaseWebviewProvider implements vscode.W
     }
 
     private updateWebviewState() {
-        if (!this._view) return;
+        if (!this._view) {
+            return;
+        }
 
         const currentSession = this.currentSessionId ?
             this.chatSessions.find(s => s.id === this.currentSessionId) : undefined;

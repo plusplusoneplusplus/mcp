@@ -272,30 +272,24 @@ export class PromptManager {
      */
     private async loadPromptFromFile(filePath: string): Promise<Prompt | null> {
         try {
-            const content = await fs.readFile(filePath, 'utf-8');
-            const stat = await fs.stat(filePath);
+            const parseResult = await this.metadataParser.parseFile(filePath);
 
-            const { metadata, content: promptContent } = this.metadataParser.parseMetadata(content);
-
-            if (!metadata) {
-                this.logger.warn('Failed to parse metadata for prompt', { file: filePath });
+            if (!parseResult.success || !parseResult.prompt) {
+                this.logger.warn('Failed to parse prompt file', {
+                    file: filePath,
+                    errors: parseResult.errors.map(e => e.message).join(', ')
+                });
                 return null;
             }
 
-            const validation = this.metadataParser.validateMetadata(metadata);
+            if (parseResult.warnings.length > 0) {
+                this.logger.warn('Prompt file has validation warnings', {
+                    file: filePath,
+                    warnings: parseResult.warnings.map(w => w.message).join(', ')
+                });
+            }
 
-            const prompt: Prompt = {
-                id: this.generatePromptId(filePath),
-                filePath,
-                fileName: path.basename(filePath),
-                metadata,
-                content: promptContent,
-                lastModified: stat.mtime,
-                isValid: validation.isValid,
-                validationErrors: validation.errors.map(e => e.message)
-            };
-
-            return prompt;
+            return parseResult.prompt;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error('Failed to load prompt from file', {
