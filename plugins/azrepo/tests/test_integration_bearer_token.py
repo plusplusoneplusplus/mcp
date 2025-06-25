@@ -46,7 +46,7 @@ class TestBearerTokenCommandIntegration(BaseTestClass):
                 "project": "MyProject",
                 "area_path": "MyProject\\Development\\Backend",
                 "iteration": "MyProject\\Sprint 1",
-                "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
             }
 
             # Also patch the azure_rest_utils env_manager
@@ -56,7 +56,7 @@ class TestBearerTokenCommandIntegration(BaseTestClass):
                     "project": "MyProject",
                     "area_path": "MyProject\\Development\\Backend",
                     "iteration": "MyProject\\Sprint 1",
-                    "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                    "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
                 }
 
                 # Step 3: Create tool instance (simulates user creating the tool)
@@ -103,7 +103,7 @@ class TestBearerTokenCommandIntegration(BaseTestClass):
                     # Verify the bearer token command was executed
                     mock_subprocess_run.assert_called_once()
                     call_args = mock_subprocess_run.call_args
-                    assert "az account get-access-token --resource https://dev.azure.com/" in call_args[0][0]
+                    assert "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\"" in call_args[0][0]
                     assert call_args[1]["shell"] is True
                     assert call_args[1]["capture_output"] is True
                     assert call_args[1]["text"] is True
@@ -159,7 +159,7 @@ class TestBearerTokenCommandIntegration(BaseTestClass):
             mock_env_manager.get_azrepo_parameters.return_value = {
                 "org": "mycompany",
                 "project": "MyProject",
-                "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
             }
 
             # Also patch the azure_rest_utils env_manager
@@ -167,7 +167,7 @@ class TestBearerTokenCommandIntegration(BaseTestClass):
                 mock_rest_env_manager.get_azrepo_parameters.return_value = {
                     "org": "mycompany",
                     "project": "MyProject",
-                    "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                    "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
                 }
 
                 # Create tool instance
@@ -235,7 +235,7 @@ class TestBearerTokenCommandIntegration(BaseTestClass):
                 "org": "mycompany",
                 "project": "MyProject",
                 "bearer_token": "static-token-12345",  # This should be ignored
-                "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
             }
 
             # Also patch the azure_rest_utils env_manager
@@ -244,7 +244,7 @@ class TestBearerTokenCommandIntegration(BaseTestClass):
                     "org": "mycompany",
                     "project": "MyProject",
                     "bearer_token": "static-token-12345",  # This should be ignored
-                    "bearer_token_command": "az account get-access-token --resource https://dev.azure.com/"
+                    "bearer_token_command": "az account get-access-token --scope \"499b84ac-1321-427f-aa17-267ca6975798/.default\""
                 }
 
                 # Create tool instance
