@@ -6,11 +6,13 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { Prompt, PromptStoreConfig, SearchFilter, FileWatcherEvent } from './types';
+import * as yaml from 'yaml';
+import { Prompt, PromptStoreConfig, SearchFilter, FileWatcherEvent, PromptMetadata } from './types';
 import { PromptFileWatcher } from './PromptFileWatcher';
 import { MetadataParser } from './MetadataParser';
 import { DEFAULT_CONFIG, LOG_CATEGORIES } from './constants';
 import { WuWeiLogger } from '../logger';
+import { FileUtils } from './utils/fileUtils';
 
 export class PromptManager {
     private logger: WuWeiLogger;
@@ -184,6 +186,200 @@ export class PromptManager {
         this.eventEmitter.dispose();
     }
 
+    // =======================
+    // File System Operations
+    // =======================
+
+    /**
+     * Scan directory for markdown files recursively
+     */
+    async scanDirectory(rootPath: string): Promise<string[]> {
+        const files: string[] = [];
+        const stack = [rootPath];
+
+        while (stack.length > 0) {
+            const currentPath = stack.pop()!;
+
+            try {
+                const entries = await fs.readdir(currentPath, { withFileTypes: true });
+
+                for (const entry of entries) {
+                    const fullPath = path.join(currentPath, entry.name);
+                    const relativePath = path.relative(rootPath, fullPath);
+
+                    // Check if path should be excluded
+                    if (FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) ||
+                        FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
+                        continue;
+                    }
+
+                    if (entry.isDirectory() && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns)) {
+                        stack.push(fullPath);
+                    } else if (entry.isFile() && FileUtils.isMarkdownFile(entry.name) && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns)) {
+                        files.push(fullPath);
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to scan directory ${currentPath}:`, error);
+                // Continue with other directories instead of failing completely
+            }
+        }
+
+        this.logger.debug(`Scanned directory ${rootPath}, found ${files.length} markdown files`);
+        return files;
+    }
+
+    /**
+     * Load a single prompt from file path
+     */
+    async loadPrompt(filePath: string): Promise<Prompt> {
+        const prompt = await this.loadPromptFromFile(filePath);
+        if (!prompt) {
+            throw new Error(`Failed to load prompt from ${filePath}`);
+        }
+        return prompt;
+    }
+
+    /**
+     * Load all prompts from a root path
+     */
+    async loadAllPrompts(rootPath: string): Promise<Prompt[]> {
+        const prompts: Prompt[] = [];
+        const files = await this.scanDirectory(rootPath);
+
+        const loadPromises = files.map(async (filePath) => {
+            try {
+                const prompt = await this.loadPromptFromFile(filePath);
+                if (prompt) {
+                    prompts.push(prompt);
+                }
+            } catch (error) {
+                this.logger.warn(`Failed to load prompt from ${filePath}:`, error);
+            }
+        });
+
+        await Promise.all(loadPromises);
+
+        this.logger.info(`Loaded ${prompts.length} prompts from ${rootPath}`);
+        return prompts;
+    }
+
+    /**
+     * Save a prompt to file system
+     */
+    async savePrompt(prompt: Prompt): Promise<void> {
+        try {
+            // Validate the prompt has required fields
+            if (!prompt.metadata.title) {
+                throw new Error('Prompt must have a title');
+            }
+
+            // Create backup if file already exists
+            if (await FileUtils.pathExists(prompt.filePath)) {
+                await FileUtils.createBackup(prompt.filePath);
+            }
+
+            // Generate file content
+            const content = this.generateFileContent(prompt);
+
+            // Use atomic write operation
+            await FileUtils.writeFileAtomic(prompt.filePath, content);
+
+            // Update in memory cache
+            prompt.lastModified = new Date();
+            this.prompts.set(prompt.id, prompt);
+
+            // Notify listeners
+            this.eventEmitter.fire(this.getAllPrompts());
+
+            this.logger.info(`Saved prompt: ${prompt.metadata.title} to ${prompt.filePath}`);
+        } catch (error) {
+            this.logger.error(`Failed to save prompt ${prompt.id}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a prompt file
+     */
+    async deletePrompt(filePath: string): Promise<void> {
+        try {
+            // Create backup before deletion
+            if (await FileUtils.pathExists(filePath)) {
+                await FileUtils.createBackup(filePath);
+                await fs.unlink(filePath);
+            }
+
+            // Remove from memory cache
+            const promptId = this.generatePromptId(filePath);
+            this.prompts.delete(promptId);
+
+            // Notify listeners
+            this.eventEmitter.fire(this.getAllPrompts());
+
+            this.logger.info(`Deleted prompt file: ${filePath}`);
+        } catch (error) {
+            this.logger.error(`Failed to delete prompt ${filePath}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Create a new prompt file
+     */
+    async createPrompt(name: string, category?: string): Promise<Prompt> {
+        try {
+            // Generate safe file name
+            const fileName = FileUtils.generateSafeFileName(name);
+
+            // Determine file path
+            let basePath = this.config.watchPaths[0]; // Use first watch path
+            if (category) {
+                basePath = path.join(basePath, category);
+            }
+
+            // Resolve workspace variables
+            basePath = this.resolvePath(basePath);
+
+            // Ensure directory exists
+            await FileUtils.ensureDirectory(basePath);
+
+            const filePath = path.join(basePath, fileName);
+
+            // Check if file already exists
+            if (await FileUtils.pathExists(filePath)) {
+                throw new Error(`A prompt with the name "${name}" already exists in this category`);
+            }
+
+            // Create prompt object
+            const prompt: Prompt = {
+                id: this.generatePromptId(filePath),
+                filePath,
+                fileName,
+                metadata: {
+                    title: name,
+                    description: '',
+                    category: category || 'General',
+                    tags: [],
+                    created: new Date(),
+                    modified: new Date()
+                },
+                content: '# ' + name + '\n\nEnter your prompt content here...',
+                lastModified: new Date(),
+                isValid: true
+            };
+
+            // Save the prompt
+            await this.savePrompt(prompt);
+
+            this.logger.info(`Created new prompt: ${name} at ${filePath}`);
+            return prompt;
+        } catch (error) {
+            this.logger.error(`Failed to create prompt "${name}":`, error);
+            throw error;
+        }
+    }
+
     /**
      * Setup file watcher event handling
      */
@@ -242,25 +438,16 @@ export class PromptManager {
      */
     private async loadPromptsFromPath(dirPath: string, prompts: Map<string, Prompt>): Promise<void> {
         try {
-            const stat = await fs.stat(dirPath);
-            if (!stat.isDirectory()) {
-                return;
-            }
+            const files = await this.scanDirectory(dirPath);
 
-            const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-            for (const entry of entries) {
-                const fullPath = path.join(dirPath, entry.name);
-
-                if (entry.isDirectory()) {
-                    await this.loadPromptsFromPath(fullPath, prompts);
-                } else if (this.isPromptFile(entry.name)) {
-                    const prompt = await this.loadPromptFromFile(fullPath);
-                    if (prompt) {
-                        prompts.set(prompt.id, prompt);
-                    }
+            const loadPromises = files.map(async (filePath) => {
+                const prompt = await this.loadPromptFromFile(filePath);
+                if (prompt) {
+                    prompts.set(prompt.id, prompt);
                 }
-            }
+            });
+
+            await Promise.all(loadPromises);
         } catch (error) {
             // Directory might not exist, which is OK
             this.logger.debug('Could not load prompts from path', { path: dirPath });
@@ -316,8 +503,7 @@ export class PromptManager {
      * Check if a file is a prompt file
      */
     private isPromptFile(fileName: string): boolean {
-        const ext = path.extname(fileName).toLowerCase();
-        return ['.md', '.markdown', '.txt'].includes(ext);
+        return FileUtils.isMarkdownFile(fileName);
     }
 
     /**
@@ -357,5 +543,38 @@ export class PromptManager {
 
         const resolved = inputPath.replace('${workspaceFolder}', workspaceRoot);
         return path.isAbsolute(resolved) ? resolved : path.join(workspaceRoot, resolved);
+    }
+
+    /**
+     * Generate file content from prompt object
+     */
+    private generateFileContent(prompt: Prompt): string {
+        let content = '';
+
+        // Add YAML frontmatter if metadata exists
+        if (Object.keys(prompt.metadata).length > 0) {
+            // Create a clean metadata object without undefined values
+            const cleanMetadata: any = {};
+
+            Object.entries(prompt.metadata).forEach(([key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    if (Array.isArray(value) && value.length === 0) {
+                        return; // Skip empty arrays
+                    }
+                    cleanMetadata[key] = value;
+                }
+            });
+
+            if (Object.keys(cleanMetadata).length > 0) {
+                content += '---\n';
+                content += yaml.stringify(cleanMetadata);
+                content += '---\n\n';
+            }
+        }
+
+        // Add the main content
+        content += prompt.content;
+
+        return content;
     }
 }
