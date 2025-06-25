@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
-import { logger } from './logger';
+import { BaseWebviewProvider } from './BaseWebviewProvider';
+import { logger } from '../logger';
 import {
     AbstractAgent,
     AgentRequest,
@@ -10,19 +9,19 @@ import {
     WuWeiExampleAgent,
     GitHubCopilotAgent,
     AgentMessage
-} from './agentInterface';
+} from '../interfaces/agentInterface';
 
 /**
- * Wu Wei Agent Panel Provider
- * Provides a panel for triggering agents with messages
+ * Wu Wei Agent Panel Provider (Migrated Structure)
+ * Provides a panel for triggering agents with messages using separated HTML, CSS, and JavaScript files
  */
-export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
-    private _view?: vscode.WebviewView;
+export class AgentPanelProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
     private _agentRegistry: AgentRegistry;
     private _messageHistory: AgentMessage[] = [];
 
-    constructor(private context: vscode.ExtensionContext) {
-        logger.debug('Wu Wei Agent Panel Provider initialized');
+    constructor(context: vscode.ExtensionContext) {
+        super(context);
+        logger.debug('Wu Wei Agent Panel Provider initialized (migrated structure)');
 
         // Initialize agent registry
         this._agentRegistry = new AgentRegistry();
@@ -38,14 +37,14 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         // Activate the example agent
         exampleAgent.activate().then(() => {
             logger.info('Example agent activated');
-        }).catch(error => {
+        }).catch((error: any) => {
             logger.error('Failed to activate example agent', error);
         });
 
         // Activate the GitHub Copilot agent
         copilotAgent.activate().then(() => {
             logger.info('GitHub Copilot agent activated');
-        }).catch(error => {
+        }).catch((error: any) => {
             logger.error('Failed to activate GitHub Copilot agent', error);
         });
     }
@@ -62,7 +61,13 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
             localResourceRoots: [this.context.extensionUri]
         };
 
-        webviewView.webview.html = this.getAgentHtml();
+        // Load HTML with separated CSS and JS files
+        webviewView.webview.html = this.getWebviewContent(
+            webviewView.webview,
+            'agent/index.html',
+            ['shared/base.css', 'shared/components.css', 'agent/style.css'],
+            ['shared/utils.js', 'agent/main.js']
+        );
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(async message => {
@@ -86,6 +91,8 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         // Send initial data
         this.sendAgentCapabilities();
         this.sendMessageHistory();
+
+        logger.debug('Wu Wei Agent Panel webview resolved (migrated structure)');
     }
 
     private async handleAgentRequest(agentName: string, method: string, params: any): Promise<void> {
@@ -193,58 +200,27 @@ export class WuWeiAgentPanelProvider implements vscode.WebviewViewProvider {
         vscode.window.showInformationMessage('Wu Wei: Message history cleared');
     }
 
+    /**
+     * Refresh the webview content
+     */
+    public refresh(): void {
+        if (this._view) {
+            this._view.webview.html = this.getWebviewContent(
+                this._view.webview,
+                'agent/index.html',
+                ['shared/base.css', 'shared/components.css', 'agent/style.css'],
+                ['shared/utils.js', 'agent/main.js']
+            );
+
+            // Re-send initial data after refresh
+            setTimeout(() => {
+                this.sendAgentCapabilities();
+                this.sendMessageHistory();
+            }, 100);
+        }
+    }
+
     private generateMessageId(): string {
         return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
-
-    private getAgentHtml(): string {
-        try {
-            // Read HTML template from file
-            const htmlPath = path.join(this.context.extensionPath, 'src', 'templates', 'agentPanel.html');
-            let html = fs.readFileSync(htmlPath, 'utf8');
-
-            // Replace template variables with actual values
-            html = html.replace('{{VERSION}}', this.getExtensionVersion());
-            html = html.replace('{{VSCODE_VERSION}}', vscode.version);
-
-            return html;
-        } catch (error) {
-            logger.error('Failed to load agent panel HTML template', error);
-
-            // Fallback HTML if template loading fails
-            return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Wu Wei Agent Panel - Error</title>
-    <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-            padding: 20px; 
-            background: var(--vscode-sideBar-background); 
-            color: var(--vscode-sideBar-foreground); 
-        }
-        .error { color: var(--vscode-errorForeground); }
-    </style>
-</head>
-<body>
-    <h2>Wu Wei Agent Panel</h2>
-    <p class="error">⚠️ Failed to load agent panel template.</p>
-    <p>Please check the extension installation and try again.</p>
-    <p><strong>Error:</strong> ${error instanceof Error ? error.message : 'Unknown error'}</p>
-</body>
-</html>`;
-        }
-    }
-
-    private getExtensionVersion(): string {
-        try {
-            const packageJsonPath = path.join(this.context.extensionPath, 'package.json');
-            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-            return packageJson.version || '0.1.0';
-        } catch (error) {
-            logger.debug('Failed to read extension version from package.json', error);
-            return '0.1.0'; // Fallback version
-        }
     }
 }

@@ -62,7 +62,7 @@ export abstract class BaseWebviewProvider {
      * @returns The placeholder name
      */
     private getCssPlaceholder(index: number): string {
-        const placeholders = ['BASE_CSS_URI', 'COMPONENTS_CSS_URI', 'DEBUG_CSS_URI', 'CHAT_CSS_URI', 'AGENT_CSS_URI'];
+        const placeholders = ['BASE_CSS_URI', 'COMPONENTS_CSS_URI', 'AGENT_CSS_URI', 'DEBUG_CSS_URI', 'CHAT_CSS_URI'];
         return placeholders[index] || `CSS_URI_${index}`;
     }
 

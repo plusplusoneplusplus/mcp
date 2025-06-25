@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { DebugPanelProvider } from './providers/debugPanelProvider';
-import { WuWeiAgentPanelProvider } from './agentPanel';
+import { AgentPanelProvider } from './providers/agentPanelProvider';
 import { UnifiedChatProvider } from './providers/unifiedChatProvider';
 import { logger } from './logger';
 
@@ -20,7 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Create the providers
     const unifiedChatProvider = new UnifiedChatProvider(context);
     const debugPanelProvider = new DebugPanelProvider(context);
-    const agentPanelProvider = new WuWeiAgentPanelProvider(context);
+    const agentPanelProvider = new AgentPanelProvider(context);
 
     logger.info('Unified chat, debug, and agent providers created');
 
@@ -128,7 +128,8 @@ export function activate(context: vscode.ExtensionContext) {
     const refreshAgentsCommand = vscode.commands.registerCommand('wu-wei.refreshAgents', () => {
         logger.info('Refresh agents command executed');
         if (agentPanelProvider) {
-            vscode.window.showInformationMessage('Wu Wei: Agent list refreshed');
+            agentPanelProvider.refresh();
+            vscode.window.showInformationMessage('Wu Wei: Agent panel refreshed');
         } else {
             vscode.window.showWarningMessage('Wu Wei: Agent panel not initialized');
         }
