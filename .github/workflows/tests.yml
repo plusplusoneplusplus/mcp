@@ -81,13 +81,13 @@ jobs:
         if: runner.os != 'Windows' && (matrix.component == 'utils-group-2' || matrix.component == 'server-group')
         run: |
           source .venv/bin/activate
-          playwright install chromium
+          playwright install
 
       - name: Install Playwright Browsers (Windows)
         if: runner.os == 'Windows' && (matrix.component == 'utils-group-2' || matrix.component == 'server-group')
         run: |
           .venv\Scripts\activate
-          playwright install chromium
+          playwright install
 
       - name: Run Core Group Tests (Unix)
         if: runner.os != 'Windows' && matrix.component == 'core-group'
