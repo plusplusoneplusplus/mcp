@@ -72,7 +72,7 @@ export abstract class BaseWebviewProvider {
      * @returns The placeholder name
      */
     private getJsPlaceholder(index: number): string {
-        const placeholders = ['UTILS_JS_URI', 'DEBUG_JS_URI', 'CHAT_JS_URI', 'AGENT_JS_URI'];
+        const placeholders = ['UTILS_JS_URI', 'AGENT_JS_URI', 'DEBUG_JS_URI', 'CHAT_JS_URI'];
         return placeholders[index] || `JS_URI_${index}`;
     }
 
