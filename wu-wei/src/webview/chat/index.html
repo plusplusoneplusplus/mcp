@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat</title>
+    <link rel="stylesheet" href="{{BASE_CSS_URI}}">
+</head>
+
+<body>
+    <div class="header">
+        <h3>Chat</h3>
+        <button class="new-chat-btn" onclick="newChat()">+ New</button>
+    </div>
+
+    <div class="sessions-container">
+        <div class="sessions-list" id="sessionsList">
+            <!-- Sessions will be populated here -->
+        </div>
+
+        <div class="chat-area">
+            <div class="model-selector-container">
+                <div class="model-selector-row">
+                    <select class="model-selector" id="modelSelector">
+                        <option value="">Loading models...</option>
+                    </select>
+                    <button class="debug-btn" onclick="showModelDetails()"
+                        title="Show detailed model information including context windows">
+                        📋 Model Details
+                    </button>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage"
+                style="display: none; color: var(--vscode-errorForeground); background: var(--vscode-inputValidation-errorBackground); border: 1px solid var(--vscode-inputValidation-errorBorder); padding: 8px; margin: 8px 16px; border-radius: 4px; font-size: 12px;">
+                <div class="error-title" id="errorTitle">Error</div>
+                <div class="error-details" id="errorDetails">Error details</div>
+                <button class="error-action-btn" id="errorActionBtn" style="display: none;">Run Diagnostics</button>
+            </div>
+
+            <div id="messagesContainer" class="messages-container">
+                <div id="emptyState" class="empty-state">
+                    <div class="empty-icon">💬</div>
+                    <div class="empty-text">Select or create a chat</div>
+                    <div class="empty-subtitle">Wu wei - effortless conversation</div>
+                </div>
+                <div class="thinking-indicator" id="thinkingIndicator">
+                    <span>Wu Wei is contemplating...</span>
+                    <div class="thinking-dots">
+                        <div class="thinking-dot"></div>
+                        <div class="thinking-dot"></div>
+                        <div class="thinking-dot"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <textarea class="message-input" id="messageInput" placeholder="Loading..." rows="1" disabled></textarea>
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{UTILS_JS_URI}}"></script>
+</body>
+
+</html>

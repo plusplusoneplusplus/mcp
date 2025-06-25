@@ -95,6 +95,12 @@
                 "title": "Wu Wei: Refresh Agents",
                 "category": "Wu Wei",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "wu-wei.showModelDetails",
+                "title": "Wu Wei: Show Detailed Model Information",
+                "category": "Wu Wei",
+                "icon": "$(info)"
             }
         ],
         "views": {
