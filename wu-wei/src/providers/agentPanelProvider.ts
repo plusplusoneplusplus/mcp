@@ -175,7 +175,9 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
     }
 
     private sendAgentCapabilities(): void {
-        if (!this._view) return;
+        if (!this._view) {
+            return;
+        }
 
         const capabilities = this._agentRegistry.getAgentCapabilities();
         this._view.webview.postMessage({
@@ -185,7 +187,9 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
     }
 
     private sendMessageHistory(): void {
-        if (!this._view) return;
+        if (!this._view) {
+            return;
+        }
 
         this._view.webview.postMessage({
             command: 'updateMessageHistory',

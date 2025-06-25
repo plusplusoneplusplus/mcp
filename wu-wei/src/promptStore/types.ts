@@ -122,6 +122,41 @@ export interface ValidationWarning {
 }
 
 /**
+ * Result of parsing a prompt file
+ */
+export interface ParsedPrompt {
+    success: boolean;
+    prompt?: Prompt;
+    metadata?: PromptMetadata;
+    content?: string;
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+}
+
+/**
+ * Validation rule definition
+ */
+export interface ValidationRule {
+    field: string;
+    type: 'string' | 'array' | 'object' | 'date' | 'boolean' | 'number';
+    required?: boolean;
+    validator?: (value: any) => boolean;
+    message?: string;
+}
+
+/**
+ * Cache entry for parsed metadata
+ */
+export interface MetadataCacheEntry {
+    metadata: PromptMetadata;
+    content: string;
+    lastModified: number;
+    filePath: string;
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+}
+
+/**
  * Webview message types for communication between extension and webview
  */
 export interface WebviewMessage {
