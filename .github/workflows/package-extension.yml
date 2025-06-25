@@ -1,0 +1,40 @@
+name: Package Wu Wei Extension
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # Every day at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Use Node.js 20
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: wu-wei/package-lock.json
+
+    - name: Install dependencies
+      run: |
+        cd wu-wei
+        npm ci
+
+    - name: Install vsce
+      run: npm install -g @vscode/vsce
+
+    - name: Package extension
+      run: |
+        cd wu-wei
+        vsce package
+
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: wu-wei-extension
+        path: wu-wei/*.vsix
