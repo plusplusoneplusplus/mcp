@@ -156,138 +156,137 @@ body {
 /* Prompts container */
 .prompts-container {
     flex: 1;
-    padding: 16px;
+    padding: 8px;
     overflow-y: auto;
+}
+
+/* Prompt list */
+.prompt-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 2px;
 }
 
-/* Prompt cards */
-.prompt-card {
-    border: 1px solid var(--vscode-border);
-    border-radius: 6px;
-    padding: 16px;
+/* Prompt list items */
+.prompt-list-item {
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 6px 12px;
     background-color: var(--vscode-background);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     position: relative;
+    border-bottom: 1px solid var(--vscode-border);
 }
 
-.prompt-card:hover {
+.prompt-list-item:hover {
     background-color: var(--vscode-hover);
     border-color: var(--vscode-focusBorder);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.prompt-card.invalid {
-    border-left: 4px solid var(--vscode-error);
+.prompt-list-item.invalid {
+    border-left: 3px solid var(--vscode-error);
 }
 
-/* Prompt header */
-.prompt-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 8px;
-}
-
-.prompt-title {
-    font-size: 1.1em;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-    margin: 0;
-    line-height: 1.3;
-}
-
-.prompt-meta {
+/* Single-line content layout */
+.prompt-content {
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-shrink: 0;
-    margin-left: 12px;
-}
-
-.parameters-indicator {
-    font-size: 0.8em;
-    color: var(--vscode-descriptionForeground);
-    background-color: var(--vscode-badge-background);
-    padding: 2px 6px;
-    border-radius: 3px;
-    white-space: nowrap;
-}
-
-.validation-error {
-    color: var(--vscode-error);
-    font-size: 1.1em;
-}
-
-/* Prompt description */
-.prompt-description {
-    color: var(--vscode-descriptionForeground);
-    margin-bottom: 12px;
-    line-height: 1.4;
-    font-size: 0.9em;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    -webkit-box-orient: vertical;
+    gap: 12px;
+    height: 20px;
     overflow: hidden;
 }
 
-/* Prompt footer */
-.prompt-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    gap: 12px;
-    margin-top: 12px;
+.prompt-title {
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--vscode-foreground);
+    min-width: 120px;
+    max-width: 200px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.prompt-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-size: 0.8em;
+.prompt-description {
     color: var(--vscode-descriptionForeground);
-}
-
-.prompt-info span {
-    display: flex;
-    align-items: center;
+    font-size: 0.8em;
+    flex: 1;
+    min-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .category {
-    color: var(--vscode-symbolIcon-classForeground);
-    font-weight: 500;
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.7em;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .author {
     color: var(--vscode-symbolIcon-functionForeground);
+    font-size: 0.75em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 60px;
 }
 
 .modified {
     color: var(--vscode-descriptionForeground);
-    font-size: 0.75em;
+    font-size: 0.7em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 70px;
 }
 
 /* Tags */
 .tags {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    justify-content: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+    max-width: 120px;
+    overflow: hidden;
 }
 
 .tag {
-    background-color: var(--vscode-badge-background);
-    color: var(--vscode-badge-foreground);
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.75em;
-    font-weight: 500;
+    background-color: var(--vscode-button-secondaryBackground);
+    color: var(--vscode-button-secondaryForeground);
+    padding: 1px 4px;
+    border-radius: 6px;
+    font-size: 0.65em;
     white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.tag.more {
+    background-color: var(--vscode-descriptionForeground);
+    color: var(--vscode-background);
+}
+
+/* Indicators */
+.prompt-indicators {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.parameters-indicator {
+    font-size: 0.7em;
+    color: var(--vscode-textLink-foreground);
+    white-space: nowrap;
+}
+
+.validation-error {
+    color: var(--vscode-error);
+    font-size: 0.8em;
 }
 
 /* Loading and empty states */
@@ -394,9 +393,9 @@ body {
 }
 
 /* Focus styles for accessibility */
-.prompt-card:focus {
+.prompt-list-item:focus {
     outline: 2px solid var(--vscode-focusBorder);
-    outline-offset: 2px;
+    outline-offset: -2px;
 }
 
 .btn:focus {
@@ -406,12 +405,25 @@ body {
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-    .prompt-card {
+    .prompt-list-item {
         border-width: 2px;
     }
 
     .btn {
         border-width: 2px;
+    }
+}
+
+/* Responsive design */
+@media (max-width: 400px) {
+    .prompt-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .tags {
+        margin-left: 0;
     }
 }
 
@@ -424,8 +436,8 @@ body {
         display: none;
     }
 
-    .prompt-card {
+    .prompt-list-item {
         break-inside: avoid;
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
 }

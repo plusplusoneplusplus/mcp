@@ -227,12 +227,12 @@ function renderPrompts() {
     }
 
     const html = filteredPrompts.map(prompt => createPromptCard(prompt)).join('');
-    promptsContainer.innerHTML = html;
+    promptsContainer.innerHTML = `<div class="prompt-list">${html}</div>`;
 
     // Add click handlers
-    const promptCards = promptsContainer.querySelectorAll('.prompt-card');
-    promptCards.forEach((card, index) => {
-        card.addEventListener('click', () => selectPrompt(filteredPrompts[index].id));
+    const promptItems = promptsContainer.querySelectorAll('.prompt-list-item');
+    promptItems.forEach((item, index) => {
+        item.addEventListener('click', () => selectPrompt(filteredPrompts[index].id));
     });
 }
 
@@ -241,38 +241,37 @@ function renderPrompts() {
  */
 function createPromptCard(prompt) {
     const tags = prompt.metadata.tags || [];
-    const tagsHtml = tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+    const tagsHtml = tags.slice(0, 2).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
+    const moreTags = tags.length > 2 ? `<span class="tag more">+${tags.length - 2}</span>` : '';
 
     const parametersCount = prompt.metadata.parameters ? prompt.metadata.parameters.length : 0;
     const parametersHtml = parametersCount > 0 ?
-        `<span class="parameters-indicator" title="${parametersCount} parameters">⚙️ ${parametersCount}</span>` : '';
+        `<span class="parameters-indicator" title="${parametersCount} parameters">⚙️${parametersCount}</span>` : '';
 
     const modifiedDate = new Date(prompt.lastModified).toLocaleDateString();
 
     const validationClass = prompt.isValid ? '' : 'invalid';
     const validationIcon = prompt.isValid ? '' : '<span class="validation-error" title="Validation errors">⚠️</span>';
 
+    // Truncate description for single line display
+    const description = prompt.metadata.description ?
+        (prompt.metadata.description.length > 50 ?
+            prompt.metadata.description.substring(0, 50) + '...' :
+            prompt.metadata.description) : '';
+
     return `
-        <div class="prompt-card ${validationClass}" data-id="${prompt.id}">
-            <div class="prompt-header">
-                <h3 class="prompt-title">${escapeHtml(prompt.metadata.title)}</h3>
-                <div class="prompt-meta">
+        <div class="prompt-list-item ${validationClass}" data-id="${prompt.id}">
+            <div class="prompt-content">
+                <span class="prompt-title">${escapeHtml(prompt.metadata.title)}</span>
+                ${description ? `<span class="prompt-description">${escapeHtml(description)}</span>` : ''}
+                <span class="category">${escapeHtml(prompt.metadata.category || 'General')}</span>
+                <span class="author">${escapeHtml(prompt.metadata.author || 'yihengtao')}</span>
+                <span class="modified">${modifiedDate}</span>
+                ${tagsHtml ? `<div class="tags">${tagsHtml}${moreTags}</div>` : ''}
+                <div class="prompt-indicators">
                     ${validationIcon}
                     ${parametersHtml}
                 </div>
-            </div>
-            
-            ${prompt.metadata.description ?
-            `<p class="prompt-description">${escapeHtml(prompt.metadata.description)}</p>` : ''
-        }
-            
-            <div class="prompt-footer">
-                <div class="prompt-info">
-                    <span class="category">${escapeHtml(prompt.metadata.category || 'General')}</span>
-                    <span class="author">${escapeHtml(prompt.metadata.author || 'Unknown')}</span>
-                    <span class="modified">${modifiedDate}</span>
-                </div>
-                ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
             </div>
         </div>
     `;
