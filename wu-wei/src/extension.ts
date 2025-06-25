@@ -1,8 +1,6 @@
 import * as vscode from 'vscode';
-import { WuWeiDebugPanelProvider } from './debugPanel';
 import { DebugPanelProvider } from './providers/debugPanelProvider';
 import { WuWeiAgentPanelProvider } from './agentPanel';
-import { UnifiedWuWeiChatProvider } from './unifiedChatProvider';
 import { UnifiedChatProvider } from './providers/unifiedChatProvider';
 import { logger } from './logger';
 
@@ -21,12 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Create the providers
     const unifiedChatProvider = new UnifiedChatProvider(context);
-    // Keep the old provider as fallback for now
-    const legacyUnifiedChatProvider = new UnifiedWuWeiChatProvider(context);
-    // Use the new migrated debug panel provider
     const debugPanelProvider = new DebugPanelProvider(context);
-    // Keep the old provider as fallback for now
-    const legacyDebugPanelProvider = new WuWeiDebugPanelProvider(context);
     const agentPanelProvider = new WuWeiAgentPanelProvider(context);
 
     logger.info('Unified chat, debug, and agent providers created');
