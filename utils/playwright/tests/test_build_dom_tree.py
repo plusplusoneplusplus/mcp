@@ -50,20 +50,50 @@ async def load_test_page(browser, fixture_name):
 
 def normalize_dom_tree(tree):
     """
-    Recursively normalize a DOM tree dict for logical comparison.
-    - Removes fields that may vary but are not semantically important (e.g., node IDs, dynamic timestamps).
-    - Sorts attributes/children where order is not significant.
+    Normalize a DOM tree for logical comparison by creating a canonical representation
+    that doesn't depend on node IDs, which can vary between runs.
     """
-    if isinstance(tree, dict):
-        # Remove keys that are known to be non-semantic or unstable
+    if not isinstance(tree, dict) or "map" not in tree or "rootId" not in tree:
+        # If it's not a DOM tree structure, do basic normalization
+        if isinstance(tree, dict):
+            ignore_keys = {"xpath", "id", "highlightIndex"}
+            return {
+                k: normalize_dom_tree(v) for k, v in tree.items() if k not in ignore_keys
+            }
+        elif isinstance(tree, list):
+            return [normalize_dom_tree(x) for x in tree]
+        else:
+            return tree
+
+    # This is a DOM tree with map and rootId - normalize the structure
+    node_map = tree["map"]
+    root_id = tree["rootId"]
+
+    def normalize_node(node_id):
+        """Convert a node and its children to a canonical form."""
+        if node_id not in node_map:
+            return None
+
+        node = node_map[node_id]
+        normalized = {}
+
+        # Copy semantic fields, ignoring unstable ones
         ignore_keys = {"xpath", "id", "highlightIndex"}
-        return {
-            k: normalize_dom_tree(v) for k, v in tree.items() if k not in ignore_keys
-        }
-    elif isinstance(tree, list):
-        return [normalize_dom_tree(x) for x in tree]
-    else:
-        return tree
+        for key, value in node.items():
+            if key not in ignore_keys:
+                if key == "children":
+                    # Recursively normalize children
+                    normalized[key] = [normalize_node(child_id) for child_id in value]
+                elif key == "attributes":
+                    # Sort attributes for consistent comparison
+                    normalized[key] = dict(sorted(value.items())) if value else {}
+                else:
+                    normalized[key] = value
+
+        return normalized
+
+    # Return normalized tree with canonical root
+    return {"root": normalize_node(root_id)}
 
 
 @pytest.mark.asyncio
