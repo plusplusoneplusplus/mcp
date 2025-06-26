@@ -336,8 +336,14 @@
                     type: 'file',
                     path: prompt.filePath,
                     name: displayName,
-                    category: category
+                    category: category,
+                    title: title || fileName.replace(/\.md$/, ''), // Store title for sorting
+                    lastModified: prompt.lastModified
                 };
+            })
+            .sort((a, b) => {
+                // Sort alphabetically by title (case-insensitive)
+                return a.title.toLowerCase().localeCompare(b.title.toLowerCase());
             });
     }
 
