@@ -28,7 +28,18 @@ export class PromptManager {
     constructor(config?: Partial<PromptStoreConfig>) {
         this.logger = WuWeiLogger.getInstance();
         this.config = { ...DEFAULT_CONFIG, ...config };
-        this.fileWatcher = new PromptFileWatcher();
+
+        // Initialize file watcher with configuration
+        this.fileWatcher = new PromptFileWatcher({
+            enabled: this.config.autoRefresh,
+            debounceMs: 500,
+            maxDepth: 10,
+            followSymlinks: false,
+            ignorePatterns: this.config.excludePatterns,
+            usePolling: false,
+            pollingInterval: 1000
+        });
+
         this.metadataParser = new MetadataParser();
         this.eventEmitter = new vscode.EventEmitter<Prompt[]>();
         this.onPromptsChanged = this.eventEmitter.event;
@@ -48,6 +59,20 @@ export class PromptManager {
             const rootDirectory = vscodeConfig.get<string>('rootDirectory', '');
             const autoRefresh = vscodeConfig.get<boolean>('autoRefresh', true);
 
+            // Get file watcher configuration
+            const fileWatcherConfig = {
+                enabled: vscodeConfig.get<boolean>('fileWatcher.enabled', true),
+                debounceMs: vscodeConfig.get<number>('fileWatcher.debounceMs', 500),
+                maxDepth: vscodeConfig.get<number>('fileWatcher.maxDepth', 10),
+                followSymlinks: false,
+                ignorePatterns: vscodeConfig.get<string[]>('fileWatcher.ignorePatterns', []),
+                usePolling: vscodeConfig.get<boolean>('fileWatcher.usePolling', false),
+                pollingInterval: vscodeConfig.get<number>('fileWatcher.pollingInterval', 1000)
+            };
+
+            // Update file watcher configuration
+            this.fileWatcher.updateConfig(fileWatcherConfig);
+
             this.logger.info('📋 Prompt Manager Configuration:', {
                 rootDirectory,
                 autoRefresh,
@@ -64,9 +89,11 @@ export class PromptManager {
                 this.logger.info('📁 Using default watch paths:', { watchPaths: this.config.watchPaths });
             }
 
-            // Start file watcher
+            // Start file watcher for each watch path
             this.logger.info('👀 Starting file watcher for paths:', { watchPaths: this.config.watchPaths });
-            await this.fileWatcher.startWatching(this.config.watchPaths);
+            for (const watchPath of this.config.watchPaths) {
+                await this.fileWatcher.start(watchPath);
+            }
 
             // Load initial prompts
             this.logger.info('🔄 Loading initial prompts...');
@@ -466,6 +493,7 @@ export class PromptManager {
      * Setup file watcher event handling
      */
     private setupFileWatcher(): void {
+        // Listen to VS Code events
         this.fileWatcher.onFileChanged(async (event: FileWatcherEvent) => {
             try {
                 switch (event.type) {
@@ -488,6 +516,31 @@ export class PromptManager {
                     error: errorMessage
                 });
             }
+        });
+
+        // Listen to enhanced file watcher events
+        this.fileWatcher.on('fileAdded', async (filePath: string) => {
+            await this.handleFileChanged(filePath);
+        });
+
+        this.fileWatcher.on('fileChanged', async (filePath: string) => {
+            await this.handleFileChanged(filePath);
+        });
+
+        this.fileWatcher.on('fileDeleted', async (filePath: string) => {
+            await this.handleFileDeleted(filePath);
+        });
+
+        this.fileWatcher.on('directoryAdded', (dirPath: string) => {
+            this.logger.debug('Directory added', { path: dirPath });
+        });
+
+        this.fileWatcher.on('directoryDeleted', (dirPath: string) => {
+            this.logger.debug('Directory deleted', { path: dirPath });
+        });
+
+        this.fileWatcher.on('error', (filePath: string, details?: any) => {
+            this.logger.error('File watcher error', { filePath, details });
         });
     }
 

@@ -113,16 +113,24 @@ export const UI_CONFIG = {
  */
 export const WATCHER_CONFIG = {
     IGNORED: [
-        '**/node_modules/**',
-        '**/.git/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/.vscode/**',
-        '**/.*' // Hidden files except .prompts
+        /(^|[\/\\])\../, // Hidden files
+        /\.tmp$/, /\.swp$/, /~$/, // Temp files
+        /node_modules/, // Common directories
+        /(^|[\/\\])\.git([\/\\]|$)/,
+        /(^|[\/\\])dist([\/\\]|$)/,
+        /(^|[\/\\])build([\/\\]|$)/,
+        /(^|[\/\\])\.vscode([\/\\]|$)/
     ],
     POLL_INTERVAL: 1000,
     USE_POLLING: false,
-    ATOMIC_WRITES: true
+    ATOMIC_WRITES: true,
+    DEBOUNCE_MS: 500,
+    MAX_DEPTH: 10,
+    FOLLOW_SYMLINKS: false,
+    AWAIT_WRITE_FINISH: {
+        stabilityThreshold: 500,
+        pollInterval: 100
+    }
 };
 
 /**
