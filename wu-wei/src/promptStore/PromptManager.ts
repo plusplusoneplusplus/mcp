@@ -114,7 +114,8 @@ export class PromptManager {
      * Get all prompts
      */
     public getAllPrompts(): Prompt[] {
-        return Array.from(this.prompts.values());
+        const prompts = Array.from(this.prompts.values());
+        return this.sortPrompts(prompts);
     }
 
     /**
@@ -341,7 +342,7 @@ export class PromptManager {
         await Promise.all(loadPromises);
 
         this.logger.info(`Loaded ${prompts.length} prompts from ${rootPath}`);
-        return prompts;
+        return this.sortPrompts(prompts);
     }
 
     /**
