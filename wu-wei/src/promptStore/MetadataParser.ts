@@ -45,6 +45,7 @@ export class MetadataParser {
                 this.logger.debug('Using cached metadata for file', { filePath });
                 return {
                     success: true,
+                    prompt: cachedEntry.prompt,
                     metadata: cachedEntry.metadata,
                     content: cachedEntry.content,
                     errors: cachedEntry.errors,
@@ -74,6 +75,7 @@ export class MetadataParser {
 
                 // Cache the result
                 this.cache.set(filePath, {
+                    prompt,
                     metadata: enhancedMetadata,
                     content: parseResult.content || '',
                     lastModified,
