@@ -8,7 +8,7 @@
         "vscode": "^1.90.0"
     },
     "categories": [
-        "Productivity",
+        "AI",
         "Other"
     ],
     "keywords": [
@@ -113,6 +113,66 @@
                 "title": "Wu Wei: Open Prompt Store",
                 "category": "Wu Wei",
                 "icon": "$(book)"
+            },
+            {
+                "command": "wu-wei.promptStore.newPrompt",
+                "title": "Wu Wei: New Prompt",
+                "category": "Wu Wei",
+                "icon": "$(add)"
+            },
+            {
+                "command": "wu-wei.promptStore.newPromptFromTemplate",
+                "title": "Wu Wei: New Prompt from Template",
+                "category": "Wu Wei",
+                "icon": "$(file-code)"
+            },
+            {
+                "command": "wu-wei.promptStore.deletePrompt",
+                "title": "Wu Wei: Delete Prompt",
+                "category": "Wu Wei",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "wu-wei.promptStore.duplicatePrompt",
+                "title": "Wu Wei: Duplicate Prompt",
+                "category": "Wu Wei",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "wu-wei.promptStore.renamePrompt",
+                "title": "Wu Wei: Rename Prompt",
+                "category": "Wu Wei",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "wu-wei.promptStore.movePrompt",
+                "title": "Wu Wei: Move Prompt",
+                "category": "Wu Wei",
+                "icon": "$(folder)"
+            },
+            {
+                "command": "wu-wei.promptStore.openPrompt",
+                "title": "Wu Wei: Open Prompt",
+                "category": "Wu Wei",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "wu-wei.promptStore.openPromptPreview",
+                "title": "Wu Wei: Open Prompt Preview",
+                "category": "Wu Wei",
+                "icon": "$(preview)"
+            },
+            {
+                "command": "wu-wei.promptStore.exportPrompts",
+                "title": "Wu Wei: Export Prompts",
+                "category": "Wu Wei",
+                "icon": "$(export)"
+            },
+            {
+                "command": "wu-wei.promptStore.batchDelete",
+                "title": "Wu Wei: Batch Delete Prompts",
+                "category": "Wu Wei",
+                "icon": "$(trash)"
             }
         ],
         "views": {
@@ -167,6 +227,21 @@
                     "command": "wu-wei.refreshChats",
                     "when": "view == wu-wei.chat",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "wu-wei.promptStore.newPrompt",
+                    "when": "view == wu-wei.promptStore",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "wu-wei.promptStore.newPromptFromTemplate",
+                    "when": "view == wu-wei.promptStore",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "wu-wei.refreshPrompts",
+                    "when": "view == wu-wei.promptStore",
+                    "group": "navigation@3"
                 }
             ]
         },
@@ -252,6 +327,12 @@
                     "minimum": 100,
                     "maximum": 10000,
                     "description": "Polling interval in milliseconds (when polling is enabled)"
+                },
+                "wu-wei.promptStore.customTemplates": {
+                    "type": "array",
+                    "default": [],
+                    "description": "User-defined custom prompt templates",
+                    "scope": "application"
                 }
             }
         }

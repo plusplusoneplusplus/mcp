@@ -208,3 +208,42 @@ export interface ExportOptions {
     includeContent: boolean;
     filterOptions?: SearchFilter;
 }
+
+/**
+ * File operation result interface
+ */
+export interface FileOperationResult {
+    success: boolean;
+    filePath?: string;
+    error?: string;
+}
+
+/**
+ * Options for creating new prompts
+ */
+export interface NewPromptOptions {
+    name: string;
+    category?: string;
+    template?: string;
+    metadata?: Partial<PromptMetadata>;
+}
+
+/**
+ * Batch operation result interface
+ */
+export interface BatchOperationResult {
+    successful: string[];
+    failed: Array<{ filePath: string; error: string }>;
+}
+
+/**
+ * Prompt template interface
+ */
+export interface PromptTemplate {
+    id: string;
+    name: string;
+    description: string;
+    content: string;
+    metadata: Partial<PromptMetadata>;
+    parameters: ParameterDef[];
+}

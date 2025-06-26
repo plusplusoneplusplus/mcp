@@ -6,6 +6,9 @@ import { PromptStoreProvider } from './promptStore/PromptStoreProvider';
 import { PromptManager } from './promptStore/PromptManager';
 import { ConfigurationManager } from './promptStore/ConfigurationManager';
 import { SessionStateManager } from './promptStore/SessionStateManager';
+import { FileOperationManager } from './promptStore/FileOperationManager';
+import { TemplateManager } from './promptStore/TemplateManager';
+import { FileOperationCommands } from './promptStore/commands';
 import { logger } from './logger';
 
 /**
@@ -30,9 +33,12 @@ export function activate(context: vscode.ExtensionContext) {
     const configManager = new ConfigurationManager(context);
     const sessionStateManager = new SessionStateManager(context);
     const promptManager = new PromptManager();
+    const templateManager = new TemplateManager();
+    const fileOperationManager = new FileOperationManager(promptManager, configManager, templateManager);
+    const fileOperationCommands = new FileOperationCommands(fileOperationManager, templateManager);
     const promptStoreProvider = new PromptStoreProvider(context.extensionUri, promptManager);
 
-    logger.info('Prompt store infrastructure created with configuration management');
+    logger.info('Prompt store infrastructure created with file operations support');
 
     // Register webview providers
     const chatViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.chat', unifiedChatProvider);
@@ -46,6 +52,17 @@ export function activate(context: vscode.ExtensionContext) {
     promptManager.initialize().catch(error => {
         logger.error('Failed to initialize prompt manager', error);
     });
+
+    // Initialize template manager
+    templateManager.loadCustomTemplates().catch(error => {
+        logger.error('Failed to load custom templates', error);
+    });
+
+    // Register file operation commands
+    const fileOperationDisposables = fileOperationCommands.registerCommands(context);
+    context.subscriptions.push(...fileOperationDisposables);
+
+    logger.info('File operation commands registered successfully');
 
     // Setup configuration change handling
     configManager.onConfigurationChanged(async (newConfig) => {
@@ -213,6 +230,8 @@ export function activate(context: vscode.ExtensionContext) {
         promptManager,
         configManager,
         sessionStateManager,
+        templateManager,
+        fileOperationManager,
         logger
     );
 
