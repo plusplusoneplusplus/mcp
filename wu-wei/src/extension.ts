@@ -4,6 +4,8 @@ import { AgentPanelProvider } from './providers/agentPanelProvider';
 import { UnifiedChatProvider } from './providers/unifiedChatProvider';
 import { PromptStoreProvider } from './promptStore/PromptStoreProvider';
 import { PromptManager } from './promptStore/PromptManager';
+import { ConfigurationManager } from './promptStore/ConfigurationManager';
+import { SessionStateManager } from './promptStore/SessionStateManager';
 import { logger } from './logger';
 
 /**
@@ -24,11 +26,13 @@ export function activate(context: vscode.ExtensionContext) {
     const debugPanelProvider = new DebugPanelProvider(context);
     const agentPanelProvider = new AgentPanelProvider(context);
 
-    // Initialize prompt store
+    // Initialize prompt store with configuration management
+    const configManager = new ConfigurationManager(context);
+    const sessionStateManager = new SessionStateManager(context);
     const promptManager = new PromptManager();
     const promptStoreProvider = new PromptStoreProvider(context.extensionUri, promptManager);
 
-    logger.info('Unified chat, debug, agent, and prompt store providers created');
+    logger.info('Prompt store infrastructure created with configuration management');
 
     // Register webview providers
     const chatViewProvider = vscode.window.registerWebviewViewProvider('wu-wei.chat', unifiedChatProvider);
@@ -41,6 +45,28 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize prompt manager
     promptManager.initialize().catch(error => {
         logger.error('Failed to initialize prompt manager', error);
+    });
+
+    // Setup configuration change handling
+    configManager.onConfigurationChanged(async (newConfig) => {
+        logger.info('Configuration changed, updating prompt manager', {
+            rootDirectory: newConfig.rootDirectory,
+            autoRefresh: newConfig.autoRefresh
+        });
+
+        try {
+            // Refresh prompts if auto-refresh is enabled
+            if (newConfig.autoRefresh) {
+                await promptManager.refreshPrompts();
+            }
+
+            // Update session state with new directory if changed
+            if (newConfig.rootDirectory) {
+                await sessionStateManager.setLastRootDirectory(newConfig.rootDirectory);
+            }
+        } catch (error) {
+            logger.error('Failed to handle configuration change', error);
+        }
     });
 
     // Update context based on chat sessions
@@ -169,28 +195,20 @@ export function activate(context: vscode.ExtensionContext) {
     const selectDirectoryCommand = vscode.commands.registerCommand('wu-wei.promptStore.selectDirectory', async () => {
         logger.info('Select prompt store directory command executed');
 
-        const result = await vscode.window.showOpenDialog({
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            title: 'Select Prompt Store Directory',
-            openLabel: 'Select Directory'
-        });
+        try {
+            const directory = await configManager.selectDirectory();
+            if (directory) {
+                await configManager.setRootDirectory(directory);
+                await sessionStateManager.setLastRootDirectory(directory);
 
-        if (result && result[0]) {
-            const selectedPath = result[0].fsPath;
-            logger.info('Directory selected for prompt store', { path: selectedPath });
+                // Refresh prompts with new directory
+                await promptManager.refreshPrompts();
 
-            // Update the configuration
-            const config = vscode.workspace.getConfiguration('wu-wei.promptStore');
-            await config.update('rootDirectory', selectedPath, vscode.ConfigurationTarget.Workspace);
-
-            // Refresh prompts with new directory
-            await promptManager.refreshPrompts();
-
-            vscode.window.showInformationMessage(`Wu Wei: Prompt store directory set to: ${selectedPath}`);
-        } else {
-            logger.info('Directory selection cancelled');
+                vscode.window.showInformationMessage(`Wu Wei: Prompt store directory set to: ${directory}`);
+            }
+        } catch (error) {
+            logger.error('Failed to select directory', error);
+            vscode.window.showErrorMessage(`Failed to set directory: ${error}`);
         }
     });
 
@@ -200,8 +218,8 @@ export function activate(context: vscode.ExtensionContext) {
         const name = await vscode.window.showInputBox({
             prompt: 'Enter prompt name',
             validateInput: (value) => {
-                if (!value.trim()) return 'Name cannot be empty';
-                if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) return 'Name contains invalid characters';
+                if (!value.trim()) { return 'Name cannot be empty'; }
+                if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) { return 'Name contains invalid characters'; }
                 return undefined;
             }
         });
@@ -229,6 +247,29 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Wu Wei: Prompt store refreshed');
     });
 
+    const resetConfigCommand = vscode.commands.registerCommand('wu-wei.promptStore.resetConfig', async () => {
+        logger.info('Reset prompt store configuration command executed');
+
+        const confirm = await vscode.window.showWarningMessage(
+            'Reset prompt store configuration to defaults? This will clear all custom settings.',
+            'Reset', 'Cancel'
+        );
+
+        if (confirm === 'Reset') {
+            try {
+                await configManager.resetToDefaults();
+                await sessionStateManager.clearState();
+                await promptManager.refreshPrompts();
+
+                vscode.window.showInformationMessage('Wu Wei: Configuration reset to defaults');
+                logger.info('Configuration reset completed');
+            } catch (error) {
+                logger.error('Failed to reset configuration', error);
+                vscode.window.showErrorMessage(`Failed to reset configuration: ${error}`);
+            }
+        }
+    });
+
     context.subscriptions.push(
         chatViewProvider,
         debugViewProvider,
@@ -251,7 +292,10 @@ export function activate(context: vscode.ExtensionContext) {
         selectDirectoryCommand,
         newPromptCommand,
         refreshStoreCommand,
+        resetConfigCommand,
         promptManager,
+        configManager,
+        sessionStateManager,
         logger
     );
 
