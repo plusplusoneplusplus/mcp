@@ -136,6 +136,7 @@ export interface ValidationRule {
  * Cache entry for parsed metadata
  */
 export interface MetadataCacheEntry {
+    prompt: Prompt;
     metadata: PromptMetadata;
     content: string;
     lastModified: number;
