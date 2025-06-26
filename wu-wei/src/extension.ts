@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { DebugPanelProvider } from './providers/debugPanelProvider';
 import { AgentPanelProvider } from './providers/agentPanelProvider';
 import { UnifiedChatProvider } from './providers/unifiedChatProvider';
+import { WuWeiChatParticipant } from './chat/WuWeiChatParticipant';
 import { PromptStoreProvider } from './promptStore/PromptStoreProvider';
 import { PromptManager } from './promptStore/PromptManager';
 import { ConfigurationManager } from './promptStore/ConfigurationManager';
@@ -28,6 +29,9 @@ export function activate(context: vscode.ExtensionContext) {
     const unifiedChatProvider = new UnifiedChatProvider(context);
     const debugPanelProvider = new DebugPanelProvider(context);
     const agentPanelProvider = new AgentPanelProvider(context);
+
+    // Initialize Wu Wei Chat Participant (MVP)
+    const chatParticipant = new WuWeiChatParticipant(context);
 
     // Initialize prompt store with configuration management
     const configManager = new ConfigurationManager(context);
@@ -267,6 +271,7 @@ export function activate(context: vscode.ExtensionContext) {
         debugViewProvider,
         agentViewProvider,
         promptStoreViewProvider,
+        chatParticipant,
         helloCommand,
         chatCommand,
         newChatCommand,
