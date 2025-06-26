@@ -79,7 +79,7 @@ class KustoClient(KustoClientInterface):
                     "default": True,
                 },
             },
-            "required": ["operation", "database", "query"],
+            "required": ["operation", "query"],
         }
 
     def __init__(self, config_dict=None):
