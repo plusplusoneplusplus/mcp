@@ -3,369 +3,233 @@
  * Following wu wei principles: simple, natural interactions that flow smoothly
  */
 
-// Get the VS Code API
-const vscode = acquireVsCodeApi();
+(function () {
+    const vscode = acquireVsCodeApi();
 
-// State management
-let prompts = [];
-let filteredPrompts = [];
-let currentFilter = {
-    query: '',
-    category: '',
-    sortBy: 'name'
-};
-
-// DOM elements
-let searchInput;
-let categoryFilter;
-let sortFilter;
-let promptsContainer;
-let refreshBtn;
-
-/**
- * Initialize the webview
- */
-function initialize() {
-    // Get DOM elements
-    searchInput = document.getElementById('search-input');
-    categoryFilter = document.getElementById('category-filter');
-    sortFilter = document.getElementById('sort-filter');
-    promptsContainer = document.getElementById('prompts-container');
-    refreshBtn = document.getElementById('refresh-btn');
-
-    // Setup event listeners
-    setupEventListeners();
-
-    // Request initial prompts
-    requestPrompts();
-}
-
-/**
- * Setup event listeners
- */
-function setupEventListeners() {
-    // Search input
-    searchInput.addEventListener('input', debounce(handleSearch, 300));
-
-    // Filter dropdowns
-    categoryFilter.addEventListener('change', handleCategoryFilter);
-    sortFilter.addEventListener('change', handleSortFilter);
-
-    // Refresh button
-    refreshBtn.addEventListener('click', handleRefresh);
-
-    // Listen for messages from the extension
-    window.addEventListener('message', handleMessage);
-}
-
-/**
- * Handle messages from the extension
- */
-function handleMessage(event) {
-    const message = event.data;
-
-    switch (message.type) {
-        case 'promptsLoaded':
-            handlePromptsLoaded(message.payload);
-            break;
-
-        case 'promptSelected':
-            handlePromptSelected(message.payload);
-            break;
-
-        case 'error':
-            handleError(message.error);
-            break;
-
-        case 'configUpdated':
-            handleConfigUpdated(message.payload);
-            break;
-    }
-}
-
-/**
- * Handle prompts loaded
- */
-function handlePromptsLoaded(loadedPrompts) {
-    prompts = loadedPrompts || [];
-    updateCategoryFilter();
-    applyFilters();
-    renderPrompts();
-}
-
-/**
- * Handle prompt selected
- */
-function handlePromptSelected(result) {
-    if (result.success) {
-        // Show success feedback
-        showNotification('Prompt inserted successfully', 'success');
-    } else {
-        showNotification('Failed to insert prompt', 'error');
-    }
-}
-
-/**
- * Handle error
- */
-function handleError(error) {
-    showNotification(error, 'error');
-    console.error('Webview error:', error);
-}
-
-/**
- * Handle configuration updated
- */
-function handleConfigUpdated(config) {
-    // Update UI based on new configuration
-    console.log('Configuration updated:', config);
-}
-
-/**
- * Request prompts from the extension
- */
-function requestPrompts() {
-    sendMessage({
-        type: 'getPrompts'
-    });
-}
-
-/**
- * Handle search input
- */
-function handleSearch(event) {
-    currentFilter.query = event.target.value.trim();
-    searchPrompts();
-}
-
-/**
- * Handle category filter change
- */
-function handleCategoryFilter(event) {
-    currentFilter.category = event.target.value;
-    searchPrompts();
-}
-
-/**
- * Handle sort filter change
- */
-function handleSortFilter(event) {
-    currentFilter.sortBy = event.target.value;
-    searchPrompts();
-}
-
-/**
- * Handle refresh button click
- */
-function handleRefresh() {
-    refreshBtn.disabled = true;
-    refreshBtn.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin"></span>';
-
-    sendMessage({
-        type: 'refreshPrompts'
-    });
-
-    // Re-enable button after a delay
-    setTimeout(() => {
-        refreshBtn.disabled = false;
-        refreshBtn.innerHTML = '<span class="codicon codicon-refresh"></span>';
-    }, 2000);
-}
-
-/**
- * Search prompts with current filter
- */
-function searchPrompts() {
-    const filter = {
-        query: currentFilter.query || undefined,
-        category: currentFilter.category || undefined
+    // State management
+    let currentState = {
+        prompts: [],
+        selectedPrompt: null,
+        searchQuery: '',
+        categoryFilter: '',
+        tagFilter: ''
     };
 
-    sendMessage({
-        type: 'searchPrompts',
-        payload: filter
-    });
-}
+    // DOM elements
+    const elements = {
+        searchInput: document.getElementById('search-input'),
+        categoryFilter: document.getElementById('category-filter'),
+        tagFilter: document.getElementById('tag-filter'),
+        promptTree: document.getElementById('prompt-tree'),
+        emptyState: document.getElementById('empty-state'),
+        loadingState: document.getElementById('loading-state'),
+        newPromptBtn: document.getElementById('new-prompt')
+    };
 
-/**
- * Apply local filters and sorting
- */
-function applyFilters() {
-    filteredPrompts = [...prompts];
+    // Event handlers
+    function setupEventHandlers() {
+        elements.searchInput.addEventListener('input', handleSearch);
+        elements.categoryFilter.addEventListener('change', handleCategoryFilter);
+        elements.tagFilter.addEventListener('change', handleTagFilter);
+        elements.newPromptBtn.addEventListener('click', createNewPrompt);
+    }
 
-    // Apply sorting
-    filteredPrompts.sort((a, b) => {
-        let comparison = 0;
+    // Message handling
+    window.addEventListener('message', event => {
+        const message = event.data;
 
-        switch (currentFilter.sortBy) {
-            case 'name':
-                comparison = a.metadata.title.localeCompare(b.metadata.title);
+        switch (message.type) {
+            case 'updatePrompts':
+                updatePrompts(message.prompts);
                 break;
-            case 'modified':
-                comparison = new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime();
-                comparison = -comparison; // Most recent first
+            case 'updateConfig':
+                updateConfig(message.config);
                 break;
-            case 'category':
-                comparison = (a.metadata.category || '').localeCompare(b.metadata.category || '');
+            case 'showLoading':
+                showLoadingState();
                 break;
-            case 'author':
-                comparison = (a.metadata.author || '').localeCompare(b.metadata.author || '');
+            case 'hideLoading':
+                hideLoadingState();
+                break;
+            case 'showError':
+                showError(message.error);
                 break;
         }
-
-        return comparison;
     });
-}
 
-/**
- * Render prompts in the container
- */
-function renderPrompts() {
-    if (!filteredPrompts || filteredPrompts.length === 0) {
-        promptsContainer.innerHTML = '<div class="empty-state">No prompts found</div>';
-        return;
+    // UI update functions
+    function updatePrompts(prompts) {
+        console.log('Received prompts:', prompts); // Debug log
+        currentState.prompts = prompts;
+        renderPromptTree();
+        updateFilters();
+
+        if (prompts.length === 0) {
+            showEmptyState();
+        } else {
+            hideEmptyState();
+        }
     }
 
-    const html = filteredPrompts.map(prompt => createPromptCard(prompt)).join('');
-    promptsContainer.innerHTML = `<div class="prompt-list">${html}</div>`;
+    function renderPromptTree() {
+        const filteredPrompts = filterPrompts(currentState.prompts);
+        const treeHTML = buildTreeHTML(organizePrompts(filteredPrompts));
+        elements.promptTree.innerHTML = treeHTML;
 
-    // Add click handlers
-    const promptItems = promptsContainer.querySelectorAll('.prompt-list-item');
-    promptItems.forEach((item, index) => {
-        item.addEventListener('click', () => selectPrompt(filteredPrompts[index].id));
-    });
-}
+        // Attach click handlers to tree nodes
+        elements.promptTree.querySelectorAll('.tree-node[data-type="file"]').forEach(node => {
+            node.addEventListener('click', () => handlePromptClick(node.dataset.path));
+        });
 
-/**
- * Create HTML for a prompt card
- */
-function createPromptCard(prompt) {
-    const tags = prompt.metadata.tags || [];
-    const tagsHtml = tags.slice(0, 2).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('');
-    const moreTags = tags.length > 2 ? `<span class="tag more">+${tags.length - 2}</span>` : '';
-
-    const parametersCount = prompt.metadata.parameters ? prompt.metadata.parameters.length : 0;
-    const parametersHtml = parametersCount > 0 ?
-        `<span class="parameters-indicator" title="${parametersCount} parameters">⚙️${parametersCount}</span>` : '';
-
-    const modifiedDate = new Date(prompt.lastModified).toLocaleDateString();
-
-    const validationClass = prompt.isValid ? '' : 'invalid';
-    const validationIcon = prompt.isValid ? '' : '<span class="validation-error" title="Validation errors">⚠️</span>';
-
-    // Truncate description for single line display
-    const description = prompt.metadata.description ?
-        (prompt.metadata.description.length > 50 ?
-            prompt.metadata.description.substring(0, 50) + '...' :
-            prompt.metadata.description) : '';
-
-    return `
-        <div class="prompt-list-item ${validationClass}" data-id="${prompt.id}">
-            <div class="prompt-content">
-                <span class="prompt-title">${escapeHtml(prompt.metadata.title)}</span>
-                ${description ? `<span class="prompt-description">${escapeHtml(description)}</span>` : ''}
-                <span class="category">${escapeHtml(prompt.metadata.category || 'General')}</span>
-                <span class="author">${escapeHtml(prompt.metadata.author || 'yihengtao')}</span>
-                <span class="modified">${modifiedDate}</span>
-                ${tagsHtml ? `<div class="tags">${tagsHtml}${moreTags}</div>` : ''}
-                <div class="prompt-indicators">
-                    ${validationIcon}
-                    ${parametersHtml}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-/**
- * Select a prompt
- */
-function selectPrompt(promptId) {
-    sendMessage({
-        type: 'selectPrompt',
-        payload: promptId
-    });
-}
-
-/**
- * Update category filter options
- */
-function updateCategoryFilter() {
-    const categories = [...new Set(prompts.map(p => p.metadata.category).filter(Boolean))];
-    categories.sort();
-
-    const currentValue = categoryFilter.value;
-    categoryFilter.innerHTML = '<option value="">All Categories</option>';
-
-    categories.forEach(category => {
-        const option = document.createElement('option');
-        option.value = category;
-        option.textContent = category;
-        categoryFilter.appendChild(option);
-    });
-
-    // Restore selection if still valid
-    if (categories.includes(currentValue)) {
-        categoryFilter.value = currentValue;
+        elements.promptTree.querySelectorAll('.tree-node[data-type="folder"]').forEach(node => {
+            node.addEventListener('click', () => handleFolderClick(node));
+        });
     }
-}
 
-/**
- * Show notification
- */
-function showNotification(message, type = 'info') {
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.textContent = message;
+    function buildTreeHTML(treeData) {
+        return treeData.map(node => {
+            if (node.type === 'folder') {
+                return `
+                    <div class="tree-node folder" data-type="folder" data-path="${node.path}">
+                        <span class="icon">${node.expanded ? '📂' : '📁'}</span>
+                        <span class="name">${node.name}</span>
+                    </div>
+                    <div class="tree-children" style="display: ${node.expanded ? 'block' : 'none'}">
+                        ${buildTreeHTML(node.children)}
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="tree-node file" data-type="file" data-path="${node.path}">
+                        <span class="icon">📄</span>
+                        <span class="name">${node.name}</span>
+                    </div>
+                `;
+            }
+        }).join('');
+    }
 
-    // Add to page
-    document.body.appendChild(notification);
+    function organizePrompts(prompts) {
+        // Basic organization for now - just return as flat list
+        // TODO: Implement proper tree structure
+        return prompts
+            .filter(prompt => prompt && (prompt.metadata?.title || prompt.fileName)) // Filter out invalid prompts
+            .map(prompt => ({
+                type: 'file',
+                path: prompt.filePath,
+                name: prompt.metadata?.title || prompt.fileName || 'Untitled'
+            }));
+    }
 
-    // Animate in
-    setTimeout(() => notification.classList.add('show'), 10);
+    function filterPrompts(prompts) {
+        return prompts.filter(prompt => {
+            const matchesSearch = !currentState.searchQuery ||
+                prompt.metadata?.title?.toLowerCase().includes(currentState.searchQuery.toLowerCase()) ||
+                prompt.metadata?.description?.toLowerCase().includes(currentState.searchQuery.toLowerCase()) ||
+                prompt.fileName?.toLowerCase().includes(currentState.searchQuery.toLowerCase());
 
-    // Remove after delay
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => document.body.removeChild(notification), 300);
-    }, 3000);
-}
+            const matchesCategory = !currentState.categoryFilter ||
+                prompt.metadata?.category === currentState.categoryFilter;
 
-/**
- * Send message to extension
- */
-function sendMessage(message) {
-    vscode.postMessage(message);
-}
+            const matchesTag = !currentState.tagFilter ||
+                prompt.metadata?.tags?.includes(currentState.tagFilter);
 
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+            return matchesSearch && matchesCategory && matchesTag;
+        });
+    }
 
-/**
- * Debounce function calls
- */
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
+    function updateFilters() {
+        // Update category filter options
+        const categories = [...new Set(currentState.prompts.map(p => p.metadata?.category).filter(Boolean))];
+        elements.categoryFilter.innerHTML = '<option value="">All Categories</option>' +
+            categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
 
-// Initialize when DOM is loaded
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
-} else {
-    initialize();
-}
+        // Update tag filter options
+        const allTags = currentState.prompts.flatMap(p => p.metadata?.tags || []);
+        const uniqueTags = [...new Set(allTags)];
+        elements.tagFilter.innerHTML = '<option value="">All Tags</option>' +
+            uniqueTags.map(tag => `<option value="${tag}">${tag}</option>`).join('');
+    }
+
+    function updateConfig(config) {
+        // Handle configuration updates
+        console.log('Received config:', config); // Debug log
+    }
+
+    // Event handler implementations
+    function handleSearch(event) {
+        currentState.searchQuery = event.target.value;
+        renderPromptTree();
+    }
+
+    function handleCategoryFilter(event) {
+        currentState.categoryFilter = event.target.value;
+        renderPromptTree();
+    }
+
+    function handleTagFilter(event) {
+        currentState.tagFilter = event.target.value;
+        renderPromptTree();
+    }
+
+    function handlePromptClick(promptPath) {
+        vscode.postMessage({
+            type: 'openPrompt',
+            path: promptPath
+        });
+    }
+
+    function handleFolderClick(node) {
+        // Toggle folder expansion
+        const children = node.nextElementSibling;
+        const icon = node.querySelector('.icon');
+
+        if (children.style.display === 'none') {
+            children.style.display = 'block';
+            icon.textContent = '📂';
+        } else {
+            children.style.display = 'none';
+            icon.textContent = '📁';
+        }
+    }
+
+    function createNewPrompt() {
+        vscode.postMessage({
+            type: 'createNewPrompt'
+        });
+    }
+
+    // Utility functions
+    function showEmptyState() {
+        elements.emptyState.style.display = 'flex';
+        elements.promptTree.style.display = 'none';
+    }
+
+    function hideEmptyState() {
+        elements.emptyState.style.display = 'none';
+        elements.promptTree.style.display = 'block';
+    }
+
+    function showLoadingState() {
+        elements.loadingState.style.display = 'flex';
+    }
+
+    function hideLoadingState() {
+        elements.loadingState.style.display = 'none';
+    }
+
+    function showError(error) {
+        // Simple error display for now
+        console.error('Prompt Store Error:', error);
+        // TODO: Implement proper error UI
+    }
+
+    // Initialize
+    setupEventHandlers();
+
+    // Show loading state and request initial data
+    showLoadingState();
+    vscode.postMessage({
+        type: 'webviewReady'
+    });
+})();

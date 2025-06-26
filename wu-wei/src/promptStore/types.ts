@@ -63,6 +63,7 @@ export interface Prompt {
  * Configuration for the Prompt Store
  */
 export interface PromptStoreConfig {
+    rootDirectory: string;
     watchPaths: string[];
     filePatterns: string[];
     excludePatterns: string[];
@@ -183,13 +184,18 @@ export interface MetadataCacheEntry {
  * Webview message types for communication between extension and webview
  */
 export interface WebviewMessage {
-    type: 'getPrompts' | 'searchPrompts' | 'selectPrompt' | 'refreshPrompts' | 'updateConfig';
+    type: 'webviewReady' | 'configureDirectory' | 'openPrompt' | 'createNewPrompt' | 'refreshStore' |
+    'getPrompts' | 'searchPrompts' | 'selectPrompt' | 'refreshPrompts' | 'updateConfig';
     payload?: any;
+    path?: string; // For openPrompt message
 }
 
 export interface WebviewResponse {
-    type: 'promptsLoaded' | 'promptSelected' | 'error' | 'configUpdated';
+    type: 'updatePrompts' | 'updateConfig' | 'showLoading' | 'hideLoading' | 'showError' |
+    'promptsLoaded' | 'promptSelected' | 'error' | 'configUpdated';
     payload?: any;
+    prompts?: Prompt[];
+    config?: any;
     error?: string;
 }
 

@@ -1,42 +1,54 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wu Wei - Prompt Store</title>
+    <title>Wu Wei Prompt Store</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <div id="app">
-        <div class="header">
-            <h2>Prompt Store</h2>
-            <div class="actions">
-                <button id="refresh-btn" class="btn btn-secondary" title="Refresh prompts">
-                    <span class="codicon codicon-refresh"></span>
-                </button>
+    <div class="prompt-store-container">
+        <header class="store-header">
+            <h2>Wu Wei Prompt Store</h2>
+        </header>
+
+        <div class="search-section">
+            <input type="text" id="search-input" placeholder="🔍 Search prompts..." />
+            <div class="search-filters">
+                <select id="category-filter">
+                    <option value="">All Categories</option>
+                </select>
+                <select id="tag-filter">
+                    <option value="">All Tags</option>
+                </select>
             </div>
         </div>
 
-        <div class="search-container">
-            <input type="text" id="search-input" placeholder="Search prompts..." class="search-input">
-        </div>
+        <main class="prompt-list-container">
+            <div id="prompt-tree" class="prompt-tree">
+                <!-- Prompt tree will be populated dynamically -->
+            </div>
 
-        <div class="filters">
-            <select id="category-filter" class="filter-select">
-                <option value="">All Categories</option>
-            </select>
-            <select id="sort-filter" class="filter-select">
-                <option value="name">Sort by Name</option>
-                <option value="modified">Sort by Modified</option>
-                <option value="category">Sort by Category</option>
-                <option value="author">Sort by Author</option>
-            </select>
-        </div>
+            <div id="empty-state" class="empty-state" style="display: none;">
+                <div class="empty-content">
+                    <h3>No Prompts Found</h3>
+                    <p>No prompts are available in the current directory</p>
+                </div>
+            </div>
 
-        <div id="prompts-container" class="prompts-container">
-            <div class="loading">Loading prompts...</div>
-        </div>
+            <div id="loading-state" class="loading-state" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Loading prompts...</p>
+            </div>
+        </main>
+
+        <footer class="store-footer">
+            <div class="footer-actions">
+                <button id="new-prompt" class="action-button">➕ New Prompt</button>
+            </div>
+        </footer>
     </div>
 
     <script src="main.js"></script>
