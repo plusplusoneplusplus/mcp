@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { logger } from '../logger';
+import { PromptTemplateLoader } from './PromptTemplateLoader';
 
 export interface WuWeiToolMetadata {
     toolCallsMetadata: ToolCallsMetadata;
@@ -145,7 +146,7 @@ export class WuWeiChatParticipant {
             // Get language model
             let models = await vscode.lm.selectChatModels();
             if (models.length === 0) {
-                stream.markdown('❌ No language models available. Please install GitHub Copilot or another language model extension for coding assistance.');
+                stream.markdown(PromptTemplateLoader.getNoModelsTemplate());
                 return;
             }
 
@@ -210,11 +211,7 @@ export class WuWeiChatParticipant {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             logger.error('Wu Wei Coding Assistant request failed', { error: errorMessage });
 
-            stream.markdown(`❌ **An error occurred while processing your request**
-            
-Error: ${errorMessage}
-
-Please try rephrasing your request or check if all required tools and extensions are properly installed.`);
+            stream.markdown(PromptTemplateLoader.getErrorTemplate(errorMessage));
         }
     }
 
@@ -234,57 +231,9 @@ Please try rephrasing your request or check if all required tools and extensions
 
     private getEnhancedSystemPrompt(hasTools: boolean): string {
         const config = vscode.workspace.getConfiguration('wu-wei');
-        const basePrompt = config.get<string>('systemPrompt',
-            'You are a coding assistant focused on helping developers write better code, debug issues, and optimize their development workflow. You provide practical, actionable advice and solutions. You are knowledgeable about multiple programming languages, frameworks, best practices, and development tools.'
-        );
+        const basePrompt = config.get<string>('systemPrompt', PromptTemplateLoader.getBaseSystemPrompt());
 
-        if (!hasTools) {
-            return basePrompt;
-        }
-
-        return `${basePrompt}
-
-You are operating in AGENT MODE with access to VS Code development tools. You have full autonomy to:
-
-1. **Decide when to use tools** based on user requests and context
-2. **Choose appropriate tools** for each task without user guidance
-3. **Execute complex workflows** by chaining multiple tool calls
-4. **Analyze and act** on tool results to provide comprehensive solutions
-
-**IMPORTANT: You MUST use tools to analyze actual code when users ask about their codebase.**
-
-Available tool capabilities:
-- Code analysis and file inspection (copilot_searchCodebase, copilot_readFile)
-- Project structure navigation (copilot_listDirectory, copilot_findFiles)
-- Symbol and usage analysis (copilot_searchWorkspaceSymbols, copilot_listCodeUsages)
-- Text search across files (copilot_findTextInFiles)
-- Debugging and error diagnosis
-- Code quality assessment
-- Performance optimization
-- Testing and documentation
-- Refactoring assistance
-- Security analysis
-
-**Agent behavior guidelines - ALWAYS FOLLOW THESE:**
-- **ALWAYS use tools** when users ask about their code, files, or project structure
-- For "explain the codebase" requests: START with copilot_searchCodebase or copilot_listDirectory
-- For specific file questions: USE copilot_readFile to examine the actual content
-- For understanding project structure: USE copilot_findFiles and copilot_listDirectory
-- For finding implementations: USE copilot_searchWorkspaceSymbols and copilot_listCodeUsages
-- Take initiative to gather necessary information using available tools
-- Use tools proactively to provide better, more accurate assistance
-- Chain tool calls when needed to solve complex problems
-- Explain your tool usage and reasoning to the user
-- Handle tool errors gracefully and try alternative approaches
-- Focus on providing actionable, practical solutions
-
-**Critical rule: Never give generic answers about code without first using tools to examine the actual codebase.**
-
-Current context:
-- You can access files, analyze code structure, and provide contextual development assistance
-- Focus on practical coding solutions, best practices, and development efficiency
-- Provide specific, actionable recommendations for code improvement
-- Use tools extensively to support your analysis and recommendations`;
+        return PromptTemplateLoader.getEnhancedSystemPrompt(basePrompt, hasTools);
     }
 
     private extractToolMetadata(context: vscode.ChatContext): ToolCallsMetadata {
@@ -371,7 +320,7 @@ Current context:
                         responseStr += part.value;
                     } else if (part instanceof vscode.LanguageModelToolCallPart) {
                         toolCalls.push(part);
-                        stream.markdown(`\n🔧 **Using tool:** ${part.name}\n`);
+                        stream.markdown(PromptTemplateLoader.getToolUsingMessage(part.name));
 
                         // Log tool call detection
                         logger.info(`Wu Wei Coding Assistant: Tool call detected`, {
@@ -407,9 +356,9 @@ Current context:
                                 inputSummary
                             });
 
-                            stream.markdown(`\n🔧 **Executing tool:** ${toolCall.name}\n`);
+                            stream.markdown(PromptTemplateLoader.getToolExecutingMessage(toolCall.name));
                             if (inputSummary) {
-                                stream.markdown(`📋 **Parameters:** ${inputSummary}\n`);
+                                stream.markdown(PromptTemplateLoader.getToolParametersMessage(inputSummary));
                             }
 
                             // Actually invoke the tool using VS Code's Language Model API
@@ -427,9 +376,9 @@ Current context:
                             accumulatedToolResults[toolCall.callId] = toolResult;
 
                             // Show completion status in chat
-                            stream.markdown(`✅ **Tool completed:** ${toolCall.name}\n`);
+                            stream.markdown(PromptTemplateLoader.getToolCompletedMessage(toolCall.name));
                             if (resultSummary) {
-                                stream.markdown(`📊 **Result:** ${resultSummary}\n`);
+                                stream.markdown(PromptTemplateLoader.getToolResultMessage(resultSummary));
                             }
 
                             // Add tool result to conversation
@@ -458,7 +407,7 @@ Current context:
 
                             const errorMsg = `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
                             accumulatedToolResults[toolCall.callId] = errorMsg;
-                            stream.markdown(`\n❌ **Tool error:** ${toolCall.name} - ${errorMsg}\n`);
+                            stream.markdown(PromptTemplateLoader.getToolErrorMessage(toolCall.name, errorMsg));
 
                             // Add error result to conversation so the LM can handle it
                             const errorResultMessage = vscode.LanguageModelChatMessage.User(
@@ -485,7 +434,7 @@ Current context:
                     // Safeguard: Prevent infinite tool calling loops
                     if (toolCallRounds.length >= 5) {
                         logger.warn(`Wu Wei Coding Assistant: Maximum tool rounds reached (${toolCallRounds.length}), stopping recursion`);
-                        stream.markdown(`\n⚠️ **Maximum tool execution rounds reached.** Summarizing results...\n`);
+                        stream.markdown(PromptTemplateLoader.getMaxRoundsReachedMessage());
 
                         // Add a summary message to help the LM conclude
                         messages.push(vscode.LanguageModelChatMessage.User(`Tool execution completed. Please provide a summary based on the tool results above. Do not call any more tools.`));
@@ -512,7 +461,7 @@ Current context:
 
                     // Add a prompt to help the LM process the tool results
                     if (successfulTools.length > 0) {
-                        stream.markdown(`\n📊 **Processing ${successfulTools.length} tool result(s)...**\n`);
+                        stream.markdown(PromptTemplateLoader.getProcessingResultsMessage(successfulTools.length));
                         messages.push(vscode.LanguageModelChatMessage.User(`Please analyze and summarize the tool results above to answer the user's question. Use the actual data from the tools, not generic information.`));
                     }
 
@@ -531,7 +480,7 @@ Current context:
                     // If the prompt should have used tools, add a helpful message
                     const toolAnalysis = this.shouldUseTool(request.prompt);
                     if (toolAnalysis.shouldUse && options.tools && options.tools.length > 0) {
-                        stream.markdown(`\n\n> 💡 **Note**: For a more accurate analysis of your codebase, I could examine your actual files using tools like \`${toolAnalysis.suggestedTools.join('`, `')}\`. Would you like me to analyze your specific code files?\n`);
+                        stream.markdown(PromptTemplateLoader.getToolSuggestionNote(toolAnalysis.suggestedTools));
                     }
                 }
 
@@ -565,12 +514,12 @@ Current context:
         const tools = this.getAvailableTools();
 
         if (tools.length === 0) {
-            stream.markdown('🔧 **Available Development Tools:** None\n\nNo VS Code language model tools are currently available. Tools may become available when you install extensions that provide them. However, I can still help with code analysis, debugging advice, and development guidance.');
+            stream.markdown(PromptTemplateLoader.getNoToolsTemplate());
             return;
         }
 
         const toolsList = tools.map(tool => tool.name).join(', ');
-        stream.markdown(`🔧 **Available Development Tools:** ${toolsList}\n\nThese tools can be used to provide enhanced code analysis, debugging assistance, and development guidance.`);
+        stream.markdown(PromptTemplateLoader.getToolsListTemplate(toolsList));
     }
 
     private async handleToolsRequest(stream: vscode.ChatResponseStream): Promise<void> {
@@ -579,42 +528,18 @@ Current context:
         const models = await vscode.lm.selectChatModels();
         const tools = this.getAvailableTools();
 
-        stream.markdown(`# �️ Development Tools & Capabilities
+        const languageModels = models.length > 0 ?
+            models.map(m => `- **${m.id}** (${m.vendor}/${m.family}) - ${m.maxInputTokens} tokens`).join('\n') :
+            '- No language models currently available';
 
-*Powerful coding assistance and development workflow optimization*
+        const vsCodeTools = tools.length > 0 ?
+            tools.map(tool => `- **${tool.name}** - ${tool.description || 'Advanced development capability'}`).join('\n') :
+            '- No VS Code tools currently available\n- Tools become available when you install extensions that provide them';
 
-## 🤖 Language Models Available
-${models.length > 0 ?
-                models.map(m => `- **${m.id}** (${m.vendor}/${m.family}) - ${m.maxInputTokens} tokens`).join('\n') :
-                '- No language models currently available'
-            }
-
-## � VS Code Development Tools
-${tools.length > 0 ?
-                tools.map(tool => `- **${tool.name}** - ${tool.description || 'Advanced development capability'}`).join('\n') :
-                '- No VS Code tools currently available\n- Tools become available when you install extensions that provide them'
-            }
-
-
-
-
-## � Core Development Features
-- **Code Analysis**: Review code quality, patterns, and best practices
-- **Debugging Support**: Help diagnose and fix issues
-- **Performance Optimization**: Identify bottlenecks and improvements
-- **Refactoring Assistance**: Suggest code structure improvements  
-- **Testing Guidance**: Recommend testing strategies and test cases
-- **Documentation**: Generate and improve code documentation
-- **Language Support**: Multi-language development assistance
-
-## 🚀 How to Get Started
-- **Code Review**: Select code and ask me to review it
-- **Debug Help**: Describe your issue and I'll help troubleshoot
-- **Optimization**: Ask about performance improvements
-- **Best Practices**: Get recommendations for coding standards
-- **Project Analysis**: Let me analyze your workspace structure
-
-*Ask me anything about your code, and I'll use the appropriate tools to provide comprehensive development assistance!*`);
+        stream.markdown(PromptTemplateLoader.getToolsRequestTemplate({
+            languageModels,
+            vsCodeTools
+        }));
     }
 
     private async handleWorkspaceRequest(stream: vscode.ChatResponseStream): Promise<void> {
@@ -625,24 +550,7 @@ ${tools.length > 0 ?
         const tools = this.getAvailableTools();
 
         if (!workspaceFolders) {
-            stream.markdown(`# 📁 Workspace Analysis
-
-No workspace is currently open. To get started with development assistance:
-
-## 🚀 Getting Started
-1. **Open a folder** in VS Code containing your project
-2. **Open files** you want to work with
-3. **Select code** for specific analysis
-
-## 💡 What I Can Help With
-- **Project Structure Analysis** - Understand your codebase organization
-- **Code Quality Review** - Identify improvements and best practices
-- **Debugging Support** - Help solve issues and errors
-- **Performance Optimization** - Find bottlenecks and efficiency gains
-- **Testing Strategy** - Recommend testing approaches
-- **Documentation** - Generate or improve code documentation
-
-Once you open a workspace, I'll be able to provide much more targeted assistance based on your specific project and technologies.`);
+            stream.markdown(PromptTemplateLoader.getNoWorkspaceTemplate());
             return;
         }
 
@@ -650,61 +558,26 @@ Once you open a workspace, I'll be able to provide much more targeted assistance
         const totalFiles = await this.getWorkspaceFileCount(workspaceFolders);
         const languagesUsed = await this.detectLanguages(workspaceFolders);
 
-        stream.markdown(`# 📁 Current Workspace Analysis
+        const projectStructure = workspaceFolders.map(folder => `- **${folder.name}**\n  \`${folder.uri.fsPath}\``).join('\n');
 
-*Analyzing your development environment and project structure*
-
-## � Project Structure
-${workspaceFolders.map(folder => `- **${folder.name}**\n  \`${folder.uri.fsPath}\``).join('\n')}
-
-## 📊 Project Overview
-- **Total Files**: ~${totalFiles} files detected
-- **Languages Detected**: ${languagesUsed.length > 0 ? languagesUsed.join(', ') : 'Analyzing...'}
-
-## 📄 Current Context
-${activeEditor ?
-                `- **Active File**: \`${activeEditor.document.fileName}\`
+        const currentContext = activeEditor ?
+            `- **Active File**: \`${activeEditor.document.fileName}\`
 - **Language**: ${activeEditor.document.languageId}
 - **Lines**: ${activeEditor.document.lineCount}
 - **Cursor Position**: Line ${activeEditor.selection.start.line + 1}, Column ${activeEditor.selection.start.character + 1}` :
-                '- No file currently active'
-            }
+            '- No file currently active';
 
-## 🛠️ Available Development Tools
-${tools.length > 0 ?
-                `${tools.map(tool => `- **${tool.name}** - Advanced code analysis capabilities`).join('\n')}` :
-                '- Basic file and project analysis available'
-            }
+        const availableTools = tools.length > 0 ?
+            `${tools.map(tool => `- **${tool.name}** - Advanced code analysis capabilities`).join('\n')}` :
+            '- Basic file and project analysis available';
 
-## � Development Assistance Available
-
-### Code Analysis
-- **Quality Review** - Check for code smells, anti-patterns, and improvements
-- **Security Scan** - Identify potential security vulnerabilities
-- **Performance Analysis** - Find optimization opportunities
-
-### Debugging & Troubleshooting  
-- **Error Analysis** - Help understand and fix errors
-- **Logic Review** - Check code flow and business logic
-- **Integration Issues** - Debug API calls, database queries, etc.
-
-### Optimization & Refactoring
-- **Code Structure** - Improve organization and maintainability
-- **Performance Tuning** - Optimize slow operations and memory usage
-- **Best Practices** - Apply language and framework-specific patterns
-
-### Testing & Documentation
-- **Test Coverage** - Identify missing test cases
-- **Documentation Generation** - Create or improve code documentation
-- **API Documentation** - Document interfaces and endpoints
-
-## 💬 How to Get Help
-- **Select code** and ask for review or explanation
-- **Describe issues** you're facing for debugging help
-- **Ask about specific files** or patterns in your project
-- **Request optimization** for performance-critical code
-
-*I'm ready to dive deep into your codebase and provide specific, actionable development assistance!*`);
+        stream.markdown(PromptTemplateLoader.getWorkspaceAnalysisTemplate({
+            projectStructure,
+            totalFiles: totalFiles.toString(),
+            languagesDetected: languagesUsed.length > 0 ? languagesUsed.join(', ') : 'Analyzing...',
+            currentContext,
+            availableTools
+        }));
     }
 
     private async getWorkspaceFileCount(workspaceFolders: readonly vscode.WorkspaceFolder[]): Promise<number> {
@@ -759,20 +632,7 @@ ${tools.length > 0 ?
         const workspaceFolders = vscode.workspace.workspaceFolders;
 
         if (!activeEditor && !workspaceFolders) {
-            stream.markdown(`# 🔍 Code Analysis
-
-No active file or workspace found. To analyze code, please:
-
-1. **Open a file** in the editor, or
-2. **Open a workspace** folder
-3. **Select code** you want me to analyze
-
-I can help you with:
-- **Code quality review** - Check for best practices and potential issues
-- **Performance analysis** - Identify optimization opportunities  
-- **Refactoring suggestions** - Improve code structure and readability
-- **Security review** - Find potential security vulnerabilities
-- **Testing recommendations** - Suggest test cases and coverage improvements`);
+            stream.markdown(PromptTemplateLoader.getNoCodeAnalysisTemplate());
             return;
         }
 
@@ -796,20 +656,10 @@ I can help you with:
             analysisContext += `\n**Workspace:** ${workspaceFolders.map(f => f.name).join(', ')}`;
         }
 
-        stream.markdown(`# 🔍 Code Analysis Request
-
-${analysisContext}
-
-**Analysis Type:** ${request.prompt}
-
-I'll analyze your code and provide detailed feedback on:
-- Code quality and best practices
-- Performance optimization opportunities
-- Potential bugs and issues
-- Refactoring suggestions
-- Testing and documentation recommendations
-
-Let me examine your code...`);
+        stream.markdown(PromptTemplateLoader.getCodeAnalysisTemplate({
+            analysisContext,
+            requestPrompt: request.prompt
+        }));
 
         // Continue with the normal flow to let the LM handle the analysis
     }
@@ -820,53 +670,42 @@ Let me examine your code...`);
         const activeEditor = vscode.window.activeTextEditor;
         const problems = vscode.languages.getDiagnostics();
 
-        stream.markdown(`# 🐛 Debug Assistant
-
-I'll help you debug your code issue. Here's what I can analyze:
-
-## Current Context`);
-
+        let currentContext = '';
         if (activeEditor) {
             const fileName = activeEditor.document.fileName;
             const language = activeEditor.document.languageId;
             const selection = activeEditor.selection;
             const selectedText = activeEditor.document.getText(selection);
 
-            stream.markdown(`- **File:** \`${fileName}\` (${language})
-- **Line:** ${selection.start.line + 1}`);
+            currentContext = `- **File:** \`${fileName}\` (${language})
+- **Line:** ${selection.start.line + 1}`;
 
             if (selectedText) {
-                stream.markdown(`- **Selected Code:**\n\`\`\`${language}\n${selectedText}\n\`\`\`\n`);
+                currentContext += `\n- **Selected Code:**\n\`\`\`${language}\n${selectedText}\n\`\`\``;
             }
         }
 
-        // Check for problems in the current file
+        let detectedIssues = '';
         if (problems.length > 0) {
-            stream.markdown(`## 🚨 Detected Issues\n`);
+            detectedIssues = '## 🚨 Detected Issues\n\n';
             let issueCount = 0;
             for (const [uri, diagnostics] of problems) {
                 if (diagnostics.length > 0 && issueCount < 5) { // Limit to first 5 files
-                    stream.markdown(`**${uri.fsPath}:**`);
+                    detectedIssues += `**${uri.fsPath}:**\n`;
                     for (const diagnostic of diagnostics.slice(0, 3)) { // Limit to 3 issues per file
                         const severity = diagnostic.severity === vscode.DiagnosticSeverity.Error ? '❌' :
                             diagnostic.severity === vscode.DiagnosticSeverity.Warning ? '⚠️' : 'ℹ️';
-                        stream.markdown(`${severity} Line ${diagnostic.range.start.line + 1}: ${diagnostic.message}`);
+                        detectedIssues += `${severity} Line ${diagnostic.range.start.line + 1}: ${diagnostic.message}\n`;
                     }
                     issueCount++;
                 }
             }
         }
 
-        stream.markdown(`## 🛠️ Debugging Capabilities
-
-I can help you with:
-- **Error analysis** - Understand error messages and stack traces
-- **Code flow tracing** - Track execution paths and logic issues
-- **Variable inspection** - Analyze variable states and values
-- **Performance debugging** - Find bottlenecks and slow operations
-- **Integration issues** - Debug API calls, database queries, and external services
-
-**Tip:** Select the problematic code and describe what you expected vs. what's happening.`);
+        stream.markdown(PromptTemplateLoader.getDebugAssistantTemplate({
+            currentContext,
+            detectedIssues
+        }));
     }
 
     /**
