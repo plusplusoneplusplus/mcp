@@ -9,6 +9,7 @@ import { PromptStoreConfig, PromptMetadata } from './types';
  * Default configuration for the Prompt Store
  */
 export const DEFAULT_CONFIG: PromptStoreConfig = {
+    rootDirectory: '',
     watchPaths: ['${workspaceFolder}/prompts', '${workspaceFolder}/.prompts'],
     filePatterns: ['**/*.md', '**/*.txt'],
     excludePatterns: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],

@@ -63,6 +63,34 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     private async handleWebviewMessage(message: WebviewMessage): Promise<void> {
         try {
             switch (message.type) {
+                case 'webviewReady':
+                    await this.sendInitialData();
+                    break;
+
+                case 'configureDirectory':
+                    await this.configureDirectory();
+                    break;
+
+                case 'openPrompt':
+                    if (message.path) {
+                        await this.openPrompt(message.path);
+                    } else {
+                        this.sendToWebview({
+                            type: 'showError',
+                            error: 'No prompt path provided'
+                        });
+                    }
+                    break;
+
+                case 'createNewPrompt':
+                    await this.createNewPrompt();
+                    break;
+
+                case 'refreshStore':
+                    await this.refreshStore();
+                    break;
+
+                // Legacy support
                 case 'getPrompts':
                     await this.handleGetPrompts();
                     break;
@@ -94,7 +122,7 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
             });
 
             this.sendToWebview({
-                type: 'error',
+                type: 'showError',
                 error: errorMessage
             });
         }
@@ -106,8 +134,8 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     private async handleGetPrompts(): Promise<void> {
         const prompts = this.promptManager.getAllPrompts();
         this.sendToWebview({
-            type: 'promptsLoaded',
-            payload: prompts
+            type: 'updatePrompts',
+            prompts
         });
     }
 
@@ -117,8 +145,8 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     private async handleSearchPrompts(filter: SearchFilter): Promise<void> {
         const prompts = this.promptManager.searchPrompts(filter);
         this.sendToWebview({
-            type: 'promptsLoaded',
-            payload: prompts
+            type: 'updatePrompts',
+            prompts
         });
     }
 
@@ -168,8 +196,8 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     private handlePromptsChanged(prompts: Prompt[]): void {
         if (this.webview) {
             this.sendToWebview({
-                type: 'promptsLoaded',
-                payload: prompts
+                type: 'updatePrompts',
+                prompts
             });
         }
     }
@@ -233,44 +261,64 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
 
         return `
             <!DOCTYPE html>
-            <html lang="en">
+            <html>
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
                 <link href="${styleUri}" rel="stylesheet">
-                <title>Wu Wei - Prompt Store</title>
+                <title>Wu Wei Prompt Store</title>
             </head>
             <body>
-                <div id="app">
-                    <div class="header">
-                        <h2>Prompt Store</h2>
-                        <div class="actions">
-                            <button id="refresh-btn" class="btn btn-secondary" title="Refresh prompts">
-                                <span class="codicon codicon-refresh"></span>
+                <div class="prompt-store-container">
+                    <header class="store-header">
+                        <h2>Wu Wei Prompt Store</h2>
+                        <div class="header-actions">
+                            <button id="configure-directory" class="action-button">
+                                📁 Configure Directory
                             </button>
+                        </div>
+                    </header>
+                    
+                    <div class="search-section">
+                        <input type="text" id="search-input" placeholder="🔍 Search prompts..." />
+                        <div class="search-filters">
+                            <select id="category-filter">
+                                <option value="">All Categories</option>
+                            </select>
+                            <select id="tag-filter">
+                                <option value="">All Tags</option>
+                            </select>
                         </div>
                     </div>
                     
-                    <div class="search-container">
-                        <input type="text" id="search-input" placeholder="Search prompts..." class="search-input">
-                    </div>
+                    <main class="prompt-list-container">
+                        <div id="prompt-tree" class="prompt-tree">
+                            <!-- Prompt tree will be populated dynamically -->
+                        </div>
+                        
+                        <div id="empty-state" class="empty-state" style="display: none;">
+                            <div class="empty-content">
+                                <h3>No Prompt Directory Configured</h3>
+                                <p>Configure a directory to start managing your prompts</p>
+                                <button id="configure-directory-empty" class="primary-button">
+                                    📁 Select Directory
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="loading-state" class="loading-state" style="display: none;">
+                            <div class="loading-spinner"></div>
+                            <p>Loading prompts...</p>
+                        </div>
+                    </main>
                     
-                    <div class="filters">
-                        <select id="category-filter" class="filter-select">
-                            <option value="">All Categories</option>
-                        </select>
-                        <select id="sort-filter" class="filter-select">
-                            <option value="name">Sort by Name</option>
-                            <option value="modified">Sort by Modified</option>
-                            <option value="category">Sort by Category</option>
-                            <option value="author">Sort by Author</option>
-                        </select>
-                    </div>
-                    
-                    <div id="prompts-container" class="prompts-container">
-                        <div class="loading">Loading prompts...</div>
-                    </div>
+                    <footer class="store-footer">
+                        <div class="footer-actions">
+                            <button id="new-prompt" class="action-button">➕ New Prompt</button>
+                            <button id="refresh-store" class="action-button">🔄 Refresh</button>
+                        </div>
+                    </footer>
                 </div>
                 
                 <script nonce="${nonce}" src="${scriptUri}"></script>
@@ -289,5 +337,146 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }
         return text;
+    }
+
+    /**
+     * Send initial data to webview when it's ready
+     */
+    private async sendInitialData(): Promise<void> {
+        const prompts = this.promptManager.getAllPrompts();
+        const config = this.promptManager.getConfig();
+
+        this.logger.info('Sending prompts to webview:', { count: prompts.length, prompts: prompts.slice(0, 2) }); // Debug log
+
+        this.sendToWebview({
+            type: 'updatePrompts',
+            prompts
+        });
+
+        this.sendToWebview({
+            type: 'updateConfig',
+            config
+        });
+
+        // Hide loading state after initial data is sent
+        this.sendToWebview({
+            type: 'hideLoading'
+        });
+    }
+
+    /**
+     * Configure prompt store directory
+     */
+    private async configureDirectory(): Promise<void> {
+        const options: vscode.OpenDialogOptions = {
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            openLabel: 'Select Prompt Directory'
+        };
+
+        const folderUri = await vscode.window.showOpenDialog(options);
+        if (folderUri && folderUri[0]) {
+            const configuration = vscode.workspace.getConfiguration('wu-wei.promptStore');
+            await configuration.update('rootDirectory', folderUri[0].fsPath, vscode.ConfigurationTarget.Workspace);
+
+            // Update prompt manager with new directory
+            this.promptManager.updateConfig({ rootDirectory: folderUri[0].fsPath });
+            await this.promptManager.refreshPrompts();
+
+            vscode.window.showInformationMessage(`Prompt store directory set to: ${folderUri[0].fsPath}`);
+        }
+    }
+
+    /**
+     * Open a prompt file in the editor
+     */
+    private async openPrompt(promptPath: string): Promise<void> {
+        try {
+            const uri = vscode.Uri.file(promptPath);
+            const document = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(document);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to open prompt file', { path: promptPath, error: errorMessage });
+
+            this.sendToWebview({
+                type: 'showError',
+                error: `Failed to open prompt: ${errorMessage}`
+            });
+        }
+    }
+
+    /**
+     * Create a new prompt file
+     */
+    private async createNewPrompt(): Promise<void> {
+        const config = this.promptManager.getConfig();
+        if (!config.rootDirectory) {
+            vscode.window.showWarningMessage('Please configure a prompt directory first');
+            await this.configureDirectory();
+            return;
+        }
+
+        const promptName = await vscode.window.showInputBox({
+            prompt: 'Enter prompt name',
+            placeHolder: 'my-new-prompt'
+        });
+
+        if (!promptName) {
+            return;
+        }
+
+        const fileName = promptName.endsWith('.md') ? promptName : `${promptName}.md`;
+        const filePath = vscode.Uri.file(`${config.rootDirectory}/${fileName}`);
+
+        const template = `---
+title: ${promptName}
+description: A new prompt
+category: general
+tags: []
+author: ${process.env.USER || 'Unknown'}
+version: 1.0.0
+---
+
+# ${promptName}
+
+Your prompt content goes here...
+`;
+
+        try {
+            await vscode.workspace.fs.writeFile(filePath, Buffer.from(template, 'utf8'));
+            const document = await vscode.workspace.openTextDocument(filePath);
+            await vscode.window.showTextDocument(document);
+
+            // Refresh the prompt store
+            await this.promptManager.refreshPrompts();
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to create new prompt', { path: filePath.fsPath, error: errorMessage });
+            vscode.window.showErrorMessage(`Failed to create prompt: ${errorMessage}`);
+        }
+    }
+
+    /**
+     * Refresh the prompt store
+     */
+    private async refreshStore(): Promise<void> {
+        this.sendToWebview({ type: 'showLoading' });
+
+        try {
+            await this.promptManager.refreshPrompts();
+            // Prompts will be sent via the onPromptsChanged event
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to refresh prompt store', { error: errorMessage });
+
+            this.sendToWebview({
+                type: 'showError',
+                error: `Failed to refresh: ${errorMessage}`
+            });
+        } finally {
+            this.sendToWebview({ type: 'hideLoading' });
+        }
     }
 }
