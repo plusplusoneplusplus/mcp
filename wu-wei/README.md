@@ -19,6 +19,7 @@ Transform your daily work through automation that:
 ### Current
 - Basic extension foundation with Wu Wei principles
 - **Wu Wei Chat Interface**: Natural conversation flow for automation guidance
+- **VS Code Chat Participant**: Use `@wu-wei` in VS Code chat for effortless assistance
 - Configuration system for automation preferences
 - Extensible architecture for future automation modules
 
@@ -37,6 +38,23 @@ Transform your daily work through automation that:
 4. Test the commands:
    - `Ctrl+Shift+P` → "Wu Wei: Hello World"
    - `Ctrl+Shift+P` → "Wu Wei: Open Chat" (Start natural conversation)
+   - Open VS Code Chat (Ctrl+Shift+I or View → Chat) and type `@wu-wei hello` for effortless assistance
+
+## Using Wu Wei Chat Participant
+
+The Wu Wei chat participant embodies the philosophy of effortless action. Simply:
+
+1. Open VS Code Chat panel (`Ctrl+Shift+I` or `View → Chat`)
+2. Type `@wu-wei` followed by your question or request
+3. Experience thoughtful, gentle guidance that flows naturally
+
+**Example interactions:**
+- `@wu-wei Tell me about Wu Wei philosophy`
+- `@wu-wei Help me with my current workspace`
+- `@wu-wei Show me the way of effortless coding`
+- `@wu-wei How can I work more harmoniously?`
+
+The assistant provides wise, concise responses that flow naturally without forcing solutions.
 
 ## Development
 

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Wu Wei Chat Participant**: VS Code chat participant (`@wu-wei`) for effortless assistance
+  - Natural conversation interface following Wu Wei philosophy
+  - Integration with existing language model setup
+  - Thoughtful followup suggestions for harmonious workflow
+  - Graceful error handling with Wu Wei-inspired messages
 - Unit testing infrastructure with Mocha and VS Code Test Runner
 - Basic extension activation and command registration tests
 - GitHub Actions CI/CD workflow for automated testing
