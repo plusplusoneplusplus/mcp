@@ -202,10 +202,64 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('wu-wei.promptStore.focus');
     });
 
+    // Register prompt store refresh command
+    const promptStoreRefreshCommand = vscode.commands.registerCommand('wu-wei.promptStore.refresh', async () => {
+        logger.info('Prompt store refresh command executed');
+        try {
+            promptStoreProvider.refresh();
+            vscode.window.showInformationMessage('Wu Wei: Prompt store refreshed');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error('Failed to refresh prompt store view', { error: errorMessage });
+            vscode.window.showErrorMessage(`Wu Wei: Failed to refresh prompt store: ${errorMessage}`);
+        }
+    });
+
+    // Register debug command for prompt store
+    const debugPromptStoreCommand = vscode.commands.registerCommand('wu-wei.debugPromptStore', async () => {
+        logger.info('Debug prompt store command executed');
+        try {
+            const prompts = promptManager.getAllPrompts();
+            const config = promptManager.getConfig();
+
+            const debugInfo = {
+                promptCount: prompts.length,
+                config: config,
+                samplePrompts: prompts.slice(0, 3).map(p => ({
+                    id: p.id,
+                    fileName: p.fileName,
+                    title: p.metadata?.title,
+                    filePath: p.filePath
+                }))
+            };
+
+            logger.info('Prompt store debug info:', debugInfo);
+
+            const message = `Prompt Store Debug:
+• Prompts: ${debugInfo.promptCount}
+• Root Directory: ${config.rootDirectory || 'Not configured'}
+• Auto Refresh: ${config.autoRefresh}
+• Sample Prompts: ${debugInfo.samplePrompts.map(p => p.title || p.fileName).join(', ')}`;
+
+            vscode.window.showInformationMessage(message);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error('Failed to debug prompt store', { error: errorMessage });
+            vscode.window.showErrorMessage(`Debug failed: ${errorMessage}`);
+        }
+    });
+
     const refreshPromptsCommand = vscode.commands.registerCommand('wu-wei.refreshPrompts', async () => {
         logger.info('Refresh prompts command executed');
-        await promptManager.refreshPrompts();
-        vscode.window.showInformationMessage('Wu Wei: Prompts refreshed');
+        try {
+            await promptManager.refreshPrompts();
+            promptStoreProvider.refresh();
+            vscode.window.showInformationMessage('Wu Wei: Prompts refreshed');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error('Failed to refresh prompts', { error: errorMessage });
+            vscode.window.showErrorMessage(`Wu Wei: Failed to refresh prompts: ${errorMessage}`);
+        }
     });
 
     context.subscriptions.push(
@@ -226,6 +280,8 @@ export function activate(context: vscode.ExtensionContext) {
         refreshAgentsCommand,
         showModelDetailsCommand,
         openPromptStoreCommand,
+        promptStoreRefreshCommand,
+        debugPromptStoreCommand,
         refreshPromptsCommand,
         promptManager,
         configManager,

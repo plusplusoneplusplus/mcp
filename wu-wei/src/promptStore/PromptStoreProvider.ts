@@ -18,6 +18,7 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     private promptManager: PromptManager;
     private fileOperationManager: FileOperationManager;
     private webview?: vscode.Webview;
+    private _view?: vscode.WebviewView;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -40,6 +41,7 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
         context: vscode.WebviewViewResolveContext,
         token: vscode.CancellationToken
     ): void {
+        this._view = webviewView;
         this.webview = webviewView.webview;
 
         webviewView.webview.options = {
@@ -58,24 +60,68 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
             []
         );
 
+        // Handle webview disposal
+        webviewView.onDidDispose(() => {
+            this.webview = undefined;
+            this._view = undefined;
+        });
+
+        // Handle webview becoming visible/hidden
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible && this.webview) {
+                // Refresh data when view becomes visible after being hidden
+                this.sendInitialData();
+            }
+        });
+
         this.logger.info('Prompt Store webview resolved');
+    }    /**
+     * Refresh the webview (called by VS Code's refresh button)
+     */
+    public refresh(): void {
+        this.logger.info('🔄 PromptStoreProvider.refresh() called');
+
+        if (this._view && this.webview) {
+            this.logger.info('🖼️ Regenerating webview HTML content');
+            // Regenerate the HTML content
+            this._view.webview.html = this.getHtmlForWebview(this._view.webview);
+
+            this.logger.info('⏰ Scheduling initial data send after 100ms delay');
+            // Send initial data after a short delay to ensure webview is ready
+            setTimeout(() => {
+                this.logger.info('📤 Sending initial data after refresh delay');
+                this.sendInitialData();
+            }, 100);
+
+            this.logger.info('✅ Prompt Store webview refreshed');
+        } else {
+            this.logger.warn('⚠️ Cannot refresh: view or webview not available', {
+                hasView: !!this._view,
+                hasWebview: !!this.webview
+            });
+        }
     }
 
     /**
      * Handle messages from the webview
      */
     private async handleWebviewMessage(message: WebviewMessage): Promise<void> {
+        this.logger.info('📨 Received webview message:', { type: message.type, hasPayload: !!message.payload });
+
         try {
             switch (message.type) {
                 case 'webviewReady':
+                    this.logger.info('🚀 Webview ready, sending initial data');
                     await this.sendInitialData();
                     break;
 
                 case 'configureDirectory':
+                    this.logger.info('📁 Configure directory requested');
                     await this.configureDirectory();
                     break;
 
                 case 'openPrompt':
+                    this.logger.info('📄 Open prompt requested:', { path: message.path });
                     if (message.path) {
                         await this.openPrompt(message.path);
                     } else {
@@ -87,10 +133,12 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
                     break;
 
                 case 'createNewPrompt':
+                    this.logger.info('➕ Create new prompt requested');
                     await this.createNewPrompt();
                     break;
 
                 case 'refreshStore':
+                    this.logger.info('🔄 Refresh store requested from webview');
                     await this.refreshStore();
                     break;
 
@@ -244,7 +292,10 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
      */
     private sendToWebview(response: WebviewResponse): void {
         if (this.webview) {
+            this.logger.info('📤 Sending message to webview:', { type: response.type });
             this.webview.postMessage(response);
+        } else {
+            this.logger.warn('⚠️ Cannot send message to webview: webview not available', { messageType: response.type });
         }
     }
 
@@ -362,31 +413,58 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }
         return text;
-    }
-
-    /**
+    }    /**
      * Send initial data to webview when it's ready
      */
     private async sendInitialData(): Promise<void> {
-        const prompts = this.promptManager.getAllPrompts();
-        const config = this.promptManager.getConfig();
+        this.logger.info('📤 sendInitialData() called');
 
-        this.logger.info('Sending prompts to webview:', { count: prompts.length, prompts: prompts.slice(0, 2) }); // Debug log
+        try {
+            const prompts = this.promptManager.getAllPrompts();
+            const config = this.promptManager.getConfig();
 
-        this.sendToWebview({
-            type: 'updatePrompts',
-            prompts
-        });
+            this.logger.info('📊 Sending prompts to webview:', {
+                count: prompts.length,
+                configExists: !!config,
+                samplePrompts: prompts.slice(0, 2).map(p => ({
+                    id: p.id,
+                    title: p.metadata?.title,
+                    fileName: p.fileName
+                }))
+            });
 
-        this.sendToWebview({
-            type: 'updateConfig',
-            config
-        });
+            this.logger.info('📤 Sending updatePrompts message');
+            this.sendToWebview({
+                type: 'updatePrompts',
+                prompts
+            });
 
-        // Hide loading state after initial data is sent
-        this.sendToWebview({
-            type: 'hideLoading'
-        });
+            this.logger.info('📤 Sending updateConfig message');
+            this.sendToWebview({
+                type: 'updateConfig',
+                config
+            });
+
+            this.logger.info('📤 Sending hideLoading message');
+            // Hide loading state after initial data is sent
+            this.sendToWebview({
+                type: 'hideLoading'
+            });
+
+            this.logger.info('✅ Initial data sent successfully');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('❌ Failed to send initial data to webview', { error: errorMessage });
+
+            this.sendToWebview({
+                type: 'showError',
+                error: `Failed to load prompts: ${errorMessage}`
+            });
+
+            this.sendToWebview({
+                type: 'hideLoading'
+            });
+        }
     }
 
     /**

@@ -50,23 +50,31 @@
     // Message handling
     window.addEventListener('message', event => {
         const message = event.data;
+        console.log('📨 Webview received message:', message.type, message);
 
         switch (message.type) {
             case 'updatePrompts':
+                console.log('🔄 Processing updatePrompts with data:', message.prompts);
                 updatePrompts(message.prompts);
                 break;
             case 'updateConfig':
+                console.log('⚙️ Processing updateConfig with data:', message.config);
                 updateConfig(message.config);
                 break;
             case 'showLoading':
+                console.log('⏳ Showing loading state');
                 showLoadingState();
                 break;
             case 'hideLoading':
+                console.log('✅ Hiding loading state');
                 hideLoadingState();
                 break;
             case 'showError':
+                console.log('❌ Showing error:', message.error);
                 showError(message.error);
                 break;
+            default:
+                console.log('❓ Unknown message type:', message.type);
         }
     });
 
@@ -183,29 +191,56 @@
                 path: promptPath
             });
         }
-    }
-
-    // UI update functions
+    }    // UI update functions
     function updatePrompts(prompts) {
-        console.log('Received prompts:', prompts); // Debug log
+        console.log('🔍 updatePrompts called with:', prompts);
+        console.log('📊 Current state before update:', currentState);
+
+        if (!prompts || !Array.isArray(prompts)) {
+            console.error('❌ Invalid prompts data received:', prompts);
+            showError('Invalid prompts data received');
+            return;
+        }
+
         currentState.prompts = prompts;
+        console.log('📝 Updated currentState.prompts:', currentState.prompts.length, 'items');
+
         renderPromptTree();
         updateFilters();
 
         if (prompts.length === 0) {
+            console.log('📭 No prompts found, showing empty state');
             showEmptyState();
         } else {
+            console.log('📚 Found', prompts.length, 'prompts, hiding empty state');
             hideEmptyState();
         }
+
+        // Hide loading state when prompts are successfully updated
+        hideLoadingState();
+        console.log('✅ updatePrompts completed successfully');
     }
 
     function renderPromptTree() {
+        console.log('🌲 renderPromptTree called with', currentState.prompts.length, 'prompts');
+
         const filteredPrompts = filterPrompts(currentState.prompts);
-        const treeHTML = buildTreeHTML(organizePrompts(filteredPrompts));
+        console.log('🔍 Filtered to', filteredPrompts.length, 'prompts');
+
+        const organizedPrompts = organizePrompts(filteredPrompts);
+        console.log('📁 Organized into', organizedPrompts.length, 'tree nodes');
+
+        const treeHTML = buildTreeHTML(organizedPrompts);
+        console.log('🏗️ Generated HTML length:', treeHTML.length, 'characters');
+
         elements.promptTree.innerHTML = treeHTML;
+        console.log('🖼️ Updated DOM with new HTML');
 
         // Attach click handlers to tree nodes
-        elements.promptTree.querySelectorAll('.tree-node[data-type="file"]').forEach(node => {
+        const fileNodes = elements.promptTree.querySelectorAll('.tree-node[data-type="file"]');
+        console.log('📄 Found', fileNodes.length, 'file nodes for click handlers');
+
+        fileNodes.forEach(node => {
             node.addEventListener('click', (e) => {
                 // Only handle left click for opening
                 if (e.button === 0) {
@@ -214,9 +249,14 @@
             });
         });
 
-        elements.promptTree.querySelectorAll('.tree-node[data-type="folder"]').forEach(node => {
+        const folderNodes = elements.promptTree.querySelectorAll('.tree-node[data-type="folder"]');
+        console.log('📁 Found', folderNodes.length, 'folder nodes for click handlers');
+
+        folderNodes.forEach(node => {
             node.addEventListener('click', () => handleFolderClick(node));
         });
+
+        console.log('✅ renderPromptTree completed');
     }
 
     function buildTreeHTML(treeData) {
@@ -348,15 +388,85 @@
     function showError(error) {
         // Simple error display for now
         console.error('Prompt Store Error:', error);
-        // TODO: Implement proper error UI
+
+        // Show error in the UI by temporarily replacing the empty state message
+        if (elements.emptyState.style.display === 'flex') {
+            const emptyContent = elements.emptyState.querySelector('.empty-content');
+            if (emptyContent) {
+                const originalContent = emptyContent.innerHTML;
+                emptyContent.innerHTML = `
+                    <h3>Error Loading Prompts</h3>
+                    <p>${error}</p>
+                    <button onclick="location.reload()" class="primary-button">
+                        🔄 Retry
+                    </button>
+                `;
+
+                // Restore original content after 5 seconds
+                setTimeout(() => {
+                    emptyContent.innerHTML = originalContent;
+                }, 5000);
+            }
+        }
+
+        // Hide loading state on error
+        hideLoadingState();
     }
 
     // Initialize
     setupEventHandlers();
 
-    // Show loading state and request initial data
-    showLoadingState();
-    vscode.postMessage({
-        type: 'webviewReady'
-    });
+    // Enhanced initialization with retry mechanism
+    function initialize() {
+        console.log('🚀 Initializing webview...');
+        console.log('📄 Document readyState:', document.readyState);
+        console.log('🖼️ Elements found:', {
+            searchInput: !!elements.searchInput,
+            categoryFilter: !!elements.categoryFilter,
+            tagFilter: !!elements.tagFilter,
+            promptTree: !!elements.promptTree,
+            emptyState: !!elements.emptyState,
+            loadingState: !!elements.loadingState
+        });
+
+        showLoadingState();
+        console.log('📤 Sending webviewReady message to extension');
+        vscode.postMessage({
+            type: 'webviewReady'
+        });
+    }
+
+    // Initialize immediately
+    console.log('🔧 Starting immediate initialization');
+    initialize();
+
+    // Also initialize when document is fully loaded (in case of timing issues)
+    if (document.readyState === 'loading') {
+        console.log('📄 Document still loading, adding DOMContentLoaded listener');
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('📄 DOMContentLoaded fired, reinitializing');
+            initialize();
+        });
+    } else {
+        console.log('📄 Document already loaded');
+    }
+
+    // Retry initialization after a short delay if no data received
+    setTimeout(() => {
+        console.log('⏰ Timeout check - prompts:', currentState.prompts.length, 'loading visible:', elements.loadingState.style.display === 'flex');
+        if (currentState.prompts.length === 0 && elements.loadingState.style.display === 'flex') {
+            console.log('🔄 No prompts received after timeout, retrying initialization...');
+            initialize();
+        }
+    }, 2000);
+
+    // Add a longer timeout for debugging
+    setTimeout(() => {
+        console.log('🕐 Extended timeout check (5s):');
+        console.log('   - Prompts count:', currentState.prompts.length);
+        console.log('   - Loading state visible:', elements.loadingState.style.display === 'flex');
+        console.log('   - Empty state visible:', elements.emptyState.style.display === 'flex');
+        console.log('   - Prompt tree content length:', elements.promptTree.innerHTML.length);
+        console.log('   - Current state:', currentState);
+    }, 5000);
 })();
