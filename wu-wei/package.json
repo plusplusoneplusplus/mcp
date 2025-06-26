@@ -131,6 +131,12 @@
                 "title": "Wu Wei: Refresh Prompt Store",
                 "category": "Wu Wei",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "wu-wei.promptStore.resetConfig",
+                "title": "Wu Wei: Reset Prompt Store Configuration",
+                "category": "Wu Wei",
+                "icon": "$(settings-gear)"
             }
         ],
         "views": {
