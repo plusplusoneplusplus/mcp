@@ -251,6 +251,45 @@
         console.log('✅ renderPromptTree completed');
     }
 
+    // Category icon mapping using hash-based selection
+    function getCategoryIcon(category) {
+        if (!category) {
+            return '📄'; // Default icon for uncategorized
+        }
+
+        // Small set of very clear, universally supported icons
+        const iconSet = [
+            '📝', // Document/text
+            '⚙️', // Settings/config
+            '🔧', // Tools/utilities
+            '💡', // Ideas/examples
+            '🎯', // Goals/targets
+            '📊', // Data/analytics
+            '🔍', // Search/research
+            '🚀', // Deployment/launch
+            '🧪', // Testing/experiments
+            '💻', // Development/coding
+            '📖', // Documentation/learning
+            '🎨'  // Design/creative
+        ];
+
+        // Simple hash function for consistent icon selection
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return Math.abs(hash);
+        }
+
+        const hash = simpleHash(category.toLowerCase());
+        const iconIndex = hash % iconSet.length;
+
+        return iconSet[iconIndex];
+    }
+
     function buildTreeHTML(treeData) {
         return treeData.map(node => {
             if (node.type === 'folder') {
@@ -264,9 +303,10 @@
                     </div>
                 `;
             } else {
+                const categoryIcon = getCategoryIcon(node.category);
                 return `
                     <div class="tree-node file" data-type="file" data-path="${node.path}" title="${node.name}">
-                        <span class="icon">📄</span>
+                        <span class="icon">${categoryIcon}</span>
                         <span class="name">${node.name}</span>
                     </div>
                 `;
@@ -282,6 +322,7 @@
             .map(prompt => {
                 const title = prompt.metadata?.title;
                 const fileName = prompt.fileName || 'untitled.md';
+                const category = prompt.metadata?.category;
 
                 // Create display name in format "Title (filename)" or just filename if no title
                 let displayName;
@@ -294,7 +335,8 @@
                 return {
                     type: 'file',
                     path: prompt.filePath,
-                    name: displayName
+                    name: displayName,
+                    category: category
                 };
             });
     }
