@@ -8,6 +8,11 @@ export { PromptStoreProvider } from './PromptStoreProvider';
 export { PromptManager } from './PromptManager';
 export { PromptFileWatcher } from './PromptFileWatcher';
 export { MetadataParser } from './MetadataParser';
+export { ConfigurationManager } from './ConfigurationManager';
+export { SessionStateManager } from './SessionStateManager';
+export { FileOperationManager } from './FileOperationManager';
+export { TemplateManager } from './TemplateManager';
+export { FileOperationCommands } from './commands';
 
 // Types and interfaces
 export * from './types';
