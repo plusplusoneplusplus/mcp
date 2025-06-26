@@ -15,6 +15,9 @@
         tagFilter: ''
     };
 
+    // Context menu state
+    let contextMenu = null;
+
     // DOM elements
     const elements = {
         searchInput: document.getElementById('search-input'),
@@ -30,6 +33,18 @@
         elements.searchInput.addEventListener('input', handleSearch);
         elements.categoryFilter.addEventListener('change', handleCategoryFilter);
         elements.tagFilter.addEventListener('change', handleTagFilter);
+
+        // Add global click handler to hide context menu
+        document.addEventListener('click', hideContextMenu);
+
+        // Prevent context menu from bubbling up
+        document.addEventListener('contextmenu', (e) => {
+            const treeNode = e.target.closest('.tree-node[data-type="file"]');
+            if (treeNode) {
+                e.preventDefault();
+                showContextMenu(e, treeNode);
+            }
+        });
     }
 
     // Message handling
@@ -55,6 +70,121 @@
         }
     });
 
+    // Context menu functions
+    function showContextMenu(event, treeNode) {
+        hideContextMenu(); // Hide any existing menu
+
+        const promptPath = treeNode.dataset.path;
+        const promptName = treeNode.querySelector('.name').textContent;
+
+        contextMenu = document.createElement('div');
+        contextMenu.className = 'context-menu';
+        contextMenu.innerHTML = `
+            <div class="context-menu-item" data-action="open">
+                <span class="icon">📝</span>
+                <span class="label">Open</span>
+            </div>
+            <div class="context-menu-item" data-action="rename">
+                <span class="icon">✏️</span>
+                <span class="label">Rename</span>
+            </div>
+            <div class="context-menu-item" data-action="duplicate">
+                <span class="icon">📋</span>
+                <span class="label">Duplicate</span>
+            </div>
+            <div class="context-menu-separator"></div>
+            <div class="context-menu-item context-menu-item--danger" data-action="delete">
+                <span class="icon">🗑️</span>
+                <span class="label">Delete</span>
+            </div>
+        `;
+
+        // Position the menu
+        contextMenu.style.position = 'absolute';
+        contextMenu.style.left = event.clientX + 'px';
+        contextMenu.style.top = event.clientY + 'px';
+        contextMenu.style.zIndex = '1000';
+
+        // Add click handlers
+        contextMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = e.target.closest('.context-menu-item')?.dataset.action;
+            if (action) {
+                handleContextMenuAction(action, promptPath, promptName);
+                hideContextMenu();
+            }
+        });
+
+        document.body.appendChild(contextMenu);
+
+        // Adjust position if menu goes off screen
+        const menuRect = contextMenu.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        if (menuRect.right > viewportWidth) {
+            contextMenu.style.left = (event.clientX - menuRect.width) + 'px';
+        }
+        if (menuRect.bottom > viewportHeight) {
+            contextMenu.style.top = (event.clientY - menuRect.height) + 'px';
+        }
+    }
+
+    function hideContextMenu() {
+        if (contextMenu) {
+            contextMenu.remove();
+            contextMenu = null;
+        }
+    }
+
+    function handleContextMenuAction(action, promptPath, promptName) {
+        switch (action) {
+            case 'open':
+                handlePromptClick(promptPath);
+                break;
+            case 'rename':
+                handleRenamePrompt(promptPath, promptName);
+                break;
+            case 'duplicate':
+                handleDuplicatePrompt(promptPath, promptName);
+                break;
+            case 'delete':
+                handleDeletePrompt(promptPath, promptName);
+                break;
+        }
+    }
+
+    function handleRenamePrompt(promptPath, currentName) {
+        const newName = prompt(`Enter new name for "${currentName}":`, currentName);
+        if (newName && newName.trim() && newName !== currentName) {
+            vscode.postMessage({
+                type: 'renamePrompt',
+                path: promptPath,
+                newName: newName.trim()
+            });
+        }
+    }
+
+    function handleDuplicatePrompt(promptPath, currentName) {
+        const newName = prompt(`Enter name for duplicate of "${currentName}":`, `${currentName} (Copy)`);
+        if (newName && newName.trim()) {
+            vscode.postMessage({
+                type: 'duplicatePrompt',
+                path: promptPath,
+                newName: newName.trim()
+            });
+        }
+    }
+
+    function handleDeletePrompt(promptPath, promptName) {
+        if (confirm(`Are you sure you want to delete "${promptName}"? This action cannot be undone.`)) {
+            vscode.postMessage({
+                type: 'deletePrompt',
+                path: promptPath
+            });
+        }
+    }
+
     // UI update functions
     function updatePrompts(prompts) {
         console.log('Received prompts:', prompts); // Debug log
@@ -76,7 +206,12 @@
 
         // Attach click handlers to tree nodes
         elements.promptTree.querySelectorAll('.tree-node[data-type="file"]').forEach(node => {
-            node.addEventListener('click', () => handlePromptClick(node.dataset.path));
+            node.addEventListener('click', (e) => {
+                // Only handle left click for opening
+                if (e.button === 0) {
+                    handlePromptClick(node.dataset.path);
+                }
+            });
         });
 
         elements.promptTree.querySelectorAll('.tree-node[data-type="folder"]').forEach(node => {

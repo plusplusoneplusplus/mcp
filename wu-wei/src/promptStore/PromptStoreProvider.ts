@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { PromptManager } from './PromptManager';
+import { FileOperationManager } from './FileOperationManager';
 import { Prompt, WebviewMessage, WebviewResponse, SearchFilter } from './types';
 import { UI_CONFIG } from './constants';
 import { WuWeiLogger } from '../logger';
@@ -15,14 +16,17 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
 
     private logger: WuWeiLogger;
     private promptManager: PromptManager;
+    private fileOperationManager: FileOperationManager;
     private webview?: vscode.Webview;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
-        promptManager: PromptManager
+        promptManager: PromptManager,
+        fileOperationManager: FileOperationManager
     ) {
         this.logger = WuWeiLogger.getInstance();
         this.promptManager = promptManager;
+        this.fileOperationManager = fileOperationManager;
 
         // Listen to prompt changes
         this.promptManager.onPromptsChanged(this.handlePromptsChanged.bind(this));
@@ -109,6 +113,39 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
 
                 case 'updateConfig':
                     await this.handleUpdateConfig(message.payload);
+                    break;
+
+                case 'deletePrompt':
+                    if (message.path) {
+                        await this.handleDeletePrompt(message.path);
+                    } else {
+                        this.sendToWebview({
+                            type: 'showError',
+                            error: 'No prompt path provided for deletion'
+                        });
+                    }
+                    break;
+
+                case 'renamePrompt':
+                    if (message.path && message.newName) {
+                        await this.handleRenamePrompt(message.path, message.newName);
+                    } else {
+                        this.sendToWebview({
+                            type: 'showError',
+                            error: 'Missing path or new name for rename operation'
+                        });
+                    }
+                    break;
+
+                case 'duplicatePrompt':
+                    if (message.path && message.newName) {
+                        await this.handleDuplicatePrompt(message.path, message.newName);
+                    } else {
+                        this.sendToWebview({
+                            type: 'showError',
+                            error: 'Missing path or new name for duplicate operation'
+                        });
+                    }
                     break;
 
                 default:
@@ -465,6 +502,112 @@ Your prompt content goes here...
             });
         } finally {
             this.sendToWebview({ type: 'hideLoading' });
+        }
+    }
+
+    /**
+     * Handle delete prompt request
+     */
+    private async handleDeletePrompt(promptPath: string): Promise<void> {
+        try {
+            const result = await this.fileOperationManager.deletePrompt(promptPath);
+
+            if (result.success) {
+                this.sendToWebview({
+                    type: 'showError', // Will be renamed to showMessage in the future
+                    error: 'Prompt deleted successfully'
+                });
+
+                // Refresh the prompt store
+                await this.promptManager.refreshPrompts();
+            } else if (result.error !== 'Deletion cancelled') {
+                this.sendToWebview({
+                    type: 'showError',
+                    error: result.error || 'Failed to delete prompt'
+                });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to delete prompt', { path: promptPath, error: errorMessage });
+
+            this.sendToWebview({
+                type: 'showError',
+                error: `Failed to delete prompt: ${errorMessage}`
+            });
+        }
+    }
+
+    /**
+     * Handle rename prompt request
+     */
+    private async handleRenamePrompt(promptPath: string, newName: string): Promise<void> {
+        try {
+            const result = await this.fileOperationManager.renamePrompt(promptPath, newName);
+
+            if (result.success) {
+                this.sendToWebview({
+                    type: 'showError', // Will be renamed to showMessage in the future
+                    error: `Prompt renamed to: ${newName}`
+                });
+
+                // Refresh the prompt store
+                await this.promptManager.refreshPrompts();
+
+                // Open the renamed file
+                if (result.filePath) {
+                    await this.openPrompt(result.filePath);
+                }
+            } else {
+                this.sendToWebview({
+                    type: 'showError',
+                    error: result.error || 'Failed to rename prompt'
+                });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to rename prompt', { path: promptPath, newName, error: errorMessage });
+
+            this.sendToWebview({
+                type: 'showError',
+                error: `Failed to rename prompt: ${errorMessage}`
+            });
+        }
+    }
+
+    /**
+     * Handle duplicate prompt request
+     */
+    private async handleDuplicatePrompt(promptPath: string, newName: string): Promise<void> {
+        try {
+            const result = await this.fileOperationManager.duplicatePrompt(promptPath, newName);
+
+            if (result.success) {
+                this.sendToWebview({
+                    type: 'showError', // Will be renamed to showMessage in the future
+                    error: `Prompt duplicated as: ${newName}`
+                });
+
+                // Refresh the prompt store
+                await this.promptManager.refreshPrompts();
+
+                // Open the duplicated file
+                if (result.filePath) {
+                    await this.openPrompt(result.filePath);
+                }
+            } else {
+                this.sendToWebview({
+                    type: 'showError',
+                    error: result.error || 'Failed to duplicate prompt'
+                });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('Failed to duplicate prompt', { path: promptPath, newName, error: errorMessage });
+
+            this.sendToWebview({
+                type: 'showError',
+                error: `Failed to duplicate prompt: ${errorMessage}`
+            });
         }
     }
 }
