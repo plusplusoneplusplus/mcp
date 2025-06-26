@@ -17,15 +17,15 @@ import {
 import { PromptManager } from './PromptManager';
 import { ConfigurationManager } from './ConfigurationManager';
 import { WuWeiLogger } from '../logger';
-import { TemplateManager } from './TemplateManager';
+// import { TemplateManager } from './TemplateManager';
 
 export class FileOperationManager {
     private logger: WuWeiLogger;
 
     constructor(
         private promptManager: PromptManager,
-        private configManager: ConfigurationManager,
-        private templateManager: TemplateManager
+        private configManager: ConfigurationManager
+        // private templateManager: TemplateManager
     ) {
         this.logger = WuWeiLogger.getInstance();
     }
@@ -155,60 +155,6 @@ export class FileOperationManager {
 
         } catch (error: any) {
             this.logger.error('Failed to delete prompt:', error);
-            return {
-                success: false,
-                error: error.message
-            };
-        }
-    }
-
-    /**
-     * Duplicate a prompt with a new name
-     */
-    async duplicatePrompt(filePath: string, newName: string): Promise<FileOperationResult> {
-        try {
-            // Load original prompt
-            const originalPrompt = await this.promptManager.loadPrompt(filePath);
-
-            // Generate new file path
-            const newFilePath = await this.generatePromptPath(newName, originalPrompt.metadata.category);
-
-            // Check if new file already exists
-            if (await this.fileExists(newFilePath)) {
-                return {
-                    success: false,
-                    error: `Prompt '${newName}' already exists`
-                };
-            }
-
-            // Update metadata for duplicate
-            const newMetadata: PromptMetadata = {
-                ...originalPrompt.metadata,
-                title: newName,
-                created: new Date(),
-                modified: new Date(),
-                version: '1.0.0' // Reset version for duplicate
-            };
-
-            // Generate new content
-            const newPrompt: Prompt = {
-                ...originalPrompt,
-                filePath: newFilePath,
-                metadata: newMetadata
-            };
-
-            // Save duplicate
-            await this.promptManager.savePrompt(newPrompt);
-
-            this.logger.info(`Duplicated prompt: ${filePath} -> ${newFilePath}`);
-
-            return {
-                success: true,
-                filePath: newFilePath
-            };
-
-        } catch (error: any) {
-            this.logger.error('Failed to duplicate prompt:', error);
             return {
                 success: false,
                 error: error.message
@@ -489,7 +435,9 @@ export class FileOperationManager {
 
         // Add template content
         if (options.template) {
-            content += await this.templateManager.loadTemplate(options.template);
+            // content += await this.templateManager.loadTemplate(options.template);
+            content += `# ${options.name}\n\n`;
+            content += 'Template loading temporarily disabled.\n\n';
         } else {
             content += `# ${options.name}\n\n`;
             content += 'Your prompt content goes here...\n\n';

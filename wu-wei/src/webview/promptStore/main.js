@@ -96,10 +96,6 @@
                 <span class="icon">✏️</span>
                 <span class="label">Rename</span>
             </div>
-            <div class="context-menu-item" data-action="duplicate">
-                <span class="icon">📋</span>
-                <span class="label">Duplicate</span>
-            </div>
             <div class="context-menu-separator"></div>
             <div class="context-menu-item context-menu-item--danger" data-action="delete">
                 <span class="icon">🗑️</span>
@@ -153,9 +149,6 @@
             case 'rename':
                 handleRenamePrompt(promptPath, promptName);
                 break;
-            case 'duplicate':
-                handleDuplicatePrompt(promptPath, promptName);
-                break;
             case 'delete':
                 handleDeletePrompt(promptPath, promptName);
                 break;
@@ -163,35 +156,30 @@
     }
 
     function handleRenamePrompt(promptPath, currentName) {
-        const newName = prompt(`Enter new name for "${currentName}":`, currentName);
-        if (newName && newName.trim() && newName !== currentName) {
-            vscode.postMessage({
-                type: 'renamePrompt',
-                path: promptPath,
-                newName: newName.trim()
-            });
-        }
-    }
+        // Create a custom input dialog since prompt() may not work in VS Code webviews
+        const inputDialog = createInputDialog('Rename Prompt', `Enter new name for "${currentName}":`, currentName);
 
-    function handleDuplicatePrompt(promptPath, currentName) {
-        const newName = prompt(`Enter name for duplicate of "${currentName}":`, `${currentName} (Copy)`);
-        if (newName && newName.trim()) {
-            vscode.postMessage({
-                type: 'duplicatePrompt',
-                path: promptPath,
-                newName: newName.trim()
-            });
-        }
+        inputDialog.onConfirm = (newName) => {
+            if (newName && newName.trim() && newName !== currentName) {
+                vscode.postMessage({
+                    type: 'renamePrompt',
+                    path: promptPath,
+                    newName: newName.trim()
+                });
+            }
+        };
+
+        inputDialog.show();
     }
 
     function handleDeletePrompt(promptPath, promptName) {
-        if (confirm(`Are you sure you want to delete "${promptName}"? This action cannot be undone.`)) {
-            vscode.postMessage({
-                type: 'deletePrompt',
-                path: promptPath
-            });
-        }
-    }    // UI update functions
+        vscode.postMessage({
+            type: 'deletePrompt',
+            path: promptPath
+        });
+    }
+
+    // UI update functions
     function updatePrompts(prompts) {
         console.log('🔍 updatePrompts called with:', prompts);
         console.log('📊 Current state before update:', currentState);
@@ -364,6 +352,91 @@
             children.style.display = 'none';
             icon.textContent = '📁';
         }
+    }
+
+    // Custom input dialog for VS Code webviews
+    function createInputDialog(title, message, defaultValue = '') {
+        const dialog = {
+            element: null,
+            onConfirm: null,
+
+            show() {
+                // Remove any existing dialog
+                const existingDialog = document.querySelector('.input-dialog-overlay');
+                if (existingDialog) {
+                    existingDialog.remove();
+                }
+
+                // Create dialog HTML
+                const overlay = document.createElement('div');
+                overlay.className = 'input-dialog-overlay';
+                overlay.innerHTML = `
+                    <div class="input-dialog">
+                        <div class="input-dialog-header">
+                            <h3>${title}</h3>
+                        </div>
+                        <div class="input-dialog-content">
+                            <p>${message}</p>
+                            <input type="text" class="input-dialog-input" value="${defaultValue}" placeholder="Enter name...">
+                        </div>
+                        <div class="input-dialog-actions">
+                            <button class="input-dialog-btn input-dialog-btn--cancel">Cancel</button>
+                            <button class="input-dialog-btn input-dialog-btn--confirm">OK</button>
+                        </div>
+                    </div>
+                `;
+
+                // Add event listeners
+                const input = overlay.querySelector('.input-dialog-input');
+                const cancelBtn = overlay.querySelector('.input-dialog-btn--cancel');
+                const confirmBtn = overlay.querySelector('.input-dialog-btn--confirm');
+
+                // Focus and select the input text
+                setTimeout(() => {
+                    input.focus();
+                    input.select();
+                }, 10);
+
+                // Handle confirm
+                const handleConfirm = () => {
+                    const value = input.value.trim();
+                    if (value && this.onConfirm) {
+                        this.onConfirm(value);
+                    }
+                    overlay.remove();
+                };
+
+                // Handle cancel
+                const handleCancel = () => {
+                    overlay.remove();
+                };
+
+                // Event listeners
+                confirmBtn.addEventListener('click', handleConfirm);
+                cancelBtn.addEventListener('click', handleCancel);
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleConfirm();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        handleCancel();
+                    }
+                });
+
+                // Close on overlay click
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) {
+                        handleCancel();
+                    }
+                });
+
+                document.body.appendChild(overlay);
+                this.element = overlay;
+            }
+        };
+
+        return dialog;
     }
 
     // Utility functions
