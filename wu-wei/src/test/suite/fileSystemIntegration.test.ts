@@ -198,15 +198,10 @@ This prompt has invalid YAML in the frontmatter.`
             assert.strictEqual(mainPrompt.metadata.description, 'A main prompt for testing');
             assert.strictEqual(mainPrompt.metadata.category, 'General');
             assert.deepStrictEqual(mainPrompt.metadata.tags, ['main', 'test']);
-            assert.strictEqual(mainPrompt.metadata.author, 'Test Author');
 
             // Verify code review prompt with parameters
             assert(codeReviewPrompt);
             assert.strictEqual(codeReviewPrompt.metadata.category, 'Development');
-            assert(codeReviewPrompt.metadata.parameters);
-            assert.strictEqual(codeReviewPrompt.metadata.parameters.length, 2);
-            assert.strictEqual(codeReviewPrompt.metadata.parameters[0].name, 'code');
-            assert.strictEqual(codeReviewPrompt.metadata.parameters[0].required, true);
 
             // Verify API docs prompt
             assert(apiDocsPrompt);

@@ -48,11 +48,7 @@ export const DEFAULT_METADATA_SCHEMA: Partial<PromptMetadata> = {
     title: 'Untitled Prompt',
     description: '',
     category: 'General',
-    tags: [],
-    author: 'Unknown',
-    version: '1.0.0',
-    parameters: [],
-    examples: []
+    tags: []
 };
 
 /**
@@ -75,13 +71,6 @@ export const VALIDATION_RULES = {
         PATTERN: /^[a-zA-Z0-9\-_]+$/,
         MAX_LENGTH: 30,
         MAX_COUNT: 20
-    },
-    PARAMETER_NAME: {
-        PATTERN: /^[a-zA-Z][a-zA-Z0-9_]*$/,
-        MAX_LENGTH: 50
-    },
-    VERSION: {
-        PATTERN: /^\d+\.\d+\.\d+(-[a-zA-Z0-9\-]+)?$/
     }
 };
 

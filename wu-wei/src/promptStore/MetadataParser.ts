@@ -239,52 +239,6 @@ export class MetadataParser {
             });
         }
 
-        // Validate version format
-        if (metadata.version && !VALIDATION_RULES.VERSION.PATTERN.test(metadata.version)) {
-            warnings.push({
-                field: 'version',
-                message: 'Version format should follow semantic versioning (e.g., 1.0.0)',
-                suggestion: 'Use format: major.minor.patch'
-            });
-        }
-
-        // Validate parameters
-        if (metadata.parameters) {
-            metadata.parameters.forEach((param, index) => {
-                if (!param.name || !VALIDATION_RULES.PARAMETER_NAME.PATTERN.test(param.name)) {
-                    errors.push({
-                        field: `parameters[${index}].name`,
-                        message: `Invalid parameter name: "${param.name}"`,
-                        severity: 'error'
-                    });
-                }
-                if (param.name && param.name.length > VALIDATION_RULES.PARAMETER_NAME.MAX_LENGTH) {
-                    warnings.push({
-                        field: `parameters[${index}].name`,
-                        message: `Parameter name "${param.name}" is too long`,
-                        suggestion: `Keep parameter names under ${VALIDATION_RULES.PARAMETER_NAME.MAX_LENGTH} characters`
-                    });
-                }
-            });
-        }
-
-        // Validate dates
-        if (metadata.created && isNaN(metadata.created.getTime())) {
-            warnings.push({
-                field: 'created',
-                message: 'Invalid created date format',
-                suggestion: 'Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)'
-            });
-        }
-
-        if (metadata.modified && isNaN(metadata.modified.getTime())) {
-            warnings.push({
-                field: 'modified',
-                message: 'Invalid modified date format',
-                suggestion: 'Use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ)'
-            });
-        }
-
         return {
             isValid: errors.length === 0,
             errors,
@@ -331,13 +285,7 @@ export class MetadataParser {
             title: 'Untitled Prompt',
             description: '',
             category: 'General',
-            tags: [],
-            author: process.env.USER || process.env.USERNAME || 'Unknown',
-            version: '1.0.0',
-            created: new Date(),
-            modified: new Date(),
-            parameters: [],
-            examples: []
+            tags: []
         };
     }
 
@@ -367,26 +315,6 @@ export class MetadataParser {
                 .replace(/\b\w/g, l => l.toUpperCase());
         }
 
-        // Set dates from file system if not provided
-        if (!enhanced.created) {
-            enhanced.created = stats.birthtime;
-        }
-        if (!enhanced.modified) {
-            enhanced.modified = stats.mtime;
-        }
-
-        // Try to get author from git config if not provided
-        if (!enhanced.author || enhanced.author === 'Unknown') {
-            try {
-                const gitAuthor = await this.getGitAuthor(filePath);
-                if (gitAuthor) {
-                    enhanced.author = gitAuthor;
-                }
-            } catch (error) {
-                // Git not available or not in a git repo - use default
-            }
-        }
-
         return enhanced;
     }
 
@@ -408,26 +336,10 @@ export class MetadataParser {
                 ...parsed
             };
 
-            // Convert date strings to Date objects
-            if (parsed.created) {
-                metadata.created = new Date(parsed.created);
-            }
-            if (parsed.modified) {
-                metadata.modified = new Date(parsed.modified);
-            }
-
             // Ensure arrays are arrays
             if (parsed.tags && !Array.isArray(parsed.tags)) {
                 metadata.tags = [];
                 this.logger.warn('Tags field is not an array, using empty array');
-            }
-            if (parsed.parameters && !Array.isArray(parsed.parameters)) {
-                metadata.parameters = [];
-                this.logger.warn('Parameters field is not an array, using empty array');
-            }
-            if (parsed.examples && !Array.isArray(parsed.examples)) {
-                metadata.examples = [];
-                this.logger.warn('Examples field is not an array, using empty array');
             }
 
             return metadata;
@@ -435,26 +347,6 @@ export class MetadataParser {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error('Failed to parse YAML frontmatter', { error: errorMessage });
             throw error;
-        }
-    }
-
-    /**
-     * Try to get the git author for the file
-     */
-    private async getGitAuthor(filePath: string): Promise<string | null> {
-        try {
-            const { exec } = require('child_process');
-            const { promisify } = require('util');
-            const execAsync = promisify(exec);
-
-            const { stdout } = await execAsync('git config user.name', {
-                cwd: path.dirname(filePath),
-                timeout: 5000
-            });
-
-            return stdout.trim() || null;
-        } catch (error) {
-            return null;
         }
     }
 

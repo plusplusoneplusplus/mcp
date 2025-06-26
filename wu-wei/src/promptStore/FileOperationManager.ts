@@ -185,8 +185,7 @@ export class FileOperationManager {
             // Update metadata
             const updatedMetadata: PromptMetadata = {
                 ...oldPrompt.metadata,
-                title: newName,
-                modified: new Date()
+                title: newName
             };
 
             // Create updated prompt
@@ -239,8 +238,7 @@ export class FileOperationManager {
             // Update metadata
             const updatedMetadata: PromptMetadata = {
                 ...prompt.metadata,
-                category: newCategory,
-                modified: new Date()
+                category: newCategory
             };
 
             const updatedPrompt: Prompt = {
@@ -416,9 +414,6 @@ export class FileOperationManager {
         const metadata: PromptMetadata = {
             title: options.name,
             description: '',
-            created: new Date(),
-            modified: new Date(),
-            author: await this.getDefaultAuthor(),
             category: options.category,
             tags: [],
             ...options.metadata
@@ -457,15 +452,6 @@ export class FileOperationManager {
             .toLowerCase() // Convert to lowercase
             .replace(/-+/g, '-') // Remove duplicate hyphens
             .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
-    }
-
-    private async getDefaultAuthor(): Promise<string> {
-        try {
-            const gitConfig = vscode.workspace.getConfiguration('git');
-            return gitConfig.get<string>('defaultCloneDirectory', 'Unknown');
-        } catch {
-            return 'Unknown';
-        }
     }
 
     private async fileExists(filePath: string): Promise<boolean> {
