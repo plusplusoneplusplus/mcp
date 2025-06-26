@@ -171,21 +171,13 @@ export class FileOperationCommands {
                 placeHolder: selectedTemplate.template.metadata.category || 'general'
             });
 
-            // Get template parameters
-            const parameters: Record<string, any> = {};
-            for (const param of selectedTemplate.template.parameters) {
-                if (param.required || param.name === 'title') {
-                    const value = await vscode.window.showInputBox({
-                        prompt: `Enter ${param.description || param.name}`,
-                        placeHolder: param.defaultValue?.toString() || '',
-                        value: param.name === 'title' ? name : param.defaultValue?.toString()
-                    });
-
-                    if (value !== undefined) {
-                        parameters[param.name] = value;
-                    }
-                }
-            }
+            // Get template parameters for substitution
+            const parameters: Record<string, any> = {
+                title: name,
+                current_date: new Date().toISOString().split('T')[0],
+                current_time: new Date().toLocaleTimeString(),
+                current_datetime: new Date().toISOString()
+            };
 
             // Render template with parameters
             const templateContent = await this.templateManager.renderTemplate(

@@ -6,7 +6,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PromptTemplate, ParameterDef, PromptMetadata } from './types';
+import { PromptTemplate, PromptMetadata } from './types';
 import { WuWeiLogger } from '../logger';
 
 export class TemplateManager {
@@ -77,8 +77,7 @@ export class TemplateManager {
             metadata: {
                 category: 'custom',
                 tags: ['user-created', 'template']
-            },
-            parameters: this.extractParameters(promptContent)
+            }
         };
 
         // Add to built-in templates (in real implementation, save to user settings)
@@ -178,10 +177,7 @@ Describe the format or type of output you expect.
                 metadata: {
                     category: 'general',
                     tags: ['basic', 'template', 'general-purpose']
-                },
-                parameters: [
-                    { name: 'title', type: 'string', required: true, description: 'The title of the prompt' }
-                ]
+                }
             },
             {
                 id: 'meeting-notes',
@@ -215,22 +211,7 @@ Describe the format or type of output you expect.
                 metadata: {
                     category: 'productivity',
                     tags: ['meeting', 'documentation', 'template', 'business']
-                },
-                parameters: [
-                    { name: 'meeting_title', type: 'string', required: true, description: 'Title of the meeting' },
-                    { name: 'date', type: 'string', required: false, description: 'Meeting date', defaultValue: '{{current_date}}' },
-                    { name: 'duration', type: 'number', required: false, description: 'Meeting duration in minutes', defaultValue: 60 },
-                    { name: 'attendees', type: 'string', required: true, description: 'List of meeting attendees' },
-                    { name: 'agenda_item_1', type: 'string', required: false, description: 'First agenda item' },
-                    { name: 'agenda_item_2', type: 'string', required: false, description: 'Second agenda item' },
-                    { name: 'agenda_item_3', type: 'string', required: false, description: 'Third agenda item' },
-                    { name: 'discussion_points', type: 'string', required: false, description: 'Key discussion points' },
-                    { name: 'action_item_1', type: 'string', required: false, description: 'First action item' },
-                    { name: 'action_item_2', type: 'string', required: false, description: 'Second action item' },
-                    { name: 'action_item_3', type: 'string', required: false, description: 'Third action item' },
-                    { name: 'next_steps', type: 'string', required: false, description: 'Next steps and follow-ups' },
-                    { name: 'additional_notes', type: 'string', required: false, description: 'Additional notes or comments' }
-                ]
+                }
             },
             {
                 id: 'code-review',
@@ -262,15 +243,7 @@ Describe the format or type of output you expect.
                 metadata: {
                     category: 'development',
                     tags: ['code-review', 'development', 'quality-assurance']
-                },
-                parameters: [
-                    { name: 'component_name', type: 'string', required: true, description: 'Name of the component or file being reviewed' },
-                    { name: 'context_description', type: 'string', required: true, description: 'Context about the code being reviewed' },
-                    { name: 'language', type: 'string', required: true, description: 'Programming language of the code' },
-                    { name: 'code_snippet', type: 'string', required: true, description: 'The actual code to be reviewed' },
-                    { name: 'focus_areas', type: 'string', required: false, description: 'Specific areas to focus on during review' },
-                    { name: 'specific_questions', type: 'string', required: false, description: 'Specific questions about the code' }
-                ]
+                }
             },
             {
                 id: 'documentation',
@@ -307,19 +280,7 @@ Describe the format or type of output you expect.
                 metadata: {
                     category: 'development',
                     tags: ['documentation', 'code', 'reference']
-                },
-                parameters: [
-                    { name: 'title', type: 'string', required: true, description: 'Title of the documentation' },
-                    { name: 'overview', type: 'string', required: true, description: 'High-level overview of the component' },
-                    { name: 'purpose', type: 'string', required: true, description: 'Purpose and use case of the component' },
-                    { name: 'language', type: 'string', required: true, description: 'Programming language' },
-                    { name: 'usage_example', type: 'string', required: true, description: 'Basic usage example' },
-                    { name: 'parameters_description', type: 'string', required: false, description: 'Description of parameters' },
-                    { name: 'return_value_description', type: 'string', required: false, description: 'Description of return value' },
-                    { name: 'examples', type: 'string', required: false, description: 'Additional examples' },
-                    { name: 'additional_notes', type: 'string', required: false, description: 'Additional notes or caveats' },
-                    { name: 'related_documentation', type: 'string', required: false, description: 'Links to related documentation' }
-                ]
+                }
             },
             {
                 id: 'analysis',
@@ -356,45 +317,9 @@ Describe the format or type of output you expect.
                 metadata: {
                     category: 'research',
                     tags: ['analysis', 'research', 'investigation']
-                },
-                parameters: [
-                    { name: 'topic', type: 'string', required: true, description: 'Topic of analysis' },
-                    { name: 'objective', type: 'string', required: true, description: 'Objective of the analysis' },
-                    { name: 'background_information', type: 'string', required: true, description: 'Background context' },
-                    { name: 'data_sources', type: 'string', required: false, description: 'Available data sources' },
-                    { name: 'analysis_framework', type: 'string', required: false, description: 'Framework or methodology to use' },
-                    { name: 'question_1', type: 'string', required: false, description: 'First key question' },
-                    { name: 'question_2', type: 'string', required: false, description: 'Second key question' },
-                    { name: 'question_3', type: 'string', required: false, description: 'Third key question' },
-                    { name: 'expected_deliverables', type: 'string', required: false, description: 'What output is expected' },
-                    { name: 'timeline', type: 'string', required: false, description: 'Timeline for completion' },
-                    { name: 'success_criteria', type: 'string', required: false, description: 'How to measure success' }
-                ]
+                }
             }
         ];
-    }
-
-    private extractParameters(content: string): ParameterDef[] {
-        const parameters: ParameterDef[] = [];
-        const parameterRegex = /{{(\w+)}}/g;
-        const matches = content.matchAll(parameterRegex);
-
-        const foundParams = new Set<string>();
-
-        for (const match of matches) {
-            const paramName = match[1];
-            if (!foundParams.has(paramName) && !this.isBuiltInVariable(paramName)) {
-                foundParams.add(paramName);
-                parameters.push({
-                    name: paramName,
-                    type: 'string',
-                    required: true,
-                    description: `Parameter: ${paramName}`
-                });
-            }
-        }
-
-        return parameters;
     }
 
     private isBuiltInVariable(name: string): boolean {

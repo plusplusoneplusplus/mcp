@@ -157,35 +157,6 @@ export class PromptManager {
             );
         }
 
-        // Filter by author
-        if (filter.author) {
-            results = results.filter(prompt =>
-                prompt.metadata.author === filter.author
-            );
-        }
-
-        // Filter by date range
-        if (filter.modifiedAfter) {
-            results = results.filter(prompt =>
-                prompt.lastModified >= filter.modifiedAfter!
-            );
-        }
-
-        if (filter.modifiedBefore) {
-            results = results.filter(prompt =>
-                prompt.lastModified <= filter.modifiedBefore!
-            );
-        }
-
-        // Filter by parameters
-        if (filter.hasParameters !== undefined) {
-            results = results.filter(prompt =>
-                filter.hasParameters ?
-                    (prompt.metadata.parameters && prompt.metadata.parameters.length > 0) :
-                    (!prompt.metadata.parameters || prompt.metadata.parameters.length === 0)
-            );
-        }
-
         return this.sortPrompts(results);
     }
 
@@ -469,9 +440,7 @@ export class PromptManager {
                     title: name,
                     description: '',
                     category: category || 'General',
-                    tags: [],
-                    created: new Date(),
-                    modified: new Date()
+                    tags: []
                 },
                 content: '# ' + name + '\n\nEnter your prompt content here...',
                 lastModified: new Date(),
@@ -685,9 +654,6 @@ export class PromptManager {
                     break;
                 case 'category':
                     comparison = (a.metadata.category || '').localeCompare(b.metadata.category || '');
-                    break;
-                case 'author':
-                    comparison = (a.metadata.author || '').localeCompare(b.metadata.author || '');
                     break;
             }
 

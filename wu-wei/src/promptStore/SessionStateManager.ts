@@ -11,14 +11,10 @@ export interface SearchFilters {
     query?: string;
     category?: string;
     tags?: string[];
-    author?: string;
-    hasParameters?: boolean;
-    modifiedAfter?: Date;
-    modifiedBefore?: Date;
 }
 
 export interface SortPreferences {
-    field: 'name' | 'modified' | 'category' | 'author' | 'created';
+    field: 'name' | 'modified' | 'category';
     direction: 'asc' | 'desc';
 }
 

@@ -46,8 +46,6 @@ This is the prompt content.`;
             assert.strictEqual(result.metadata?.description, 'A test prompt for unit testing');
             assert.strictEqual(result.metadata?.category, 'Testing');
             assert.deepStrictEqual(result.metadata?.tags, ['test', 'unit']);
-            assert.strictEqual(result.metadata?.author, 'Test Author');
-            assert.strictEqual(result.metadata?.version, '1.0.0');
             assert.strictEqual(result.content, 'This is the prompt content.');
             assert.strictEqual(result.errors.length, 0);
         });
@@ -137,13 +135,7 @@ This should be treated as regular content.`;
             const metadata: PromptMetadata = {
                 title: '',
                 category: 'Test',
-                tags: [],
-                author: 'Test',
-                version: '1.0.0',
-                created: new Date(),
-                modified: new Date(),
-                parameters: [],
-                examples: []
+                tags: []
             };
 
             const result = parser.validateMetadata(metadata);
@@ -160,12 +152,6 @@ This should be treated as regular content.`;
                 title: longTitle,
                 category: 'Test',
                 tags: [],
-                author: 'Test',
-                version: '1.0.0',
-                created: new Date(),
-                modified: new Date(),
-                parameters: [],
-                examples: []
             };
 
             const result = parser.validateMetadata(metadata);
@@ -182,12 +168,6 @@ This should be treated as regular content.`;
                 title: 'Test',
                 category: 'Test',
                 tags: manyTags,
-                author: 'Test',
-                version: '1.0.0',
-                created: new Date(),
-                modified: new Date(),
-                parameters: [],
-                examples: []
             };
 
             const result = parser.validateMetadata(metadata);
@@ -201,12 +181,6 @@ This should be treated as regular content.`;
                 title: 'Test',
                 category: 'Test',
                 tags: [],
-                author: 'Test',
-                version: 'invalid-version',
-                created: new Date(),
-                modified: new Date(),
-                parameters: [],
-                examples: []
             };
 
             const result = parser.validateMetadata(metadata);
@@ -219,18 +193,6 @@ This should be treated as regular content.`;
                 title: 'Test',
                 category: 'Test',
                 tags: [],
-                author: 'Test',
-                version: '1.0.0',
-                created: new Date(),
-                modified: new Date(),
-                parameters: [
-                    {
-                        name: '123invalid',
-                        type: 'string',
-                        required: true
-                    }
-                ],
-                examples: []
             };
 
             const result = parser.validateMetadata(metadata);
@@ -280,12 +242,7 @@ Content after empty frontmatter`;
 
             assert.strictEqual(defaults.title, 'Untitled Prompt');
             assert.strictEqual(defaults.category, 'General');
-            assert.strictEqual(defaults.version, '1.0.0');
             assert(Array.isArray(defaults.tags));
-            assert(Array.isArray(defaults.parameters));
-            assert(Array.isArray(defaults.examples));
-            assert(defaults.created instanceof Date);
-            assert(defaults.modified instanceof Date);
         });
     });
 

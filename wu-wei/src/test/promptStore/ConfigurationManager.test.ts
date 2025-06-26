@@ -67,8 +67,7 @@ suite('ConfigurationManager Tests', () => {
                 metadataSchema: {
                     requireTitle: true,
                     requireDescription: false,
-                    allowCustomFields: true,
-                    validateParameters: true
+                    allowCustomFields: true
                 },
                 fileWatcher: {
                     enabled: true,
@@ -97,8 +96,7 @@ suite('ConfigurationManager Tests', () => {
                 metadataSchema: {
                     requireTitle: true,
                     requireDescription: false,
-                    allowCustomFields: true,
-                    validateParameters: true
+                    allowCustomFields: true
                 },
                 fileWatcher: {
                     enabled: true,
@@ -126,8 +124,7 @@ suite('ConfigurationManager Tests', () => {
                 metadataSchema: {
                     requireTitle: true,
                     requireDescription: false,
-                    allowCustomFields: true,
-                    validateParameters: true
+                    allowCustomFields: true
                 },
                 fileWatcher: {
                     enabled: true,
@@ -154,8 +151,7 @@ suite('ConfigurationManager Tests', () => {
                 metadataSchema: {
                     requireTitle: true,
                     requireDescription: false,
-                    allowCustomFields: true,
-                    validateParameters: true
+                    allowCustomFields: true
                 },
                 fileWatcher: {
                     enabled: true,

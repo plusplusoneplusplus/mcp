@@ -4,23 +4,6 @@
  */
 
 /**
- * Represents a parameter definition in a prompt
- */
-export interface ParameterDef {
-    name: string;
-    type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-    required: boolean;
-    description?: string;
-    defaultValue?: any;
-    validation?: {
-        pattern?: string;
-        min?: number;
-        max?: number;
-        options?: string[];
-    };
-}
-
-/**
  * Metadata extracted from prompt file frontmatter
  */
 export interface PromptMetadata {
@@ -28,21 +11,6 @@ export interface PromptMetadata {
     description?: string;
     category?: string;
     tags?: string[];
-    author?: string;
-    version?: string;
-    created?: Date;
-    modified?: Date;
-    parameters?: ParameterDef[];
-    examples?: Array<{
-        name: string;
-        description?: string;
-        input: Record<string, any>;
-    }>;
-    model?: {
-        preferred?: string;
-        temperature?: number;
-        maxTokens?: number;
-    };
 }
 
 /**
@@ -71,7 +39,7 @@ export interface PromptStoreConfig {
     refreshInterval: number;
     enableCache: boolean;
     maxCacheSize: number;
-    sortBy: 'name' | 'modified' | 'category' | 'author';
+    sortBy: 'name' | 'modified' | 'category';
     sortOrder: 'asc' | 'desc';
     showCategories: boolean;
     showTags: boolean;
@@ -118,10 +86,6 @@ export interface SearchFilter {
     query?: string;
     category?: string;
     tags?: string[];
-    author?: string;
-    hasParameters?: boolean;
-    modifiedAfter?: Date;
-    modifiedBefore?: Date;
 }
 
 /**
@@ -247,5 +211,4 @@ export interface PromptTemplate {
     description: string;
     content: string;
     metadata: Partial<PromptMetadata>;
-    parameters: ParameterDef[];
 }

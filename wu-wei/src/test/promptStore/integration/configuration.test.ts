@@ -90,8 +90,7 @@ suite('Configuration Integration Tests', () => {
             metadataSchema: {
                 requireTitle: true,
                 requireDescription: false,
-                allowCustomFields: true,
-                validateParameters: true
+                allowCustomFields: true
             },
             fileWatcher: {
                 enabled: true,
@@ -159,15 +158,13 @@ suite('Configuration Integration Tests', () => {
         await sessionStateManager.updateSearchFilters({
             query: 'test query',
             category: 'test',
-            tags: ['tag1', 'tag2'],
-            hasParameters: true
+            tags: ['tag1', 'tag2']
         });
 
         const state = sessionStateManager.getState();
         assert.strictEqual(state.searchFilters.query, 'test query');
         assert.strictEqual(state.searchFilters.category, 'test');
         assert(Array.isArray(state.searchFilters.tags));
-        assert.strictEqual(state.searchFilters.hasParameters, true);
     });
 
     test('Should export and import state', async () => {

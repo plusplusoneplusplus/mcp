@@ -22,7 +22,6 @@ export interface MetadataSchemaConfig {
     requireTitle: boolean;
     requireDescription: boolean;
     allowCustomFields: boolean;
-    validateParameters: boolean;
 }
 
 export interface FileWatcherConfig {
@@ -310,8 +309,7 @@ export class ConfigurationManager {
         return {
             requireTitle: true,
             requireDescription: false,
-            allowCustomFields: true,
-            validateParameters: true
+            allowCustomFields: true
         };
     }
 
