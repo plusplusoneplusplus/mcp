@@ -7,17 +7,36 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { PromptStoreProvider } from '../../promptStore/PromptStoreProvider';
 import { PromptManager } from '../../promptStore/PromptManager';
+import { FileOperationManager } from '../../promptStore/FileOperationManager';
+import { ConfigurationManager } from '../../promptStore/ConfigurationManager';
+import { TemplateManager } from '../../promptStore/TemplateManager';
 
 suite('PromptStoreProvider - Step 6 Tests', () => {
     let provider: PromptStoreProvider;
     let mockPromptManager: PromptManager;
+    let mockFileOperationManager: FileOperationManager;
     let mockExtensionUri: vscode.Uri;
 
     setup(() => {
         // Setup mock objects
         mockExtensionUri = vscode.Uri.file('/mock/path');
         mockPromptManager = new PromptManager();
-        provider = new PromptStoreProvider(mockExtensionUri, mockPromptManager);
+
+        // Create mock dependencies for FileOperationManager
+        const mockContext = {
+            subscriptions: [],
+            workspaceState: { get: () => undefined, update: () => Promise.resolve() },
+            globalState: { get: () => undefined, update: () => Promise.resolve() },
+            extensionPath: '/mock/path',
+            storagePath: '/mock/path',
+            globalStoragePath: '/mock/path'
+        } as any;
+
+        const mockConfigManager = new ConfigurationManager(mockContext);
+        const mockTemplateManager = new TemplateManager();
+        mockFileOperationManager = new FileOperationManager(mockPromptManager, mockConfigManager, mockTemplateManager);
+
+        provider = new PromptStoreProvider(mockExtensionUri, mockPromptManager, mockFileOperationManager);
     });
 
     test('Provider should be created successfully', () => {

@@ -185,9 +185,11 @@ export interface MetadataCacheEntry {
  */
 export interface WebviewMessage {
     type: 'webviewReady' | 'configureDirectory' | 'openPrompt' | 'createNewPrompt' | 'refreshStore' |
-    'getPrompts' | 'searchPrompts' | 'selectPrompt' | 'refreshPrompts' | 'updateConfig';
+    'getPrompts' | 'searchPrompts' | 'selectPrompt' | 'refreshPrompts' | 'updateConfig' |
+    'deletePrompt' | 'renamePrompt' | 'duplicatePrompt';
     payload?: any;
-    path?: string; // For openPrompt message
+    path?: string; // For openPrompt, deletePrompt, renamePrompt, duplicatePrompt messages
+    newName?: string; // For renamePrompt and duplicatePrompt messages
 }
 
 export interface WebviewResponse {
