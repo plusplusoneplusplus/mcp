@@ -22,8 +22,7 @@
         tagFilter: document.getElementById('tag-filter'),
         promptTree: document.getElementById('prompt-tree'),
         emptyState: document.getElementById('empty-state'),
-        loadingState: document.getElementById('loading-state'),
-        newPromptBtn: document.getElementById('new-prompt')
+        loadingState: document.getElementById('loading-state')
     };
 
     // Event handlers
@@ -31,7 +30,6 @@
         elements.searchInput.addEventListener('input', handleSearch);
         elements.categoryFilter.addEventListener('change', handleCategoryFilter);
         elements.tagFilter.addEventListener('change', handleTagFilter);
-        elements.newPromptBtn.addEventListener('click', createNewPrompt);
     }
 
     // Message handling
@@ -191,12 +189,6 @@
             children.style.display = 'none';
             icon.textContent = '📁';
         }
-    }
-
-    function createNewPrompt() {
-        vscode.postMessage({
-            type: 'createNewPrompt'
-        });
     }
 
     // Utility functions

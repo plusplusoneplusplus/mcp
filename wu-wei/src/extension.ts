@@ -191,85 +191,6 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Wu Wei: Prompts refreshed');
     });
 
-    // Add missing prompt store commands
-    const selectDirectoryCommand = vscode.commands.registerCommand('wu-wei.promptStore.selectDirectory', async () => {
-        logger.info('Select prompt store directory command executed');
-
-        try {
-            const directory = await configManager.selectDirectory();
-            if (directory) {
-                await configManager.setRootDirectory(directory);
-                await sessionStateManager.setLastRootDirectory(directory);
-
-                // Refresh prompts with new directory
-                await promptManager.refreshPrompts();
-
-                vscode.window.showInformationMessage(`Wu Wei: Prompt store directory set to: ${directory}`);
-            }
-        } catch (error) {
-            logger.error('Failed to select directory', error);
-            vscode.window.showErrorMessage(`Failed to set directory: ${error}`);
-        }
-    });
-
-    const newPromptCommand = vscode.commands.registerCommand('wu-wei.promptStore.newPrompt', async () => {
-        logger.info('New prompt command executed');
-
-        const name = await vscode.window.showInputBox({
-            prompt: 'Enter prompt name',
-            validateInput: (value) => {
-                if (!value.trim()) { return 'Name cannot be empty'; }
-                if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) { return 'Name contains invalid characters'; }
-                return undefined;
-            }
-        });
-
-        if (name) {
-            try {
-                const prompt = await promptManager.createPrompt(name);
-                logger.info('New prompt created', { name, path: prompt.filePath });
-
-                // Open the new prompt file
-                const document = await vscode.workspace.openTextDocument(prompt.filePath);
-                await vscode.window.showTextDocument(document);
-
-                vscode.window.showInformationMessage(`Wu Wei: Created new prompt "${name}"`);
-            } catch (error) {
-                logger.error('Failed to create new prompt', { name, error });
-                vscode.window.showErrorMessage(`Failed to create prompt: ${error}`);
-            }
-        }
-    });
-
-    const refreshStoreCommand = vscode.commands.registerCommand('wu-wei.promptStore.refreshStore', async () => {
-        logger.info('Refresh prompt store command executed');
-        await promptManager.refreshPrompts();
-        vscode.window.showInformationMessage('Wu Wei: Prompt store refreshed');
-    });
-
-    const resetConfigCommand = vscode.commands.registerCommand('wu-wei.promptStore.resetConfig', async () => {
-        logger.info('Reset prompt store configuration command executed');
-
-        const confirm = await vscode.window.showWarningMessage(
-            'Reset prompt store configuration to defaults? This will clear all custom settings.',
-            'Reset', 'Cancel'
-        );
-
-        if (confirm === 'Reset') {
-            try {
-                await configManager.resetToDefaults();
-                await sessionStateManager.clearState();
-                await promptManager.refreshPrompts();
-
-                vscode.window.showInformationMessage('Wu Wei: Configuration reset to defaults');
-                logger.info('Configuration reset completed');
-            } catch (error) {
-                logger.error('Failed to reset configuration', error);
-                vscode.window.showErrorMessage(`Failed to reset configuration: ${error}`);
-            }
-        }
-    });
-
     context.subscriptions.push(
         chatViewProvider,
         debugViewProvider,
@@ -289,10 +210,6 @@ export function activate(context: vscode.ExtensionContext) {
         showModelDetailsCommand,
         openPromptStoreCommand,
         refreshPromptsCommand,
-        selectDirectoryCommand,
-        newPromptCommand,
-        refreshStoreCommand,
-        resetConfigCommand,
         promptManager,
         configManager,
         sessionStateManager,
