@@ -46,12 +46,12 @@ export class FileOperationCommands {
             })
         );
 
-        // Duplicate prompt command
-        disposables.push(
-            vscode.commands.registerCommand('wu-wei.promptStore.duplicatePrompt', async (filePath: string) => {
-                await this.handleDuplicatePrompt(filePath);
-            })
-        );
+        // Duplicate prompt command (commented out)
+        // disposables.push(
+        //     vscode.commands.registerCommand('wu-wei.promptStore.duplicatePrompt', async (filePath: string) => {
+        //         await this.handleDuplicatePrompt(filePath);
+        //     })
+        // );
 
         // Rename prompt command
         disposables.push(
@@ -231,34 +231,34 @@ export class FileOperationCommands {
         }
     }
 
-    private async handleDuplicatePrompt(filePath: string): Promise<void> {
-        try {
-            const originalName = path.basename(filePath, path.extname(filePath));
-            const newName = await vscode.window.showInputBox({
-                prompt: 'Enter name for duplicate',
-                value: `${originalName} (Copy)`,
-                validateInput: (value) => {
-                    if (!value.trim()) return 'Name cannot be empty';
-                    if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) return 'Name contains invalid characters';
-                    return undefined;
-                }
-            });
+    // private async handleDuplicatePrompt(filePath: string): Promise<void> {
+    //     try {
+    //         const originalName = path.basename(filePath, path.extname(filePath));
+    //         const newName = await vscode.window.showInputBox({
+    //             prompt: 'Enter name for duplicate',
+    //             value: `${originalName} (Copy)`,
+    //             validateInput: (value) => {
+    //                 if (!value.trim()) return 'Name cannot be empty';
+    //                 if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) return 'Name contains invalid characters';
+    //                 return undefined;
+    //             }
+    //         });
 
-            if (!newName) return;
+    //         if (!newName) return;
 
-            const result = await this.fileOperationManager.duplicatePrompt(filePath, newName);
-            if (result.success) {
-                await this.fileOperationManager.openPrompt(result.filePath!);
-                vscode.window.showInformationMessage(`Duplicated prompt: ${newName}`);
-            } else {
-                vscode.window.showErrorMessage(result.error!);
-            }
+    //         const result = await this.fileOperationManager.duplicatePrompt(filePath, newName);
+    //         if (result.success) {
+    //             await this.fileOperationManager.openPrompt(result.filePath!);
+    //             vscode.window.showInformationMessage(`Duplicated prompt: ${newName}`);
+    //         } else {
+    //             vscode.window.showErrorMessage(result.error!);
+    //         }
 
-        } catch (error: any) {
-            this.logger.error('Failed to duplicate prompt:', error);
-            vscode.window.showErrorMessage(`Failed to duplicate prompt: ${error.message}`);
-        }
-    }
+    //     } catch (error: any) {
+    //         this.logger.error('Failed to duplicate prompt:', error);
+    //         vscode.window.showErrorMessage(`Failed to duplicate prompt: ${error.message}`);
+    //     }
+    // }
 
     private async handleRenamePrompt(filePath: string): Promise<void> {
         try {

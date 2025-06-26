@@ -256,3 +256,107 @@ body {
     background: var(--vscode-menu-separatorBackground, var(--vscode-input-border));
     margin: 4px 0;
 }
+
+/* Input Dialog Styles */
+.input-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.input-dialog {
+    background: var(--vscode-editor-background, #1e1e1e);
+    border: 1px solid var(--vscode-input-border, #3c3c3c);
+    border-radius: 4px;
+    min-width: 300px;
+    max-width: 500px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.input-dialog-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--vscode-input-border, #3c3c3c);
+}
+
+.input-dialog-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--vscode-foreground, #cccccc);
+}
+
+.input-dialog-content {
+    padding: 16px 20px;
+}
+
+.input-dialog-content p {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    color: var(--vscode-foreground, #cccccc);
+    line-height: 1.4;
+}
+
+.input-dialog-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--vscode-input-border, #3c3c3c);
+    border-radius: 2px;
+    background: var(--vscode-input-background, #3c3c3c);
+    color: var(--vscode-input-foreground, #cccccc);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.input-dialog-input:focus {
+    border-color: var(--vscode-focusBorder, #007acc);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}
+
+.input-dialog-actions {
+    padding: 12px 20px 16px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.input-dialog-btn {
+    padding: 6px 16px;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 2px;
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+    min-width: 70px;
+}
+
+.input-dialog-btn--cancel {
+    background: var(--vscode-button-secondaryBackground, transparent);
+    color: var(--vscode-button-secondaryForeground, #cccccc);
+    border-color: var(--vscode-input-border, #3c3c3c);
+}
+
+.input-dialog-btn--cancel:hover {
+    background: var(--vscode-button-secondaryHoverBackground, #2a2d2e);
+}
+
+.input-dialog-btn--confirm {
+    background: var(--vscode-button-background, #0e639c);
+    color: var(--vscode-button-foreground, #ffffff);
+}
+
+.input-dialog-btn--confirm:hover {
+    background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.input-dialog-btn:focus {
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}

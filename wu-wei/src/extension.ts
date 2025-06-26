@@ -34,7 +34,7 @@ export function activate(context: vscode.ExtensionContext) {
     const sessionStateManager = new SessionStateManager(context);
     const promptManager = new PromptManager();
     const templateManager = new TemplateManager();
-    const fileOperationManager = new FileOperationManager(promptManager, configManager, templateManager);
+    const fileOperationManager = new FileOperationManager(promptManager, configManager);
     const fileOperationCommands = new FileOperationCommands(fileOperationManager, templateManager);
     const promptStoreProvider = new PromptStoreProvider(context.extensionUri, promptManager, fileOperationManager);
 

@@ -185,17 +185,6 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
                     }
                     break;
 
-                case 'duplicatePrompt':
-                    if (message.path && message.newName) {
-                        await this.handleDuplicatePrompt(message.path, message.newName);
-                    } else {
-                        this.sendToWebview({
-                            type: 'showError',
-                            error: 'Missing path or new name for duplicate operation'
-                        });
-                    }
-                    break;
-
                 default:
                     this.logger.warn('Unknown webview message type', { type: message.type });
             }
@@ -648,43 +637,6 @@ Your prompt content goes here...
             this.sendToWebview({
                 type: 'showError',
                 error: `Failed to rename prompt: ${errorMessage}`
-            });
-        }
-    }
-
-    /**
-     * Handle duplicate prompt request
-     */
-    private async handleDuplicatePrompt(promptPath: string, newName: string): Promise<void> {
-        try {
-            const result = await this.fileOperationManager.duplicatePrompt(promptPath, newName);
-
-            if (result.success) {
-                this.sendToWebview({
-                    type: 'showError', // Will be renamed to showMessage in the future
-                    error: `Prompt duplicated as: ${newName}`
-                });
-
-                // Refresh the prompt store
-                await this.promptManager.refreshPrompts();
-
-                // Open the duplicated file
-                if (result.filePath) {
-                    await this.openPrompt(result.filePath);
-                }
-            } else {
-                this.sendToWebview({
-                    type: 'showError',
-                    error: result.error || 'Failed to duplicate prompt'
-                });
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error('Failed to duplicate prompt', { path: promptPath, newName, error: errorMessage });
-
-            this.sendToWebview({
-                type: 'showError',
-                error: `Failed to duplicate prompt: ${errorMessage}`
             });
         }
     }
