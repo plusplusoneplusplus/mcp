@@ -253,6 +253,38 @@
                     "minimum": 100,
                     "maximum": 5000,
                     "description": "Debounce delay for file changes (ms)"
+                },
+                "wu-wei.promptStore.fileWatcher.maxDepth": {
+                    "type": "number",
+                    "default": 10,
+                    "minimum": 1,
+                    "maximum": 50,
+                    "description": "Maximum directory depth to watch"
+                },
+                "wu-wei.promptStore.fileWatcher.ignorePatterns": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "*.tmp",
+                        "*.swp",
+                        "*~",
+                        ".git/**"
+                    ],
+                    "description": "Additional file patterns to ignore"
+                },
+                "wu-wei.promptStore.fileWatcher.usePolling": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Use polling instead of native file events (useful for network drives)"
+                },
+                "wu-wei.promptStore.fileWatcher.pollingInterval": {
+                    "type": "number",
+                    "default": 1000,
+                    "minimum": 100,
+                    "maximum": 10000,
+                    "description": "Polling interval in milliseconds (when polling is enabled)"
                 }
             }
         }

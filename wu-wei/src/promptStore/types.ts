@@ -88,6 +88,29 @@ export interface FileWatcherEvent {
 }
 
 /**
+ * Configuration for the file watcher
+ */
+export interface FileWatcherConfig {
+    enabled: boolean;
+    debounceMs: number;
+    maxDepth: number;
+    followSymlinks: boolean;
+    ignorePatterns: string[];
+    usePolling: boolean;
+    pollingInterval: number;
+}
+
+/**
+ * File watcher event types
+ */
+export type FileWatcherEventType = 'fileAdded' | 'fileChanged' | 'fileDeleted' | 'directoryAdded' | 'directoryDeleted' | 'error';
+
+/**
+ * File watcher event callback type
+ */
+export type FileWatcherEventCallback = (filePath: string, details?: any) => void;
+
+/**
  * Search filter options
  */
 export interface SearchFilter {
