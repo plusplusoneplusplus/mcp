@@ -37,24 +37,53 @@ class PullRequestComment(BaseModel):
     id: int
     content: str
     author: PullRequestIdentity
-    created_date: datetime
-    status: str  # active, resolved, etc.
-    thread_id: Optional[int] = None
-    parent_comment_id: Optional[int] = None
-    last_updated_date: Optional[datetime] = None
-    last_content_updated_date: Optional[datetime] = None
-    comment_type: Optional[str] = None  # text, system, etc.
+    publishedDate: datetime
+    commentType: str = "text"  # text, system, codeChange
+    parentCommentId: Optional[int] = None
+    lastUpdatedDate: Optional[datetime] = None
+    lastContentUpdatedDate: Optional[datetime] = None
+    isDeleted: Optional[bool] = None
+    usersLiked: Optional[List[PullRequestIdentity]] = Field(default_factory=list)
+
+    # Legacy field mappings for backward compatibility
+    @property
+    def created_date(self) -> datetime:
+        return self.publishedDate
+
+    @property
+    def parent_comment_id(self) -> Optional[int]:
+        return self.parentCommentId
+
+    @property
+    def last_updated_date(self) -> Optional[datetime]:
+        return self.lastUpdatedDate
+
+    @property
+    def comment_type(self) -> str:
+        return self.commentType
 
 
 class PullRequestThread(BaseModel):
     """Pull request comment thread information"""
 
     id: int
-    status: str  # active, resolved, etc.
+    status: str  # active, closed, fixed, wontFix, etc.
     comments: List[PullRequestComment]
+    publishedDate: Optional[datetime] = None
+    lastUpdatedDate: Optional[datetime] = None
     properties: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    thread_context: Optional[Dict[str, Any]] = None
-    pull_request_thread_context: Optional[Dict[str, Any]] = None
+    threadContext: Optional[Dict[str, Any]] = None
+    pullRequestThreadContext: Optional[Dict[str, Any]] = None
+    isDeleted: Optional[bool] = None
+
+    # Legacy field mappings for backward compatibility
+    @property
+    def thread_context(self) -> Optional[Dict[str, Any]]:
+        return self.threadContext
+
+    @property
+    def pull_request_thread_context(self) -> Optional[Dict[str, Any]]:
+        return self.pullRequestThreadContext
 
 
 class PullRequestCommentsResponse(BaseModel):
@@ -62,6 +91,7 @@ class PullRequestCommentsResponse(BaseModel):
 
     success: bool
     data: Optional[List[PullRequestThread]] = None
+    count: Optional[int] = None  # Total count of threads
     error: Optional[str] = None
     raw_output: Optional[str] = None
 
