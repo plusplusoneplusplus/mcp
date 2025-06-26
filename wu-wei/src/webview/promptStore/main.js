@@ -156,11 +156,15 @@
     }
 
     function handleRenamePrompt(promptPath, currentName) {
+        // Extract just the title from display name "Title (filename)" format
+        const titleMatch = currentName.match(/^(.+?) \(.+\)$/);
+        const currentTitle = titleMatch ? titleMatch[1] : currentName;
+
         // Create a custom input dialog since prompt() may not work in VS Code webviews
-        const inputDialog = createInputDialog('Rename Prompt', `Enter new name for "${currentName}":`, currentName);
+        const inputDialog = createInputDialog('Rename Prompt', `Enter new title for "${currentTitle}":`, currentTitle);
 
         inputDialog.onConfirm = (newName) => {
-            if (newName && newName.trim() && newName !== currentName) {
+            if (newName && newName.trim() && newName !== currentTitle) {
                 vscode.postMessage({
                     type: 'renamePrompt',
                     path: promptPath,
@@ -261,7 +265,7 @@
                 `;
             } else {
                 return `
-                    <div class="tree-node file" data-type="file" data-path="${node.path}">
+                    <div class="tree-node file" data-type="file" data-path="${node.path}" title="${node.name}">
                         <span class="icon">📄</span>
                         <span class="name">${node.name}</span>
                     </div>
@@ -275,11 +279,24 @@
         // TODO: Implement proper tree structure
         return prompts
             .filter(prompt => prompt && (prompt.metadata?.title || prompt.fileName)) // Filter out invalid prompts
-            .map(prompt => ({
-                type: 'file',
-                path: prompt.filePath,
-                name: prompt.metadata?.title || prompt.fileName || 'Untitled'
-            }));
+            .map(prompt => {
+                const title = prompt.metadata?.title;
+                const fileName = prompt.fileName || 'untitled.md';
+
+                // Create display name in format "Title (filename)" or just filename if no title
+                let displayName;
+                if (title && title !== fileName.replace(/\.md$/, '')) {
+                    displayName = `${title} (${fileName})`;
+                } else {
+                    displayName = fileName;
+                }
+
+                return {
+                    type: 'file',
+                    path: prompt.filePath,
+                    name: displayName
+                };
+            });
     }
 
     function filterPrompts(prompts) {
