@@ -347,7 +347,8 @@
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
+        "compile": "npm run clean && tsc -p ./ && npm run copy-webview",
+        "copy-webview": "cp -r src/webview out/",
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
