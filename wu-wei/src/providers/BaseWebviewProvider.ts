@@ -27,13 +27,13 @@ export abstract class BaseWebviewProvider {
         jsFiles: string[] = []
     ): string {
         try {
-            const htmlPath = path.join(this.context.extensionPath, 'src', 'webview', htmlFile);
+            const htmlPath = path.join(this.context.extensionPath, 'out', 'webview', htmlFile);
             let html = fs.readFileSync(htmlPath, 'utf8');
 
             // Replace CSS URIs
             cssFiles.forEach((cssFile, index) => {
                 const cssUri = webview.asWebviewUri(
-                    vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview', cssFile)
+                    vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview', cssFile)
                 );
                 html = html.replace(`{{${this.getCssPlaceholder(index)}}}`, cssUri.toString());
             });
@@ -41,7 +41,7 @@ export abstract class BaseWebviewProvider {
             // Replace JS URIs
             jsFiles.forEach((jsFile, index) => {
                 const jsUri = webview.asWebviewUri(
-                    vscode.Uri.joinPath(this.context.extensionUri, 'src', 'webview', jsFile)
+                    vscode.Uri.joinPath(this.context.extensionUri, 'out', 'webview', jsFile)
                 );
                 html = html.replace(`{{${this.getJsPlaceholder(index)}}}`, jsUri.toString());
             });

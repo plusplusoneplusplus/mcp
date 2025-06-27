@@ -611,10 +611,10 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     private getHtmlForWebview(webview: vscode.Webview): string {
         // Get resource URIs
         const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'src', 'webview', 'promptStore', 'main.js')
+            vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'promptStore', 'main.js')
         );
         const styleUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.extensionUri, 'src', 'webview', 'promptStore', 'style.css')
+            vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'promptStore', 'style.css')
         );
 
         // Use a nonce to only allow specific scripts to be run
