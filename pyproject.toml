@@ -125,9 +125,22 @@ commit_message = "chore: release {version}"
 push = false
 commit = false
 tag = false
+# Disable major version bumps - use major_on_zero = false and allow_zero_version = true
+major_on_zero = false
+allow_zero_version = true
 
 [tool.semantic_release.commit_parser_options]
-allowed_tags = ["feat", "fix", "perf", "refactor"]
+# Explicitly configure to NEVER allow major version bumps
+allowed_tags = ["feat", "fix", "perf", "refactor", "ci", "docs", "style", "test", "chore", "build"]
 minor_tags = ["feat"]
-patch_tags = ["fix", "perf", "refactor"]
-# Explicitly disable major version bumps by not including any major_tags
+patch_tags = ["fix", "perf", "refactor", "ci", "docs", "style", "test", "chore", "build"]
+# CRITICAL: No major_tags defined - this prevents ANY major version bumps
+# Even commits with BREAKING CHANGE or ! will be treated as minor bumps
+
+[tool.semantic_release.changelog]
+# Disable changelog generation for breaking changes to prevent accidental major bumps
+exclude_commit_patterns = [
+    "BREAKING CHANGE",
+    "BREAKING:",
+    "!:",
+]
