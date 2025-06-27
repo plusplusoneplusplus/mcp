@@ -9,10 +9,18 @@ export class PromptServiceFactory {
     /**
      * Create or get the singleton PromptService instance
      */
-    static createService(context: vscode.ExtensionContext): PromptService {
+    static createService(context: vscode.ExtensionContext, config?: any): PromptService {
         if (!this.instance) {
             this.context = context;
-            const promptManager = new PromptManager();
+
+            // If no config provided, get it from VS Code settings
+            if (!config) {
+                const { ConfigurationManager } = require('../../promptStore/ConfigurationManager');
+                const configManager = new ConfigurationManager(context);
+                config = configManager.getConfig();
+            }
+
+            const promptManager = new PromptManager(config);
             this.instance = new PromptManagerServiceAdapter(promptManager);
         }
         return this.instance;
