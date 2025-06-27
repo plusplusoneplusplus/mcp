@@ -215,8 +215,7 @@ export class GitHubCopilotAgent extends AbstractAgent {
             description: 'GitHub Copilot agent for AI-powered coding assistance',
             metadata: {
                 supportsStreaming: true,
-                requiresWorkspace: true,
-                agentId: '@workspace'
+                requiresWorkspace: true
             }
         });
     }
@@ -235,9 +234,11 @@ export class GitHubCopilotAgent extends AbstractAgent {
             default:
                 throw new Error(`Unsupported method: ${method}`);
         }
-    } private async handleOpenAgent(params: any, vscode: typeof import('vscode')): Promise<any> {
+    }
+
+    private async handleOpenAgent(params: any, vscode: typeof import('vscode')): Promise<any> {
         try {
-            const agentId = params.agentId || '@workspace';
+            const agentId = params.agentId || '';
             const query = params.query || params.message || '';
 
             // First, open a new chat to ensure we start fresh
@@ -246,9 +247,10 @@ export class GitHubCopilotAgent extends AbstractAgent {
             // Wait a moment for the chat to initialize
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Then open the agent with the query
+            // Then open the agent with the query (don't prepend agentId if query already contains it)
+            const finalQuery = query ? (query.includes('@') ? query : `${agentId} ${query}`) : agentId;
             await vscode.commands.executeCommand('workbench.action.chat.openAgent', {
-                query: query ? `${agentId} ${query}` : agentId,
+                query: finalQuery,
                 isPartialQuery: !query
             });
 
@@ -262,7 +264,9 @@ export class GitHubCopilotAgent extends AbstractAgent {
         } catch (error) {
             throw new Error(`Failed to open agent: ${error instanceof Error ? error.message : String(error)}`);
         }
-    } private async handleAskRequest(params: any, vscode: typeof import('vscode')): Promise<any> {
+    }
+
+    private async handleAskRequest(params: any, vscode: typeof import('vscode')): Promise<any> {
         try {
             const question = params.question || params.message || '';
             const context = params.context || '';
@@ -277,7 +281,8 @@ export class GitHubCopilotAgent extends AbstractAgent {
             // Wait a moment for the chat to initialize
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            const fullQuery = context ? `@workspace ${question} Context: ${context}` : `@workspace ${question}`;
+            // Let the user or prompt control agent selection
+            const fullQuery = context ? `${question} Context: ${context}` : question;
 
             // Then execute the ask command
             await vscode.commands.executeCommand('workbench.action.chat.openAgent', {

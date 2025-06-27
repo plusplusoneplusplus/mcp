@@ -4,6 +4,12 @@ const vscode = acquireVsCodeApi();
 let agentCapabilities = [];
 let messageHistory = [];
 
+// Prompt integration state
+let availablePrompts = [];
+let selectedPromptContext = null;
+let promptVariables = {};
+let promptMode = 'custom';
+
 // DOM elements
 const agentSelect = document.getElementById('agentSelect');
 const methodSelect = document.getElementById('methodSelect');
@@ -11,10 +17,27 @@ const paramsInput = document.getElementById('paramsInput');
 const agentTooltip = document.getElementById('agentTooltip');
 const messageList = document.getElementById('messageList');
 
+// DOM elements - new prompt integration
+const promptModeSelector = document.getElementById('promptModeSelector');
+const promptSelectorContainer = document.getElementById('promptSelectorContainer');
+const promptSearch = document.getElementById('promptSearch');
+const promptSelector = document.getElementById('promptSelector');
+const variableEditorContainer = document.getElementById('variableEditorContainer');
+const variableEditor = document.getElementById('variableEditor');
+const promptPreviewContainer = document.getElementById('promptPreviewContainer');
+const promptPreview = document.getElementById('promptPreview');
+const parameterSubtitle = document.getElementById('parameterSubtitle');
+const parametersLabel = document.getElementById('parametersLabel');
+
 // Event listeners
 agentSelect.addEventListener('change', updateMethodSelect);
 methodSelect.addEventListener('change', updatePlaceholder);
 paramsInput.addEventListener('keydown', handleKeyDown);
+
+// Event listeners - new prompt integration
+promptModeSelector.addEventListener('change', handlePromptModeChange);
+promptSearch.addEventListener('input', debounce(handlePromptSearch, 300));
+promptSelector.addEventListener('change', handlePromptSelection);
 
 // Handle messages from extension
 window.addEventListener('message', event => {
@@ -29,19 +52,45 @@ window.addEventListener('message', event => {
             messageHistory = message.messages;
             updateMessageHistory();
             break;
+        case 'updateAvailablePrompts':
+            availablePrompts = message.prompts || [];
+            updatePromptSelector();
+            break;
+        case 'promptSelected':
+            selectedPromptContext = message.promptContext;
+            handlePromptContextUpdate();
+            break;
+        case 'promptRendered':
+            updatePromptPreview(message.rendered);
+            break;
+        case 'error':
+            showError(message.error);
+            break;
     }
 });
 
 // Initialize collapse state from localStorage
 function initializeCollapseState() {
-    const savedState = localStorage.getItem('historyCollapsed');
+    // Initialize history section collapse state
+    const savedHistoryState = localStorage.getItem('historyCollapsed');
     const historySection = document.querySelector('.history-section');
 
     // Default to collapsed if no saved state exists, otherwise use saved state
-    const isCollapsed = savedState === null ? true : savedState === 'true';
+    const isHistoryCollapsed = savedHistoryState === null ? true : savedHistoryState === 'true';
 
-    if (isCollapsed) {
+    if (isHistoryCollapsed) {
         historySection.classList.add('collapsed');
+    }
+
+    // Initialize agent selection collapse state
+    const savedAgentState = localStorage.getItem('agentCollapsed');
+    const agentSection = document.querySelector('.agent-selection');
+
+    // Default to expanded for agent selection (false means not collapsed)
+    const isAgentCollapsed = savedAgentState === 'true';
+
+    if (isAgentCollapsed) {
+        agentSection.classList.add('collapsed');
     }
 }
 
@@ -59,6 +108,334 @@ function toggleHistoryCollapse() {
     }
 }
 
+// Toggle agent selection collapse state
+function toggleAgentCollapse() {
+    const agentSection = document.querySelector('.agent-selection');
+    const isCollapsed = agentSection.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        agentSection.classList.remove('collapsed');
+        localStorage.setItem('agentCollapsed', 'false');
+    } else {
+        agentSection.classList.add('collapsed');
+        localStorage.setItem('agentCollapsed', 'true');
+    }
+}
+
+// Prompt Mode Management
+function handlePromptModeChange() {
+    promptMode = promptModeSelector.value;
+    updateUIForPromptMode();
+    updateInputLabelsAndPlaceholders();
+}
+
+function updateUIForPromptMode() {
+    switch (promptMode) {
+        case 'custom':
+            promptSelectorContainer.style.display = 'none';
+            variableEditorContainer.style.display = 'none';
+            promptPreviewContainer.style.display = 'none';
+            break;
+        case 'prompt':
+            promptSelectorContainer.style.display = 'block';
+            variableEditorContainer.style.display = selectedPromptContext ? 'block' : 'none';
+            promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
+            break;
+        case 'combined':
+            promptSelectorContainer.style.display = 'block';
+            variableEditorContainer.style.display = selectedPromptContext ? 'block' : 'none';
+            promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
+            break;
+    }
+}
+
+function updateInputLabelsAndPlaceholders() {
+    switch (promptMode) {
+        case 'custom':
+            parameterSubtitle.textContent = 'Enter your message or JSON parameters';
+            parametersLabel.textContent = 'Message/Parameters';
+            paramsInput.placeholder = 'Enter your message or JSON parameters...';
+            break;
+        case 'prompt':
+            parameterSubtitle.textContent = 'Prompt will be sent automatically when configured';
+            parametersLabel.textContent = 'Additional Parameters (Optional)';
+            paramsInput.placeholder = 'Enter additional JSON parameters if needed...';
+            break;
+        case 'combined':
+            parameterSubtitle.textContent = 'Add custom message to combine with prompt';
+            parametersLabel.textContent = 'Additional Message';
+            paramsInput.placeholder = 'Enter additional message to combine with prompt...';
+            break;
+    }
+}
+
+// Prompt Search and Selection
+function handlePromptSearch(event) {
+    const query = event.target.value.toLowerCase();
+
+    // Filter prompts based on search query
+    const filteredPrompts = availablePrompts.filter(prompt => {
+        return prompt.title.toLowerCase().includes(query) ||
+            (prompt.description && prompt.description.toLowerCase().includes(query)) ||
+            (prompt.category && prompt.category.toLowerCase().includes(query)) ||
+            (prompt.tags && prompt.tags.some(tag => tag.toLowerCase().includes(query)));
+    });
+
+    updatePromptSelectorList(filteredPrompts);
+}
+
+function updatePromptSelector() {
+    updatePromptSelectorList(availablePrompts);
+}
+
+function updatePromptSelectorList(prompts) {
+    promptSelector.innerHTML = '';
+
+    if (prompts.length === 0) {
+        promptSelector.innerHTML = '<option value="">No prompts available</option>';
+        return;
+    }
+
+    promptSelector.innerHTML = '<option value="">Select a prompt...</option>';
+    prompts.forEach(prompt => {
+        const option = document.createElement('option');
+        option.value = prompt.id;
+        option.textContent = `${prompt.title} ${prompt.category ? `(${prompt.category})` : ''}`;
+        option.title = prompt.description || prompt.title;
+        promptSelector.appendChild(option);
+    });
+}
+
+function handlePromptSelection() {
+    const promptId = promptSelector.value;
+
+    if (!promptId) {
+        selectedPromptContext = null;
+        clearVariableEditor();
+        clearPromptPreview();
+        updateUIForPromptMode();
+        return;
+    }
+
+    // Request prompt selection from extension
+    vscode.postMessage({
+        command: 'selectPrompt',
+        promptId: promptId
+    });
+}
+
+function handlePromptContextUpdate() {
+    if (!selectedPromptContext) {
+        return;
+    }
+
+    // Update variable editor
+    generateVariableEditor(selectedPromptContext.parameters || []);
+
+    // Update prompt preview
+    renderPromptPreview();
+
+    // Show appropriate containers
+    updateUIForPromptMode();
+}
+
+// Variable Editor
+function generateVariableEditor(parameters) {
+    variableEditor.innerHTML = '';
+
+    if (!parameters || parameters.length === 0) {
+        variableEditor.innerHTML = '<p class="no-variables">This prompt has no variables.</p>';
+        promptVariables = {};
+        return;
+    }
+
+    const form = document.createElement('div');
+    form.className = 'variable-form';
+
+    parameters.forEach(param => {
+        const fieldContainer = createVariableField(param);
+        form.appendChild(fieldContainer);
+    });
+
+    variableEditor.appendChild(form);
+}
+
+function createVariableField(param) {
+    const container = document.createElement('div');
+    container.className = 'variable-field';
+
+    // Label
+    const label = document.createElement('label');
+    label.className = 'form-label';
+    label.textContent = param.name;
+    if (param.required) {
+        label.classList.add('required');
+        label.textContent += ' *';
+    }
+
+    // Description
+    if (param.description) {
+        const description = document.createElement('small');
+        description.textContent = param.description;
+        description.className = 'field-description';
+        label.appendChild(document.createElement('br'));
+        label.appendChild(description);
+    }
+
+    // Input
+    const input = createVariableInput(param);
+
+    container.appendChild(label);
+    container.appendChild(input);
+
+    return container;
+}
+
+function createVariableInput(param) {
+    let input;
+
+    switch (param.type) {
+        case 'multiline':
+            input = document.createElement('textarea');
+            input.rows = 3;
+            break;
+        case 'number':
+            input = document.createElement('input');
+            input.type = 'number';
+            break;
+        case 'boolean':
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            break;
+        case 'select':
+            input = document.createElement('select');
+            if (!param.required) {
+                const emptyOption = document.createElement('option');
+                emptyOption.value = '';
+                emptyOption.textContent = `Select ${param.name}...`;
+                input.appendChild(emptyOption);
+            }
+            if (param.options) {
+                param.options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    input.appendChild(optionElement);
+                });
+            }
+            break;
+        case 'file':
+            input = document.createElement('input');
+            input.type = 'file';
+            break;
+        default: // string
+            input = document.createElement('input');
+            input.type = 'text';
+            break;
+    }
+
+    input.name = param.name;
+    input.placeholder = param.placeholder || `Enter ${param.name}...`;
+    input.required = param.required || false;
+
+    if (param.defaultValue !== undefined) {
+        if (param.type === 'boolean') {
+            input.checked = Boolean(param.defaultValue);
+        } else {
+            input.value = String(param.defaultValue);
+        }
+        promptVariables[param.name] = param.defaultValue;
+    }
+
+    // Event listener for value changes
+    const eventType = param.type === 'boolean' ? 'change' : 'input';
+    input.addEventListener(eventType, (e) => {
+        let value;
+        if (param.type === 'boolean') {
+            value = e.target.checked;
+        } else if (param.type === 'number') {
+            value = e.target.value ? Number(e.target.value) : undefined;
+        } else {
+            value = e.target.value || undefined;
+        }
+
+        promptVariables[param.name] = value;
+        renderPromptPreview();
+    });
+
+    return input;
+}
+
+function clearVariableEditor() {
+    variableEditor.innerHTML = '<p class="no-variables">Select a prompt to configure variables</p>';
+    promptVariables = {};
+}
+
+// Prompt Preview
+function renderPromptPreview() {
+    if (!selectedPromptContext || promptMode === 'custom') {
+        clearPromptPreview();
+        return;
+    }
+
+    // Request prompt rendering from extension
+    vscode.postMessage({
+        command: 'renderPromptWithVariables',
+        promptId: selectedPromptContext.id,
+        variables: promptVariables
+    });
+}
+
+function updatePromptPreview(rendered) {
+    if (!rendered) {
+        clearPromptPreview();
+        return;
+    }
+
+    promptPreview.innerHTML = `
+        <div class="preview-content">
+            <h4>Rendered Prompt:</h4>
+            <div class="preview-text">${formatPreviewContent(rendered)}</div>
+        </div>
+    `;
+}
+
+function formatPreviewContent(content) {
+    // Basic markdown-to-HTML conversion for preview
+    return content
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+        .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+        .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+}
+
+function clearPromptPreview() {
+    promptPreview.innerHTML = '<p class="no-preview">Select a prompt to see preview</p>';
+}
+
+// Utility Functions
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function showError(errorMessage) {
+    console.error('Agent panel error:', errorMessage);
+    // You could also show a visual error notification here
+}
+
+// Existing functions (updated to work with prompt integration)
 function updateAgentSelect() {
     agentSelect.innerHTML = '';
 
@@ -90,8 +467,8 @@ function updateMethodSelect() {
     if (!selectedAgent) {
         methodSelect.innerHTML = '<option value="">Select an agent first</option>';
         methodSelect.disabled = true;
-        paramsInput.placeholder = 'Select an agent and method first';
         agentTooltip.textContent = 'Select an agent to see its capabilities';
+        updatePlaceholder();
         return;
     }
 
@@ -114,21 +491,15 @@ function updateMethodSelect() {
         methodSelect.appendChild(option);
     });
 
-    // Update placeholder based on selected agent
+    // Auto-select openAgent method for GitHub Copilot
     if (selectedAgent === 'github-copilot') {
-        paramsInput.placeholder = 'Ask a question or describe what you need help with...';
-
-        // Auto-select openAgent method for GitHub Copilot
         const openAgentOption = Array.from(methodSelect.options).find(option => option.value === 'openAgent');
         if (openAgentOption) {
             methodSelect.value = 'openAgent';
-            updatePlaceholder();
         }
-    } else if (selectedAgent === 'wu-wei-example') {
-        paramsInput.placeholder = 'Enter your message or use JSON: {"action": "test"}';
-    } else {
-        paramsInput.placeholder = 'Enter your message or question...';
     }
+
+    updatePlaceholder();
 }
 
 function handleKeyDown(event) {
@@ -140,10 +511,15 @@ function handleKeyDown(event) {
 }
 
 function updatePlaceholder() {
+    if (promptMode !== 'custom') {
+        return; // Placeholder is managed by prompt mode
+    }
+
     const selectedAgent = agentSelect.value;
     const selectedMethod = methodSelect.value;
 
     if (!selectedAgent || !selectedMethod) {
+        paramsInput.placeholder = 'Select an agent and method first';
         return;
     }
 
@@ -180,41 +556,94 @@ function sendAgentRequest() {
         return;
     }
 
-    let params = {};
-    if (paramsText) {
-        // Try to parse as JSON first
-        if (paramsText.startsWith('{') || paramsText.startsWith('[')) {
-            try {
-                params = JSON.parse(paramsText);
-            } catch (error) {
-                alert('Invalid JSON format. Please check your syntax or use plain text.');
-                return;
-            }
-        } else {
-            // Treat as raw string and convert to appropriate parameter format
-            // For most common cases, treat it as a message or question
-            if (method === 'ask') {
-                params = { question: paramsText };
-            } else if (method === 'openAgent') {
-                params = { query: paramsText };
-            } else if (method === 'echo') {
-                params = { message: paramsText };
-            } else {
-                // Generic fallback - use 'message' as the key
-                params = { message: paramsText };
-            }
+    // Handle different prompt modes
+    if (promptMode === 'prompt' || promptMode === 'combined') {
+        if (!selectedPromptContext) {
+            alert('Please select a prompt for this input mode');
+            return;
         }
+
+        // Validate required variables
+        const validationErrors = validatePromptVariables();
+        if (validationErrors.length > 0) {
+            alert(`Please fill in required fields:\n${validationErrors.join('\n')}`);
+            return;
+        }
+
+        // Send request with prompt context
+        vscode.postMessage({
+            command: 'sendAgentRequestWithPrompt',
+            agentName,
+            method,
+            params: parseParams(paramsText),
+            promptContext: {
+                promptId: selectedPromptContext.id,
+                variables: promptVariables,
+                mode: promptMode
+            }
+        });
+    } else {
+        // Standard request without prompt
+        vscode.postMessage({
+            command: 'sendAgentRequest',
+            agentName,
+            method,
+            params: parseParams(paramsText)
+        });
     }
 
-    vscode.postMessage({
-        command: 'sendAgentRequest',
-        agentName,
-        method,
-        params
+    // Clear input after sending (only for custom mode or combined additional message)
+    if (promptMode === 'custom' || promptMode === 'combined') {
+        paramsInput.value = '';
+    }
+}
+
+function parseParams(paramsText) {
+    if (!paramsText) {
+        return {};
+    }
+
+    // Try to parse as JSON first
+    if (paramsText.startsWith('{') || paramsText.startsWith('[')) {
+        try {
+            return JSON.parse(paramsText);
+        } catch (error) {
+            alert('Invalid JSON format. Please check your syntax or use plain text.');
+            return null;
+        }
+    } else {
+        // Treat as raw string and convert to appropriate parameter format
+        const method = methodSelect.value;
+        if (method === 'ask') {
+            return { question: paramsText };
+        } else if (method === 'openAgent') {
+            return { query: paramsText };
+        } else if (method === 'echo') {
+            return { message: paramsText };
+        } else {
+            // Generic fallback - use 'message' as the key
+            return { message: paramsText };
+        }
+    }
+}
+
+function validatePromptVariables() {
+    const errors = [];
+
+    if (!selectedPromptContext || !selectedPromptContext.parameters) {
+        return errors;
+    }
+
+    selectedPromptContext.parameters.forEach(param => {
+        if (param.required) {
+            const value = promptVariables[param.name];
+            if (value === undefined || value === '' || value === null) {
+                errors.push(`${param.name} is required`);
+            }
+        }
     });
 
-    // Clear input after sending
-    paramsInput.value = '';
+    return errors;
 }
 
 function clearHistory() {
@@ -275,10 +704,12 @@ function updateMessageHistory() {
     }, 100);
 }
 
-// Initialize the collapse state when the page loads
+// Initialize the panel
 document.addEventListener('DOMContentLoaded', function () {
     initializeCollapseState();
+    updateInputLabelsAndPlaceholders();
 });
 
 // Request initial data
 vscode.postMessage({ command: 'getAgentCapabilities' });
+vscode.postMessage({ command: 'getAvailablePrompts' });

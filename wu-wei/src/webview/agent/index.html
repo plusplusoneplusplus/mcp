@@ -18,49 +18,105 @@
                 <div class="section-title">
                     <span class="icon">🤖</span>
                     <span>Agent Selection</span>
+                    <button class="collapse-toggle" id="agentToggle" onclick="toggleAgentCollapse()"
+                        title="Toggle agent selection visibility">
+                        <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path
+                                d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
+                        </svg>
+                    </button>
                 </div>
                 <div class="section-subtitle">Choose an AI agent and method to interact with</div>
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Agent</label>
-                    <div class="agent-selector">
-                        <select id="agentSelect">
-                            <option value="">Select an agent...</option>
-                        </select>
-                        <button class="info-button" type="button" title="Agent Information">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-                                <path
-                                    d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
-                            </svg>
-                            <div class="tooltip" id="agentTooltip">Select an agent to see its capabilities</div>
-                        </button>
+            <div class="collapsible-content" id="agentContent">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Agent</label>
+                        <div class="agent-selector">
+                            <select id="agentSelect">
+                                <option value="">Select an agent...</option>
+                            </select>
+                            <button class="info-button" type="button" title="Agent Information">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                                    <path
+                                        d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
+                                </svg>
+                                <div class="tooltip" id="agentTooltip">Select an agent to see its capabilities</div>
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="form-group">
-                    <label class="form-label">Method</label>
-                    <select id="methodSelect" disabled>
-                        <option value="">Select a method...</option>
-                    </select>
+                    <div class="form-group">
+                        <label class="form-label">Method</label>
+                        <select id="methodSelect" disabled>
+                            <option value="">Select a method...</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Request Parameters Section -->
-        <div class="section parameters-section">
+        <!-- Request Input Section -->
+        <div class="section input-section">
             <div class="section-header">
                 <div class="section-title">
-                    <span class="icon">⚙️</span>
-                    <span>Parameters</span>
+                    <span class="icon">💬</span>
+                    <span>Request Input</span>
                 </div>
-                <div class="section-subtitle">Enter your message or JSON parameters</div>
+                <div class="section-subtitle" id="parameterSubtitle">Configure your agent request with prompts or custom
+                    input</div>
             </div>
 
             <div class="form-group">
-                <label class="form-label">Message/Parameters</label>
+                <label class="form-label">Input Mode</label>
+                <select id="promptModeSelector">
+                    <option value="custom">Custom Message</option>
+                    <option value="prompt">Use Prompt Template</option>
+                    <option value="combined">Prompt + Custom Message</option>
+                </select>
+            </div>
+
+            <!-- Prompt Selector (hidden by default) -->
+            <div class="prompt-selector-container" id="promptSelectorContainer" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Search Prompts</label>
+                    <input type="text" id="promptSearch" placeholder="Search prompts..." class="prompt-search">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Available Prompts</label>
+                    <select id="promptSelector" size="5" class="prompt-list">
+                        <option value="">Loading prompts...</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Variable Editor (hidden by default) -->
+            <div class="variable-editor-container" id="variableEditorContainer" style="display: none;">
+                <div class="subsection-title">
+                    <span class="icon">⚙️</span>
+                    <span>Prompt Variables</span>
+                </div>
+                <div class="variable-editor" id="variableEditor">
+                    <p class="no-variables">Select a prompt to configure variables</p>
+                </div>
+            </div>
+
+            <!-- Prompt Preview (hidden by default) -->
+            <div class="prompt-preview-container" id="promptPreviewContainer" style="display: none;">
+                <div class="subsection-title">
+                    <span class="icon">👁️</span>
+                    <span>Prompt Preview</span>
+                </div>
+                <div class="prompt-preview" id="promptPreview">
+                    <p class="no-preview">Select a prompt to see preview</p>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" id="parametersLabel">Message/Parameters</label>
                 <textarea id="paramsInput" placeholder="Enter your message or JSON parameters...
 
 Examples:
