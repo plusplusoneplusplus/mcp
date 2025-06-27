@@ -10,10 +10,11 @@ export function run(): Promise<void> {
         timeout: 10000
     });
 
-    const testsRoot = path.resolve(__dirname, '..');
+    const testsRoot = path.resolve(__dirname, '.');
 
     return new Promise((c, e) => {
-        const testFiles = glob.sync('**/**.test.js', { cwd: testsRoot });
+        // Only look for tests in the suite directory
+        const testFiles = glob.sync('**/*.test.js', { cwd: testsRoot });
 
         // Add files to the test suite
         testFiles.forEach((f: string) => mocha.addFile(path.resolve(testsRoot, f)));

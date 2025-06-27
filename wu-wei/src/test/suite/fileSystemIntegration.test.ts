@@ -180,9 +180,10 @@ This prompt has invalid YAML in the frontmatter.`
             assert(fileNames.includes('README.md'));
 
             // Should exclude these (in excluded directories)
-            assert(!files.some(f => f.includes('node_modules')));
-            assert(!files.some(f => f.includes('.git')));
-            assert(!files.some(f => f.includes('temp')));
+            // Use path separators to specifically check for files IN the excluded directories
+            assert(!files.some(f => f.includes(path.sep + 'node_modules' + path.sep) || f.endsWith(path.sep + 'node_modules')));
+            assert(!files.some(f => f.includes(path.sep + '.git' + path.sep) || f.endsWith(path.sep + '.git')));
+            assert(!files.some(f => f.includes(path.sep + 'temp' + path.sep) || f.endsWith(path.sep + 'temp')));
         });
 
         it('should load all prompts with proper metadata parsing', async () => {

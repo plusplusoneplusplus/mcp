@@ -57,31 +57,73 @@ export class FileUtils {
      * Simple pattern matching (supports * wildcard and ** for recursive)
      */
     static matchesPattern(str: string, pattern: string): boolean {
+        // Normalize path separators for cross-platform compatibility
+        const normalizedStr = str.replace(/\\/g, '/');
+        const normalizedPattern = pattern.replace(/\\/g, '/');
+
         // Handle ** pattern for recursive matching
-        if (pattern.includes('**')) {
-            const regexPattern = pattern
+        if (normalizedPattern.includes('**')) {
+            const regexPattern = normalizedPattern
                 .replace(/\*\*/g, '.*')
-                .replace(/\*/g, '[^/]*');
+                .replace(/(?<!\.\*)\*(?!\*)/g, '[^/]*');
             const regex = new RegExp(`^${regexPattern}$`, 'i');
-            return regex.test(str);
+            return regex.test(normalizedStr);
         }
 
         // Convert simple glob pattern to regex
-        const regexPattern = pattern
+        const regexPattern = normalizedPattern
             .replace(/\*/g, '.*')
             .replace(/\?/g, '.');
 
         const regex = new RegExp(`^${regexPattern}$`, 'i');
-        return regex.test(str);
+        return regex.test(normalizedStr);
     }
 
     /**
-     * Check if a path should be excluded based on patterns
-     */
+ * Check if a path should be excluded based on patterns
+ */
     static shouldExcludePath(filePath: string, excludePatterns: string[] = []): boolean {
+        // Normalize path separators
+        const normalizedPath = filePath.replace(/\\/g, '/');
+
         for (const pattern of excludePatterns) {
-            if (this.matchesPattern(filePath, pattern)) {
+            // Check exact match
+            if (this.matchesPattern(normalizedPath, pattern)) {
                 return true;
+            }
+
+            // For patterns with **, check if any part of the path matches
+            if (pattern.includes('**')) {
+                // Extract the core directory name from patterns like **/node_modules/**
+                const dirPattern = pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, '');
+
+                // Check if any path segment matches the directory pattern
+                const pathParts = normalizedPath.split('/');
+                for (const part of pathParts) {
+                    if (this.matchesPattern(part, dirPattern)) {
+                        return true;
+                    }
+                }
+
+                // Also check if the path contains the pattern as a substring
+                const segments = normalizedPath.split('/');
+                for (let i = 0; i < segments.length; i++) {
+                    for (let j = i; j < segments.length; j++) {
+                        const subPath = segments.slice(i, j + 1).join('/');
+                        if (this.matchesPattern(subPath, dirPattern)) {
+                            return true;
+                        }
+                    }
+                }
+            } else {
+                // Check if any parent directory matches the pattern
+                const pathParts = normalizedPath.split('/');
+                for (let i = 0; i < pathParts.length; i++) {
+                    const partialPath = pathParts.slice(0, i + 1).join('/');
+                    if (this.matchesPattern(partialPath, pattern)) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
