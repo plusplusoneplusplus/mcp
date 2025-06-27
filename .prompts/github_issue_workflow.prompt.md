@@ -1,8 +1,10 @@
 ---
-description:
-globs:
-alwaysApply: false
+title: GitHub Issue Resolution Workflow
+description: Complete end-to-end workflow for resolving GitHub issues including analysis, implementation, testing, code review, and PR creation
+category: Development Workflow
+tags: [github, issues, workflow, implementation, testing, pull-requests, git, code-review]
 ---
+
 # AI Prompt: GitHub Issue Resolution Workflow
 
 ## Task Overview

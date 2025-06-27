@@ -1,8 +1,10 @@
 ---
-description:
-globs:
-alwaysApply: false
+title: GitHub Issue Analysis and Work Planning
+description: Analyzes GitHub issues to identify dependencies, resolve conflicts, and create optimal work distribution plans for development teams
+category: Project Management
+tags: [github, issues, planning, dependencies, conflict-resolution, team-coordination, project-planning]
 ---
+
 # AI Prompt: GitHub Issue Analysis and Work Planning
 
 ## Role

@@ -1,8 +1,10 @@
 ---
-description:
-globs:
-alwaysApply: false
+title: Extract Key Information from Commits
+description: Analyzes software commits to extract patterns and entities for building knowledge graphs from codebase evolution
+category: Code Analysis
+tags: [commits, knowledge-extraction, patterns, entities, relationships, documentation]
 ---
+
 # AI Prompt: Extract Key Information from Commits
 
 ## Task Overview
