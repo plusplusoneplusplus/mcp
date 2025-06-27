@@ -65,6 +65,10 @@ export class VsCodePromptService implements PromptService {
         return this.promptManager.searchPrompts(searchFilter);
     }
 
+    async refreshPrompts(): Promise<void> {
+        await this.promptManager.refreshPrompts();
+    }
+
     async selectPromptForUse(promptId: string): Promise<PromptUsageContext> {
         const prompt = await this.getPrompt(promptId);
         if (!prompt) {

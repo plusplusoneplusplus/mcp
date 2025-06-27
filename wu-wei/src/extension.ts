@@ -40,7 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
     const templateManager = new TemplateManager();
     const fileOperationManager = new FileOperationManager(promptManager, configManager);
     const fileOperationCommands = new FileOperationCommands(fileOperationManager, templateManager);
-    const promptStoreProvider = new PromptStoreProvider(context.extensionUri, promptManager, fileOperationManager);
+    const promptStoreProvider = new PromptStoreProvider(context.extensionUri, context);
 
     logger.info('Prompt store infrastructure created with file operations support');
 

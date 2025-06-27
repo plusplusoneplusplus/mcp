@@ -36,7 +36,7 @@ suite('PromptStoreProvider - Step 6 Tests', () => {
         const mockTemplateManager = new TemplateManager();
         mockFileOperationManager = new FileOperationManager(mockPromptManager, mockConfigManager);
 
-        provider = new PromptStoreProvider(mockExtensionUri, mockPromptManager, mockFileOperationManager);
+        provider = new PromptStoreProvider(mockExtensionUri, mockContext);
     });
 
     test('Provider should be created successfully', () => {
