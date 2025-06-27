@@ -162,72 +162,6 @@ export class PromptManager {
     }
 
     /**
-     * Refresh all prompts from file system
-     */
-    public async refreshPrompts(): Promise<void> {
-        try {
-            this.logger.info('🔄 Refreshing prompts from file system');
-
-            // Update configuration from VS Code settings
-            const vscodeConfig = vscode.workspace.getConfiguration('wu-wei.promptStore');
-            const rootDirectory = vscodeConfig.get<string>('rootDirectory', '');
-
-            if (rootDirectory) {
-                this.config.watchPaths = [rootDirectory];
-                this.logger.info('📁 Updated watch paths from configuration:', { rootDirectory });
-            }
-
-            const newPrompts = new Map<string, Prompt>();
-            let totalFilesScanned = 0;
-            let totalPromptsLoaded = 0;
-
-            for (const watchPath of this.config.watchPaths) {
-                const resolvedPath = this.resolvePath(watchPath);
-                this.logger.info(`🔍 Scanning directory: ${resolvedPath}`);
-
-                // Check if directory exists
-                try {
-                    const stats = await fs.stat(resolvedPath);
-                    if (!stats.isDirectory()) {
-                        this.logger.warn(`❌ Path is not a directory: ${resolvedPath}`);
-                        continue;
-                    }
-                    this.logger.info(`✅ Directory exists and is accessible: ${resolvedPath}`);
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    this.logger.warn(`❌ Cannot access directory: ${resolvedPath}`, { error: errorMessage });
-                    continue;
-                }
-
-                await this.loadPromptsFromPath(resolvedPath, newPrompts);
-
-                // Count files and prompts for this path
-                const files = await this.scanDirectory(resolvedPath);
-                totalFilesScanned += files.length;
-
-                // Count prompts loaded for this path  
-                const promptsForPath = Array.from(newPrompts.values()).filter(p =>
-                    p.filePath.startsWith(resolvedPath)
-                );
-                totalPromptsLoaded = newPrompts.size;
-            }
-
-            this.prompts = newPrompts;
-            this.eventEmitter.fire(this.getAllPrompts());
-
-            this.logger.info('✅ Prompts refresh completed', {
-                totalFilesScanned,
-                totalPromptsLoaded,
-                promptCount: this.prompts.size,
-                watchPaths: this.config.watchPaths
-            });
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logger.error('❌ Failed to refresh prompts', { error: errorMessage });
-        }
-    }
-
-    /**
      * Update configuration
      */
     public updateConfig(newConfig: Partial<PromptStoreConfig>): void {
@@ -248,220 +182,6 @@ export class PromptManager {
     public dispose(): void {
         this.fileWatcher.dispose();
         this.eventEmitter.dispose();
-    }
-
-    // =======================
-    // File System Operations
-    // =======================
-
-    /**
-     * Scan directory for markdown files recursively
-     */
-    async scanDirectory(rootPath: string): Promise<string[]> {
-        this.logger.info(`🔍 Scanning directory: ${rootPath}`);
-        const files: string[] = [];
-        const stack = [rootPath];
-        let directoriesScanned = 0;
-        let filesFound = 0;
-
-        while (stack.length > 0) {
-            const currentPath = stack.pop()!;
-            directoriesScanned++;
-
-            try {
-                const entries = await fs.readdir(currentPath, { withFileTypes: true });
-                this.logger.debug(`📂 Found ${entries.length} entries in ${currentPath}`);
-
-                for (const entry of entries) {
-                    const fullPath = path.join(currentPath, entry.name);
-                    const relativePath = path.relative(rootPath, fullPath);
-
-                    // Check if path should be excluded
-                    if (FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) ||
-                        FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
-                        this.logger.debug(`⏭️ Skipping excluded path: ${relativePath}`);
-                        continue;
-                    }
-
-                    if (entry.isDirectory() && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns) &&
-                        !FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) &&
-                        !FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
-                        stack.push(fullPath);
-                        this.logger.debug(`📁 Adding directory to scan: ${fullPath}`);
-                    } else if (entry.isFile() && FileUtils.isMarkdownFile(entry.name) &&
-                        !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns) &&
-                        !FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) &&
-                        !FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
-                        files.push(fullPath);
-                        filesFound++;
-                        this.logger.debug(`📄 Found markdown file: ${fullPath}`);
-                    }
-                }
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                this.logger.error(`❌ Failed to scan directory ${currentPath}:`, { error: errorMessage });
-                // Continue with other directories instead of failing completely
-            }
-        }
-
-        this.logger.info(`✅ Directory scan complete`, {
-            rootPath,
-            directoriesScanned,
-            markdownFilesFound: files.length,
-            filePatterns: this.config.filePatterns,
-            excludePatterns: this.config.excludePatterns
-        });
-
-        return files;
-    }
-
-    /**
-     * Load a single prompt from file path
-     */
-    async loadPrompt(filePath: string): Promise<Prompt> {
-        const prompt = await this.loadPromptFromFile(filePath);
-        if (!prompt) {
-            throw new Error(`Failed to load prompt from ${filePath}`);
-        }
-        return prompt;
-    }
-
-    /**
-     * Load all prompts from a root path
-     */
-    async loadAllPrompts(rootPath: string): Promise<Prompt[]> {
-        const prompts: Prompt[] = [];
-        const files = await this.scanDirectory(rootPath);
-
-        const loadPromises = files.map(async (filePath) => {
-            try {
-                const prompt = await this.loadPromptFromFile(filePath);
-                if (prompt) {
-                    prompts.push(prompt);
-                }
-            } catch (error) {
-                this.logger.warn(`Failed to load prompt from ${filePath}:`, error);
-            }
-        });
-
-        await Promise.all(loadPromises);
-
-        this.logger.info(`Loaded ${prompts.length} prompts from ${rootPath}`);
-        return this.sortPrompts(prompts);
-    }
-
-    /**
-     * Save a prompt to file system
-     */
-    async savePrompt(prompt: Prompt): Promise<void> {
-        try {
-            // Validate the prompt has required fields
-            if (!prompt.metadata.title) {
-                throw new Error('Prompt must have a title');
-            }
-
-            // Create backup if file already exists
-            if (await FileUtils.pathExists(prompt.filePath)) {
-                await FileUtils.createBackup(prompt.filePath);
-            }
-
-            // Generate file content
-            const content = this.generateFileContent(prompt);
-
-            // Use atomic write operation
-            await FileUtils.writeFileAtomic(prompt.filePath, content);
-
-            // Update in memory cache
-            prompt.lastModified = new Date();
-            this.prompts.set(prompt.id, prompt);
-
-            // Notify listeners
-            this.eventEmitter.fire(this.getAllPrompts());
-
-            this.logger.info(`Saved prompt: ${prompt.metadata.title} to ${prompt.filePath}`);
-        } catch (error) {
-            this.logger.error(`Failed to save prompt ${prompt.id}:`, error);
-            throw error;
-        }
-    }
-
-    /**
-     * Delete a prompt file
-     */
-    async deletePrompt(filePath: string): Promise<void> {
-        try {
-            // Create backup before deletion
-            if (await FileUtils.pathExists(filePath)) {
-                await FileUtils.createBackup(filePath);
-                await fs.unlink(filePath);
-            }
-
-            // Remove from memory cache
-            const promptId = this.generatePromptId(filePath);
-            this.prompts.delete(promptId);
-
-            // Notify listeners
-            this.eventEmitter.fire(this.getAllPrompts());
-
-            this.logger.info(`Deleted prompt file: ${filePath}`);
-        } catch (error) {
-            this.logger.error(`Failed to delete prompt ${filePath}:`, error);
-            throw error;
-        }
-    }
-
-    /**
-     * Create a new prompt file
-     */
-    async createPrompt(name: string, category?: string): Promise<Prompt> {
-        try {
-            // Generate safe file name
-            const fileName = FileUtils.generateSafeFileName(name);
-
-            // Determine file path
-            let basePath = this.config.watchPaths[0]; // Use first watch path
-            if (category) {
-                basePath = path.join(basePath, category);
-            }
-
-            // Resolve workspace variables
-            basePath = this.resolvePath(basePath);
-
-            // Ensure directory exists
-            await FileUtils.ensureDirectory(basePath);
-
-            const filePath = path.join(basePath, fileName);
-
-            // Check if file already exists
-            if (await FileUtils.pathExists(filePath)) {
-                throw new Error(`A prompt with the name "${name}" already exists in this category`);
-            }
-
-            // Create prompt object
-            const prompt: Prompt = {
-                id: this.generatePromptId(filePath),
-                filePath,
-                fileName,
-                metadata: {
-                    title: name,
-                    description: '',
-                    category: category || 'General',
-                    tags: []
-                },
-                content: '# ' + name + '\n\nEnter your prompt content here...',
-                lastModified: new Date(),
-                isValid: true
-            };
-
-            // Save the prompt
-            await this.savePrompt(prompt);
-
-            this.logger.info(`Created new prompt: ${name} at ${filePath}`);
-            return prompt;
-        } catch (error) {
-            this.logger.error(`Failed to create prompt "${name}":`, error);
-            throw error;
-        }
     }
 
     /**
@@ -711,5 +431,281 @@ export class PromptManager {
         content += prompt.content;
 
         return content;
+    }
+
+    /**
+     * Refresh all prompts from file system
+     */
+    public async refreshPrompts(): Promise<void> {
+        try {
+            this.logger.info('🔄 Refreshing prompts from file system');
+
+            // Update configuration from VS Code settings
+            const vscodeConfig = vscode.workspace.getConfiguration('wu-wei.promptStore');
+            const rootDirectory = vscodeConfig.get<string>('rootDirectory', '');
+
+            if (rootDirectory) {
+                this.config.watchPaths = [rootDirectory];
+                this.logger.info('📁 Updated watch paths from configuration:', { rootDirectory });
+            }
+
+            const newPrompts = new Map<string, Prompt>();
+            let totalFilesScanned = 0;
+            let totalPromptsLoaded = 0;
+
+            for (const watchPath of this.config.watchPaths) {
+                const resolvedPath = this.resolvePath(watchPath);
+                this.logger.info(`🔍 Scanning directory: ${resolvedPath}`);
+
+                // Check if directory exists
+                try {
+                    const stats = await fs.stat(resolvedPath);
+                    if (!stats.isDirectory()) {
+                        this.logger.warn(`❌ Path is not a directory: ${resolvedPath}`);
+                        continue;
+                    }
+                    this.logger.info(`✅ Directory exists and is accessible: ${resolvedPath}`);
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    this.logger.warn(`❌ Cannot access directory: ${resolvedPath}`, { error: errorMessage });
+                    continue;
+                }
+
+                await this.loadPromptsFromPath(resolvedPath, newPrompts);
+
+                // Count files and prompts for this path
+                const files = await this.scanDirectory(resolvedPath);
+                totalFilesScanned += files.length;
+
+                // Count prompts loaded for this path  
+                const promptsForPath = Array.from(newPrompts.values()).filter(p =>
+                    p.filePath.startsWith(resolvedPath)
+                );
+                totalPromptsLoaded = newPrompts.size;
+            }
+
+            this.prompts = newPrompts;
+            this.eventEmitter.fire(this.getAllPrompts());
+
+            this.logger.info('✅ Prompts refresh completed', {
+                totalFilesScanned,
+                totalPromptsLoaded,
+                promptCount: this.prompts.size,
+                watchPaths: this.config.watchPaths
+            });
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('❌ Failed to refresh prompts', { error: errorMessage });
+        }
+    }
+
+    /**
+     * Scan directory for markdown files recursively
+     */
+    async scanDirectory(rootPath: string): Promise<string[]> {
+        this.logger.info(`🔍 Scanning directory: ${rootPath}`);
+        const files: string[] = [];
+        const stack = [rootPath];
+        let directoriesScanned = 0;
+        let filesFound = 0;
+
+        while (stack.length > 0) {
+            const currentPath = stack.pop()!;
+            directoriesScanned++;
+
+            try {
+                const entries = await fs.readdir(currentPath, { withFileTypes: true });
+                this.logger.debug(`📂 Found ${entries.length} entries in ${currentPath}`);
+
+                for (const entry of entries) {
+                    const fullPath = path.join(currentPath, entry.name);
+                    const relativePath = path.relative(rootPath, fullPath);
+
+                    // Check if path should be excluded
+                    if (FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) ||
+                        FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
+                        this.logger.debug(`⏭️ Skipping excluded path: ${relativePath}`);
+                        continue;
+                    }
+
+                    if (entry.isDirectory() && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
+                        stack.push(fullPath);
+                        this.logger.debug(`📁 Adding directory to scan: ${fullPath}`);
+                    } else if (entry.isFile() && FileUtils.isMarkdownFile(entry.name) &&
+                        !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
+                        files.push(fullPath);
+                        filesFound++;
+                        this.logger.debug(`📄 Found markdown file: ${fullPath}`);
+                    }
+                }
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                this.logger.error(`❌ Failed to scan directory ${currentPath}:`, { error: errorMessage });
+                // Continue with other directories instead of failing completely
+            }
+        }
+
+        this.logger.info(`✅ Directory scan complete`, {
+            rootPath,
+            directoriesScanned,
+            markdownFilesFound: files.length,
+            filePatterns: this.config.filePatterns,
+            excludePatterns: this.config.excludePatterns
+        });
+
+        return files;
+    }
+
+    /**
+     * Load a single prompt from file path
+     */
+    async loadPrompt(filePath: string): Promise<Prompt> {
+        const prompt = await this.loadPromptFromFile(filePath);
+        if (!prompt) {
+            throw new Error(`Failed to load prompt from ${filePath}`);
+        }
+        return prompt;
+    }
+
+    /**
+     * Load all prompts from a root path
+     */
+    async loadAllPrompts(rootPath: string): Promise<Prompt[]> {
+        const prompts: Prompt[] = [];
+        const files = await this.scanDirectory(rootPath);
+
+        const loadPromises = files.map(async (filePath) => {
+            try {
+                const prompt = await this.loadPromptFromFile(filePath);
+                if (prompt) {
+                    prompts.push(prompt);
+                }
+            } catch (error) {
+                this.logger.warn(`Failed to load prompt from ${filePath}:`, error);
+            }
+        });
+
+        await Promise.all(loadPromises);
+
+        this.logger.info(`Loaded ${prompts.length} prompts from ${rootPath}`);
+        return this.sortPrompts(prompts);
+    }
+
+    /**
+     * Save a prompt to file system
+     */
+    async savePrompt(prompt: Prompt): Promise<void> {
+        try {
+            // Validate the prompt has required fields
+            if (!prompt.metadata.title) {
+                throw new Error('Prompt must have a title');
+            }
+
+            // Create backup if file already exists
+            if (await FileUtils.pathExists(prompt.filePath)) {
+                await FileUtils.createBackup(prompt.filePath);
+            }
+
+            // Generate file content
+            const content = this.generateFileContent(prompt);
+
+            // Use atomic write operation
+            await FileUtils.writeFileAtomic(prompt.filePath, content);
+
+            // Update in memory cache
+            prompt.lastModified = new Date();
+            this.prompts.set(prompt.id, prompt);
+
+            // Notify listeners
+            this.eventEmitter.fire(this.getAllPrompts());
+
+            this.logger.info(`Saved prompt: ${prompt.metadata.title} to ${prompt.filePath}`);
+        } catch (error) {
+            this.logger.error(`Failed to save prompt ${prompt.id}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete a prompt file
+     */
+    async deletePrompt(filePath: string): Promise<void> {
+        try {
+            // Create backup before deletion
+            if (await FileUtils.pathExists(filePath)) {
+                await FileUtils.createBackup(filePath);
+                await fs.unlink(filePath);
+            }
+
+            // Remove from memory cache
+            const promptId = this.generatePromptId(filePath);
+            this.prompts.delete(promptId);
+
+            // Notify listeners
+            this.eventEmitter.fire(this.getAllPrompts());
+
+            this.logger.info(`Deleted prompt file: ${filePath}`);
+        } catch (error) {
+            this.logger.error(`Failed to delete prompt ${filePath}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Create a new prompt file
+     */
+    async createPrompt(name: string, category?: string): Promise<Prompt> {
+        try {
+            // Generate safe file name
+            const fileName = FileUtils.generateSafeFileName(name);
+
+            // Determine file path
+            let basePath = this.config.watchPaths[0]; // Use first watch path
+            if (category) {
+                basePath = path.join(basePath, category);
+            }
+
+            // Resolve workspace variables
+            basePath = this.resolvePath(basePath);
+
+            // Ensure directory exists
+            await FileUtils.ensureDirectory(basePath);
+
+            const filePath = path.join(basePath, fileName);
+
+            // Check if file already exists
+            if (await FileUtils.pathExists(filePath)) {
+                throw new Error(`A prompt with the name "${name}" already exists in this category`);
+            }
+
+            // Create prompt object
+            const prompt: Prompt = {
+                id: this.generatePromptId(filePath),
+                filePath,
+                fileName,
+                metadata: {
+                    title: name,
+                    description: '',
+                    category: category || 'General',
+                    tags: []
+                },
+                content: '# ' + name + '\n\nEnter your prompt content here...',
+                lastModified: new Date(),
+                isValid: true
+            };
+
+            // Save the prompt
+            await this.savePrompt(prompt);
+
+            this.logger.info(`Created new prompt: ${name} at ${filePath}`);
+            return prompt;
+        } catch (error) {
+            this.logger.error(`Failed to create prompt "${name}":`, error);
+            throw error;
+        }
     }
 }

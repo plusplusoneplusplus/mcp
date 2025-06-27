@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { PromptService } from './types';
-import { VsCodePromptService } from './VsCodePromptService';
+import { PromptManager, PromptManagerServiceAdapter } from '../../promptStore/index';
 
 export class PromptServiceFactory {
     private static instance: PromptService | null = null;
@@ -12,7 +12,8 @@ export class PromptServiceFactory {
     static createService(context: vscode.ExtensionContext): PromptService {
         if (!this.instance) {
             this.context = context;
-            this.instance = new VsCodePromptService(context);
+            const promptManager = new PromptManager();
+            this.instance = new PromptManagerServiceAdapter(promptManager);
         }
         return this.instance;
     }
