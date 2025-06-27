@@ -254,9 +254,6 @@ Content for prompt ${prompt} in category ${category}.`;
         });
 
         it('should maintain file system consistency during concurrent operations', async () => {
-            const concurrentDir = path.join(tempDir, 'concurrent');
-            await fs.mkdir(concurrentDir);
-
             // Create multiple prompts concurrently
             const createPromises = [];
             for (let i = 0; i < 10; i++) {
@@ -275,7 +272,8 @@ Content for prompt ${prompt} in category ${category}.`;
                 assert(exists, `File should exist: ${prompt.filePath}`);
             }
 
-            // Verify all prompts can be loaded
+            // Verify all prompts can be loaded from the category directory where they were actually created
+            const concurrentDir = path.join(tempDir, 'Concurrent');
             const loadedPrompts = await promptManager.loadAllPrompts(concurrentDir);
             assert(loadedPrompts.length >= 10);
         });
