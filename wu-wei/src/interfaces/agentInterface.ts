@@ -239,7 +239,7 @@ export class GitHubCopilotAgent extends AbstractAgent {
     private async handleOpenAgent(params: any, vscode: typeof import('vscode')): Promise<any> {
         try {
             const agentId = params.agentId || '';
-            const query = params.query || params.message || '';
+            const query = params.message || params.query || '';
 
             // First, open a new chat to ensure we start fresh
             await vscode.commands.executeCommand('workbench.action.chat.newChat');
