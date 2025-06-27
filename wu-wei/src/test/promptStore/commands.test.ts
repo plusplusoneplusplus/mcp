@@ -164,7 +164,7 @@ suite('FileOperationCommands Tests', () => {
             const handler = registeredCommands.get('wu-wei.promptStore.newPromptFromTemplate');
 
             let quickPickCalled = false;
-            vscode.window.showQuickPick = async (items: any[], options: any) => {
+            (vscode.window.showQuickPick as any) = async (items: any[], options?: any) => {
                 quickPickCalled = true;
                 assert(Array.isArray(items));
                 assert(items.length > 0);
@@ -192,7 +192,7 @@ suite('FileOperationCommands Tests', () => {
             };
 
             let inputCallCount = 0;
-            vscode.window.showQuickPick = async () => mockTemplate;
+            (vscode.window.showQuickPick as any) = async () => mockTemplate;
             vscode.window.showInputBox = async (options: any) => {
                 inputCallCount++;
                 if (inputCallCount === 1) return 'Template Test';
@@ -369,7 +369,7 @@ suite('FileOperationCommands Tests', () => {
             const handler = registeredCommands.get('wu-wei.promptStore.exportPrompts');
 
             let formatOptions: any[] = [];
-            vscode.window.showQuickPick = async (items: any[]) => {
+            (vscode.window.showQuickPick as any) = async (items: any[]) => {
                 formatOptions = items;
                 return items[0]; // Select first option
             };
@@ -390,7 +390,7 @@ suite('FileOperationCommands Tests', () => {
             const disposables = commands.registerCommands(mockContext);
             const handler = registeredCommands.get('wu-wei.promptStore.exportPrompts');
 
-            vscode.window.showQuickPick = async (items: any[]) => items[0];
+            (vscode.window.showQuickPick as any) = async (items: any[]) => items[0];
 
             mockFileOperationManager.exportPrompts = async (filePaths: string[], format: any) => {
                 assert.strictEqual(filePaths.length, 2);
