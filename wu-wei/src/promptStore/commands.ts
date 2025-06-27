@@ -104,13 +104,13 @@ export class FileOperationCommands {
                 prompt: 'Enter prompt name',
                 placeHolder: 'my-awesome-prompt',
                 validateInput: (value) => {
-                    if (!value.trim()) return 'Name cannot be empty';
-                    if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) return 'Name contains invalid characters';
+                    if (!value.trim()) {return 'Name cannot be empty';}
+                    if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) {return 'Name contains invalid characters';}
                     return undefined;
                 }
             });
 
-            if (!name) return;
+            if (!name) {return;}
 
             const category = await vscode.window.showInputBox({
                 prompt: 'Enter category (optional)',
@@ -152,19 +152,19 @@ export class FileOperationCommands {
                 matchOnDetail: true
             });
 
-            if (!selectedTemplate) return;
+            if (!selectedTemplate) {return;}
 
             const name = await vscode.window.showInputBox({
                 prompt: 'Enter prompt name',
                 placeHolder: 'my-prompt-from-template',
                 validateInput: (value) => {
-                    if (!value.trim()) return 'Name cannot be empty';
-                    if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) return 'Name contains invalid characters';
+                    if (!value.trim()) {return 'Name cannot be empty';}
+                    if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) {return 'Name contains invalid characters';}
                     return undefined;
                 }
             });
 
-            if (!name) return;
+            if (!name) {return;}
 
             const category = await vscode.window.showInputBox({
                 prompt: 'Enter category (optional)',
@@ -259,13 +259,13 @@ export class FileOperationCommands {
                 prompt: 'Enter new name',
                 value: currentName,
                 validateInput: (value) => {
-                    if (!value.trim()) return 'Name cannot be empty';
-                    if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) return 'Name contains invalid characters';
+                    if (!value.trim()) {return 'Name cannot be empty';}
+                    if (!/^[a-zA-Z0-9\s\-_]+$/.test(value)) {return 'Name contains invalid characters';}
                     return undefined;
                 }
             });
 
-            if (!newName || newName === currentName) return;
+            if (!newName || newName === currentName) {return;}
 
             const result = await this.fileOperationManager.renamePrompt(filePath, newName);
             if (result.success) {
@@ -288,7 +288,7 @@ export class FileOperationCommands {
                 placeHolder: 'general, development, analysis, etc.'
             });
 
-            if (!newCategory) return;
+            if (!newCategory) {return;}
 
             const result = await this.fileOperationManager.movePrompt(filePath, newCategory);
             if (result.success) {
@@ -312,7 +312,7 @@ export class FileOperationCommands {
                 placeHolder: 'Select export format'
             });
 
-            if (!format) return;
+            if (!format) {return;}
 
             const result = await this.fileOperationManager.exportPrompts(filePaths, format.value);
             if (result.success) {

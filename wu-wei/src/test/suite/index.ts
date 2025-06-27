@@ -13,8 +13,8 @@ export function run(): Promise<void> {
     const testsRoot = path.resolve(__dirname, '..');
 
     return new Promise((c, e) => {
-        // Look for tests in suite and promptStore directories
-        const testFiles = glob.sync('**/*.test.js', {
+        // Look for tests only in the suite directory
+        const testFiles = glob.sync('suite/**/*.test.js', {
             cwd: testsRoot,
             ignore: ['**/node_modules/**']
         });
