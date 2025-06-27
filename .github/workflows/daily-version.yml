@@ -32,8 +32,11 @@ jobs:
         id: semantic
         run: |
           source .venv/bin/activate
-          NEW_VERSION=$(semantic-release version)
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          NEW_VERSION=$(semantic-release version --print)
+          if [ -n "$NEW_VERSION" ] && [ "$NEW_VERSION" != "$(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.0')" ]; then
+            echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+            semantic-release version --no-push --no-tag --no-commit
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
