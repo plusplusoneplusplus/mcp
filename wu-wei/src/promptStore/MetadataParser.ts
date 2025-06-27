@@ -241,6 +241,44 @@ export class MetadataParser {
             });
         }
 
+        // Validate version format if present
+        const metadataAny = metadata as any;
+        if (metadataAny.version) {
+            const versionPattern = /^\d+\.\d+\.\d+$/; // Simple semantic versioning
+            if (!versionPattern.test(metadataAny.version)) {
+                warnings.push({
+                    field: 'version',
+                    message: 'Version should follow semantic versioning (e.g., 1.0.0)',
+                    suggestion: 'Use format: major.minor.patch'
+                });
+            }
+        } else {
+            warnings.push({
+                field: 'version',
+                message: 'Version not specified',
+                suggestion: 'Consider adding a version field for better tracking'
+            });
+        }
+
+        // Validate parameters if present
+        if ((metadata as any).parameters && Array.isArray((metadata as any).parameters)) {
+            (metadata as any).parameters.forEach((param: any, index: number) => {
+                if (!param.name || typeof param.name !== 'string') {
+                    errors.push({
+                        field: `parameters[${index}].name`,
+                        message: 'Parameter name is required and must be a string',
+                        severity: 'error'
+                    });
+                } else if (!/^[a-zA-Z][a-zA-Z0-9_]*$/.test(param.name)) {
+                    errors.push({
+                        field: `parameters[${index}].name`,
+                        message: `Parameter name "${param.name}" is invalid`,
+                        severity: 'error'
+                    });
+                }
+            });
+        }
+
         return {
             isValid: errors.length === 0,
             errors,

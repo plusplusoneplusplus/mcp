@@ -185,14 +185,19 @@ This should be treated as regular content.`;
 
             const result = parser.validateMetadata(metadata);
 
+            // Should have a warning about missing version
             assert(result.warnings.some(w => w.field === 'version'));
         });
 
         it('should validate parameter names', () => {
-            const metadata: PromptMetadata = {
+            const metadata: PromptMetadata & { parameters: any[] } = {
                 title: 'Test',
                 category: 'Test',
                 tags: [],
+                parameters: [
+                    { name: '', type: 'string' }, // Invalid empty name
+                    { name: '123invalid', type: 'string' } // Invalid name starting with number
+                ]
             };
 
             const result = parser.validateMetadata(metadata);

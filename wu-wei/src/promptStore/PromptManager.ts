@@ -283,10 +283,15 @@ export class PromptManager {
                         continue;
                     }
 
-                    if (entry.isDirectory() && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns)) {
+                    if (entry.isDirectory() && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
                         stack.push(fullPath);
                         this.logger.debug(`📁 Adding directory to scan: ${fullPath}`);
-                    } else if (entry.isFile() && FileUtils.isMarkdownFile(entry.name) && !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns)) {
+                    } else if (entry.isFile() && FileUtils.isMarkdownFile(entry.name) &&
+                        !FileUtils.shouldIgnore(entry.name, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(relativePath, this.config.excludePatterns) &&
+                        !FileUtils.shouldExcludePath(fullPath, this.config.excludePatterns)) {
                         files.push(fullPath);
                         filesFound++;
                         this.logger.debug(`📄 Found markdown file: ${fullPath}`);
