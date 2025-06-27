@@ -50,3 +50,15 @@ jobs:
           body: "Automated version bump to ${{ env.NEW_VERSION }}"
           branch: "release/${{ env.NEW_VERSION }}"
           base: "main"
+
+      - name: Enable auto-merge for Pull Request
+        if: env.NEW_VERSION
+        run: |
+          # Get the PR number from the previous step
+          PR_NUMBER=$(gh pr list --head "release/${{ env.NEW_VERSION }}" --json number --jq '.[0].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr merge $PR_NUMBER --auto --squash
+            echo "Auto-merge enabled for PR #$PR_NUMBER"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
