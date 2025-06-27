@@ -8,3 +8,17 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+esbuild.js
+test/**
+out/test/**
+*.vsix
+.eslintrc.js
+.prettierrc
+.github/**
+**/*.test.js
+**/*.spec.js
+# Include only necessary node_modules
+node_modules/*
+!node_modules/chokidar/**
+!node_modules/yaml/**
+!node_modules/@vscode/prompt-tsx/**

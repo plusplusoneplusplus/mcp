@@ -10,7 +10,7 @@ Wu Wei (無為) represents the Taoist concept of "effortless action" - achieving
 
 Transform your daily work through automation that:
 - **Flows naturally** with your existing workflow
-- **Reduces friction** in repetitive tasks  
+- **Reduces friction** in repetitive tasks
 - **Enhances productivity** without complexity
 - **Adapts effortlessly** to your work patterns
 
@@ -75,6 +75,38 @@ npm run watch    # Auto-compile on changes
 # Press F5 in VS Code to launch extension host
 ```
 
+### Building the Extension
+
+The extension uses esbuild for bundling to optimize performance and reduce file count:
+
+```bash
+# Development build with source maps
+npm run esbuild
+
+# Watch mode for development
+npm run esbuild-watch
+
+# Production build (minified)
+npm run package
+```
+
+### Bundling
+
+The extension is bundled using esbuild to significantly reduce the number of files and improve performance:
+- **Before bundling**: 360 files (275 JavaScript files)
+- **After bundling**: Single `extension.js` file (~250KB)
+
+External dependencies like `chokidar` are excluded from bundling to avoid issues with native binaries.
+
+### Packaging
+
+```bash
+# Create VSIX package
+vsce package
+```
+
+The GitHub workflow automatically builds and packages the extension using the bundled approach for optimal performance.
+
 ## Configuration
 
 Access settings via `Ctrl+,` → Search "Wu Wei"
@@ -86,7 +118,7 @@ Access settings via `Ctrl+,` → Search "Wu Wei"
 This extension follows Wu Wei principles:
 
 1. **Minimal Intervention**: Automation works behind the scenes
-2. **Natural Flow**: Features integrate seamlessly with existing workflows  
+2. **Natural Flow**: Features integrate seamlessly with existing workflows
 3. **Adaptive Intelligence**: The system learns and adapts to your patterns
 4. **Effortless Scaling**: Simple actions produce disproportionate results
 
