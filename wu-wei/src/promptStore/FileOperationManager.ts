@@ -487,7 +487,7 @@ export class FileOperationManager {
         const config = this.configManager.getConfig();
 
         // Don't delete the root directory
-        if (dirPath === config.rootDirectory) return;
+        if (dirPath === config.rootDirectory) { return; }
 
         try {
             const entries = await fs.readdir(dirPath);

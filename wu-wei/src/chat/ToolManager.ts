@@ -160,12 +160,12 @@ Please check the VS Code Developer Console for more details and ensure all requi
             const summary: string[] = [];
 
             // Common parameter patterns to summarize
-            if (input.query) summary.push(`query: "${String(input.query).substring(0, 100)}"`);
-            if (input.filePath) summary.push(`file: ${String(input.filePath)}`);
-            if (input.command) summary.push(`command: "${String(input.command)}"`);
-            if (input.code) summary.push(`code: ${String(input.code).length} chars`);
-            if (input.url) summary.push(`url: ${String(input.url)}`);
-            if (input.pattern) summary.push(`pattern: "${String(input.pattern)}"`);
+            if (input.query) { summary.push(`query: "${String(input.query).substring(0, 100)}"`); }
+            if (input.filePath) { summary.push(`file: ${String(input.filePath)}`); }
+            if (input.command) { summary.push(`command: "${String(input.command)}"`); }
+            if (input.code) { summary.push(`code: ${String(input.code).length} chars`); }
+            if (input.url) { summary.push(`url: ${String(input.url)}`); }
+            if (input.pattern) { summary.push(`pattern: "${String(input.pattern)}"`); }
 
             // Add any other key parameters
             for (const [key, value] of Object.entries(input)) {
