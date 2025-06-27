@@ -195,8 +195,12 @@ suite('FileOperationCommands Tests', () => {
             (vscode.window.showQuickPick as any) = async () => mockTemplate;
             vscode.window.showInputBox = async (options: any) => {
                 inputCallCount++;
-                if (inputCallCount === 1) return 'Template Test';
-                if (inputCallCount === 2) return 'template-category';
+                if (inputCallCount === 1) {
+                    return 'Template Test';
+                }
+                if (inputCallCount === 2) {
+                    return 'template-category';
+                }
                 return undefined;
             };
 
