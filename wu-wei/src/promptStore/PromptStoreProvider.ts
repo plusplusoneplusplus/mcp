@@ -75,7 +75,7 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
         );
 
         // Use shared service factory after ensuring PromptManager is properly configured
-        this.promptService = PromptServiceFactory.createService(context);
+        this.promptService = PromptServiceFactory.createService(context, initialConfig);
 
         // Initialize services sequentially to avoid race conditions
         this.initializeServicesSequentially(promptManager, configManager);
