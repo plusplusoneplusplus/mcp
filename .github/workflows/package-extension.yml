@@ -28,9 +28,10 @@ jobs:
     - name: Install vsce
       run: npm install -g @vscode/vsce
 
-    - name: Package extension
+    - name: Package extension (bundled)
       run: |
         cd wu-wei
+        npm run package
         vsce package
 
     - name: Upload package artifact
