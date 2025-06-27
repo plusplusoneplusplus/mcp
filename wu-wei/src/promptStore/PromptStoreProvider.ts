@@ -58,24 +58,56 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     ) {
         this.logger = WuWeiLogger.getInstance();
 
-        // Use shared service factory instead of direct PromptManager instantiation
-        this.promptService = PromptServiceFactory.createService(context);
-
-        // Create a temporary configuration manager for now
+        // Create configuration manager first
         const { ConfigurationManager } = require('./ConfigurationManager');
-        const configManager = new ConfigurationManager();
+        const configManager = new ConfigurationManager(context);
 
-        // Create legacy PromptManager for FileOperationManager compatibility
+        // Get initial configuration
+        const initialConfig = configManager.getConfig();
+
+        // Create legacy PromptManager for FileOperationManager compatibility with proper config
         const { PromptManager } = require('./PromptManager');
-        const promptManager = new PromptManager();
+        const promptManager = new PromptManager(initialConfig);
 
         this.fileOperationManager = new FileOperationManager(
             promptManager,
             configManager
         );
 
+        // Use shared service factory after ensuring PromptManager is properly configured
+        this.promptService = PromptServiceFactory.createService(context);
+
+        // Initialize services sequentially to avoid race conditions
+        this.initializeServicesSequentially(promptManager, configManager);
+
         // Set up event listeners for the shared service
         this.setupServiceEventHandlers();
+    }
+
+    /**
+     * Initialize services in the correct order to avoid race conditions
+     */
+    private async initializeServicesSequentially(promptManager: any, configManager: any): Promise<void> {
+        try {
+            // First ensure configuration is properly loaded
+            const config = configManager.getConfig();
+            this.logger.info('📋 Configuration loaded:', {
+                rootDirectory: config.rootDirectory,
+                autoRefresh: config.autoRefresh
+            });
+
+            // Initialize the legacy PromptManager first
+            await promptManager.initialize();
+            this.logger.info('✅ Legacy PromptManager initialized successfully');
+
+            // Then initialize the shared service
+            await this.promptService.initialize();
+            this.logger.info('✅ PromptService initialized successfully');
+
+        } catch (error) {
+            this.logger.error('❌ Failed to initialize services', error);
+            // Don't throw - let the extension continue to work even if initialization fails
+        }
     }
 
     /**
@@ -646,12 +678,45 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
         this.logger.info('📤 sendInitialData() called');
 
         try {
-            const prompts = await this.getPromptsWithCache();
+            // Ensure service is initialized before using it
+            if (!this.promptService) {
+                throw new Error('PromptService not available');
+            }
+
+            // Initialize service if not already done
+            await this.promptService.initialize();
+
             const config = await this.promptService.getConfig();
+
+            // Check if root directory is configured
+            if (!config.rootDirectory) {
+                this.logger.info('📁 No root directory configured, sending empty state with config');
+
+                // Send empty prompts list and config
+                this.sendToWebview({
+                    type: 'updatePrompts',
+                    prompts: []
+                });
+
+                this.sendToWebview({
+                    type: 'updateConfig',
+                    config
+                });
+
+                this.sendToWebview({
+                    type: 'hideLoading'
+                });
+
+                this.logger.info('✅ Initial data sent (no directory configured)');
+                return;
+            }
+
+            const prompts = await this.getPromptsWithCache();
 
             this.logger.info('📊 Sending prompts to webview:', {
                 count: prompts.length,
                 configExists: !!config,
+                rootDirectory: config.rootDirectory,
                 samplePrompts: prompts.slice(0, 2).map(p => ({
                     id: p.id,
                     title: p.metadata?.title,
@@ -697,23 +762,51 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
      * Configure prompt store directory
      */
     private async configureDirectory(): Promise<void> {
-        const options: vscode.OpenDialogOptions = {
-            canSelectFiles: false,
-            canSelectFolders: true,
-            canSelectMany: false,
-            openLabel: 'Select Prompt Directory'
-        };
+        try {
+            const options: vscode.OpenDialogOptions = {
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                openLabel: 'Select Prompt Directory'
+            };
 
-        const folderUri = await vscode.window.showOpenDialog(options);
-        if (folderUri && folderUri[0]) {
-            const configuration = vscode.workspace.getConfiguration('wu-wei.promptStore');
-            await configuration.update('rootDirectory', folderUri[0].fsPath, vscode.ConfigurationTarget.Workspace);
+            this.logger.info('📁 Opening directory selection dialog');
+            const folderUri = await vscode.window.showOpenDialog(options);
 
-            // Update prompt manager with new directory
-            await this.promptService.updateConfig({ rootDirectory: folderUri[0].fsPath });
-            await this.promptService.refreshPrompts();
+            if (folderUri && folderUri[0]) {
+                const selectedPath = folderUri[0].fsPath;
+                this.logger.info('📁 Directory selected:', { path: selectedPath });
 
-            vscode.window.showInformationMessage(`Prompt store directory set to: ${folderUri[0].fsPath}`);
+                // Update VS Code configuration
+                const configuration = vscode.workspace.getConfiguration('wu-wei.promptStore');
+                await configuration.update('rootDirectory', selectedPath, vscode.ConfigurationTarget.Workspace);
+
+                // Update both prompt services with new directory
+                await this.promptService.updateConfig({ rootDirectory: selectedPath });
+                await this.promptService.refreshPrompts();
+
+                // Show success message
+                vscode.window.showInformationMessage(`Prompt store directory set to: ${selectedPath}`);
+
+                // Send updated configuration and prompts to webview
+                setTimeout(async () => {
+                    await this.sendInitialData();
+                }, 500); // Give time for the config to propagate
+
+                this.logger.info('✅ Directory configuration completed successfully');
+            } else {
+                this.logger.info('📁 Directory selection cancelled by user');
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            this.logger.error('❌ Failed to configure directory', { error: errorMessage });
+
+            vscode.window.showErrorMessage(`Failed to configure directory: ${errorMessage}`);
+
+            this.sendToWebview({
+                type: 'showError',
+                error: `Failed to configure directory: ${errorMessage}`
+            });
         }
     }
 
