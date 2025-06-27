@@ -1,7 +1,7 @@
 from typing import List, Optional
 import asyncio
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
-from mcp_tools import time_util
+from mcp_tools.time import time_util
 import click
 import shlex
 import json
