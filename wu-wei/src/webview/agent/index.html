@@ -97,33 +97,24 @@ Examples:
                 <div class="section-title">
                     <span class="icon">📋</span>
                     <span>Message History</span>
+                    <button class="collapse-toggle" id="historyToggle" onclick="toggleHistoryCollapse()"
+                        title="Toggle history visibility">
+                        <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                            <path
+                                d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
+                        </svg>
+                    </button>
                 </div>
                 <div class="section-subtitle">Recent agent interactions and responses</div>
             </div>
 
-            <div class="message-list" id="messageList">
-                <div class="empty-state">
-                    <div class="empty-icon">💬</div>
-                    <h3>No messages yet</h3>
-                    <p>Send your first agent request to see the conversation history here.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Extension Info Section -->
-        <div class="section info-section">
-            <div class="section-title">
-                <span class="icon">ℹ️</span>
-                <span>Extension Info</span>
-            </div>
-            <div class="info-grid">
-                <div class="info-card">
-                    <div class="info-label">Wu Wei Version</div>
-                    <div class="info-value">{{VERSION}}</div>
-                </div>
-                <div class="info-card">
-                    <div class="info-label">VS Code Version</div>
-                    <div class="info-value">{{VSCODE_VERSION}}</div>
+            <div class="collapsible-content" id="historyContent">
+                <div class="message-list" id="messageList">
+                    <div class="empty-state">
+                        <div class="empty-icon">💬</div>
+                        <h3>No messages yet</h3>
+                        <p>Send your first agent request to see the conversation history here.</p>
+                    </div>
                 </div>
             </div>
         </div>
