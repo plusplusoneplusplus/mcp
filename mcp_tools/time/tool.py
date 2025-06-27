@@ -3,7 +3,7 @@ from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 from typing import Dict, Any
 
-from mcp_tools import time_util
+from mcp_tools.time import time_util
 
 
 @register_tool()
