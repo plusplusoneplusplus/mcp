@@ -293,8 +293,13 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             }
 
             // Handle different prompt modes
-            if (promptContext.mode === 'combined' && params.message) {
-                enhancedParams.additionalMessage = params.message;
+            if (promptContext.mode === 'combined') {
+                // Check for user input in various possible parameter names
+                const userInput = params.message || params.question || params.query || params.input;
+                if (!userInput) {
+                    throw new Error('Please provide a custom message to combine with the prompt template');
+                }
+                enhancedParams.additionalMessage = userInput;
             }
 
             return enhancedParams;
@@ -307,14 +312,21 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 promptContext.variables
             );
 
-            if (promptContext.mode === 'combined' && params.message) {
+            if (promptContext.mode === 'combined') {
+                // For combined mode, always require both prompt and custom message
+                // Check for user input in various possible parameter names
+                const userInput = params.message || params.question || params.query || params.input;
+                if (!userInput) {
+                    throw new Error('Please provide a custom message to combine with the prompt template');
+                }
+
                 // Combine prompt and custom message
                 return {
                     ...params,
-                    message: `${rendered}\n\n${params.message}`
+                    message: `${rendered}\n\n${userInput}`
                 };
             } else {
-                // Use prompt as main message
+                // For custom mode, use prompt as main message
                 return {
                     ...params,
                     message: rendered,

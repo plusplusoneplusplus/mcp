@@ -136,11 +136,6 @@ function updateUIForPromptMode() {
             variableEditorContainer.style.display = 'none';
             promptPreviewContainer.style.display = 'none';
             break;
-        case 'prompt':
-            promptSelectorContainer.style.display = 'block';
-            variableEditorContainer.style.display = selectedPromptContext ? 'block' : 'none';
-            promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
-            break;
         case 'combined':
             promptSelectorContainer.style.display = 'block';
             variableEditorContainer.style.display = selectedPromptContext ? 'block' : 'none';
@@ -155,11 +150,6 @@ function updateInputLabelsAndPlaceholders() {
             parameterSubtitle.textContent = 'Enter your message or JSON parameters';
             parametersLabel.textContent = 'Message/Parameters';
             paramsInput.placeholder = 'Enter your message or JSON parameters...';
-            break;
-        case 'prompt':
-            parameterSubtitle.textContent = 'Prompt will be sent automatically when configured';
-            parametersLabel.textContent = 'Additional Parameters (Optional)';
-            paramsInput.placeholder = 'Enter additional JSON parameters if needed...';
             break;
         case 'combined':
             parameterSubtitle.textContent = 'Add custom message to combine with prompt';
@@ -557,9 +547,14 @@ function sendAgentRequest() {
     }
 
     // Handle different prompt modes
-    if (promptMode === 'prompt' || promptMode === 'combined') {
+    if (promptMode === 'combined') {
         if (!selectedPromptContext) {
             alert('Please select a prompt for this input mode');
+            return;
+        }
+
+        if (!paramsText.trim()) {
+            alert('Please enter a custom message to combine with the prompt');
             return;
         }
 
