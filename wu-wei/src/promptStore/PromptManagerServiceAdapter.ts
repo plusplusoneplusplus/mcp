@@ -79,6 +79,13 @@ export class PromptManagerServiceAdapter implements PromptService {
     }
 
     /**
+     * Refresh prompts (async wrapper over sync method)
+     */
+    async refreshPrompts(): Promise<void> {
+        await this.promptManager.refreshPrompts();
+    }
+
+    /**
      * Select prompt for use with enhanced context
      */
     async selectPromptForUse(promptId: string): Promise<PromptUsageContext> {

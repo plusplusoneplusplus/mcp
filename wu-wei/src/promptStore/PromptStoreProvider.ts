@@ -1,36 +1,135 @@
 /**
  * Prompt Store Provider - Webview provider for the prompt store UI
  * Following wu wei principles: simple, natural interface that flows with user needs
+ * Phase 3: Migrated to use shared PromptService interface
  */
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { PromptManager } from './PromptManager';
+import { PromptService, PromptUsageContext } from '../shared/promptManager/types';
+import { PromptServiceFactory } from '../shared/promptManager/PromptServiceFactory';
 import { FileOperationManager } from './FileOperationManager';
 import { Prompt, WebviewMessage, WebviewResponse, SearchFilter } from './types';
 import { UI_CONFIG } from './constants';
 import { WuWeiLogger } from '../logger';
 
+// Enhanced message types for Phase 3
+interface EnhancedWebviewMessage {
+    type: 'webviewReady' | 'configureDirectory' | 'openPrompt' | 'createNewPrompt' |
+    'refreshStore' | 'getPrompts' | 'searchPrompts' | 'selectPrompt' |
+    'refreshPrompts' | 'updateConfig' | 'deletePrompt' | 'renamePrompt' |
+    'duplicatePrompt' | 'selectPromptForUse' | 'renderPromptWithVariables';
+    payload?: any;
+    path?: string;
+    newName?: string;
+    promptId?: string;
+    variables?: Record<string, any>;
+}
+
+interface EnhancedWebviewResponse {
+    type: 'updatePrompts' | 'updateConfig' | 'showLoading' | 'hideLoading' |
+    'showError' | 'promptsLoaded' | 'promptSelected' | 'error' |
+    'configUpdated' | 'promptUsageContext' | 'promptRendered';
+    payload?: any;
+    prompts?: Prompt[];
+    config?: any;
+    error?: string;
+    usageContext?: PromptUsageContext;
+    renderedContent?: string;
+}
+
 export class PromptStoreProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = 'wu-wei.promptStore';
 
     private logger: WuWeiLogger;
-    private promptManager: PromptManager;
+    private promptService: PromptService;
     private fileOperationManager: FileOperationManager;
     private webview?: vscode.Webview;
     private _view?: vscode.WebviewView;
 
+    // Performance optimization: cache for recent operations
+    private promptCache: Map<string, Prompt> = new Map();
+    private lastRefreshTime: number = 0;
+    private readonly CACHE_DURATION = 30000; // 30 seconds
+
     constructor(
         private readonly extensionUri: vscode.Uri,
-        promptManager: PromptManager,
-        fileOperationManager: FileOperationManager
+        context: vscode.ExtensionContext
     ) {
         this.logger = WuWeiLogger.getInstance();
-        this.promptManager = promptManager;
-        this.fileOperationManager = fileOperationManager;
 
-        // Listen to prompt changes
-        this.promptManager.onPromptsChanged(this.handlePromptsChanged.bind(this));
+        // Use shared service factory instead of direct PromptManager instantiation
+        this.promptService = PromptServiceFactory.createService(context);
+
+        // Create a temporary configuration manager for now
+        const { ConfigurationManager } = require('./ConfigurationManager');
+        const configManager = new ConfigurationManager();
+
+        // Create legacy PromptManager for FileOperationManager compatibility
+        const { PromptManager } = require('./PromptManager');
+        const promptManager = new PromptManager();
+
+        this.fileOperationManager = new FileOperationManager(
+            promptManager,
+            configManager
+        );
+
+        // Set up event listeners for the shared service
+        this.setupServiceEventHandlers();
+    }
+
+    /**
+     * Set up event handlers for the shared service
+     */
+    private setupServiceEventHandlers(): void {
+        // Replace direct PromptManager event handlers with service events
+        this.promptService.onPromptsChanged(this.handlePromptsChanged.bind(this));
+        this.promptService.onConfigChanged(this.handleConfigChanged.bind(this));
+        this.promptService.onPromptSelected(this.handlePromptSelected.bind(this));
+    }
+
+    /**
+     * Handle prompts changed event from service
+     */
+    private async handlePromptsChanged(prompts: Prompt[]): Promise<void> {
+        // Update cache
+        this.promptCache.clear();
+        prompts.forEach(prompt => this.promptCache.set(prompt.id, prompt));
+        this.lastRefreshTime = Date.now();
+
+        // Send to webview
+        if (this.webview) {
+            this.sendToWebview({
+                type: 'updatePrompts',
+                prompts
+            });
+        }
+    }
+
+    /**
+     * Handle config changed event from service
+     */
+    private async handleConfigChanged(config: any): Promise<void> {
+        if (this.webview) {
+            this.sendToWebview({
+                type: 'configUpdated',
+                payload: config
+            });
+        }
+    }
+
+    /**
+     * Handle prompt selected event from service (for future agent integration)
+     */
+    private async handlePromptSelected(context: PromptUsageContext): Promise<void> {
+        this.logger.info(`Prompt selected for use: ${context.prompt.metadata.title}`);
+
+        if (this.webview) {
+            this.sendToWebview({
+                type: 'promptUsageContext',
+                usageContext: context
+            });
+        }
     }
 
     /**
@@ -75,7 +174,9 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
         });
 
         this.logger.info('Prompt Store webview resolved');
-    }    /**
+    }
+
+    /**
      * Refresh the webview (called by VS Code's refresh button)
      */
     public refresh(): void {
@@ -103,9 +204,9 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * Handle messages from the webview
+     * Handle messages from the webview with enhanced functionality
      */
-    private async handleWebviewMessage(message: WebviewMessage): Promise<void> {
+    private async handleWebviewMessage(message: EnhancedWebviewMessage): Promise<void> {
         this.logger.info('📨 Received webview message:', { type: message.type, hasPayload: !!message.payload });
 
         try {
@@ -142,7 +243,6 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
                     await this.refreshStore();
                     break;
 
-                // Legacy support
                 case 'getPrompts':
                     await this.handleGetPrompts();
                     break;
@@ -153,6 +253,29 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
 
                 case 'selectPrompt':
                     await this.handleSelectPrompt(message.payload);
+                    break;
+
+                // New enhanced handlers for Phase 3
+                case 'selectPromptForUse':
+                    if (message.promptId) {
+                        await this.handleSelectPromptForUse(message.promptId);
+                    } else {
+                        this.sendToWebview({
+                            type: 'showError',
+                            error: 'No prompt ID provided for selection'
+                        });
+                    }
+                    break;
+
+                case 'renderPromptWithVariables':
+                    if (message.promptId && message.variables) {
+                        await this.handleRenderPromptWithVariables(message.promptId, message.variables);
+                    } else {
+                        this.sendToWebview({
+                            type: 'showError',
+                            error: 'Missing prompt ID or variables for rendering'
+                        });
+                    }
                     break;
 
                 case 'refreshPrompts':
@@ -202,46 +325,99 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    // ===== Enhanced Handler Methods for Phase 3 =====
+
     /**
-     * Handle get prompts request
+     * Handle get prompts request with caching
      */
     private async handleGetPrompts(): Promise<void> {
-        const prompts = this.promptManager.getAllPrompts();
-        this.sendToWebview({
-            type: 'updatePrompts',
-            prompts
-        });
+        try {
+            const prompts = await this.getPromptsWithCache();
+            this.sendToWebview({
+                type: 'updatePrompts',
+                prompts
+            });
+        } catch (error) {
+            this.handleError('Failed to load prompts', error);
+        }
     }
 
     /**
-     * Handle search prompts request
+     * Handle search prompts request with async service
      */
     private async handleSearchPrompts(filter: SearchFilter): Promise<void> {
-        const prompts = this.promptManager.searchPrompts(filter);
-        this.sendToWebview({
-            type: 'updatePrompts',
-            prompts
-        });
+        try {
+            const query = filter.query || '';
+            const prompts = await this.promptService.searchPrompts(query, filter);
+            this.sendToWebview({
+                type: 'updatePrompts',
+                prompts
+            });
+        } catch (error) {
+            this.handleError('Search failed', error);
+        }
     }
 
     /**
-     * Handle select prompt request
+     * Handle select prompt request (existing behavior)
      */
     private async handleSelectPrompt(promptId: string): Promise<void> {
-        const prompt = this.promptManager.getPrompt(promptId);
-        if (prompt) {
-            // Insert prompt into active editor or show in new document
-            await this.insertPromptIntoEditor(prompt);
+        try {
+            const prompt = await this.promptService.getPrompt(promptId);
+            if (prompt) {
+                // Insert prompt into active editor or show in new document
+                await this.insertPromptIntoEditor(prompt);
+
+                this.sendToWebview({
+                    type: 'promptSelected',
+                    payload: { id: promptId, success: true }
+                });
+            } else {
+                this.sendToWebview({
+                    type: 'error',
+                    error: 'Prompt not found'
+                });
+            }
+        } catch (error) {
+            this.handleError('Failed to select prompt', error);
+        }
+    }
+
+    /**
+     * Handle select prompt for use (new enhanced functionality)
+     */
+    private async handleSelectPromptForUse(promptId: string): Promise<void> {
+        try {
+            const usageContext = await this.promptService.selectPromptForUse(promptId);
 
             this.sendToWebview({
-                type: 'promptSelected',
-                payload: { id: promptId, success: true }
+                type: 'promptUsageContext',
+                usageContext
             });
-        } else {
+        } catch (error) {
+            this.handleError('Failed to select prompt for use', error);
+        }
+    }
+
+    /**
+     * Handle render prompt with variables (new functionality)
+     */
+    private async handleRenderPromptWithVariables(
+        promptId: string,
+        variables: Record<string, any>
+    ): Promise<void> {
+        try {
+            const renderedContent = await this.promptService.renderPromptWithVariables(
+                promptId,
+                variables
+            );
+
             this.sendToWebview({
-                type: 'error',
-                error: 'Prompt not found'
+                type: 'promptRendered',
+                renderedContent
             });
+        } catch (error) {
+            this.handleError('Failed to render prompt', error);
         }
     }
 
@@ -249,37 +425,96 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
      * Handle refresh prompts request
      */
     private async handleRefreshPrompts(): Promise<void> {
-        await this.promptManager.refreshPrompts();
-        // Prompts will be sent via the onPromptsChanged event
+        try {
+            await this.invalidateCache();
+            // Prompts will be sent via the onPromptsChanged event
+        } catch (error) {
+            this.handleError('Failed to refresh prompts', error);
+        }
     }
 
     /**
      * Handle update configuration request
      */
     private async handleUpdateConfig(config: any): Promise<void> {
-        this.promptManager.updateConfig(config);
-        this.sendToWebview({
-            type: 'configUpdated',
-            payload: this.promptManager.getConfig()
-        });
+        try {
+            await this.promptService.updateConfig(config);
+            // Config update will be sent via the onConfigChanged event
+        } catch (error) {
+            this.handleError('Failed to update configuration', error);
+        }
+    }
+
+    // ===== Performance Optimization Methods =====
+
+    /**
+     * Get prompts with caching for better performance
+     */
+    private async getPromptsWithCache(): Promise<Prompt[]> {
+        const now = Date.now();
+
+        // Use cache if recent
+        if (now - this.lastRefreshTime < this.CACHE_DURATION && this.promptCache.size > 0) {
+            return Array.from(this.promptCache.values());
+        }
+
+        // Refresh from service
+        const prompts = await this.promptService.getAllPrompts();
+
+        // Update cache
+        this.promptCache.clear();
+        prompts.forEach(prompt => this.promptCache.set(prompt.id, prompt));
+        this.lastRefreshTime = now;
+
+        return prompts;
     }
 
     /**
-     * Handle prompts changed event
+     * Invalidate cache and refresh
      */
-    private handlePromptsChanged(prompts: Prompt[]): void {
-        if (this.webview) {
+    private async invalidateCache(): Promise<void> {
+        this.promptCache.clear();
+        this.lastRefreshTime = 0;
+        await this.loadAndDisplayPrompts();
+    }
+
+    /**
+     * Load and display prompts with loading states
+     */
+    private async loadAndDisplayPrompts(): Promise<void> {
+        try {
+            this.sendToWebview({ type: 'showLoading' });
+            const prompts = await this.promptService.getAllPrompts();
             this.sendToWebview({
                 type: 'updatePrompts',
                 prompts
             });
+        } catch (error) {
+            this.handleError('Failed to load prompts', error);
+        } finally {
+            this.sendToWebview({ type: 'hideLoading' });
         }
+    }
+
+    // ===== Utility Methods =====
+
+    /**
+     * Handle errors with consistent logging and user feedback
+     */
+    private handleError(message: string, error: any): void {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(message, { error: errorMessage });
+
+        this.sendToWebview({
+            type: 'showError',
+            error: `${message}: ${errorMessage}`
+        });
     }
 
     /**
      * Send message to webview
      */
-    private sendToWebview(response: WebviewResponse): void {
+    private sendToWebview(response: EnhancedWebviewResponse): void {
         if (this.webview) {
             this.logger.info('📤 Sending message to webview:', { type: response.type });
             this.webview.postMessage(response);
@@ -402,15 +637,17 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }
         return text;
-    }    /**
+    }
+
+    /**
      * Send initial data to webview when it's ready
      */
     private async sendInitialData(): Promise<void> {
         this.logger.info('📤 sendInitialData() called');
 
         try {
-            const prompts = this.promptManager.getAllPrompts();
-            const config = this.promptManager.getConfig();
+            const prompts = await this.getPromptsWithCache();
+            const config = await this.promptService.getConfig();
 
             this.logger.info('📊 Sending prompts to webview:', {
                 count: prompts.length,
@@ -473,8 +710,8 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
             await configuration.update('rootDirectory', folderUri[0].fsPath, vscode.ConfigurationTarget.Workspace);
 
             // Update prompt manager with new directory
-            this.promptManager.updateConfig({ rootDirectory: folderUri[0].fsPath });
-            await this.promptManager.refreshPrompts();
+            await this.promptService.updateConfig({ rootDirectory: folderUri[0].fsPath });
+            await this.promptService.refreshPrompts();
 
             vscode.window.showInformationMessage(`Prompt store directory set to: ${folderUri[0].fsPath}`);
         }
@@ -503,7 +740,7 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
      * Create a new prompt file
      */
     private async createNewPrompt(): Promise<void> {
-        const config = this.promptManager.getConfig();
+        const config = await this.promptService.getConfig();
         if (!config.rootDirectory) {
             vscode.window.showWarningMessage('Please configure a prompt directory first');
             await this.configureDirectory();
@@ -542,7 +779,7 @@ Your prompt content goes here...
             await vscode.window.showTextDocument(document);
 
             // Refresh the prompt store
-            await this.promptManager.refreshPrompts();
+            await this.promptService.refreshPrompts();
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger.error('Failed to create new prompt', { path: filePath.fsPath, error: errorMessage });
@@ -557,7 +794,7 @@ Your prompt content goes here...
         this.sendToWebview({ type: 'showLoading' });
 
         try {
-            await this.promptManager.refreshPrompts();
+            await this.invalidateCache();
             // Prompts will be sent via the onPromptsChanged event
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -586,7 +823,7 @@ Your prompt content goes here...
                 });
 
                 // Refresh the prompt store
-                await this.promptManager.refreshPrompts();
+                await this.promptService.refreshPrompts();
             } else if (result.error !== 'Deletion cancelled') {
                 this.sendToWebview({
                     type: 'showError',
@@ -618,7 +855,7 @@ Your prompt content goes here...
                 });
 
                 // Refresh the prompt store
-                await this.promptManager.refreshPrompts();
+                await this.promptService.refreshPrompts();
 
                 // Open the renamed file
                 if (result.filePath) {

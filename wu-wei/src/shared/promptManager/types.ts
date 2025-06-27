@@ -51,6 +51,7 @@ export interface PromptService {
     getAllPrompts(): Promise<import('../../promptStore/types').Prompt[]>;
     getPrompt(id: string): Promise<import('../../promptStore/types').Prompt | null>;
     searchPrompts(query: string, filters?: import('../../promptStore/types').SearchFilter): Promise<import('../../promptStore/types').Prompt[]>;
+    refreshPrompts(): Promise<void>;
 
     // Prompt Usage
     selectPromptForUse(promptId: string): Promise<PromptUsageContext>;
