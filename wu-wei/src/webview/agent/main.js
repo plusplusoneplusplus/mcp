@@ -32,6 +32,33 @@ window.addEventListener('message', event => {
     }
 });
 
+// Initialize collapse state from localStorage
+function initializeCollapseState() {
+    const savedState = localStorage.getItem('historyCollapsed');
+    const historySection = document.querySelector('.history-section');
+
+    // Default to collapsed if no saved state exists, otherwise use saved state
+    const isCollapsed = savedState === null ? true : savedState === 'true';
+
+    if (isCollapsed) {
+        historySection.classList.add('collapsed');
+    }
+}
+
+// Toggle history collapse state
+function toggleHistoryCollapse() {
+    const historySection = document.querySelector('.history-section');
+    const isCollapsed = historySection.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        historySection.classList.remove('collapsed');
+        localStorage.setItem('historyCollapsed', 'false');
+    } else {
+        historySection.classList.add('collapsed');
+        localStorage.setItem('historyCollapsed', 'true');
+    }
+}
+
 function updateAgentSelect() {
     agentSelect.innerHTML = '';
 
@@ -247,6 +274,11 @@ function updateMessageHistory() {
         });
     }, 100);
 }
+
+// Initialize the collapse state when the page loads
+document.addEventListener('DOMContentLoaded', function () {
+    initializeCollapseState();
+});
 
 // Request initial data
 vscode.postMessage({ command: 'getAgentCapabilities' });
