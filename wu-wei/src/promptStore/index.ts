@@ -6,6 +6,7 @@
 // Core classes
 export { PromptStoreProvider } from './PromptStoreProvider';
 export { PromptManager } from './PromptManager';
+export { PromptManagerServiceAdapter } from './PromptManagerServiceAdapter';
 export { PromptFileWatcher } from './PromptFileWatcher';
 export { MetadataParser } from './MetadataParser';
 export { ConfigurationManager } from './ConfigurationManager';
