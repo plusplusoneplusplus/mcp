@@ -8,11 +8,11 @@ import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { FileOperationManager } from '../../../src/promptStore/FileOperationManager';
-import { FileOperationCommands } from '../../../src/promptStore/commands';
-import { PromptManager } from '../../../src/promptStore/PromptManager';
-import { ConfigurationManager } from '../../../src/promptStore/ConfigurationManager';
-import { TemplateManager } from '../../../src/promptStore/TemplateManager';
+import { FileOperationManager } from '../../../promptStore/FileOperationManager';
+import { FileOperationCommands } from '../../../promptStore/commands';
+import { PromptManager } from '../../../promptStore/PromptManager';
+import { ConfigurationManager } from '../../../promptStore/ConfigurationManager';
+import { TemplateManager } from '../../../promptStore/TemplateManager';
 
 suite('File Operations Integration Tests', () => {
     let fileOperationManager: FileOperationManager;
@@ -47,7 +47,7 @@ suite('File Operations Integration Tests', () => {
         configManager = new ConfigurationManager(context);
         templateManager = new TemplateManager();
         promptManager = new PromptManager();
-        fileOperationManager = new FileOperationManager(promptManager, configManager, templateManager);
+        fileOperationManager = new FileOperationManager(promptManager, configManager);
         fileOperationCommands = new FileOperationCommands(fileOperationManager, templateManager);
 
         // Mock configuration to use test directory
@@ -205,53 +205,54 @@ suite('File Operations Integration Tests', () => {
         }
     });
 
-    test('Prompt duplication workflow', async () => {
-        // Create original prompt
-        const original = await fileOperationManager.createNewPrompt({
-            name: 'original-for-duplication',
-            category: 'test'
-        });
-        assert.strictEqual(original.success, true);
+    // Note: Duplicate prompt functionality is currently commented out in commands
+    // test('Prompt duplication workflow', async () => {
+    //     // Create original prompt
+    //     const original = await fileOperationManager.createNewPrompt({
+    //         name: 'original-for-duplication',
+    //         category: 'test'
+    //     });
+    //     assert.strictEqual(original.success, true);
 
-        // Mock user input for new name
-        const originalShowInputBox = vscode.window.showInputBox;
-        vscode.window.showInputBox = async () => 'duplicated-prompt';
+    //     // Mock user input for new name
+    //     const originalShowInputBox = vscode.window.showInputBox;
+    //     vscode.window.showInputBox = async () => 'duplicated-prompt';
 
-        // Mock file operations
-        const mockDocument = {
-            uri: vscode.Uri.file(path.join(testDir, 'test', 'duplicated-prompt.md')),
-            save: async () => true
-        } as any;
+    //     // Mock file operations
+    //     const mockDocument = {
+    //         uri: vscode.Uri.file(path.join(testDir, 'test', 'duplicated-prompt.md')),
+    //         save: async () => true
+    //     } as any;
 
-        const originalOpenTextDocument = vscode.workspace.openTextDocument;
-        vscode.workspace.openTextDocument = async () => mockDocument;
+    //     const originalOpenTextDocument = vscode.workspace.openTextDocument;
+    //     vscode.workspace.openTextDocument = async () => mockDocument;
 
-        const originalShowTextDocument = vscode.window.showTextDocument;
-        vscode.window.showTextDocument = async () => ({} as any);
+    //     const originalShowTextDocument = vscode.window.showTextDocument;
+    //     vscode.window.showTextDocument = async () => ({} as any);
 
-        const originalShowInformationMessage = vscode.window.showInformationMessage;
-        vscode.window.showInformationMessage = async () => undefined;
+    //     const originalShowInformationMessage = vscode.window.showInformationMessage;
+    //     vscode.window.showInformationMessage = async () => undefined;
 
-        try {
-            // Execute duplicate command
-            await vscode.commands.executeCommand('wu-wei.promptStore.duplicatePrompt', original.filePath);
+    //     try {
+    //         // Execute duplicate command
+    //         await vscode.commands.executeCommand('wu-wei.promptStore.duplicatePrompt', original.filePath);
 
-            // Verify both files exist
-            const originalExists = await fs.access(original.filePath!).then(() => true, () => false);
-            const duplicateExists = await fs.access(
-                path.join(testDir, 'test', 'duplicated-prompt.md')
-            ).then(() => true, () => false);
+    //         // Verify both files exist
+    //         const originalExists = await fs.access(original.filePath!).then(() => true, () => false);
+    //         const duplicateExists = await fs.access(
+    //             path.join(testDir, 'test', 'duplicated-prompt.md')
+    //         ).then(() => true, () => false);
 
-            assert.strictEqual(originalExists, true);
-            assert.strictEqual(duplicateExists, true);
+    //         assert.strictEqual(originalExists, true);
+    //         assert.strictEqual(duplicateExists, true);
 
-        } finally {
-            vscode.window.showInputBox = originalShowInputBox;
-            vscode.workspace.openTextDocument = originalOpenTextDocument;
-            vscode.window.showTextDocument = originalShowTextDocument;
-            vscode.window.showInformationMessage = originalShowInformationMessage;
-        }
-    });
+    //     } finally {
+    //         vscode.window.showInputBox = originalShowInputBox;
+    //         vscode.workspace.openTextDocument = originalOpenTextDocument;
+    //         vscode.window.showTextDocument = originalShowTextDocument;
+    //         vscode.window.showInformationMessage = originalShowInformationMessage;
+    //     }
+    // });
 
     test('Prompt deletion workflow', async () => {
         // Create prompt to delete
@@ -411,4 +412,4 @@ This prompt was created externally.
         assert.ok(foundPrompt, 'File watcher should detect externally created files');
         assert.strictEqual(foundPrompt.metadata.title, 'Externally Created');
     });
-});
+}); 
