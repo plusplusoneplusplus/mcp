@@ -62,8 +62,25 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
         const { ConfigurationManager } = require('./ConfigurationManager');
         const configManager = new ConfigurationManager(context);
 
-        // Get initial configuration
-        const initialConfig = configManager.getConfig();
+        // Get initial configuration from ConfigurationManager
+        const configManagerConfig = configManager.getConfig();
+
+        // Convert to PromptManager-compatible config format
+        const initialConfig = {
+            rootDirectory: configManagerConfig.rootDirectory,
+            watchPaths: configManagerConfig.rootDirectory ? [configManagerConfig.rootDirectory] : [],
+            filePatterns: ['**/*.md', '**/*.txt'],
+            excludePatterns: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+            autoRefresh: configManagerConfig.autoRefresh,
+            refreshInterval: 1000,
+            enableCache: true,
+            maxCacheSize: 1000,
+            sortBy: 'name' as const,
+            sortOrder: 'asc' as const,
+            showCategories: true,
+            showTags: true,
+            enableSearch: true
+        };
 
         // Create legacy PromptManager for FileOperationManager compatibility with proper config
         const { PromptManager } = require('./PromptManager');

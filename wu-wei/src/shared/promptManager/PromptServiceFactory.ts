@@ -17,7 +17,24 @@ export class PromptServiceFactory {
             if (!config) {
                 const { ConfigurationManager } = require('../../promptStore/ConfigurationManager');
                 const configManager = new ConfigurationManager(context);
-                config = configManager.getConfig();
+                const configManagerConfig = configManager.getConfig();
+
+                // Convert to PromptManager-compatible config format
+                config = {
+                    rootDirectory: configManagerConfig.rootDirectory,
+                    watchPaths: configManagerConfig.rootDirectory ? [configManagerConfig.rootDirectory] : [],
+                    filePatterns: ['**/*.md', '**/*.txt'],
+                    excludePatterns: ['**/node_modules/**', '**/.git/**', '**/dist/**', '**/build/**'],
+                    autoRefresh: configManagerConfig.autoRefresh,
+                    refreshInterval: 1000,
+                    enableCache: true,
+                    maxCacheSize: 1000,
+                    sortBy: 'name',
+                    sortOrder: 'asc',
+                    showCategories: true,
+                    showTags: true,
+                    enableSearch: true
+                };
             }
 
             const promptManager = new PromptManager(config);
