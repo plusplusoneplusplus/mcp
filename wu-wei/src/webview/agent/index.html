@@ -65,21 +65,12 @@
                     <span class="icon">💬</span>
                     <span>Request Input</span>
                 </div>
-                <div class="section-subtitle" id="parameterSubtitle">Configure your agent request with prompts or custom
-                    input</div>
+                <div class="section-subtitle" id="parameterSubtitle">Select a prompt template and add your custom
+                    message</div>
             </div>
 
-            <div class="form-group">
-                <label class="form-label">Input Mode</label>
-                <select id="promptModeSelector">
-                    <option value="custom">Custom Message</option>
-                    <option value="prompt">Prompt Only</option>
-                    <option value="combined">Prompt + Custom Message</option>
-                </select>
-            </div>
-
-            <!-- Prompt Selector (hidden by default) -->
-            <div class="prompt-selector-container" id="promptSelectorContainer" style="display: none;">
+            <!-- Prompt Selector -->
+            <div class="prompt-selector-container" id="promptSelectorContainer">
                 <div class="form-group">
                     <label class="form-label">Search Prompts</label>
                     <input type="text" id="promptSearch" placeholder="Search prompts..." class="prompt-search">
@@ -93,7 +84,7 @@
                 </div>
             </div>
 
-            <!-- Variable Editor (hidden by default) -->
+            <!-- Variable Editor -->
             <div class="variable-editor-container" id="variableEditorContainer" style="display: none;">
                 <div class="subsection-title">
                     <span class="icon">⚙️</span>
@@ -104,7 +95,7 @@
                 </div>
             </div>
 
-            <!-- Prompt Preview (hidden by default) -->
+            <!-- Prompt Preview -->
             <div class="prompt-preview-container" id="promptPreviewContainer" style="display: none;">
                 <div class="subsection-title">
                     <span class="icon">👁️</span>

@@ -8,7 +8,7 @@ let messageHistory = [];
 let availablePrompts = [];
 let selectedPromptContext = null;
 let promptVariables = {};
-let promptMode = 'custom';
+let promptMode = 'combined'; // Always use combined mode
 
 // DOM elements
 const agentSelect = document.getElementById('agentSelect');
@@ -18,7 +18,6 @@ const agentTooltip = document.getElementById('agentTooltip');
 const messageList = document.getElementById('messageList');
 
 // DOM elements - new prompt integration
-const promptModeSelector = document.getElementById('promptModeSelector');
 const promptSelectorContainer = document.getElementById('promptSelectorContainer');
 const promptSearch = document.getElementById('promptSearch');
 const promptSelector = document.getElementById('promptSelector');
@@ -35,7 +34,6 @@ methodSelect.addEventListener('change', updatePlaceholder);
 paramsInput.addEventListener('keydown', handleKeyDown);
 
 // Event listeners - new prompt integration
-promptModeSelector.addEventListener('change', handlePromptModeChange);
 promptSearch.addEventListener('input', debounce(handlePromptSearch, 300));
 promptSelector.addEventListener('change', handlePromptSelection);
 
@@ -122,55 +120,22 @@ function toggleAgentCollapse() {
     }
 }
 
-// Prompt Mode Management
-function handlePromptModeChange() {
-    promptMode = promptModeSelector.value;
-    updateUIForPromptMode();
-    updateInputLabelsAndPlaceholders();
-}
+// UI Management for Combined Mode
+function updateUIForCombinedMode() {
+    // Always show prompt selector
+    promptSelectorContainer.style.display = 'block';
 
-function updateUIForPromptMode() {
-    switch (promptMode) {
-        case 'custom':
-            promptSelectorContainer.style.display = 'none';
-            variableEditorContainer.style.display = 'none';
-            promptPreviewContainer.style.display = 'none';
-            break;
-        case 'prompt':
-            promptSelectorContainer.style.display = 'block';
-            // Only show variable editor if prompt has variables
-            const hasVariablesPrompt = selectedPromptContext?.parameters?.length > 0;
-            variableEditorContainer.style.display = selectedPromptContext && hasVariablesPrompt ? 'block' : 'none';
-            promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
-            break;
-        case 'combined':
-            promptSelectorContainer.style.display = 'block';
-            // Only show variable editor if prompt has variables
-            const hasVariables = selectedPromptContext?.parameters?.length > 0;
-            variableEditorContainer.style.display = selectedPromptContext && hasVariables ? 'block' : 'none';
-            promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
-            break;
-    }
+    // Only show variable editor if prompt has variables
+    const hasVariables = selectedPromptContext?.parameters?.length > 0;
+    variableEditorContainer.style.display = selectedPromptContext && hasVariables ? 'block' : 'none';
+    promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
 }
 
 function updateInputLabelsAndPlaceholders() {
-    switch (promptMode) {
-        case 'custom':
-            parameterSubtitle.textContent = 'Enter your message or JSON parameters';
-            parametersLabel.textContent = 'Message/Parameters';
-            paramsInput.placeholder = 'Enter your message or JSON parameters...';
-            break;
-        case 'prompt':
-            parameterSubtitle.textContent = 'Use selected prompt template only';
-            parametersLabel.textContent = 'Additional Parameters (Optional)';
-            paramsInput.placeholder = 'Enter additional JSON parameters if needed...';
-            break;
-        case 'combined':
-            parameterSubtitle.textContent = 'Add custom message to combine with prompt';
-            parametersLabel.textContent = 'Additional Message';
-            paramsInput.placeholder = 'Enter additional message to combine with prompt...';
-            break;
-    }
+    // Always use combined mode labels
+    parameterSubtitle.textContent = 'Select a prompt template and add your custom message';
+    parametersLabel.textContent = 'Additional Message';
+    paramsInput.placeholder = 'Enter additional message to combine with prompt...';
 }
 
 // Prompt Search and Selection
@@ -217,7 +182,7 @@ function handlePromptSelection() {
         selectedPromptContext = null;
         clearVariableEditor();
         clearPromptPreview();
-        updateUIForPromptMode();
+        updateUIForCombinedMode();
         return;
     }
 
@@ -239,8 +204,8 @@ function handlePromptContextUpdate() {
     // Update prompt preview
     renderPromptPreview();
 
-    // Show appropriate containers
-    updateUIForPromptMode();
+    // Show appropriate containers for combined mode
+    updateUIForCombinedMode();
 }
 
 // Variable Editor
@@ -377,7 +342,7 @@ function clearVariableEditor() {
 
 // Prompt Preview
 function renderPromptPreview() {
-    if (!selectedPromptContext || promptMode === 'custom') {
+    if (!selectedPromptContext) {
         clearPromptPreview();
         return;
     }
@@ -515,34 +480,9 @@ function handleKeyDown(event) {
 }
 
 function updatePlaceholder() {
-    if (promptMode !== 'custom') {
-        return; // Placeholder is managed by prompt mode
-    }
-
-    const selectedAgent = agentSelect.value;
-    const selectedMethod = methodSelect.value;
-
-    if (!selectedAgent || !selectedMethod) {
-        paramsInput.placeholder = 'Select an agent and method first';
-        return;
-    }
-
-    // Update placeholder based on agent and method
-    if (selectedAgent === 'github-copilot') {
-        if (selectedMethod === 'ask') {
-            paramsInput.placeholder = 'Ask a question about your code or project...';
-        } else if (selectedMethod === 'openAgent') {
-            paramsInput.placeholder = 'Describe what you want to do or ask about...';
-        }
-    } else if (selectedAgent === 'wu-wei-example') {
-        if (selectedMethod === 'echo') {
-            paramsInput.placeholder = 'Enter a message to echo back...';
-        } else if (selectedMethod === 'status') {
-            paramsInput.placeholder = 'No parameters needed (leave empty)';
-        } else if (selectedMethod === 'execute') {
-            paramsInput.placeholder = 'Describe what to execute or use JSON: {"action": "test"}';
-        }
-    }
+    // Placeholder is managed by combined mode settings
+    // Always use the combined mode placeholder set by updateInputLabelsAndPlaceholders()
+    return;
 }
 
 function sendAgentRequest() {
@@ -560,51 +500,39 @@ function sendAgentRequest() {
         return;
     }
 
-    // Handle different prompt modes
-    if (promptMode === 'combined') {
-        if (!selectedPromptContext) {
-            alert('Please select a prompt for this input mode');
-            return;
-        }
-
-        if (!paramsText.trim()) {
-            alert('Please enter a custom message to combine with the prompt');
-            return;
-        }
-
-        // Validate required variables
-        const validationErrors = validatePromptVariables();
-        if (validationErrors.length > 0) {
-            alert(`Please fill in required fields:\n${validationErrors.join('\n')}`);
-            return;
-        }
-
-        // Send request with prompt context
-        vscode.postMessage({
-            command: 'sendAgentRequestWithPrompt',
-            agentName,
-            method,
-            params: parseParams(paramsText),
-            promptContext: {
-                promptId: selectedPromptContext.id,
-                variables: promptVariables,
-                mode: promptMode
-            }
-        });
-    } else {
-        // Standard request without prompt
-        vscode.postMessage({
-            command: 'sendAgentRequest',
-            agentName,
-            method,
-            params: parseParams(paramsText)
-        });
+    // Always use combined mode (prompt + custom message)
+    if (!selectedPromptContext) {
+        alert('Please select a prompt template');
+        return;
     }
 
-    // Clear input after sending (only for custom mode or combined additional message)
-    if (promptMode === 'custom' || promptMode === 'combined') {
-        paramsInput.value = '';
+    if (!paramsText.trim()) {
+        alert('Please enter a custom message to combine with the prompt');
+        return;
     }
+
+    // Validate required variables
+    const validationErrors = validatePromptVariables();
+    if (validationErrors.length > 0) {
+        alert(`Please fill in required fields:\n${validationErrors.join('\n')}`);
+        return;
+    }
+
+    // Send request with prompt context
+    vscode.postMessage({
+        command: 'sendAgentRequestWithPrompt',
+        agentName,
+        method,
+        params: parseParams(paramsText),
+        promptContext: {
+            promptId: selectedPromptContext.id,
+            variables: promptVariables,
+            mode: promptMode
+        }
+    });
+
+    // Clear input after sending
+    paramsInput.value = '';
 }
 
 function parseParams(paramsText) {
@@ -717,6 +645,7 @@ function updateMessageHistory() {
 document.addEventListener('DOMContentLoaded', function () {
     initializeCollapseState();
     updateInputLabelsAndPlaceholders();
+    updateUIForCombinedMode();
 });
 
 // Request initial data
