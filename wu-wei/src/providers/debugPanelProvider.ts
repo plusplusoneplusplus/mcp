@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { BaseWebviewProvider } from './BaseWebviewProvider';
+import { BaseWebviewProvider, WebviewResourceConfig } from './BaseWebviewProvider';
 import { logger } from '../logger';
 
 /**
@@ -13,6 +13,25 @@ export class DebugPanelProvider extends BaseWebviewProvider implements vscode.We
         logger.debug('Wu Wei Debug Panel Provider initialized (migrated structure)');
     }
 
+    /**
+     * Get the webview resource configuration for the debug panel
+     * @returns WebviewResourceConfig for the debug panel
+     */
+    private getDebugPanelConfig(): WebviewResourceConfig {
+        return {
+            htmlFile: 'debug/index.html',
+            cssResources: {
+                'BASE_CSS_URI': 'shared/base.css',
+                'COMPONENTS_CSS_URI': 'shared/components.css',
+                'DEBUG_CSS_URI': 'debug/style.css'
+            },
+            jsResources: {
+                'UTILS_JS_URI': 'shared/utils.js',
+                'DEBUG_JS_URI': 'debug/main.js'
+            }
+        };
+    }
+
     resolveWebviewView(webviewView: vscode.WebviewView, context: vscode.WebviewViewResolveContext, token: vscode.CancellationToken): void {
         this._view = webviewView;
 
@@ -21,13 +40,8 @@ export class DebugPanelProvider extends BaseWebviewProvider implements vscode.We
             localResourceRoots: [this.context.extensionUri]
         };
 
-        // Load HTML with separated CSS and JS files
-        webviewView.webview.html = this.getWebviewContent(
-            webviewView.webview,
-            'debug/index.html',
-            ['shared/base.css', 'shared/components.css', 'debug/style.css'],
-            ['shared/utils.js', 'debug/main.js']
-        );
+        // Load HTML with named resource mapping
+        webviewView.webview.html = this.getWebviewContent(webviewView.webview, this.getDebugPanelConfig());
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(message => {
@@ -348,12 +362,7 @@ The copy-paste method works in most contexts but requires a focused text input.`
      */
     public refresh(): void {
         if (this._view) {
-            this._view.webview.html = this.getWebviewContent(
-                this._view.webview,
-                'debug/index.html',
-                ['shared/base.css', 'shared/components.css', 'debug/style.css'],
-                ['shared/utils.js', 'debug/main.js']
-            );
+            this._view.webview.html = this.getWebviewContent(this._view.webview, this.getDebugPanelConfig());
             logger.debug('Debug panel view refreshed (migrated structure)');
         }
     }

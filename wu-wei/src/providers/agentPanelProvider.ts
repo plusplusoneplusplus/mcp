@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { BaseWebviewProvider } from './BaseWebviewProvider';
+import { BaseWebviewProvider, WebviewResourceConfig } from './BaseWebviewProvider';
 import { logger } from '../logger';
 import {
     AbstractAgent,
@@ -110,13 +110,8 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             localResourceRoots: [this.context.extensionUri]
         };
 
-        // Load HTML with separated CSS and JS files
-        webviewView.webview.html = this.getWebviewContent(
-            webviewView.webview,
-            'agent/index.html',
-            ['shared/base.css', 'shared/components.css', 'agent/style.css'],
-            ['shared/utils.js', 'agent/main.js']
-        );
+        // Load HTML with named resource mapping
+        webviewView.webview.html = this.getWebviewContent(webviewView.webview, this.getAgentPanelConfig());
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(async message => {
@@ -479,12 +474,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
      */
     public refresh(): void {
         if (this._view) {
-            this._view.webview.html = this.getWebviewContent(
-                this._view.webview,
-                'agent/index.html',
-                ['shared/base.css', 'shared/components.css', 'agent/style.css'],
-                ['shared/utils.js', 'agent/main.js']
-            );
+            this._view.webview.html = this.getWebviewContent(this._view.webview, this.getAgentPanelConfig());
 
             // Re-send initial data after refresh
             setTimeout(() => {
@@ -497,6 +487,25 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
 
     private generateMessageId(): string {
         return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    /**
+     * Get the webview resource configuration for the agent panel
+     * @returns WebviewResourceConfig for the agent panel
+     */
+    private getAgentPanelConfig(): WebviewResourceConfig {
+        return {
+            htmlFile: 'agent/index.html',
+            cssResources: {
+                'BASE_CSS_URI': 'shared/base.css',
+                'COMPONENTS_CSS_URI': 'shared/components.css',
+                'AGENT_CSS_URI': 'agent/style.css'
+            },
+            jsResources: {
+                'UTILS_JS_URI': 'shared/utils.js',
+                'AGENT_JS_URI': 'agent/main.js'
+            }
+        };
     }
 
     private async initializePromptService(): Promise<void> {

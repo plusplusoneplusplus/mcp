@@ -12,7 +12,7 @@ import { FileOperationManager } from './FileOperationManager';
 import { Prompt, WebviewMessage, WebviewResponse, SearchFilter } from './types';
 import { UI_CONFIG } from './constants';
 import { WuWeiLogger } from '../logger';
-import { BaseWebviewProvider } from '../providers/BaseWebviewProvider';
+import { BaseWebviewProvider, WebviewResourceConfig } from '../providers/BaseWebviewProvider';
 
 // Enhanced message types for Phase 3
 interface EnhancedWebviewMessage {
@@ -200,12 +200,7 @@ export class PromptStoreProvider extends BaseWebviewProvider implements vscode.W
             ]
         };
 
-        webviewView.webview.html = this.getWebviewContent(
-            webviewView.webview,
-            'promptStore/index.html',
-            ['shared/base.css', 'shared/components.css', 'promptStore/style.css'],
-            ['shared/utils.js', 'promptStore/main.js']
-        );
+        webviewView.webview.html = this.getWebviewContent(webviewView.webview, this.getPromptStoreConfig());
 
         // Handle messages from the webview
         webviewView.webview.onDidReceiveMessage(
@@ -241,12 +236,7 @@ export class PromptStoreProvider extends BaseWebviewProvider implements vscode.W
         if (this._view && this.webview) {
             this.logger.info('🖼️ Regenerating webview HTML content');
             // Regenerate the HTML content
-            this._view.webview.html = this.getWebviewContent(
-                this._view.webview,
-                'promptStore/index.html',
-                ['shared/base.css', 'shared/components.css', 'promptStore/style.css'],
-                ['shared/utils.js', 'promptStore/main.js']
-            );
+            this._view.webview.html = this.getWebviewContent(this._view.webview, this.getPromptStoreConfig());
 
             this.logger.info('⏰ Scheduling initial data send after 100ms delay');
             // Send initial data after a short delay to ensure webview is ready
@@ -269,12 +259,7 @@ export class PromptStoreProvider extends BaseWebviewProvider implements vscode.W
      * @deprecated Use getWebviewContent instead
      */
     public getHtmlForWebview(webview: vscode.Webview): string {
-        const html = this.getWebviewContent(
-            webview,
-            'promptStore/index.html',
-            ['shared/base.css', 'shared/components.css', 'promptStore/style.css'],
-            ['shared/utils.js', 'promptStore/main.js']
-        );
+        const html = this.getWebviewContent(webview, this.getPromptStoreConfig());
 
         // Check if we got the fallback error HTML (contains "Wu Wei - Error" title)
         // If so, return our mock HTML for testing
@@ -359,6 +344,25 @@ export class PromptStoreProvider extends BaseWebviewProvider implements vscode.W
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }
         return text;
+    }
+
+    /**
+     * Get the webview resource configuration for the prompt store
+     * @returns WebviewResourceConfig for the prompt store
+     */
+    private getPromptStoreConfig(): WebviewResourceConfig {
+        return {
+            htmlFile: 'promptStore/index.html',
+            cssResources: {
+                'BASE_CSS_URI': 'shared/base.css',
+                'COMPONENTS_CSS_URI': 'shared/components.css',
+                'PROMPT_STORE_CSS_URI': 'promptStore/style.css'
+            },
+            jsResources: {
+                'UTILS_JS_URI': 'shared/utils.js',
+                'PROMPT_STORE_JS_URI': 'promptStore/main.js'
+            }
+        };
     }
 
     /**

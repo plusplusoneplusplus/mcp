@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../logger';
-import { BaseWebviewProvider } from './BaseWebviewProvider';
+import { BaseWebviewProvider, WebviewResourceConfig } from './BaseWebviewProvider';
 
 interface ChatMessage {
     role: 'user' | 'assistant' | 'system';
@@ -57,6 +57,23 @@ export class UnifiedChatProvider extends BaseWebviewProvider implements vscode.W
         }
     }
 
+    /**
+     * Get the webview resource configuration for the chat panel
+     * @returns WebviewResourceConfig for the chat panel
+     */
+    private getChatPanelConfig(): WebviewResourceConfig {
+        return {
+            htmlFile: 'chat/index.html',
+            cssResources: {
+                'BASE_CSS_URI': 'chat/style.css'
+            },
+            jsResources: {
+                'UTILS_JS_URI': 'shared/utils.js',
+                'CHAT_JS_URI': 'chat/main.js'
+            }
+        };
+    }
+
     public dispose() {
         this.modelChangeListener?.dispose();
         if (this.debounceTimer) {
@@ -76,12 +93,7 @@ export class UnifiedChatProvider extends BaseWebviewProvider implements vscode.W
             localResourceRoots: [this.context.extensionUri]
         };
 
-        webviewView.webview.html = this.getWebviewContent(
-            webviewView.webview,
-            'chat/index.html',
-            ['chat/style.css'],
-            ['chat/main.js']
-        );
+        webviewView.webview.html = this.getWebviewContent(webviewView.webview, this.getChatPanelConfig());
 
         // Handle messages from webview
         webviewView.webview.onDidReceiveMessage(data => {
@@ -661,12 +673,7 @@ export class UnifiedChatProvider extends BaseWebviewProvider implements vscode.W
 
     public refresh(): void {
         if (this._view) {
-            this._view.webview.html = this.getWebviewContent(
-                this._view.webview,
-                'chat/index.html',
-                ['chat/style.css'],
-                ['chat/main.js']
-            );
+            this._view.webview.html = this.getWebviewContent(this._view.webview, this.getChatPanelConfig());
             this.updateWebviewState();
             this.loadAvailableModels();
         }
