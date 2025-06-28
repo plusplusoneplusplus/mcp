@@ -1,16 +1,30 @@
 import * as vscode from 'vscode';
-import { PromptService, PromptUsageContext, VariableResolutionOptions, PromptParameter } from './types';
+import {
+    PromptService,
+    PromptUsageContext,
+    VariableResolutionOptions,
+    PromptParameter,
+    BasePromptElementProps,
+    TsxRenderOptions,
+    TsxRenderResult,
+    ValidationResult,
+    PromptElement
+} from './types';
 import { Prompt, PromptStoreConfig, SearchFilter } from '../../promptStore/types';
 import { PromptManager } from '../../promptStore/PromptManager';
 import { VariableResolver } from './utils/variableResolver';
 import { PromptRenderer } from './utils/promptRenderer';
 import { PromptValidators } from './utils/validators';
+import { TsxRenderer } from './utils/tsxRenderer';
+import { TsxValidation } from './utils/tsxValidation';
 
 export class VsCodePromptService implements PromptService {
     private context: vscode.ExtensionContext;
     private promptManager: PromptManager;
     private variableResolver: VariableResolver;
     private promptRenderer: PromptRenderer;
+    private tsxRenderer: TsxRenderer;
+    private tsxValidation: TsxValidation;
     private disposables: vscode.Disposable[] = [];
 
     // Event emitters
@@ -27,6 +41,8 @@ export class VsCodePromptService implements PromptService {
         this.context = context;
         this.variableResolver = new VariableResolver();
         this.promptRenderer = new PromptRenderer();
+        this.tsxRenderer = new TsxRenderer();
+        this.tsxValidation = new TsxValidation();
 
         // Initialize PromptManager with default config
         this.promptManager = new PromptManager();
@@ -108,6 +124,78 @@ export class VsCodePromptService implements PromptService {
         }
 
         return this.promptRenderer.render(prompt.content, variables);
+    }
+
+    // ===== New TSX Methods =====
+
+    /**
+     * Render a TSX prompt component
+     */
+    async renderTsxPrompt<T extends BasePromptElementProps>(
+        promptComponent: new (props: T) => PromptElement<T>,
+        props: T,
+        options?: TsxRenderOptions
+    ): Promise<TsxRenderResult> {
+        try {
+            return await this.tsxRenderer.renderTsxPrompt(promptComponent, props, options);
+        } catch (error) {
+            throw new Error(`TSX prompt rendering failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Render a prompt with token budget management
+     */
+    async renderPromptWithTokenBudget(
+        promptId: string,
+        variables: Record<string, any>,
+        tokenBudget: number,
+        model?: vscode.LanguageModelChat
+    ): Promise<vscode.LanguageModelChatMessage[]> {
+        const prompt = await this.getPrompt(promptId);
+        if (!prompt) {
+            throw new Error(`Prompt not found: ${promptId}`);
+        }
+
+        // Render the prompt with variables
+        const renderedContent = await this.renderPromptWithVariables(promptId, variables);
+
+        // Create a simple message array
+        const messages: vscode.LanguageModelChatMessage[] = [{
+            role: vscode.LanguageModelChatMessageRole.User,
+            content: [{ value: renderedContent, text: renderedContent } as vscode.LanguageModelTextPart],
+            name: `prompt-${promptId}`
+        }];
+
+        // Check token budget (simplified implementation)
+        const tokenCount = Math.ceil(renderedContent.length / 4); // Rough estimate
+        if (tokenCount > tokenBudget) {
+            throw new Error(`Rendered prompt exceeds token budget: ${tokenCount} > ${tokenBudget}`);
+        }
+
+        return messages;
+    }
+
+    /**
+     * Validate a TSX prompt component
+     */
+    async validateTsxPrompt<T extends BasePromptElementProps>(
+        component: new (props: T) => PromptElement<T>,
+        props: T
+    ): Promise<ValidationResult> {
+        try {
+            return await this.tsxRenderer.validateTsxPrompt(component, props);
+        } catch (error) {
+            return {
+                isValid: false,
+                errors: [{
+                    field: 'validation',
+                    message: `TSX validation failed: ${error instanceof Error ? error.message : String(error)}`,
+                    severity: 'error'
+                }],
+                warnings: []
+            };
+        }
     }
 
     async getConfig(): Promise<PromptStoreConfig> {
@@ -204,8 +292,8 @@ export class VsCodePromptService implements PromptService {
 
         // Listen to configuration changes
         this.disposables.push(
-            vscode.workspace.onDidChangeConfiguration((event) => {
-                if (event.affectsConfiguration('wu-wei.promptStore')) {
+            vscode.workspace.onDidChangeConfiguration((e) => {
+                if (e.affectsConfiguration('wuwei.prompts')) {
                     this.handleConfigurationChange();
                 }
             })
@@ -214,59 +302,33 @@ export class VsCodePromptService implements PromptService {
 
     private async handleConfigurationChange(): Promise<void> {
         try {
-            // Refresh prompts after configuration change
-            await this.promptManager.refreshPrompts();
-
-            // Fire config changed event
-            const config = await this.getConfig();
-            this._onConfigChanged.fire(config);
+            await this.refreshPrompts();
+            const newConfig = await this.getConfig();
+            this._onConfigChanged.fire(newConfig);
         } catch (error) {
             console.error('Failed to handle configuration change:', error);
         }
     }
 
     private extractParameters(prompt: Prompt): PromptParameter[] {
-        const parameters: PromptParameter[] = [];
-
-        // Extract variables from content
+        // Extract variables from prompt content
         const variables = this.variableResolver.extractVariables(prompt.content);
 
-        // Check if prompt metadata has parameter definitions
-        const metadataParams = (prompt.metadata as any).parameters as PromptParameter[] | undefined;
-
-        if (metadataParams && Array.isArray(metadataParams)) {
-            // Use defined parameters
-            return metadataParams;
-        }
-
-        // Generate basic parameters from variables
-        for (const variable of variables) {
-            parameters.push({
-                name: variable,
-                type: 'string',
-                description: `Variable: ${variable}`,
-                required: true
-            });
-        }
-
-        return parameters;
+        return variables.map(variable => ({
+            name: variable,
+            type: 'string' as const,
+            description: `Variable: ${variable}`,
+            required: true,
+            defaultValue: undefined
+        }));
     }
 
     private generateUsageInstructions(parameters: PromptParameter[]): string {
         if (parameters.length === 0) {
-            return 'This prompt has no variables and can be used directly.';
+            return 'This prompt has no variables and can be used as-is.';
         }
 
-        const instructions = [
-            'This prompt requires the following variables:',
-            ...parameters.map(param => {
-                const required = param.required ? ' (required)' : ' (optional)';
-                const type = param.type !== 'string' ? ` [${param.type}]` : '';
-                const description = param.description ? `: ${param.description}` : '';
-                return `• {{${param.name}}}${type}${required}${description}`;
-            })
-        ];
-
-        return instructions.join('\n');
+        const variableList = parameters.map(p => `- ${p.name}: ${p.description || 'No description'}`).join('\n');
+        return `This prompt requires the following variables:\n${variableList}`;
     }
 } 

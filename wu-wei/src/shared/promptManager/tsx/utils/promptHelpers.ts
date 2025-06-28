@@ -9,7 +9,7 @@ export class PromptHelpers {
      * Uses the common rule of ~4 characters per token
      */
     static estimateTokenCount(text: string): number {
-        if (!text) return 0;
+        if (!text) {return 0;}
         return Math.ceil(text.length / 4);
     }
 
@@ -17,10 +17,10 @@ export class PromptHelpers {
      * Truncates text to fit within a token budget
      */
     static truncateToTokenLimit(text: string, maxTokens: number): string {
-        if (!text || maxTokens <= 0) return '';
+        if (!text || maxTokens <= 0) {return '';}
 
         const estimatedTokens = this.estimateTokenCount(text);
-        if (estimatedTokens <= maxTokens) return text;
+        if (estimatedTokens <= maxTokens) {return text;}
 
         // Calculate approximate character limit
         const charLimit = maxTokens * 4;
@@ -47,7 +47,7 @@ export class PromptHelpers {
         maxMessages?: number,
         includeTimestamps: boolean = false
     ): string {
-        if (!messages || messages.length === 0) return '';
+        if (!messages || messages.length === 0) {return '';}
 
         const messagesToFormat = maxMessages
             ? messages.slice(-maxMessages)
@@ -139,7 +139,7 @@ export class PromptHelpers {
      * Sanitizes text content to prevent injection issues
      */
     static sanitizeContent(content: string): string {
-        if (!content) return '';
+        if (!content) {return '';}
 
         // Basic sanitization - remove potentially harmful patterns
         return content

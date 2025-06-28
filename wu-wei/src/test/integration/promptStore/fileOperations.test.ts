@@ -59,10 +59,10 @@ suite('File Operations Integration Tests', () => {
             if (section === 'wu-wei.promptStore') {
                 return {
                     get: (key: string, defaultValue?: any) => {
-                        if (key === 'rootDirectory') return testDir;
-                        if (key === 'autoRefresh') return true;
-                        if (key === 'showMetadataTooltips') return true;
-                        if (key === 'enableTemplates') return true;
+                        if (key === 'rootDirectory') {return testDir;}
+                        if (key === 'autoRefresh') {return true;}
+                        if (key === 'showMetadataTooltips') {return true;}
+                        if (key === 'enableTemplates') {return true;}
                         if (key.startsWith('fileWatcher.')) {
                             const watcherKey = key.replace('fileWatcher.', '');
                             const defaults: any = {
