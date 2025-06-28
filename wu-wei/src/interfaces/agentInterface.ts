@@ -53,7 +53,15 @@ export interface AgentCapabilities {
     version: string;
     methods: string[];
     description?: string;
-    metadata?: Record<string, any>;
+    metadata?: {
+        promptSupport?: {
+            supportsPrompts: boolean;
+            supportsTsxMessages?: boolean;
+            promptParameterName?: string;
+            variableResolution?: boolean;
+        };
+        [key: string]: any;
+    };
 }
 
 /**
