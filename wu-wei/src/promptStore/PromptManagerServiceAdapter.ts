@@ -175,7 +175,7 @@ export class PromptManagerServiceAdapter implements PromptService {
 
             return {
                 messages: fallbackMessages,
-                tokenCount: this.tokenManager.estimateMessageTokens(fallbackMessages),
+                tokenCount: this.tokenManager.countTokensInMessages(fallbackMessages),
                 prunedElements: [],
                 renderingMetadata: {
                     totalElements: 1,
@@ -337,7 +337,14 @@ export class PromptManagerServiceAdapter implements PromptService {
         contextData: number;
         reserve: number;
     } {
-        return this.tokenManager.getRecommendedBudgets(totalBudget);
+        const budget = this.tokenManager.createTokenBudget(totalBudget);
+        return {
+            systemPrompt: budget.allocation.systemPrompt,
+            userQuery: budget.allocation.userQuery,
+            conversationHistory: budget.allocation.conversationHistory,
+            contextData: budget.allocation.contextData,
+            reserve: Math.floor(totalBudget * 0.05) // 5% reserve
+        };
     }
 
     // ===== Private Helper Methods =====
