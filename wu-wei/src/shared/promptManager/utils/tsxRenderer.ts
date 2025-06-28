@@ -232,8 +232,8 @@ export class TsxRenderer {
      * Count elements in a rendered component
      */
     private countElements(rendered: any): number {
-        if (!rendered) return 0;
-        if (Array.isArray(rendered)) return rendered.length;
+        if (!rendered) {return 0;}
+        if (Array.isArray(rendered)) {return rendered.length;}
         if (typeof rendered === 'object' && rendered.props && rendered.props.children) {
             return Array.isArray(rendered.props.children) ? rendered.props.children.length : 1;
         }
@@ -247,7 +247,7 @@ export class TsxRenderer {
         const priorities: number[] = [];
 
         const extractFromElement = (element: any) => {
-            if (!element) return;
+            if (!element) {return;}
 
             if (element.props && typeof element.props.priority === 'number') {
                 priorities.push(element.props.priority);
