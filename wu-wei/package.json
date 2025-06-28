@@ -93,12 +93,6 @@
                 "icon": "$(refresh)"
             },
             {
-                "command": "wu-wei.sendAgentRequest",
-                "title": "Wu Wei: Send Agent Request",
-                "category": "Wu Wei",
-                "icon": "$(send)"
-            },
-            {
                 "command": "wu-wei.refreshAgents",
                 "title": "Wu Wei: Refresh Agents",
                 "category": "Wu Wei",

@@ -148,9 +148,6 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
 
     protected async handleMessage(message: any): Promise<void> {
         switch (message.command) {
-            case 'sendAgentRequest':
-                await this.handleAgentRequest(message.agentName, message.method, message.params);
-                break;
             case 'sendAgentRequestWithPrompt':
                 await this.handleAgentRequestWithPrompt(
                     message.agentName,
@@ -521,73 +518,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         }
     }
 
-    private async handleAgentRequest(agentName: string, method: string, params: any): Promise<void> {
-        try {
-            logger.info(`Processing agent request: ${agentName}.${method}`, params);
 
-            const agent = this._agentRegistry.getAgent(agentName);
-
-            if (!agent) {
-                const errorMessage = `Agent '${agentName}' not found`;
-                logger.error(errorMessage);
-                this.addMessageToHistory({
-                    id: this.generateMessageId(),
-                    timestamp: new Date(),
-                    type: 'error',
-                    error: {
-                        code: -32000,
-                        message: errorMessage
-                    }
-                });
-                return;
-            }
-
-            // Create request
-            const request: AgentRequest = {
-                id: this.generateMessageId(),
-                method,
-                params,
-                timestamp: new Date()
-            };
-
-            // Add request to history
-            this.addMessageToHistory({
-                id: request.id,
-                timestamp: request.timestamp,
-                type: 'request',
-                method: request.method,
-                params: request.params
-            });
-
-            // Process request
-            const response = await agent.processRequest(request);
-
-            // Add response to history
-            this.addMessageToHistory({
-                id: response.id,
-                timestamp: response.timestamp,
-                type: 'response',
-                result: response.result,
-                error: response.error
-            });
-
-            logger.info(`Agent request completed: ${agentName}.${method}`, response);
-
-        } catch (error) {
-            logger.error('Error handling agent request', error);
-
-            this.addMessageToHistory({
-                id: this.generateMessageId(),
-                timestamp: new Date(),
-                type: 'error',
-                error: {
-                    code: -32603,
-                    message: 'Internal error processing request',
-                    data: error instanceof Error ? error.message : String(error)
-                }
-            });
-        }
-    }
 
     private addMessageToHistory(message: AgentMessage): void {
         this._messageHistory.push(message);
