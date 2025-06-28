@@ -10,10 +10,8 @@ import {
     GitHubCopilotAgent,
     AgentMessage
 } from '../interfaces/agentInterface';
-import { PromptService, PromptUsageContext, TsxRenderOptions, TsxRenderResult } from '../shared/promptManager/types';
+import { PromptService, PromptUsageContext } from '../shared/promptManager/types';
 import { PromptServiceFactory } from '../shared/promptManager/PromptServiceFactory';
-import { AgentPrompt } from '../shared/promptManager/tsx/components/AgentPrompt';
-import { ChatMessage, DEFAULT_PRIORITIES } from '../shared/promptManager/tsx/types';
 
 /**
  * Configuration interface for agent prompt handling
@@ -21,15 +19,12 @@ import { ChatMessage, DEFAULT_PRIORITIES } from '../shared/promptManager/tsx/typ
 interface AgentPromptConfig {
     maxTokens: number;
     historyMessageCount: number;
-    enablePrioritization: boolean;
-    fallbackToStringConcatenation: boolean;
 }
 
 /**
  * Wu Wei Agent Panel Provider (Enhanced with Prompt Integration)
  * Provides a panel for triggering agents with messages using separated HTML, CSS, and JavaScript files
  * Phase 4: Added prompt selection and integration capabilities
- * Phase 5: Enhanced with TSX-based prompt composition (Issue #378)
  */
 export class AgentPanelProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
     private _agentRegistry: AgentRegistry;
@@ -38,14 +33,12 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
     private _selectedPromptContext?: PromptUsageContext;
     private _agentPromptConfig: AgentPromptConfig = {
         maxTokens: 4096,
-        historyMessageCount: 4,
-        enablePrioritization: true,
-        fallbackToStringConcatenation: true
+        historyMessageCount: 4
     };
 
     constructor(context: vscode.ExtensionContext) {
         super(context);
-        logger.debug('Wu Wei Agent Panel Provider initialized with prompt integration and TSX support');
+        logger.debug('Wu Wei Agent Panel Provider initialized with prompt integration');
 
         // Initialize prompt service
         this._promptService = PromptServiceFactory.createService(context);
@@ -282,32 +275,37 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             return params;
         }
 
-        // Try TSX-based rendering first if enabled
-        if (this._agentPromptConfig.enablePrioritization) {
-            try {
-                return await this.enhanceParamsWithTsxPrompt(params, promptContext, agent);
-            } catch (error) {
-                logger.warn('TSX prompt rendering failed, falling back to string concatenation', error);
-
-                // If fallback is disabled, re-throw the error
-                if (!this._agentPromptConfig.fallbackToStringConcatenation) {
-                    throw error;
-                }
-            }
+        // Check if both prompt and user input are empty - do nothing in this case
+        const userInput = params.message || params.question || params.query || params.input;
+        if (!promptContext.promptId && !userInput) {
+            throw new Error('Please provide either a prompt template or a message');
         }
 
-        // Original string concatenation logic (fallback)
+        // String concatenation logic
         const capabilities = agent.getCapabilities();
         const promptSupport = capabilities.metadata?.promptSupport;
 
         if (promptSupport?.supportsPrompts) {
             const promptParam = promptSupport.promptParameterName || 'prompt';
 
-            // Render the prompt with variables
-            const rendered = await this._promptService.renderPromptWithVariables(
-                promptContext.promptId,
-                promptContext.variables
-            );
+            // Check if the prompt has variables that need rendering
+            const hasVariables = promptContext.variables && Object.keys(promptContext.variables).length > 0;
+
+            let rendered: string;
+            if (hasVariables) {
+                // Render the prompt with variables
+                rendered = await this._promptService.renderPromptWithVariables(
+                    promptContext.promptId,
+                    promptContext.variables
+                );
+            } else {
+                // Get the prompt file path for direct reference
+                const promptData = await this._promptService.getPrompt(promptContext.promptId);
+                if (!promptData) {
+                    throw new Error(`Prompt with id '${promptContext.promptId}' not found`);
+                }
+                rendered = promptData.filePath ? `#${promptData.filePath}` : promptData.content;
+            }
 
             const enhancedParams = {
                 ...params,
@@ -318,118 +316,56 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 enhancedParams.variables = promptContext.variables;
             }
 
-            // Always use combined mode - check for user input
+            // Support optional user input - can use prompt alone or combined with user message
             const userInput = params.message || params.question || params.query || params.input;
-            if (!userInput) {
-                throw new Error('Please provide a custom message to combine with the prompt template');
+            if (userInput) {
+                enhancedParams.additionalMessage = userInput;
             }
-            enhancedParams.additionalMessage = userInput;
 
             return enhancedParams;
         }
 
         // Fallback: add prompt as message parameter
         if (promptContext.promptId) {
-            const rendered = await this._promptService.renderPromptWithVariables(
-                promptContext.promptId,
-                promptContext.variables
-            );
+            // Check if the prompt has variables that need rendering
+            const hasVariables = promptContext.variables && Object.keys(promptContext.variables).length > 0;
 
-            // Always use combined mode - require both prompt and custom message
-            const userInput = params.message || params.question || params.query || params.input;
-            if (!userInput) {
-                throw new Error('Please provide a custom message to combine with the prompt template');
+            let promptContent: string;
+            if (hasVariables) {
+                // Render the prompt with variables
+                const rendered = await this._promptService.renderPromptWithVariables(
+                    promptContext.promptId,
+                    promptContext.variables
+                );
+                promptContent = "System Instructions:\n" + rendered;
+            } else {
+                // Get the prompt file path for direct reference
+                const promptData = await this._promptService.getPrompt(promptContext.promptId);
+                if (!promptData) {
+                    throw new Error(`Prompt with id '${promptContext.promptId}' not found`);
+                }
+                promptContent = promptData.filePath ? `Follow Instances in ${promptData.filePath}` : "System Instructions:\n" + promptData.content;
             }
 
-            // Combine prompt and custom message
-            return {
-                ...params,
-                message: `${rendered}\n\n${userInput}`
-            };
+            // Support optional user input - can use prompt alone or combined with user message
+            const userInput = params.message || params.question || params.query || params.input;
+
+            if (userInput) {
+                // Combine prompt with user input
+                return {
+                    ...params,
+                    message: `${promptContent}\n\nUser Request:\n${userInput}`
+                };
+            } else {
+                // Use prompt alone
+                return {
+                    ...params,
+                    message: promptContent
+                };
+            }
         }
 
         return params;
-    }
-
-    /**
-     * Enhanced TSX-based prompt parameter enhancement
-     * Replaces string concatenation with intelligent TSX composition
-     */
-    private async enhanceParamsWithTsxPrompt(
-        params: any,
-        promptContext: any,
-        agent: AbstractAgent
-    ): Promise<any> {
-        if (!promptContext) {
-            return params;
-        }
-
-        const userInput = params.message || params.question || params.query || params.input;
-        if (!userInput) {
-            throw new Error('Please provide a custom message to combine with the prompt template');
-        }
-
-        // Render the prompt with variables
-        const rendered = await this._promptService.renderPromptWithVariables(
-            promptContext.promptId,
-            promptContext.variables
-        );
-
-        // Convert message history to ChatMessage format
-        const conversationHistory: ChatMessage[] = this._messageHistory
-            .filter(msg => msg.type === 'request' || msg.type === 'response')
-            .slice(-this._agentPromptConfig.historyMessageCount)
-            .map(msg => ({
-                role: msg.type === 'request' ? 'user' : 'assistant',
-                content: this.extractMessageContent(msg),
-                timestamp: msg.timestamp,
-                id: msg.id
-            }));
-
-        // Prepare TSX rendering options
-        const tsxOptions: TsxRenderOptions = {
-            modelMaxPromptTokens: this._agentPromptConfig.maxTokens,
-            enablePrioritization: this._agentPromptConfig.enablePrioritization,
-            tokenBudget: this._agentPromptConfig.maxTokens
-        };
-
-        // Render TSX prompt with intelligent composition
-        const tsxResult: TsxRenderResult = await this._promptService.renderTsxPrompt(
-            AgentPrompt,
-            {
-                systemPrompt: rendered,
-                userInput: userInput,
-                conversationHistory: conversationHistory,
-                contextData: params.context || '',
-                maxTokens: this._agentPromptConfig.maxTokens,
-                priorityStrategy: DEFAULT_PRIORITIES
-            },
-            tsxOptions
-        );
-
-        // Check agent capabilities for TSX support
-        const capabilities = agent.getCapabilities();
-        const promptSupport = capabilities.metadata?.promptSupport;
-
-        if (promptSupport?.supportsPrompts && promptSupport.supportsTsxMessages) {
-            // Agent supports TSX messages directly
-            return {
-                ...params,
-                messages: tsxResult.messages,
-                tokenCount: tsxResult.tokenCount,
-                renderingMetadata: tsxResult.renderingMetadata
-            };
-        } else {
-            // Convert TSX messages back to string format for compatibility
-            const combinedMessage = this.convertTsxMessagesToString(tsxResult.messages);
-
-            return {
-                ...params,
-                message: combinedMessage,
-                tokenCount: tsxResult.tokenCount,
-                renderingMetadata: tsxResult.renderingMetadata
-            };
-        }
     }
 
     /**
@@ -442,38 +378,6 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             return message.result?.message || message.result?.content || JSON.stringify(message.result || {});
         }
         return 'Unknown message';
-    }
-
-    /**
-     * Convert TSX messages to string format for agents that don't support TSX
-     */
-    private convertTsxMessagesToString(messages: vscode.LanguageModelChatMessage[]): string {
-        return messages.map(msg => {
-            // Map roles to string labels
-            let role = 'USER';
-            if (msg.role === vscode.LanguageModelChatMessageRole.User) {
-                role = 'USER';
-            } else {
-                // For any other role (system, assistant, etc.), use generic labels
-                role = 'ASSISTANT';
-            }
-
-            // Extract text content from message
-            const content = Array.isArray(msg.content)
-                ? msg.content.map(part => {
-                    if (typeof part === 'string') {
-                        return part;
-                    } else if (part && typeof part === 'object' && 'text' in part) {
-                        return part.text;
-                    } else if (part && typeof part === 'object' && 'value' in part) {
-                        return String(part.value);
-                    }
-                    return JSON.stringify(part);
-                }).join(' ')
-                : String(msg.content);
-
-            return `${role}: ${content}`;
-        }).join('\n\n');
     }
 
     /**
