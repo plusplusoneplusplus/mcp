@@ -284,15 +284,13 @@ class AgentPanelProvider {
 
 ## Testing
 
-Run the included tests to verify functionality:
+The PromptHelpers functionality is tested using Mocha unit tests. To run the tests:
 
-```typescript
-import { PromptHelpersTests } from '../promptManager/tsx/tests/PromptHelpers.test';
-
-// Run all tests
-const success = PromptHelpersTests.runAllTests();
-console.log('Tests passed:', success);
+```bash
+npm run test:unit
 ```
+
+The tests are located in `src/test/unit/shared/promptHelpers.test.ts` and cover all utility functions including token estimation, text truncation, message formatting, and content validation.
 
 ## Best Practices
 
