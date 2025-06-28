@@ -2,7 +2,7 @@
     "name": "wu-wei",
     "displayName": "Wu Wei",
     "description": "Effortless work automation - 无为而治",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "publisher": "your-publisher-name",
     "engines": {
         "vscode": "^1.90.0"
