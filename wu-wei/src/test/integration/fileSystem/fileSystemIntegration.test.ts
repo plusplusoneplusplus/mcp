@@ -7,8 +7,8 @@ import assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import { PromptManager } from '../../promptStore/PromptManager';
-import { PromptStoreConfig } from '../../promptStore/types';
+import { PromptManager } from '../../../promptStore/PromptManager';
+import { PromptStoreConfig } from '../../../promptStore/types';
 
 suite('PromptManager Integration Tests', () => {
     let tempDir: string;
@@ -180,9 +180,10 @@ This prompt has invalid YAML in the frontmatter.`
             assert(fileNames.includes('README.md'));
 
             // Should exclude these (in excluded directories)
-            assert(!files.some(f => f.includes('node_modules')));
-            assert(!files.some(f => f.includes('.git')));
-            assert(!files.some(f => f.includes('temp')));
+            // Use path separators to specifically check for files IN the excluded directories
+            assert(!files.some(f => f.includes(path.sep + 'node_modules' + path.sep) || f.endsWith(path.sep + 'node_modules')));
+            assert(!files.some(f => f.includes(path.sep + '.git' + path.sep) || f.endsWith(path.sep + '.git')));
+            assert(!files.some(f => f.includes(path.sep + 'temp' + path.sep) || f.endsWith(path.sep + 'temp')));
         });
 
         test('should load all prompts with proper metadata parsing', async () => {
@@ -253,9 +254,6 @@ Content for prompt ${prompt} in category ${category}.`;
         });
 
         test('should maintain file system consistency during concurrent operations', async () => {
-            const concurrentDir = path.join(tempDir, 'concurrent');
-            await fs.mkdir(concurrentDir);
-
             // Create multiple prompts concurrently
             const createPromises = [];
             for (let i = 0; i < 10; i++) {
@@ -274,7 +272,8 @@ Content for prompt ${prompt} in category ${category}.`;
                 assert(exists, `File should exist: ${prompt.filePath}`);
             }
 
-            // Verify all prompts can be loaded
+            // Verify all prompts can be loaded from the category directory where they were actually created
+            const concurrentDir = path.join(tempDir, 'Concurrent');
             const loadedPrompts = await promptManager.loadAllPrompts(concurrentDir);
             assert(loadedPrompts.length >= 10);
         });

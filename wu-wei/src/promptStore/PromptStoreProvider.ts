@@ -634,6 +634,17 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
                 <div class="prompt-store-container">
                     <header class="store-header">
                         <h2>Wu Wei Prompt Store</h2>
+                        <div class="header-buttons">
+                            <button id="configure-directory" class="header-button" title="Configure Directory">
+                                📁
+                            </button>
+                            <button id="new-prompt" class="header-button" title="New Prompt">
+                                ➕
+                            </button>
+                            <button id="refresh-store" class="header-button" title="Refresh">
+                                🔄
+                            </button>
+                        </div>
                     </header>
                     
                     <div class="search-section">
@@ -668,6 +679,12 @@ export class PromptStoreProvider implements vscode.WebviewViewProvider {
                             <p>Loading prompts...</p>
                         </div>
                     </main>
+                    
+                    <footer class="store-footer">
+                        <div class="footer-content">
+                            <span class="footer-text">Wu Wei Prompt Store</span>
+                        </div>
+                    </footer>
                 </div>
                 
                 <script nonce="${nonce}" src="${scriptUri}"></script>

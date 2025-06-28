@@ -22,6 +22,7 @@ suite('File Operations Integration Tests', () => {
     let templateManager: TemplateManager;
     let testDir: string;
     let context: vscode.ExtensionContext;
+    let originalGetConfiguration: typeof vscode.workspace.getConfiguration;
 
     suiteSetup(async () => {
         // Create temporary test directory
@@ -50,18 +51,67 @@ suite('File Operations Integration Tests', () => {
         fileOperationManager = new FileOperationManager(promptManager, configManager);
         fileOperationCommands = new FileOperationCommands(fileOperationManager, templateManager);
 
-        // Mock configuration to use test directory
+        // Store original configuration function
+        originalGetConfiguration = vscode.workspace.getConfiguration;
+
+        // Mock VS Code configuration to use test directory
+        vscode.workspace.getConfiguration = (section?: string) => {
+            if (section === 'wu-wei.promptStore') {
+                return {
+                    get: (key: string, defaultValue?: any) => {
+                        if (key === 'rootDirectory') return testDir;
+                        if (key === 'autoRefresh') return true;
+                        if (key === 'showMetadataTooltips') return true;
+                        if (key === 'enableTemplates') return true;
+                        if (key.startsWith('fileWatcher.')) {
+                            const watcherKey = key.replace('fileWatcher.', '');
+                            const defaults: any = {
+                                enabled: true,
+                                debounceMs: 500,
+                                maxDepth: 10,
+                                ignorePatterns: [],
+                                usePolling: false,
+                                pollingInterval: 1000
+                            };
+                            return defaults[watcherKey] ?? defaultValue;
+                        }
+                        return defaultValue;
+                    },
+                    update: async () => Promise.resolve(),
+                    has: () => true,
+                    inspect: () => ({ key: '', defaultValue: undefined })
+                } as any;
+            }
+            return originalGetConfiguration(section);
+        };
+
+        // Mock configuration manager to use test directory
         const originalGetConfig = configManager.getConfig.bind(configManager);
         configManager.getConfig = () => ({
             ...originalGetConfig(),
             rootDirectory: testDir
         });
 
+        // Register commands with test instances
+        const disposables = fileOperationCommands.registerCommands(context);
+        context.subscriptions.push(...disposables);
+
         // Load custom templates
         await templateManager.loadCustomTemplates();
+
+        // Wait for commands to be registered
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Verify commands are registered
+        const commands = await vscode.commands.getCommands(true);
+        const promptStoreCommands = commands.filter(cmd => cmd.startsWith('wu-wei.promptStore'));
+        console.log('Registered prompt store commands:', promptStoreCommands);
     });
 
     suiteTeardown(async () => {
+        // Restore original configuration function
+        vscode.workspace.getConfiguration = originalGetConfiguration;
+
         // Clean up test directory
         try {
             await fs.rm(testDir, { recursive: true, force: true });

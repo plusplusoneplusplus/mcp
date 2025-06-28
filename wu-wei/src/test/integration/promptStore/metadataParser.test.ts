@@ -5,24 +5,24 @@
 import assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
-import { MetadataParser } from '../../promptStore/MetadataParser';
-import { PromptMetadata } from '../../promptStore/types';
+import { MetadataParser } from '../../../promptStore/MetadataParser';
+import { PromptMetadata } from '../../../promptStore/types';
 
-describe('MetadataParser', () => {
+suite('MetadataParser', () => {
     let parser: MetadataParser;
     let tempDir: string;
 
-    beforeEach(() => {
+    setup(() => {
         parser = new MetadataParser();
         tempDir = path.join(__dirname, '..', '..', '..', 'test-fixtures');
     });
 
-    afterEach(() => {
+    teardown(() => {
         parser.clearCache();
     });
 
-    describe('parseContent', () => {
-        it('should parse valid YAML frontmatter', () => {
+    suite('parseContent', () => {
+        test('should parse valid YAML frontmatter', () => {
             const content = `---
 title: Test Prompt
 description: A test prompt for unit testing
@@ -50,7 +50,7 @@ This is the prompt content.`;
             assert.strictEqual(result.errors.length, 0);
         });
 
-        it('should handle content without frontmatter', () => {
+        test('should handle content without frontmatter', () => {
             const content = 'This is just plain content without frontmatter.';
 
             const result = parser.parseContent(content);
@@ -61,7 +61,7 @@ This is the prompt content.`;
             assert.strictEqual(result.errors.length, 0);
         });
 
-        it('should handle invalid YAML syntax', () => {
+        test('should handle invalid YAML syntax', () => {
             const content = `---
 title: Test Prompt
 invalid: yaml: syntax: here
@@ -78,7 +78,7 @@ Content here.`;
             assert(result.errors[0].message.includes('Invalid YAML syntax'));
         });
 
-        it('should handle partial frontmatter', () => {
+        test('should handle partial frontmatter', () => {
             const content = `---
 title: Partial Prompt
 ---
@@ -94,7 +94,7 @@ Content with minimal metadata.`;
             assert.strictEqual(result.content, 'Content with minimal metadata.');
         });
 
-        it('should handle empty file', () => {
+        test('should handle empty file', () => {
             const content = '';
 
             const result = parser.parseContent(content);
@@ -104,7 +104,7 @@ Content with minimal metadata.`;
             assert.strictEqual(result.content, '');
         });
 
-        it('should handle frontmatter without closing delimiter', () => {
+        test('should handle frontmatter without closing delimiter', () => {
             const content = `---
 title: Unclosed Frontmatter
 description: This frontmatter has no closing delimiter
@@ -118,7 +118,7 @@ This should be treated as regular content.`;
             assert.strictEqual(result.content, content);
         });
 
-        it('should handle Windows line endings', () => {
+        test('should handle Windows line endings', () => {
             const content = `---\r\ntitle: Windows Test\r\ndescription: Testing Windows line endings\r\n---\r\n\r\nContent with CRLF line endings.`;
 
             const result = parser.parseContent(content);
@@ -130,8 +130,8 @@ This should be treated as regular content.`;
         });
     });
 
-    describe('validateMetadata', () => {
-        it('should validate required title', () => {
+    suite('validateMetadata', () => {
+        test('should validate required title', () => {
             const metadata: PromptMetadata = {
                 title: '',
                 category: 'Test',
@@ -146,7 +146,7 @@ This should be treated as regular content.`;
             assert.strictEqual(result.errors[0].message, 'Title is required');
         });
 
-        it('should validate title length', () => {
+        test('should validate title length', () => {
             const longTitle = 'A'.repeat(250);
             const metadata: PromptMetadata = {
                 title: longTitle,
@@ -162,7 +162,7 @@ This should be treated as regular content.`;
             assert(result.errors[0].message.includes('exceeds maximum length'));
         });
 
-        it('should validate tag count', () => {
+        test('should validate tag count', () => {
             const manyTags = Array.from({ length: 25 }, (_, i) => `tag${i}`);
             const metadata: PromptMetadata = {
                 title: 'Test',
@@ -176,7 +176,7 @@ This should be treated as regular content.`;
             assert(result.warnings.some(w => w.field === 'tags' && w.message.includes('Too many tags')));
         });
 
-        it('should validate version format', () => {
+        test('should validate version format', () => {
             const metadata: PromptMetadata = {
                 title: 'Test',
                 category: 'Test',
@@ -189,7 +189,7 @@ This should be treated as regular content.`;
             assert(result.warnings.some(w => w.field === 'version'));
         });
 
-        it('should validate parameter names', () => {
+        test('should validate parameter names', () => {
             const metadata: PromptMetadata & { parameters: any[] } = {
                 title: 'Test',
                 category: 'Test',
@@ -207,8 +207,8 @@ This should be treated as regular content.`;
         });
     });
 
-    describe('extractFrontmatter', () => {
-        it('should extract valid frontmatter', () => {
+    suite('extractFrontmatter', () => {
+        test('should extract valid frontmatter', () => {
             const content = `---
 title: Test
 ---
@@ -220,7 +220,7 @@ Content here`;
             assert.strictEqual(result.content, 'Content here');
         });
 
-        it('should return null for no frontmatter', () => {
+        test('should return null for no frontmatter', () => {
             const content = 'Just content';
 
             const result = parser.extractFrontmatter(content);
@@ -229,7 +229,7 @@ Content here`;
             assert.strictEqual(result.content, content);
         });
 
-        it('should handle empty frontmatter', () => {
+        test('should handle empty frontmatter', () => {
             const content = `---
 ---
 Content after empty frontmatter`;
@@ -241,8 +241,8 @@ Content after empty frontmatter`;
         });
     });
 
-    describe('getDefaultMetadata', () => {
-        it('should return valid default metadata', () => {
+    suite('getDefaultMetadata', () => {
+        test('should return valid default metadata', () => {
             const defaults = parser.getDefaultMetadata();
 
             assert.strictEqual(defaults.title, 'Untitled Prompt');
@@ -251,15 +251,15 @@ Content after empty frontmatter`;
         });
     });
 
-    describe('cache functionality', () => {
-        it('should track cache statistics', () => {
+    suite('cache functionality', () => {
+        test('should track cache statistics', () => {
             const stats = parser.getCacheStats();
 
             assert.strictEqual(typeof stats.size, 'number');
             assert(Array.isArray(stats.entries));
         });
 
-        it('should clear cache', () => {
+        test('should clear cache', () => {
             parser.clearCache();
             const stats = parser.getCacheStats();
 

@@ -5,8 +5,8 @@
 
 import assert from 'assert';
 import * as vscode from 'vscode';
-import { TemplateManager } from '../../promptStore/TemplateManager';
-import { PromptTemplate } from '../../promptStore/types';
+import { TemplateManager } from '../../../promptStore/TemplateManager';
+import { PromptTemplate } from '../../../promptStore/types';
 
 suite('TemplateManager Tests', () => {
     let templateManager: TemplateManager;

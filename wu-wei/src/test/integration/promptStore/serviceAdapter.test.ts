@@ -7,9 +7,9 @@ import assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { PromptManager } from '../../promptStore/PromptManager';
-import { PromptManagerServiceAdapter } from '../../promptStore/PromptManagerServiceAdapter';
-import { PromptService } from '../../shared/promptManager/types';
+import { PromptManager } from '../../../promptStore/PromptManager';
+import { PromptManagerServiceAdapter } from '../../../promptStore/PromptManagerServiceAdapter';
+import { PromptService } from '../../../shared/promptManager/types';
 
 suite('PromptManagerServiceAdapter Tests', () => {
     let tempDir: string;

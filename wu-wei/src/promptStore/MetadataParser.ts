@@ -347,12 +347,23 @@ export class MetadataParser {
     ): Promise<PromptMetadata> {
         const enhanced = { ...metadata };
 
-        // Set title from filename if not provided
+        // Set title from content or filename if not provided
         if (!enhanced.title || enhanced.title === 'Untitled Prompt') {
-            const baseName = path.basename(filePath, path.extname(filePath));
-            enhanced.title = baseName
-                .replace(/[-_]/g, ' ')
-                .replace(/\b\w/g, l => l.toUpperCase());
+            // First try to extract title from markdown content
+            const content = await fs.promises.readFile(filePath, 'utf-8');
+            const { content: bodyContent } = this.extractFrontmatter(content);
+
+            // Look for first markdown heading
+            const headingMatch = bodyContent.match(/^#\s+(.+)$/m);
+            if (headingMatch && headingMatch[1]) {
+                enhanced.title = headingMatch[1].trim();
+            } else {
+                // Fall back to filename
+                const baseName = path.basename(filePath, path.extname(filePath));
+                enhanced.title = baseName
+                    .replace(/[-_]/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+            }
         }
 
         return enhanced;

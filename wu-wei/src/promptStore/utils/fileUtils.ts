@@ -63,16 +63,43 @@ export class FileUtils {
 
         // Handle ** pattern for recursive matching
         if (normalizedPattern.includes('**')) {
-            const regexPattern = normalizedPattern
-                .replace(/\*\*/g, '.*')
-                .replace(/(?<!\.\*)\*(?!\*)/g, '[^/]*');
-            const regex = new RegExp(`^${regexPattern}$`, 'i');
-            return regex.test(normalizedStr);
+            // Special handling for patterns like **/something/**
+            if (normalizedPattern.startsWith('**/') && normalizedPattern.endsWith('/**')) {
+                const middle = normalizedPattern.slice(3, -3);
+                const regexPattern = `(.*/)?(${middle.replace(/\*/g, '[^/]*')})(/.*)`;
+                const regex = new RegExp(`^${regexPattern}$`, 'i');
+                return regex.test(normalizedStr);
+            }
+            // Handle patterns like **/something
+            else if (normalizedPattern.startsWith('**/')) {
+                const suffix = normalizedPattern.slice(3);
+                const regexPattern = `(.*/)?(${suffix.replace(/\*/g, '[^/]*')})$`;
+                const regex = new RegExp(`^${regexPattern}$`, 'i');
+                return regex.test(normalizedStr);
+            }
+            // Handle patterns like something/**
+            else if (normalizedPattern.endsWith('/**')) {
+                const prefix = normalizedPattern.slice(0, -3);
+                const regexPattern = `^(${prefix.replace(/\*/g, '[^/]*')})(/.*)`;
+                const regex = new RegExp(`^${regexPattern}$`, 'i');
+                return regex.test(normalizedStr);
+            }
+            // Handle patterns like src/**/*.tsx
+            else {
+                // Replace ** with a pattern that matches any number of path segments including none
+                let regexPattern = normalizedPattern
+                    .replace(/\*\*/g, '.*')
+                    .replace(/(?<!\.\*)\*(?!\*)/g, '[^/]*')
+                    .replace(/\?/g, '.');
+
+                const regex = new RegExp(`^${regexPattern}$`, 'i');
+                return regex.test(normalizedStr);
+            }
         }
 
         // Convert simple glob pattern to regex
         const regexPattern = normalizedPattern
-            .replace(/\*/g, '.*')
+            .replace(/\*/g, '[^/]*')
             .replace(/\?/g, '.');
 
         const regex = new RegExp(`^${regexPattern}$`, 'i');
@@ -80,48 +107,56 @@ export class FileUtils {
     }
 
     /**
- * Check if a path should be excluded based on patterns
- */
+     * Check if a path should be excluded based on patterns
+     */
     static shouldExcludePath(filePath: string, excludePatterns: string[] = []): boolean {
         // Normalize path separators
         const normalizedPath = filePath.replace(/\\/g, '/');
 
         for (const pattern of excludePatterns) {
-            // Check exact match
+            // Direct pattern match
             if (this.matchesPattern(normalizedPath, pattern)) {
                 return true;
             }
 
             // For patterns with **, check if any part of the path matches
             if (pattern.includes('**')) {
-                // Extract the core directory name from patterns like **/node_modules/**
-                const dirPattern = pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, '');
+                // Handle patterns like **/node_modules/**
+                if (pattern.startsWith('**/') && pattern.endsWith('/**')) {
+                    const dirName = pattern.slice(3, -3);
+                    const pathParts = normalizedPath.split('/');
 
-                // Check if any path segment matches the directory pattern
-                const pathParts = normalizedPath.split('/');
-                for (const part of pathParts) {
-                    if (this.matchesPattern(part, dirPattern)) {
-                        return true;
-                    }
-                }
-
-                // Also check if the path contains the pattern as a substring
-                const segments = normalizedPath.split('/');
-                for (let i = 0; i < segments.length; i++) {
-                    for (let j = i; j < segments.length; j++) {
-                        const subPath = segments.slice(i, j + 1).join('/');
-                        if (this.matchesPattern(subPath, dirPattern)) {
+                    // Check if any directory in the path matches
+                    for (const part of pathParts) {
+                        if (this.matchesPattern(part, dirName)) {
                             return true;
                         }
                     }
                 }
-            } else {
-                // Check if any parent directory matches the pattern
-                const pathParts = normalizedPath.split('/');
-                for (let i = 0; i < pathParts.length; i++) {
-                    const partialPath = pathParts.slice(0, i + 1).join('/');
-                    if (this.matchesPattern(partialPath, pattern)) {
-                        return true;
+                // Handle patterns like **/something
+                else if (pattern.startsWith('**/')) {
+                    const suffix = pattern.slice(3);
+                    const pathParts = normalizedPath.split('/');
+
+                    // Check if the file or any parent path ends with the suffix
+                    for (let i = 0; i < pathParts.length; i++) {
+                        const subPath = pathParts.slice(i).join('/');
+                        if (this.matchesPattern(subPath, suffix)) {
+                            return true;
+                        }
+                    }
+                }
+                // Handle patterns like something/**
+                else if (pattern.endsWith('/**')) {
+                    const prefix = pattern.slice(0, -3);
+                    const pathParts = normalizedPath.split('/');
+
+                    // Check if any parent path matches the prefix
+                    for (let i = 0; i < pathParts.length; i++) {
+                        const subPath = pathParts.slice(0, i + 1).join('/');
+                        if (this.matchesPattern(subPath, prefix)) {
+                            return true;
+                        }
                     }
                 }
             }
@@ -218,12 +253,25 @@ export class FileUtils {
      * Generate a safe filename from a title
      */
     static generateSafeFileName(title: string, extension: string = '.md'): string {
+        // Handle empty or whitespace-only titles
+        if (!title || !title.trim()) {
+            return extension;
+        }
+
         // Remove or replace invalid characters
-        const safe = title
+        let safe = title
+            .trim()                        // Remove leading/trailing whitespace
             .replace(/[<>:"/\\|?*]/g, '')  // Remove invalid filename characters
             .replace(/\s+/g, '-')          // Replace spaces with hyphens
             .replace(/[^\w\-_.]/g, '')     // Keep only word chars, hyphens, underscores, and dots
+            .replace(/^[-_]+|[-_]+$/g, '') // Remove leading/trailing hyphens and underscores
+            .replace(/[-_]+/g, '-')        // Collapse multiple hyphens and underscores to single hyphen
             .toLowerCase();
+
+        // Handle edge case where all characters were removed
+        if (!safe) {
+            return extension;
+        }
 
         return `${safe}${extension}`;
     }

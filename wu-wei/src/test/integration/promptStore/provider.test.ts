@@ -5,11 +5,11 @@
 
 import assert from 'assert';
 import * as vscode from 'vscode';
-import { PromptStoreProvider } from '../../promptStore/PromptStoreProvider';
-import { PromptManager } from '../../promptStore/PromptManager';
-import { FileOperationManager } from '../../promptStore/FileOperationManager';
-import { ConfigurationManager } from '../../promptStore/ConfigurationManager';
-import { TemplateManager } from '../../promptStore/TemplateManager';
+import { PromptStoreProvider } from '../../../promptStore/PromptStoreProvider';
+import { PromptManager } from '../../../promptStore/PromptManager';
+import { FileOperationManager } from '../../../promptStore/FileOperationManager';
+import { ConfigurationManager } from '../../../promptStore/ConfigurationManager';
+import { TemplateManager } from '../../../promptStore/TemplateManager';
 
 suite('PromptStoreProvider - Step 6 Tests', () => {
     let provider: PromptStoreProvider;

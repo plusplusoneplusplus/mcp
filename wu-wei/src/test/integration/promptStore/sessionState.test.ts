@@ -5,7 +5,7 @@
 
 import assert from 'assert';
 import * as vscode from 'vscode';
-import { SessionStateManager, SessionState, SearchFilters, SortPreferences, UIState } from '../../promptStore/SessionStateManager';
+import { SessionStateManager, SessionState, SearchFilters, SortPreferences, UIState } from '../../../promptStore/SessionStateManager';
 
 suite('SessionStateManager Tests', () => {
     let sessionManager: SessionStateManager;
