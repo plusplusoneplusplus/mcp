@@ -20,8 +20,20 @@ Transform your daily work through automation that:
 - Basic extension foundation with Wu Wei principles
 - **Wu Wei Chat Interface**: Natural conversation flow for automation guidance
 - **VS Code Chat Participant**: Use `@wu-wei` in VS Code chat for effortless assistance
+- **Prompt TSX Support**: Advanced prompt composition using Microsoft's @vscode/prompt-tsx package
 - Configuration system for automation preferences
 - Extensible architecture for future automation modules
+
+### Prompt TSX Integration
+
+Wu Wei now supports sophisticated prompt composition using Microsoft's `@vscode/prompt-tsx` package:
+
+- **Intelligent Prioritization**: Components have priority levels for context window management
+- **Flexible Text Handling**: Dynamic content adaptation to available token budget
+- **Type-Safe Components**: Full TypeScript support for prompt elements
+- **Async Preparation**: Support for asynchronous data gathering before prompt rendering
+
+For detailed information, see [Prompt TSX Setup Documentation](./docs/prompt-tsx-setup.md).
 
 ### Planned Automation Areas
 - **File & Document Operations**: Batch processing, organization, templates
