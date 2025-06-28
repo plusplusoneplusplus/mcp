@@ -6,8 +6,8 @@
 import assert from 'assert';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { MetadataParser } from '../../promptStore/MetadataParser';
-import { PromptMetadata, ValidationResult, ParsedPrompt } from '../../promptStore/types';
+import { MetadataParser } from '../../../promptStore/MetadataParser';
+import { PromptMetadata, ValidationResult, ParsedPrompt } from '../../../promptStore/types';
 
 suite('MetadataParser Tests', () => {
     let parser: MetadataParser;

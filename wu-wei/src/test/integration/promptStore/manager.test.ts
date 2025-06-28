@@ -7,15 +7,15 @@ import assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
-import { PromptManager } from '../../promptStore/PromptManager';
-import { Prompt, PromptStoreConfig } from '../../promptStore/types';
+import { PromptManager } from '../../../promptStore/PromptManager';
+import { Prompt, PromptStoreConfig } from '../../../promptStore/types';
 
-describe('PromptManager File System Operations', () => {
+suite('PromptManager File System Operations', () => {
     let tempDir: string;
     let promptManager: PromptManager;
     let testConfig: Partial<PromptStoreConfig>;
 
-    beforeEach(async () => {
+    setup(async () => {
         // Create temporary directory for tests
         tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'prompt-manager-test-'));
 
@@ -28,14 +28,14 @@ describe('PromptManager File System Operations', () => {
         promptManager = new PromptManager(testConfig);
     });
 
-    afterEach(async () => {
+    teardown(async () => {
         // Clean up
         promptManager.dispose();
         await fs.rm(tempDir, { recursive: true, force: true });
     });
 
-    describe('Directory Scanning', () => {
-        it('should discover markdown files in flat directory', async () => {
+    suite('Directory Scanning', () => {
+        test('should discover markdown files in flat directory', async () => {
             // Create test files
             await fs.writeFile(path.join(tempDir, 'prompt1.md'), '# Test Prompt 1\nContent');
             await fs.writeFile(path.join(tempDir, 'prompt2.md'), '# Test Prompt 2\nContent');
@@ -48,7 +48,7 @@ describe('PromptManager File System Operations', () => {
             assert(files.some((f: string) => f.endsWith('prompt2.md')));
         });
 
-        it('should discover markdown files in nested directories', async () => {
+        test('should discover markdown files in nested directories', async () => {
             // Create nested directory structure
             const category1Dir = path.join(tempDir, 'category1');
             const category2Dir = path.join(tempDir, 'category2');
@@ -67,7 +67,7 @@ describe('PromptManager File System Operations', () => {
             assert(files.some((f: string) => f.endsWith('root.md')));
         });
 
-        it('should ignore hidden files and directories', async () => {
+        test('should ignore hidden files and directories', async () => {
             // Create hidden files and directories
             await fs.mkdir(path.join(tempDir, '.hidden-dir'));
             await fs.writeFile(path.join(tempDir, '.hidden-file.md'), '# Hidden\nContent');
@@ -80,7 +80,7 @@ describe('PromptManager File System Operations', () => {
             assert(files[0].endsWith('visible.md'));
         });
 
-        it('should handle non-existent directories gracefully', async () => {
+        test('should handle non-existent directories gracefully', async () => {
             const nonExistentDir = path.join(tempDir, 'does-not-exist');
 
             const files = await promptManager.scanDirectory(nonExistentDir);
@@ -89,8 +89,8 @@ describe('PromptManager File System Operations', () => {
         });
     });
 
-    describe('Prompt Loading', () => {
-        it('should load prompt with metadata', async () => {
+    suite('Prompt Loading', () => {
+        test('should load prompt with metadata', async () => {
             const promptFile = path.join(tempDir, 'test-prompt.md');
             const content = `---
 title: Test Prompt
@@ -114,7 +114,7 @@ This is a test prompt content.`;
             assert(prompt.content.includes('This is a test prompt content.'));
         });
 
-        it('should load prompt without metadata', async () => {
+        test('should load prompt without metadata', async () => {
             const promptFile = path.join(tempDir, 'simple-prompt.md');
             const content = `# Simple Prompt
 
@@ -128,7 +128,7 @@ Just content, no metadata.`;
             assert(prompt.content.includes('Just content, no metadata.'));
         });
 
-        it('should load all prompts from directory', async () => {
+        test('should load all prompts from directory', async () => {
             // Create multiple prompt files
             await fs.writeFile(path.join(tempDir, 'prompt1.md'), '# Prompt 1\nContent 1');
             await fs.writeFile(path.join(tempDir, 'prompt2.md'), '# Prompt 2\nContent 2');
@@ -147,7 +147,7 @@ Just content, no metadata.`;
             assert(titles.includes('Prompt 3'));
         });
 
-        it('should handle invalid prompt files gracefully', async () => {
+        test('should handle invalid prompt files gracefully', async () => {
             const promptFile = path.join(tempDir, 'invalid.md');
             await fs.writeFile(promptFile, 'Invalid content without proper structure');
 
@@ -158,8 +158,8 @@ Just content, no metadata.`;
         });
     });
 
-    describe('Prompt Saving', () => {
-        it('should save prompt with metadata', async () => {
+    suite('Prompt Saving', () => {
+        test('should save prompt with metadata', async () => {
             const promptFile = path.join(tempDir, 'new-prompt.md');
             const prompt: Prompt = {
                 id: 'test-prompt',
@@ -189,7 +189,7 @@ Just content, no metadata.`;
             assert(savedContent.includes('This is new content.'));
         });
 
-        it('should save prompt without metadata', async () => {
+        test('should save prompt without metadata', async () => {
             const promptFile = path.join(tempDir, 'simple-new.md');
             const prompt: Prompt = {
                 id: 'simple-test',
@@ -210,7 +210,7 @@ Just content, no metadata.`;
             assert(savedContent.includes('Just content.'));
         });
 
-        it('should create directory structure when saving', async () => {
+        test('should create directory structure when saving', async () => {
             const nestedDir = path.join(tempDir, 'new', 'category');
             const promptFile = path.join(nestedDir, 'nested-prompt.md');
             const prompt: Prompt = {
@@ -233,8 +233,8 @@ Just content, no metadata.`;
         });
     });
 
-    describe('Prompt Creation', () => {
-        it('should create new prompt in root directory', async () => {
+    suite('Prompt Creation', () => {
+        test('should create new prompt in root directory', async () => {
             const prompt = await promptManager.createPrompt('My New Prompt');
 
             assert.strictEqual(prompt.metadata.title, 'My New Prompt');
@@ -246,7 +246,7 @@ Just content, no metadata.`;
             assert(exists);
         });
 
-        it('should create new prompt in category directory', async () => {
+        test('should create new prompt in category directory', async () => {
             const prompt = await promptManager.createPrompt('Categorized Prompt', 'Development');
 
             assert.strictEqual(prompt.metadata.title, 'Categorized Prompt');
@@ -255,7 +255,7 @@ Just content, no metadata.`;
             assert(prompt.filePath.endsWith('categorized-prompt.md'));
         });
 
-        it('should handle special characters in prompt names', async () => {
+        test('should handle special characters in prompt names', async () => {
             const prompt = await promptManager.createPrompt('Prompt with: Special/Characters?');
 
             assert.strictEqual(prompt.metadata.title, 'Prompt with: Special/Characters?');
@@ -263,7 +263,7 @@ Just content, no metadata.`;
             assert(prompt.fileName.match(/^[a-z0-9\-_.]+\.md$/));
         });
 
-        it('should reject creating prompt with existing name', async () => {
+        test('should reject creating prompt with existing name', async () => {
             await promptManager.createPrompt('Duplicate Name');
 
             await assert.rejects(
@@ -273,8 +273,8 @@ Just content, no metadata.`;
         });
     });
 
-    describe('Prompt Deletion', () => {
-        it('should delete existing prompt file', async () => {
+    suite('Prompt Deletion', () => {
+        test('should delete existing prompt file', async () => {
             const promptFile = path.join(tempDir, 'to-delete.md');
             await fs.writeFile(promptFile, '# To Delete\nThis will be deleted');
 
@@ -285,7 +285,7 @@ Just content, no metadata.`;
             assert(!exists);
         });
 
-        it('should handle deleting non-existent file gracefully', async () => {
+        test('should handle deleting non-existent file gracefully', async () => {
             const nonExistentFile = path.join(tempDir, 'does-not-exist.md');
 
             // Should not throw
@@ -293,8 +293,8 @@ Just content, no metadata.`;
         });
     });
 
-    describe('Error Handling', () => {
-        it('should handle permission errors gracefully', async () => {
+    suite('Error Handling', () => {
+        test('should handle permission errors gracefully', async () => {
             // This test is platform-dependent and might be skipped on some systems
             if (process.platform === 'win32') {
                 return; // Skip on Windows due to different permission model
@@ -314,7 +314,7 @@ Just content, no metadata.`;
             }
         });
 
-        it('should handle concurrent file operations', async () => {
+        test('should handle concurrent file operations', async () => {
             const promptFile1 = path.join(tempDir, 'concurrent1.md');
             const promptFile2 = path.join(tempDir, 'concurrent2.md');
             const prompt1: Prompt = {

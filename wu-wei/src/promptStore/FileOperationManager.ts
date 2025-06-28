@@ -431,8 +431,14 @@ export class FileOperationManager {
         // Add template content
         if (options.template) {
             // content += await this.templateManager.loadTemplate(options.template);
-            content += `# ${options.name}\n\n`;
-            content += 'Template loading temporarily disabled.\n\n';
+            content += `# {{title}}\n\n`;
+            content += '{{description}}\n\n';
+            content += '## Parameters\n\n';
+            content += '{{#each parameters}}\n';
+            content += '- **{{name}}**: {{description}}\n';
+            content += '{{/each}}\n\n';
+            content += '## Usage\n\n';
+            content += '{{usage}}\n';
         } else {
             content += `# ${options.name}\n\n`;
             content += 'Your prompt content goes here...\n\n';

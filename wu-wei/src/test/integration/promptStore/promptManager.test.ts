@@ -7,8 +7,8 @@ import assert from 'assert';
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { PromptManager } from '../../promptStore/PromptManager';
-import { Prompt, PromptStoreConfig, SearchFilter } from '../../promptStore/types';
+import { PromptManager } from '../../../promptStore/PromptManager';
+import { Prompt, PromptStoreConfig, SearchFilter } from '../../../promptStore/types';
 
 suite('PromptManager Tests', () => {
     let promptManager: PromptManager;

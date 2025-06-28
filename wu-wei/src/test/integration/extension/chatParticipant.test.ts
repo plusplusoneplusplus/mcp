@@ -1,10 +1,10 @@
 import assert from 'assert';
 import * as vscode from 'vscode';
-import { WuWeiChatParticipant } from '../../chat/WuWeiChatParticipant';
+import { WuWeiChatParticipant } from '../../../chat/WuWeiChatParticipant';
 
-describe('Wu Wei Chat Participant Test Suite', () => {
+suite('Wu Wei Chat Participant Test Suite', () => {
 
-    it('Chat participant can be instantiated', () => {
+    test('Chat participant can be instantiated', () => {
         // Create a mock extension context
         const mockContext: vscode.ExtensionContext = {
             subscriptions: [],
@@ -36,7 +36,7 @@ describe('Wu Wei Chat Participant Test Suite', () => {
         });
     });
 
-    it('Chat participant philosophy aligns with Wu Wei', () => {
+    test('Chat participant philosophy aligns with Wu Wei', () => {
         // This test verifies that the chat participant embodies Wu Wei principles
         // The implementation should be simple, natural, and effortless
 

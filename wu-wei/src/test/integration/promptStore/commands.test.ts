@@ -5,11 +5,11 @@
 
 import assert from 'assert';
 import * as vscode from 'vscode';
-import { FileOperationCommands } from '../../promptStore/commands';
-import { FileOperationManager } from '../../promptStore/FileOperationManager';
-import { TemplateManager } from '../../promptStore/TemplateManager';
-import { PromptManager } from '../../promptStore/PromptManager';
-import { ConfigurationManager } from '../../promptStore/ConfigurationManager';
+import { FileOperationCommands } from '../../../promptStore/commands';
+import { FileOperationManager } from '../../../promptStore/FileOperationManager';
+import { TemplateManager } from '../../../promptStore/TemplateManager';
+import { PromptManager } from '../../../promptStore/PromptManager';
+import { ConfigurationManager } from '../../../promptStore/ConfigurationManager';
 
 suite('FileOperationCommands Tests', () => {
     let commands: FileOperationCommands;
@@ -358,7 +358,7 @@ suite('FileOperationCommands Tests', () => {
             let successMessageShown = false;
             vscode.window.showInformationMessage = async (message: string) => {
                 successMessageShown = true;
-                assert(message.includes('new-category'));
+                assert(message.includes('Moved prompt to category: new-category'));
                 return undefined;
             };
 

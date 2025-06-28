@@ -355,8 +355,11 @@
         "esbuild-watch": "node esbuild.js --watch",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js",
-        "test:watch": "npm run test -- --watch",
+        "test": "npm run test:all",
+        "test:unit": "npm run clean && tsc -p ./tsconfig.unit.json && npm run copy-webview && node ./out/test/runUnitTests.js",
+        "test:integration": "npm run clean && tsc -p ./tsconfig.integration.json && npm run copy-webview && node ./out/test/runIntegrationTests.js",
+        "test:all": "npm run test:unit && npm run test:integration",
+        "test:watch": "npm run test:unit -- --watch",
         "clean": "rimraf out"
     },
     "dependencies": {

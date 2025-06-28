@@ -1,0 +1,20 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "strict": false,
+        "noImplicitAny": false
+    },
+    "include": [
+        "src/test/unit/**/*",
+        "src/test/runUnitTests.ts",
+        "src/shared/**/*",
+        "src/promptStore/**/*"
+    ],
+    "exclude": [
+        "src/test/integration/**/*",
+        "src/test/suite/**/*",
+        "src/test/promptTsx/**/*",
+        "node_modules",
+        ".vscode-test"
+    ]
+}
