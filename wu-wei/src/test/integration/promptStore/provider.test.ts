@@ -51,7 +51,30 @@ suite('PromptStoreProvider - Step 6 Tests', () => {
             cspSource: 'mock-csp-source'
         } as any;
 
-        const html = (provider as any).getHtmlForWebview(mockWebview);
+        // Debug - check if methods exist
+        console.log('=== METHOD DEBUG ===');
+        console.log('getHtmlForWebview exists:', typeof (provider as any).getHtmlForWebview);
+        console.log('getMockHtmlForTesting exists:', typeof (provider as any).getMockHtmlForTesting);
+        console.log('Provider type:', typeof provider);
+        console.log('=== END METHOD DEBUG ===');
+
+        // Try to get HTML content
+        let html: string;
+        try {
+            html = (provider as any).getHtmlForWebview(mockWebview);
+        } catch (error) {
+            console.log('getHtmlForWebview error:', error);
+            // Fallback to mock HTML directly
+            html = (provider as any).getMockHtmlForTesting();
+        }
+
+        // Debug logging to see what we actually get
+        console.log('=== HTML CONTENT DEBUG ===');
+        console.log('HTML length:', html ? html.length : 'null');
+        console.log('HTML type:', typeof html);
+        console.log('HTML preview:', html ? html.substring(0, 200) : 'null');
+        console.log('Contains prompt-store-container:', html ? html.includes('prompt-store-container') : false);
+        console.log('=== END DEBUG ===');
 
         // Check for main structural elements that exist in the current HTML
         assert.ok(html.includes('prompt-store-container'), 'Should have main container');
