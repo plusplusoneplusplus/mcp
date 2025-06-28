@@ -3,7 +3,7 @@
  * Testing wu wei principle: simple, flexible templates that flow naturally
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as vscode from 'vscode';
 import { TemplateManager } from '../../promptStore/TemplateManager';
 import { PromptTemplate } from '../../promptStore/types';

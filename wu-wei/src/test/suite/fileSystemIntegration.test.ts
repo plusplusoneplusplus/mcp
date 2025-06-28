@@ -3,7 +3,7 @@
  * Testing real file system behavior with various scenarios
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';

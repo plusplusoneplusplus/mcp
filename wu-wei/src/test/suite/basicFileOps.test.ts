@@ -2,7 +2,7 @@
  * Simple test to verify the PromptManager file system operations
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';

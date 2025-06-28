@@ -3,7 +3,7 @@
  * Testing the complete configuration flow
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs/promises';

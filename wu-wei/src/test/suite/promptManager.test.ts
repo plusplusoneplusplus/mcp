@@ -3,7 +3,7 @@
  * Testing the core file discovery, reading, and writing functionality
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';

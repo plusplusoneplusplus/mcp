@@ -3,7 +3,7 @@
  * Tests real file system operations and integration with PromptManager
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';

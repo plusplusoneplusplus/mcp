@@ -7,7 +7,7 @@
  * 3. Verifying that the output contains expected chat messages
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import { renderPrompt } from '@vscode/prompt-tsx';
 import { BasicTestPrompt, TestPromptWithFlex, AsyncTestPrompt, tsxTestConfig } from '../promptTsx/basicTsxTest';
 
