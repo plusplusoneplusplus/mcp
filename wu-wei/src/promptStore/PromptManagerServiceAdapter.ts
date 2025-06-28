@@ -11,16 +11,29 @@ import {
     PromptUsageContext,
     PromptParameter,
     ValidationError,
-    VariableResolutionOptions
+    VariableResolutionOptions,
+    BasePromptElementProps,
+    TsxRenderOptions,
+    TsxRenderResult,
+    ValidationResult,
+    PromptElement
 } from '../shared/promptManager/types';
 import { VariableResolver } from '../shared/promptManager/utils/variableResolver';
 import { PromptRenderer } from '../shared/promptManager/utils/promptRenderer';
+import TsxRenderer from '../shared/promptManager/utils/tsxRenderer';
+import TokenManager from '../shared/promptManager/utils/tokenManager';
+import TsxValidation from '../shared/promptManager/utils/tsxValidation';
 
 export class PromptManagerServiceAdapter implements PromptService {
     private promptManager: PromptManager;
     private variableResolver: VariableResolver;
     private promptRenderer: PromptRenderer;
     private sharedEventEmitter: vscode.EventEmitter<any>;
+
+    // TSX-related utilities
+    private tsxRenderer: TsxRenderer;
+    private tokenManager: TokenManager;
+    private tsxValidation: TsxValidation;
 
     // Event emitters for PromptService interface
     private _onPromptSelected = new vscode.EventEmitter<PromptUsageContext>();
@@ -36,6 +49,11 @@ export class PromptManagerServiceAdapter implements PromptService {
         this.variableResolver = new VariableResolver();
         this.promptRenderer = new PromptRenderer();
         this.sharedEventEmitter = new vscode.EventEmitter<any>();
+
+        // Initialize TSX utilities
+        this.tsxRenderer = TsxRenderer.getInstance();
+        this.tokenManager = TokenManager.getInstance();
+        this.tsxValidation = TsxValidation.getInstance();
 
         // Bridge events from PromptManager
         this.onPromptsChanged = this.promptManager.onPromptsChanged;
@@ -138,6 +156,87 @@ export class PromptManagerServiceAdapter implements PromptService {
         });
     }
 
+    // ===== NEW TSX METHODS =====
+
+    /**
+     * Render a TSX prompt component with token budget management
+     */
+    async renderTsxPrompt<T extends BasePromptElementProps>(
+        promptComponent: new (props: T) => PromptElement<T>,
+        props: T,
+        options: TsxRenderOptions = {}
+    ): Promise<TsxRenderResult> {
+        try {
+            return await this.tsxRenderer.renderTsxPrompt(promptComponent, props, options);
+        } catch (error) {
+            // Fallback to simple text-based rendering
+            const fallbackContent = `TSX rendering failed: ${error instanceof Error ? error.message : String(error)}`;
+            const fallbackMessages = this.tsxRenderer.createFallbackMessages(fallbackContent);
+
+            return {
+                messages: fallbackMessages,
+                tokenCount: this.tokenManager.estimateMessageTokens(fallbackMessages),
+                prunedElements: [],
+                renderingMetadata: {
+                    totalElements: 1,
+                    includedElements: 1,
+                    priorityLevels: [50]
+                }
+            };
+        }
+    }
+
+    /**
+     * Render prompt with token budget management
+     */
+    async renderPromptWithTokenBudget(
+        promptId: string,
+        variables: Record<string, any>,
+        tokenBudget: number,
+        model?: vscode.LanguageModelChat
+    ): Promise<vscode.LanguageModelChatMessage[]> {
+        try {
+            // First render the prompt with variables
+            const renderedContent = await this.renderPromptWithVariables(promptId, variables);
+
+            // Apply token budget constraints
+            const truncatedContent = this.tokenManager.truncateToTokenBudget(renderedContent, tokenBudget);
+
+            // Create VS Code language model messages
+            const messages: vscode.LanguageModelChatMessage[] = [{
+                role: vscode.LanguageModelChatMessageRole.User,
+                content: [{ value: truncatedContent, text: truncatedContent } as vscode.LanguageModelTextPart],
+                name: `prompt-${promptId}`
+            }];
+
+            return messages;
+        } catch (error) {
+            throw new Error(`Token budget rendering failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    /**
+     * Validate a TSX prompt component
+     */
+    async validateTsxPrompt<T extends BasePromptElementProps>(
+        component: new (props: T) => PromptElement<T>,
+        props: T
+    ): Promise<ValidationResult> {
+        try {
+            return await this.tsxValidation.validateComponent(component, props);
+        } catch (error) {
+            return {
+                isValid: false,
+                errors: [{
+                    field: 'validation',
+                    message: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
+                    severity: 'error'
+                }],
+                warnings: []
+            };
+        }
+    }
+
     /**
      * Get configuration (async wrapper over sync method)
      */
@@ -212,6 +311,33 @@ export class PromptManagerServiceAdapter implements PromptService {
             throw new Error(`Prompt not found: ${promptId}`);
         }
         return this.variableResolver.extractVariables(prompt.content);
+    }
+
+    // ===== TSX-Enhanced Methods =====
+
+    /**
+     * Render TSX component with token budget constraints
+     */
+    async renderTsxWithTokenBudget<T extends BasePromptElementProps>(
+        promptComponent: new (props: T) => PromptElement<T>,
+        props: T,
+        tokenBudget: number,
+        model?: vscode.LanguageModelChat
+    ): Promise<vscode.LanguageModelChatMessage[]> {
+        return await this.tsxRenderer.renderWithTokenBudget(promptComponent, props, tokenBudget, model);
+    }
+
+    /**
+     * Get recommended token budgets for prompt composition
+     */
+    getRecommendedTokenBudgets(totalBudget: number): {
+        systemPrompt: number;
+        userQuery: number;
+        conversationHistory: number;
+        contextData: number;
+        reserve: number;
+    } {
+        return this.tokenManager.getRecommendedBudgets(totalBudget);
     }
 
     // ===== Private Helper Methods =====

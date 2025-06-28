@@ -1,10 +1,23 @@
 import * as vscode from 'vscode';
-import { PromptService, PromptUsageContext, VariableResolutionOptions, PromptParameter } from './types';
+import {
+    PromptService,
+    PromptUsageContext,
+    VariableResolutionOptions,
+    PromptParameter,
+    BasePromptElementProps,
+    TsxRenderOptions,
+    TsxRenderResult,
+    ValidationResult,
+    PromptElement
+} from './types';
 import { Prompt, PromptStoreConfig, SearchFilter } from '../../promptStore/types';
 import { PromptManager } from '../../promptStore/PromptManager';
 import { VariableResolver } from './utils/variableResolver';
 import { PromptRenderer } from './utils/promptRenderer';
 import { PromptValidators } from './utils/validators';
+import TsxRenderer from './utils/tsxRenderer';
+import TokenManager from './utils/tokenManager';
+import TsxValidation from './utils/tsxValidation';
 
 export class VsCodePromptService implements PromptService {
     private context: vscode.ExtensionContext;
@@ -12,6 +25,11 @@ export class VsCodePromptService implements PromptService {
     private variableResolver: VariableResolver;
     private promptRenderer: PromptRenderer;
     private disposables: vscode.Disposable[] = [];
+
+    // TSX-related utilities
+    private tsxRenderer: TsxRenderer;
+    private tokenManager: TokenManager;
+    private tsxValidation: TsxValidation;
 
     // Event emitters
     private _onPromptsChanged = new vscode.EventEmitter<Prompt[]>();
@@ -27,6 +45,11 @@ export class VsCodePromptService implements PromptService {
         this.context = context;
         this.variableResolver = new VariableResolver();
         this.promptRenderer = new PromptRenderer();
+
+        // Initialize TSX utilities
+        this.tsxRenderer = TsxRenderer.getInstance();
+        this.tokenManager = TokenManager.getInstance();
+        this.tsxValidation = TsxValidation.getInstance();
 
         // Initialize PromptManager with default config
         this.promptManager = new PromptManager();
@@ -120,6 +143,39 @@ export class VsCodePromptService implements PromptService {
         // Fire config changed event
         const newConfig = await this.getConfig();
         this._onConfigChanged.fire(newConfig);
+    }
+
+    // ===== NEW TSX METHODS =====
+
+    async renderTsxPrompt<T extends BasePromptElementProps>(
+        promptComponent: new (props: T) => PromptElement<T>,
+        props: T,
+        options: TsxRenderOptions = {}
+    ): Promise<TsxRenderResult> {
+        return await this.tsxRenderer.renderTsxPrompt(promptComponent, props, options);
+    }
+
+    async renderPromptWithTokenBudget(
+        promptId: string,
+        variables: Record<string, any>,
+        tokenBudget: number,
+        model?: vscode.LanguageModelChat
+    ): Promise<vscode.LanguageModelChatMessage[]> {
+        const renderedContent = await this.renderPromptWithVariables(promptId, variables);
+        const truncatedContent = this.tokenManager.truncateToTokenBudget(renderedContent, tokenBudget);
+
+        return [{
+            role: vscode.LanguageModelChatMessageRole.User,
+            content: [{ value: truncatedContent, text: truncatedContent } as vscode.LanguageModelTextPart],
+            name: `prompt-${promptId}`
+        }];
+    }
+
+    async validateTsxPrompt<T extends BasePromptElementProps>(
+        component: new (props: T) => PromptElement<T>,
+        props: T
+    ): Promise<ValidationResult> {
+        return await this.tsxValidation.validateComponent(component, props);
     }
 
     dispose(): void {
