@@ -3,6 +3,9 @@ import * as vscode from 'vscode';
 // Re-export existing types from promptStore for compatibility
 export { Prompt, PromptMetadata, SearchFilter, PromptStoreConfig } from '../../promptStore/types';
 
+// Re-export TSX-related types for convenience
+export * from './tsx/types';
+
 export interface PromptParameter {
     name: string;
     type: 'string' | 'number' | 'boolean' | 'select' | 'multiline' | 'file';

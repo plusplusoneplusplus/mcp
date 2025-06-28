@@ -14,4 +14,7 @@ export {
     PromptMetadata,
     SearchFilter,
     PromptStoreConfig
-} from '../../promptStore/types'; 
+} from '../../promptStore/types';
+
+// Export TSX prompt components and utilities
+export * from './tsx'; 
