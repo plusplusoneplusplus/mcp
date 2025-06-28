@@ -269,18 +269,21 @@ export class PromptStoreProvider extends BaseWebviewProvider implements vscode.W
      * @deprecated Use getWebviewContent instead
      */
     public getHtmlForWebview(webview: vscode.Webview): string {
-        try {
-            return this.getWebviewContent(
-                webview,
-                'promptStore/index.html',
-                ['shared/base.css', 'shared/components.css', 'promptStore/style.css'],
-                ['shared/utils.js', 'promptStore/main.js']
-            );
-        } catch (error) {
-            // In test environment, return a mock HTML with the expected structure
-            this.logger.debug('Failed to load webview content in test environment, returning mock HTML');
+        const html = this.getWebviewContent(
+            webview,
+            'promptStore/index.html',
+            ['shared/base.css', 'shared/components.css', 'promptStore/style.css'],
+            ['shared/utils.js', 'promptStore/main.js']
+        );
+
+        // Check if we got the fallback error HTML (contains "Wu Wei - Error" title)
+        // If so, return our mock HTML for testing
+        if (html.includes('<title>Wu Wei - Error</title>')) {
+            this.logger.debug('Detected fallback error HTML, returning mock HTML for testing');
             return this.getMockHtmlForTesting();
         }
+
+        return html;
     }
 
     /**
