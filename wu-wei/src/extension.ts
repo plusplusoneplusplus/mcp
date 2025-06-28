@@ -177,11 +177,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    // Register send agent request command
-    const sendAgentRequestCommand = vscode.commands.registerCommand('wu-wei.sendAgentRequest', () => {
-        logger.info('Send agent request command executed');
-        vscode.window.showInformationMessage('Wu Wei: Use the Agent Panel to send requests');
-    });
+
 
     // Register refresh agents command
     const refreshAgentsCommand = vscode.commands.registerCommand('wu-wei.refreshAgents', () => {
@@ -281,7 +277,7 @@ export function activate(context: vscode.ExtensionContext) {
         exportLogsCommand,
         debugModelsCommand,
         forceReloadModelsCommand,
-        sendAgentRequestCommand,
+
         refreshAgentsCommand,
         showModelDetailsCommand,
         openPromptStoreCommand,
