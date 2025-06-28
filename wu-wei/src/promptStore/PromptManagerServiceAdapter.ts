@@ -4,6 +4,7 @@
  */
 
 import * as vscode from 'vscode';
+import { BasePromptElementProps, PromptElement } from '@vscode/prompt-tsx';
 import { PromptManager } from './PromptManager';
 import { Prompt, PromptStoreConfig, SearchFilter } from './types';
 import {
@@ -12,28 +13,22 @@ import {
     PromptParameter,
     ValidationError,
     VariableResolutionOptions,
-    BasePromptElementProps,
     TsxRenderOptions,
     TsxRenderResult,
-    ValidationResult,
-    PromptElement
+    ValidationResult
 } from '../shared/promptManager/types';
 import { VariableResolver } from '../shared/promptManager/utils/variableResolver';
 import { PromptRenderer } from '../shared/promptManager/utils/promptRenderer';
-import TsxRenderer from '../shared/promptManager/utils/tsxRenderer';
-import TokenManager from '../shared/promptManager/utils/tokenManager';
-import TsxValidation from '../shared/promptManager/utils/tsxValidation';
+import { TsxRenderer } from '../shared/promptManager/utils/tsxRenderer';
+import { TsxValidation } from '../shared/promptManager/utils/tsxValidation';
 
 export class PromptManagerServiceAdapter implements PromptService {
     private promptManager: PromptManager;
     private variableResolver: VariableResolver;
     private promptRenderer: PromptRenderer;
-    private sharedEventEmitter: vscode.EventEmitter<any>;
-
-    // TSX-related utilities
     private tsxRenderer: TsxRenderer;
-    private tokenManager: TokenManager;
     private tsxValidation: TsxValidation;
+    private sharedEventEmitter: vscode.EventEmitter<any>;
 
     // Event emitters for PromptService interface
     private _onPromptSelected = new vscode.EventEmitter<PromptUsageContext>();
@@ -48,12 +43,9 @@ export class PromptManagerServiceAdapter implements PromptService {
         this.promptManager = promptManager;
         this.variableResolver = new VariableResolver();
         this.promptRenderer = new PromptRenderer();
+        this.tsxRenderer = new TsxRenderer();
+        this.tsxValidation = new TsxValidation();
         this.sharedEventEmitter = new vscode.EventEmitter<any>();
-
-        // Initialize TSX utilities
-        this.tsxRenderer = TsxRenderer.getInstance();
-        this.tokenManager = TokenManager.getInstance();
-        this.tsxValidation = TsxValidation.getInstance();
 
         // Bridge events from PromptManager
         this.onPromptsChanged = this.promptManager.onPromptsChanged;
@@ -156,38 +148,25 @@ export class PromptManagerServiceAdapter implements PromptService {
         });
     }
 
-    // ===== NEW TSX METHODS =====
+    // ===== New TSX Methods =====
 
     /**
-     * Render a TSX prompt component with token budget management
+     * Render a TSX prompt component
      */
     async renderTsxPrompt<T extends BasePromptElementProps>(
         promptComponent: new (props: T) => PromptElement<T>,
         props: T,
-        options: TsxRenderOptions = {}
+        options?: TsxRenderOptions
     ): Promise<TsxRenderResult> {
         try {
             return await this.tsxRenderer.renderTsxPrompt(promptComponent, props, options);
         } catch (error) {
-            // Fallback to simple text-based rendering
-            const fallbackContent = `TSX rendering failed: ${error instanceof Error ? error.message : String(error)}`;
-            const fallbackMessages = this.tsxRenderer.createFallbackMessages(fallbackContent);
-
-            return {
-                messages: fallbackMessages,
-                tokenCount: this.tokenManager.countTokensInMessages(fallbackMessages),
-                prunedElements: [],
-                renderingMetadata: {
-                    totalElements: 1,
-                    includedElements: 1,
-                    priorityLevels: [50]
-                }
-            };
+            throw new Error(`TSX prompt rendering failed: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
     /**
-     * Render prompt with token budget management
+     * Render a prompt with token budget management
      */
     async renderPromptWithTokenBudget(
         promptId: string,
@@ -195,24 +174,28 @@ export class PromptManagerServiceAdapter implements PromptService {
         tokenBudget: number,
         model?: vscode.LanguageModelChat
     ): Promise<vscode.LanguageModelChatMessage[]> {
-        try {
-            // First render the prompt with variables
-            const renderedContent = await this.renderPromptWithVariables(promptId, variables);
-
-            // Apply token budget constraints
-            const truncatedContent = this.tokenManager.truncateToTokenBudget(renderedContent, tokenBudget);
-
-            // Create VS Code language model messages
-            const messages: vscode.LanguageModelChatMessage[] = [{
-                role: vscode.LanguageModelChatMessageRole.User,
-                content: [{ value: truncatedContent, text: truncatedContent } as vscode.LanguageModelTextPart],
-                name: `prompt-${promptId}`
-            }];
-
-            return messages;
-        } catch (error) {
-            throw new Error(`Token budget rendering failed: ${error instanceof Error ? error.message : String(error)}`);
+        const prompt = await this.getPrompt(promptId);
+        if (!prompt) {
+            throw new Error(`Prompt not found: ${promptId}`);
         }
+
+        // For now, render as string and convert to messages
+        const renderedContent = await this.renderPromptWithVariables(promptId, variables);
+
+        // Create a simple message array
+        const messages: vscode.LanguageModelChatMessage[] = [{
+            role: vscode.LanguageModelChatMessageRole.User,
+            content: [{ value: renderedContent, text: renderedContent } as vscode.LanguageModelTextPart],
+            name: `prompt-${promptId}`
+        }];
+
+        // Check token budget (simplified implementation)
+        const tokenCount = Math.ceil(renderedContent.length / 4); // Rough estimate
+        if (tokenCount > tokenBudget) {
+            throw new Error(`Rendered prompt exceeds token budget: ${tokenCount} > ${tokenBudget}`);
+        }
+
+        return messages;
     }
 
     /**
@@ -223,13 +206,13 @@ export class PromptManagerServiceAdapter implements PromptService {
         props: T
     ): Promise<ValidationResult> {
         try {
-            return await this.tsxValidation.validateComponent(component, props);
+            return await this.tsxRenderer.validateTsxPrompt(component, props);
         } catch (error) {
             return {
                 isValid: false,
                 errors: [{
                     field: 'validation',
-                    message: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
+                    message: `TSX validation failed: ${error instanceof Error ? error.message : String(error)}`,
                     severity: 'error'
                 }],
                 warnings: []
@@ -303,123 +286,48 @@ export class PromptManagerServiceAdapter implements PromptService {
     }
 
     /**
-     * Get prompt variables
+     * Get variables used in a prompt
      */
     async getPromptVariables(promptId: string): Promise<string[]> {
         const prompt = await this.getPrompt(promptId);
         if (!prompt) {
             throw new Error(`Prompt not found: ${promptId}`);
         }
+
         return this.variableResolver.extractVariables(prompt.content);
-    }
-
-    // ===== TSX-Enhanced Methods =====
-
-    /**
-     * Render TSX component with token budget constraints
-     */
-    async renderTsxWithTokenBudget<T extends BasePromptElementProps>(
-        promptComponent: new (props: T) => PromptElement<T>,
-        props: T,
-        tokenBudget: number,
-        model?: vscode.LanguageModelChat
-    ): Promise<vscode.LanguageModelChatMessage[]> {
-        return await this.tsxRenderer.renderWithTokenBudget(promptComponent, props, tokenBudget, model);
-    }
-
-    /**
-     * Get recommended token budgets for prompt composition
-     */
-    getRecommendedTokenBudgets(totalBudget: number): {
-        systemPrompt: number;
-        userQuery: number;
-        conversationHistory: number;
-        contextData: number;
-        reserve: number;
-    } {
-        const budget = this.tokenManager.createTokenBudget(totalBudget);
-        return {
-            systemPrompt: budget.allocation.systemPrompt,
-            userQuery: budget.allocation.userQuery,
-            conversationHistory: budget.allocation.conversationHistory,
-            contextData: budget.allocation.contextData,
-            reserve: Math.floor(totalBudget * 0.05) // 5% reserve
-        };
     }
 
     // ===== Private Helper Methods =====
 
-    /**
-     * Setup event bridge between PromptManager and PromptService
-     */
     private setupEventBridge(): void {
-        // Bridge existing events to new interface
-        this.promptManager.onPromptsChanged(() => {
-            // Events are already bridged through the public property
+        // Bridge events from PromptManager to PromptService interface
+        this.promptManager.onPromptsChanged((prompts) => {
+            // Event is already bridged via public property
         });
     }
 
-    /**
-     * Extract prompt parameters from metadata or auto-detect from content
-     */
     private extractPromptParameters(prompt: Prompt): PromptParameter[] {
-        const parameters: PromptParameter[] = [];
-
-        // Extract from metadata if defined
-        const metadataParams = (prompt.metadata as any).parameters as PromptParameter[] | undefined;
-        if (metadataParams && Array.isArray(metadataParams)) {
-            return metadataParams;
-        }
-
-        // Auto-extract from content
+        // Extract variables from prompt content
         const variables = this.variableResolver.extractVariables(prompt.content);
 
-        for (const variable of variables) {
-            parameters.push({
-                name: variable,
-                type: 'string',
-                required: true,
-                description: `Parameter for ${variable}`,
-                placeholder: `Enter value for ${variable}...`
-            });
-        }
-
-        return parameters;
+        return variables.map(variable => ({
+            name: variable,
+            type: 'string' as const,
+            description: `Variable: ${variable}`,
+            required: true,
+            defaultValue: undefined
+        }));
     }
 
-    /**
-     * Generate usage instructions for prompt parameters
-     */
     private generateUsageInstructions(parameters: PromptParameter[]): string {
         if (parameters.length === 0) {
-            return 'This prompt has no variables and can be used directly.';
+            return 'This prompt has no variables and can be used as-is.';
         }
 
-        const required = parameters.filter(p => p.required);
-        const optional = parameters.filter(p => !p.required);
-
-        let instructions = 'This prompt requires the following variables:\n\n';
-
-        if (required.length > 0) {
-            instructions += 'Required:\n';
-            required.forEach(p => {
-                instructions += `- ${p.name}: ${p.description || 'No description'}\n`;
-            });
-        }
-
-        if (optional.length > 0) {
-            instructions += '\nOptional:\n';
-            optional.forEach(p => {
-                instructions += `- ${p.name}: ${p.description || 'No description'}\n`;
-            });
-        }
-
-        return instructions;
+        const variableList = parameters.map(p => `- ${p.name}: ${p.description || 'No description'}`).join('\n');
+        return `This prompt requires the following variables:\n${variableList}`;
     }
 
-    /**
-     * Get default variable values from parameters
-     */
     private getDefaultVariableValues(parameters: PromptParameter[]): Record<string, any> {
         const defaults: Record<string, any> = {};
 

@@ -1,10 +1,14 @@
 import * as vscode from 'vscode';
+import { BasePromptElementProps, PromptElement } from '@vscode/prompt-tsx';
 
 // Re-export existing types from promptStore for compatibility
 export { Prompt, PromptMetadata, SearchFilter, PromptStoreConfig } from '../../promptStore/types';
 
 // Re-export TSX-related types for convenience
 export * from './tsx/types';
+
+// Re-export TSX types for external use
+export { BasePromptElementProps, PromptElement };
 
 export interface PromptParameter {
     name: string;
@@ -49,13 +53,7 @@ export interface VariableResolutionOptions {
     resolver?: (variable: string) => any;
 }
 
-// TSX-related interfaces for PromptService integration
-export interface BasePromptElementProps {
-    priority?: number;
-    flexGrow?: number;
-    maxTokens?: number;
-}
-
+// New TSX-related interfaces
 export interface TsxRenderOptions {
     modelMaxPromptTokens?: number;
     tokenBudget?: number;
@@ -78,11 +76,6 @@ export interface ValidationResult {
     isValid: boolean;
     errors: ValidationError[];
     warnings: ValidationError[];
-}
-
-// Type for TSX prompt components
-export interface PromptElement<T extends BasePromptElementProps> {
-    render(): any;
 }
 
 export interface PromptService {

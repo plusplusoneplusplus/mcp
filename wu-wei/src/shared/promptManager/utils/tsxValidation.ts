@@ -1,75 +1,73 @@
-import { BasePromptElementProps, ValidationError, ValidationResult, PromptElement } from '../types';
+import { BasePromptElementProps, PromptElement } from '@vscode/prompt-tsx';
+import { ValidationError, ValidationResult } from '../types';
 
 /**
- * TSX Validation Utility - Validates TSX prompt components and their props
+ * TSX component validation utility
  */
 export class TsxValidation {
-    private static instance: TsxValidation | null = null;
-
     /**
-     * Get singleton instance
+     * Validate a TSX component class and props
      */
-    static getInstance(): TsxValidation {
-        if (!this.instance) {
-            this.instance = new TsxValidation();
-        }
-        return this.instance;
-    }
-
-    /**
-     * Validate a TSX prompt component
-     */
-    async validateComponent<T extends BasePromptElementProps>(
-        componentClass: new (props: T) => PromptElement<T>,
-        props: T,
-        requiredProps: (keyof T)[] = []
-    ): Promise<ValidationResult> {
+    validateComponent<T extends BasePromptElementProps>(
+        component: new (props: T) => PromptElement<T>,
+        props: T
+    ): ValidationResult {
         const errors: ValidationError[] = [];
         const warnings: ValidationError[] = [];
 
         try {
-            // Validate required props
-            for (const propName of requiredProps) {
-                if (props[propName] === undefined || props[propName] === null) {
-                    errors.push({
-                        field: String(propName),
-                        message: `Required property '${String(propName)}' is missing`,
-                        severity: 'error'
-                    });
-                }
-            }
-
-            // Validate base prompt element props
-            this.validateBaseProps(props, errors, warnings);
-
-            // Try to instantiate the component
-            const component = new componentClass(props);
-
-            // Validate that render method exists and is callable
-            if (typeof component.render !== 'function') {
+            // Validate component constructor
+            if (typeof component !== 'function') {
                 errors.push({
-                    field: 'render',
-                    message: 'Component must have a render() method',
+                    field: 'component',
+                    message: 'Component must be a constructor function',
                     severity: 'error'
                 });
-            } else {
-                // Try to call render to catch any runtime errors
-                try {
-                    const rendered = component.render();
-                    this.validateRenderedOutput(rendered, errors, warnings);
-                } catch (renderError) {
-                    errors.push({
-                        field: 'render',
-                        message: `Render method failed: ${renderError instanceof Error ? renderError.message : String(renderError)}`,
-                        severity: 'error'
-                    });
-                }
+                return { isValid: false, errors, warnings };
             }
 
-        } catch (instantiationError) {
+            // Validate props
+            if (!props || typeof props !== 'object') {
+                errors.push({
+                    field: 'props',
+                    message: 'Props must be a valid object',
+                    severity: 'error'
+                });
+                return { isValid: false, errors, warnings };
+            }
+
+            // Try to instantiate the component
+            let instance: PromptElement<T>;
+            try {
+                instance = new component(props);
+            } catch (error) {
+                errors.push({
+                    field: 'instantiation',
+                    message: `Failed to create component instance: ${error instanceof Error ? error.message : String(error)}`,
+                    severity: 'error'
+                });
+                return { isValid: false, errors, warnings };
+            }
+
+            // Validate component has render method
+            if (!instance || typeof instance.render !== 'function') {
+                errors.push({
+                    field: 'render',
+                    message: 'Component must have a render method',
+                    severity: 'error'
+                });
+            }
+
+            // Validate common props
+            this.validateCommonProps(props, errors, warnings);
+
+            // Validate specific prop types
+            this.validatePropTypes(props, errors, warnings);
+
+        } catch (error) {
             errors.push({
-                field: 'constructor',
-                message: `Component instantiation failed: ${instantiationError instanceof Error ? instantiationError.message : String(instantiationError)}`,
+                field: 'validation',
+                message: `Validation failed: ${error instanceof Error ? error.message : String(error)}`,
                 severity: 'error'
             });
         }
@@ -82,9 +80,13 @@ export class TsxValidation {
     }
 
     /**
-     * Validate base prompt element properties
+     * Validate common BasePromptElementProps
      */
-    private validateBaseProps(props: BasePromptElementProps, errors: ValidationError[], warnings: ValidationError[]): void {
+    private validateCommonProps(
+        props: BasePromptElementProps,
+        errors: ValidationError[],
+        warnings: ValidationError[]
+    ): void {
         // Validate priority
         if (props.priority !== undefined) {
             if (typeof props.priority !== 'number') {
@@ -94,15 +96,9 @@ export class TsxValidation {
                     severity: 'error'
                 });
             } else if (props.priority < 0 || props.priority > 100) {
-                errors.push({
-                    field: 'priority',
-                    message: 'Priority must be between 0 and 100',
-                    severity: 'error'
-                });
-            } else if (props.priority < 10) {
                 warnings.push({
                     field: 'priority',
-                    message: 'Very low priority may result in content being excluded',
+                    message: 'Priority should be between 0 and 100',
                     severity: 'warning'
                 });
             }
@@ -117,145 +113,152 @@ export class TsxValidation {
                     severity: 'error'
                 });
             } else if (props.flexGrow < 0) {
-                errors.push({
+                warnings.push({
                     field: 'flexGrow',
-                    message: 'flexGrow must be non-negative',
-                    severity: 'error'
-                });
-            }
-        }
-
-        // Validate maxTokens
-        if (props.maxTokens !== undefined) {
-            if (typeof props.maxTokens !== 'number') {
-                errors.push({
-                    field: 'maxTokens',
-                    message: 'maxTokens must be a number',
-                    severity: 'error'
-                });
-            } else if (props.maxTokens <= 0) {
-                errors.push({
-                    field: 'maxTokens',
-                    message: 'maxTokens must be positive',
-                    severity: 'error'
-                });
-            } else if (props.maxTokens > 10000) {
-                warnings.push({
-                    field: 'maxTokens',
-                    message: 'Very high maxTokens may exceed model limits',
+                    message: 'flexGrow should be non-negative',
                     severity: 'warning'
                 });
             }
         }
+
+        // Note: maxTokens validation is handled in specific prop validation
     }
 
     /**
-     * Validate the output of a component's render method
+     * Validate specific prop types based on common patterns
      */
-    private validateRenderedOutput(rendered: any, errors: ValidationError[], warnings: ValidationError[]): void {
-        if (rendered === null || rendered === undefined) {
-            errors.push({
-                field: 'render',
-                message: 'Render method returned null or undefined',
-                severity: 'error'
-            });
-            return;
+    private validatePropTypes(
+        props: any,
+        errors: ValidationError[],
+        warnings: ValidationError[]
+    ): void {
+        // Validate string props that shouldn't be empty
+        const stringProps = ['systemPrompt', 'userInput', 'content'];
+        for (const propName of stringProps) {
+            if (propName in props) {
+                if (typeof props[propName] !== 'string') {
+                    errors.push({
+                        field: propName,
+                        message: `${propName} must be a string`,
+                        severity: 'error'
+                    });
+                } else if (props[propName].trim().length === 0) {
+                    warnings.push({
+                        field: propName,
+                        message: `${propName} should not be empty`,
+                        severity: 'warning'
+                    });
+                }
+            }
         }
 
-        // Check for circular references
-        try {
-            JSON.stringify(rendered);
-        } catch (circularError) {
-            errors.push({
-                field: 'render',
-                message: 'Rendered output contains circular references',
-                severity: 'error'
-            });
+        // Validate array props
+        const arrayProps = ['conversationHistory', 'history'];
+        for (const propName of arrayProps) {
+            if (propName in props && props[propName] !== undefined) {
+                if (!Array.isArray(props[propName])) {
+                    errors.push({
+                        field: propName,
+                        message: `${propName} must be an array`,
+                        severity: 'error'
+                    });
+                }
+            }
         }
 
-        // Validate structure
-        this.validateRenderStructure(rendered, errors, warnings);
+        // Validate boolean props
+        const booleanProps = ['includeTimestamps', 'enforced'];
+        for (const propName of booleanProps) {
+            if (propName in props && props[propName] !== undefined) {
+                if (typeof props[propName] !== 'boolean') {
+                    errors.push({
+                        field: propName,
+                        message: `${propName} must be a boolean`,
+                        severity: 'error'
+                    });
+                }
+            }
+        }
+
+        // Validate number props that should be positive
+        const positiveNumberProps = ['maxMessages', 'maxTokens'];
+        for (const propName of positiveNumberProps) {
+            if (propName in props && props[propName] !== undefined) {
+                if (typeof props[propName] !== 'number') {
+                    errors.push({
+                        field: propName,
+                        message: `${propName} must be a number`,
+                        severity: 'error'
+                    });
+                } else if (props[propName] <= 0) {
+                    errors.push({
+                        field: propName,
+                        message: `${propName} must be positive`,
+                        severity: 'error'
+                    });
+                }
+            }
+        }
     }
 
     /**
-     * Validate the structure of rendered output
+     * Validate a collection of components
      */
-    private validateRenderStructure(rendered: any, errors: ValidationError[], warnings: ValidationError[], depth: number = 0): void {
-        if (depth > 10) {
-            warnings.push({
-                field: 'render',
-                message: 'Render output has very deep nesting',
-                severity: 'warning'
-            });
-            return;
-        }
+    validateComponents<T extends BasePromptElementProps>(
+        components: Array<{ component: new (props: T) => PromptElement<T>; props: T }>
+    ): ValidationResult {
+        const allErrors: ValidationError[] = [];
+        const allWarnings: ValidationError[] = [];
 
-        if (Array.isArray(rendered)) {
-            if (rendered.length === 0) {
-                warnings.push({
-                    field: 'render',
-                    message: 'Render method returned empty array',
-                    severity: 'warning'
-                });
-            }
+        for (let i = 0; i < components.length; i++) {
+            const { component, props } = components[i];
+            const result = this.validateComponent(component, props);
 
-            rendered.forEach((item, index) => {
-                this.validateRenderStructure(item, errors, warnings, depth + 1);
-            });
-        } else if (rendered && typeof rendered === 'object') {
-            // Validate object structure
-            if (rendered.props) {
-                this.validateRenderStructure(rendered.props, errors, warnings, depth + 1);
-            }
-            if (rendered.children) {
-                this.validateRenderStructure(rendered.children, errors, warnings, depth + 1);
-            }
-        }
-    }
+            // Prefix field names with component index
+            const prefixedErrors = result.errors.map(error => ({
+                ...error,
+                field: `component[${i}].${error.field}`
+            }));
 
-    /**
-     * Validate props against a simple schema (simplified implementation)
-     */
-    validatePropsSchema<T>(props: T, requiredProps: string[] = []): ValidationResult {
-        const errors: ValidationError[] = [];
-        const warnings: ValidationError[] = [];
+            const prefixedWarnings = result.warnings.map(warning => ({
+                ...warning,
+                field: `component[${i}].${warning.field}`
+            }));
 
-        // Check required properties
-        for (const propName of requiredProps) {
-            if (!(propName in (props as any)) || (props as any)[propName] === undefined || (props as any)[propName] === null) {
-                errors.push({
-                    field: propName,
-                    message: `Required property '${propName}' is missing`,
-                    severity: 'error'
-                });
-            }
+            allErrors.push(...prefixedErrors);
+            allWarnings.push(...prefixedWarnings);
         }
 
         return {
-            isValid: errors.length === 0,
-            errors,
-            warnings
+            isValid: allErrors.length === 0,
+            errors: allErrors,
+            warnings: allWarnings
         };
     }
 
     /**
-     * Create a validation summary for multiple components
+     * Create a simple validation result for success
      */
-    createValidationSummary(results: ValidationResult[]): {
-        totalComponents: number;
-        validComponents: number;
-        totalErrors: number;
-        totalWarnings: number;
-        isAllValid: boolean;
-    } {
+    createSuccessResult(): ValidationResult {
         return {
-            totalComponents: results.length,
-            validComponents: results.filter(r => r.isValid).length,
-            totalErrors: results.reduce((sum, r) => sum + r.errors.length, 0),
-            totalWarnings: results.reduce((sum, r) => sum + r.warnings.length, 0),
-            isAllValid: results.every(r => r.isValid)
+            isValid: true,
+            errors: [],
+            warnings: []
         };
     }
-}
 
-export default TsxValidation; 
+    /**
+     * Create a validation result with a single error
+     */
+    createErrorResult(field: string, message: string): ValidationResult {
+        return {
+            isValid: false,
+            errors: [{
+                field,
+                message,
+                severity: 'error'
+            }],
+            warnings: []
+        };
+    }
+} 
