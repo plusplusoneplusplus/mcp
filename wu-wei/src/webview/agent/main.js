@@ -136,9 +136,18 @@ function updateUIForPromptMode() {
             variableEditorContainer.style.display = 'none';
             promptPreviewContainer.style.display = 'none';
             break;
+        case 'prompt':
+            promptSelectorContainer.style.display = 'block';
+            // Only show variable editor if prompt has variables
+            const hasVariablesPrompt = selectedPromptContext?.parameters?.length > 0;
+            variableEditorContainer.style.display = selectedPromptContext && hasVariablesPrompt ? 'block' : 'none';
+            promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
+            break;
         case 'combined':
             promptSelectorContainer.style.display = 'block';
-            variableEditorContainer.style.display = selectedPromptContext ? 'block' : 'none';
+            // Only show variable editor if prompt has variables
+            const hasVariables = selectedPromptContext?.parameters?.length > 0;
+            variableEditorContainer.style.display = selectedPromptContext && hasVariables ? 'block' : 'none';
             promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
             break;
     }
@@ -150,6 +159,11 @@ function updateInputLabelsAndPlaceholders() {
             parameterSubtitle.textContent = 'Enter your message or JSON parameters';
             parametersLabel.textContent = 'Message/Parameters';
             paramsInput.placeholder = 'Enter your message or JSON parameters...';
+            break;
+        case 'prompt':
+            parameterSubtitle.textContent = 'Use selected prompt template only';
+            parametersLabel.textContent = 'Additional Parameters (Optional)';
+            paramsInput.placeholder = 'Enter additional JSON parameters if needed...';
             break;
         case 'combined':
             parameterSubtitle.textContent = 'Add custom message to combine with prompt';
