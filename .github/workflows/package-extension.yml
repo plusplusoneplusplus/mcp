@@ -81,9 +81,7 @@ jobs:
 
         This PR was automatically created by the package-extension workflow." \
           --base main \
-          --head "$BRANCH_NAME" \
-          --label "automated" \
-          --label "version-bump")
+          --head "$BRANCH_NAME")
 
         # Enable auto-merge with squash strategy
         gh pr merge "$PR_URL" --auto --squash
