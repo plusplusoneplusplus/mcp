@@ -1,16 +1,48 @@
 import * as vscode from 'vscode';
 import { BasePromptElementProps, PromptElement, renderPrompt } from '@vscode/prompt-tsx';
 import { TsxRenderOptions, TsxRenderResult, ValidationError } from '../types';
-import { TokenManager } from './tokenManager';
 
 /**
  * TSX rendering engine that handles component rendering with token management
  */
 export class TsxRenderer {
-    private tokenManager: TokenManager;
 
     constructor() {
-        this.tokenManager = new TokenManager();
+    }
+
+    /**
+     * Simple token estimation (approximately 4 characters per token)
+     */
+    private estimateTokenCount(text: string): number {
+        if (!text || text.length === 0) {
+            return 0;
+        }
+        return Math.ceil(text.length / 4);
+    }
+
+    /**
+     * Count tokens in chat messages
+     */
+    private countTokensInMessages(messages: vscode.LanguageModelChatMessage[]): number {
+        let totalTokens = 0;
+        for (const message of messages) {
+            totalTokens += 2; // Role overhead
+            if (typeof message.content === 'string') {
+                totalTokens += this.estimateTokenCount(message.content);
+            } else if (Array.isArray(message.content)) {
+                for (const part of message.content) {
+                    if ('text' in part && typeof part.text === 'string') {
+                        totalTokens += this.estimateTokenCount(part.text);
+                    } else if ('value' in part && typeof part.value === 'string') {
+                        totalTokens += this.estimateTokenCount(part.value);
+                    }
+                }
+            }
+            if (message.name) {
+                totalTokens += this.estimateTokenCount(message.name);
+            }
+        }
+        return totalTokens;
     }
 
     /**
@@ -35,7 +67,7 @@ export class TsxRenderer {
             ];
 
             // Count tokens in the result
-            const tokenCount = this.tokenManager.countTokensInMessages(messages);
+            const tokenCount = this.countTokensInMessages(messages);
 
             // Create rendering metadata
             const renderingMetadata = {
