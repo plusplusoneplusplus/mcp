@@ -265,6 +265,32 @@ export class PromptStoreProvider extends BaseWebviewProvider implements vscode.W
     }
 
     /**
+     * Legacy method for backward compatibility with tests
+     * @deprecated Use getWebviewContent instead
+     */
+    private getHtmlForWebview(webview: vscode.Webview): string {
+        return this.getWebviewContent(
+            webview,
+            'promptStore/index.html',
+            ['shared/base.css', 'shared/components.css', 'promptStore/style.css'],
+            ['shared/utils.js', 'promptStore/main.js']
+        );
+    }
+
+    /**
+     * Generate a cryptographically secure random nonce for CSP
+     * Used for test compatibility
+     */
+    private getNonce(): string {
+        let text = '';
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 32; i++) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+    }
+
+    /**
      * Handle messages from the webview with enhanced functionality
      */
     private async handleWebviewMessage(message: EnhancedWebviewMessage): Promise<void> {
@@ -616,8 +642,6 @@ export class PromptStoreProvider extends BaseWebviewProvider implements vscode.W
             });
         }
     }
-
-
 
     /**
      * Send initial data to webview when it's ready

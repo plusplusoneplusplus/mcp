@@ -261,27 +261,44 @@ Content for prompt ${prompt} in category ${category}.`;
             const concurrentDir = path.join(tempDir, 'concurrent');
             await fs.mkdir(concurrentDir);
 
-            // Create multiple prompts concurrently
-            const createPromises = [];
-            for (let i = 0; i < 10; i++) {
-                const promise = promptManager.createPrompt(`Concurrent Prompt ${i}`, 'Concurrent');
-                createPromises.push(promise);
+            // Update prompt manager config to use the concurrent directory
+            const concurrentConfig: Partial<PromptStoreConfig> = {
+                rootDirectory: concurrentDir,
+                watchPaths: [concurrentDir],
+                autoRefresh: false,
+                enableCache: true,
+                excludePatterns: ['**/node_modules/**', '**/.git/**', '**/temp/**'],
+                filePatterns: ['**/*.md']
+            };
+
+            const concurrentPromptManager = new PromptManager(concurrentConfig);
+            await concurrentPromptManager.initialize();
+
+            try {
+                // Create multiple prompts concurrently
+                const createPromises = [];
+                for (let i = 0; i < 10; i++) {
+                    const promise = concurrentPromptManager.createPrompt(`Concurrent Prompt ${i}`, 'Concurrent');
+                    createPromises.push(promise);
+                }
+
+                const createdPrompts = await Promise.all(createPromises);
+
+                // Verify all prompts were created
+                assert.strictEqual(createdPrompts.length, 10);
+
+                // Verify all files exist on disk
+                for (const prompt of createdPrompts) {
+                    const exists = await fs.access(prompt.filePath).then(() => true).catch(() => false);
+                    assert(exists, `File should exist: ${prompt.filePath}`);
+                }
+
+                // Verify all prompts can be loaded
+                const loadedPrompts = await concurrentPromptManager.loadAllPrompts(concurrentDir);
+                assert(loadedPrompts.length >= 10, `Expected at least 10 prompts, got ${loadedPrompts.length}`);
+            } finally {
+                concurrentPromptManager.dispose();
             }
-
-            const createdPrompts = await Promise.all(createPromises);
-
-            // Verify all prompts were created
-            assert.strictEqual(createdPrompts.length, 10);
-
-            // Verify all files exist on disk
-            for (const prompt of createdPrompts) {
-                const exists = await fs.access(prompt.filePath).then(() => true).catch(() => false);
-                assert(exists, `File should exist: ${prompt.filePath}`);
-            }
-
-            // Verify all prompts can be loaded
-            const loadedPrompts = await promptManager.loadAllPrompts(concurrentDir);
-            assert(loadedPrompts.length >= 10);
         });
 
         test('should handle file system edge cases', async () => {
