@@ -3,7 +3,7 @@
  * Testing wu wei principle: gentle parsing that flows with content
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { MetadataParser } from '../../promptStore/MetadataParser';

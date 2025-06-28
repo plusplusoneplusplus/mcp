@@ -3,7 +3,7 @@
  * Testing Step 6: Basic Webview UI implementation
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as vscode from 'vscode';
 import { PromptStoreProvider } from '../../promptStore/PromptStoreProvider';
 import { PromptManager } from '../../promptStore/PromptManager';

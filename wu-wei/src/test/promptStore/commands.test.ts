@@ -3,7 +3,7 @@
  * Testing wu wei principle: simple, intuitive commands that flow naturally
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as vscode from 'vscode';
 import { FileOperationCommands } from '../../promptStore/commands';
 import { FileOperationManager } from '../../promptStore/FileOperationManager';

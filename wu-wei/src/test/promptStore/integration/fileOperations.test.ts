@@ -3,7 +3,7 @@
  * Testing end-to-end file operations with VS Code integration
  */
 
-import * as assert from 'assert';
+import assert from 'assert';
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
