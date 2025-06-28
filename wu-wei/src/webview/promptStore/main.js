@@ -34,6 +34,12 @@
         elements.categoryFilter.addEventListener('change', handleCategoryFilter);
         elements.tagFilter.addEventListener('change', handleTagFilter);
 
+        // Add configure directory button handler
+        const configureButton = document.getElementById('configure-directory-empty');
+        if (configureButton) {
+            configureButton.addEventListener('click', handleConfigureDirectory);
+        }
+
         // Add global click handler to hide context menu
         document.addEventListener('click', hideContextMenu);
 
@@ -402,6 +408,13 @@
         vscode.postMessage({
             type: 'openPrompt',
             path: promptPath
+        });
+    }
+
+    function handleConfigureDirectory() {
+        console.log('📁 Configure directory clicked');
+        vscode.postMessage({
+            type: 'configureDirectory'
         });
     }
 

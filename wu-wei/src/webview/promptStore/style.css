@@ -29,19 +29,7 @@ body {
     height: 100vh;
 }
 
-.store-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--vscode-input-border);
-}
 
-.store-header h2 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 600;
-}
 
 .search-section {
     padding: 8px 12px;
@@ -161,15 +149,7 @@ body {
     }
 }
 
-.store-footer {
-    border-top: 1px solid var(--vscode-input-border);
-    padding: 8px 12px;
-}
 
-.footer-actions {
-    display: flex;
-    gap: 8px;
-}
 
 .action-button,
 .primary-button {

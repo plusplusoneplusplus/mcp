@@ -1,17 +1,18 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Wu Wei Prompt Store</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{BASE_CSS_URI}}">
+    <link rel="stylesheet" href="{{COMPONENTS_CSS_URI}}">
+    <link rel="stylesheet" href="{{PROMPT_STORE_CSS_URI}}">
 </head>
 
 <body>
     <div class="prompt-store-container">
-        <header class="store-header">
-        </header>
 
         <div class="search-section">
             <input type="text" id="search-input" placeholder="🔍 Search prompts..." />
@@ -32,8 +33,11 @@
 
             <div id="empty-state" class="empty-state" style="display: none;">
                 <div class="empty-content">
-                    <h3>No Prompts Found</h3>
-                    <p>No prompts are available in the current directory</p>
+                    <h3>No Prompt Directory Configured</h3>
+                    <p>Configure a directory to start managing your prompts</p>
+                    <button id="configure-directory-empty" class="primary-button">
+                        📁 Select Directory
+                    </button>
                 </div>
             </div>
 
@@ -44,7 +48,8 @@
         </main>
     </div>
 
-    <script src="main.js"></script>
+    <script src="{{UTILS_JS_URI}}"></script>
+    <script src="{{PROMPT_STORE_JS_URI}}"></script>
 </body>
 
 </html>
