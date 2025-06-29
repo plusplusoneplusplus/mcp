@@ -83,5 +83,12 @@ jobs:
           --base main \
           --head "$BRANCH_NAME")
 
+        # Trigger the test workflow manually for this PR to ensure tests run
+        gh workflow run tests.yml --ref "$BRANCH_NAME"
+        echo "Triggered test workflow for branch $BRANCH_NAME"
+
+        # Wait a moment for the workflow to start
+        sleep 10
+
         # Enable auto-merge with squash strategy
         gh pr merge "$PR_URL" --auto --squash

@@ -55,8 +55,15 @@ jobs:
         if: env.NEW_VERSION
         run: |
           # Get the PR number from the previous step
-          PR_NUMBER=$(gh pr list --head "release/${{ env.NEW_VERSION }}" --json number --jq '.[0].number')
+          PR_NUMBER=$(gh pr list --head "release/$NEW_VERSION" --json number --jq '.[0].number')
           if [ -n "$PR_NUMBER" ]; then
+            # Trigger the test workflow manually for this PR
+            gh workflow run tests.yml --ref "release/$NEW_VERSION"
+            echo "Triggered test workflow for branch release/$NEW_VERSION"
+
+            # Wait a moment for the workflow to start
+            sleep 10
+
             gh pr merge $PR_NUMBER --auto --squash
             echo "Auto-merge enabled for PR #$PR_NUMBER"
           fi
