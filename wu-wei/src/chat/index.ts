@@ -19,3 +19,6 @@ export { RequestHandlers } from './RequestHandlers';
 export { WorkspaceAnalyzer } from './WorkspaceAnalyzer';
 export { ConversationOrchestrator } from './ConversationOrchestrator';
 export { PromptTemplateLoader } from './PromptTemplateLoader';
+
+// Enhanced tool calling framework exports
+export * from './enhanced';
