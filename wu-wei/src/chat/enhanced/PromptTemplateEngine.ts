@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { logger } from '../../logger';
 import { PromptTemplate, ToolCallContext, ToolSelectionResult } from './types';
+import { PromptTemplateLoader } from '../PromptTemplateLoader';
 
 /**
  * Generates context-aware prompts for tool usage
@@ -10,6 +11,44 @@ export class PromptTemplateEngine {
 
     constructor() {
         this.initializeDefaultTemplates();
+        this.initializeFileBasedTemplates();
+    }
+
+    /**
+     * Get a template by name, supporting both file-based and in-memory templates
+     */
+    getTemplate(templateName: string, variables?: Record<string, string>): string {
+        try {
+            // First try to load from PromptTemplateLoader for file-based templates
+            if (templateName === 'workspace-analysis-template.md' && variables) {
+                return PromptTemplateLoader.getWorkspaceAnalysisTemplate({
+                    projectStructure: variables.projectStructure || '',
+                    totalFiles: variables.totalFiles || '0',
+                    languagesDetected: variables.languagesDetected || '',
+                    currentContext: variables.currentContext || '',
+                    availableTools: variables.availableTools || ''
+                });
+            }
+
+            if (templateName === 'code-analysis-template.md' && variables) {
+                return PromptTemplateLoader.getCodeAnalysisTemplate({
+                    analysisContext: variables.analysisContext || '',
+                    requestPrompt: variables.requestPrompt || ''
+                });
+            }
+
+            // Try in-memory templates
+            const template = this.templates.get(templateName);
+            if (template) {
+                return variables ? this.interpolateTemplate(template.template, variables) : template.template;
+            }
+
+            // If template not found, return error message
+            return `Template ${templateName} not found`;
+        } catch (error) {
+            logger.error('PromptTemplateEngine: Failed to get template', { templateName, error });
+            return `Template ${templateName} not found`;
+        }
     }
 
     /**
@@ -262,7 +301,7 @@ Context: ${this.summarizeContext(context)}`;
      */
     private interpolateTemplate(template: string, variables: Record<string, any>): string {
         let result = template;
-        
+
         for (const [key, value] of Object.entries(variables)) {
             const placeholder = `{{${key}}}`;
             result = result.replace(new RegExp(placeholder, 'g'), String(value));
@@ -276,15 +315,15 @@ Context: ${this.summarizeContext(context)}`;
      */
     private summarizeContext(context: ToolCallContext): string {
         const parts = [];
-        
+
         if (context.userIntent) {
             parts.push(`Intent: ${context.userIntent}`);
         }
-        
+
         if (context.roundNumber > 1) {
             parts.push(`Round: ${context.roundNumber}`);
         }
-        
+
         if (Object.keys(context.previousResults).length > 0) {
             parts.push(`Previous results: ${Object.keys(context.previousResults).length}`);
         }
@@ -298,7 +337,7 @@ Context: ${this.summarizeContext(context)}`;
     private extractUserIntent(userPrompt: string): string {
         // Simple intent extraction - could be enhanced with NLP
         const prompt = userPrompt.toLowerCase();
-        
+
         if (prompt.includes('analyze') || prompt.includes('analysis')) {
             return 'analysis';
         } else if (prompt.includes('debug') || prompt.includes('error')) {
@@ -310,7 +349,7 @@ Context: ${this.summarizeContext(context)}`;
         } else if (prompt.includes('search') || prompt.includes('find')) {
             return 'search';
         }
-        
+
         return 'general';
     }
 
@@ -330,7 +369,7 @@ Context: ${this.summarizeContext(context)}`;
         };
 
         const keywords = intentKeywords[intent] || [];
-        
+
         return availableTools.filter(tool => {
             const toolText = `${tool.name} ${tool.description}`.toLowerCase();
             return keywords.some(keyword => toolText.includes(keyword));
@@ -360,7 +399,7 @@ Context: ${this.summarizeContext(context)}`;
         if (relevantTools.length === 0) {
             return `No specific tools found for ${intent} tasks.`;
         }
-        
+
         const toolNames = relevantTools.map(t => t.name).join(', ');
         return `Selected ${relevantTools.length} tools for ${intent}: ${toolNames}`;
     }
@@ -375,7 +414,7 @@ Context: ${this.summarizeContext(context)}`;
         if (resultCount === 0) {
             return 'No previous results.';
         }
-        
+
         return `${resultCount} previous tool results available.`;
     }
 
@@ -502,6 +541,28 @@ This will help you provide accurate, up-to-date information rather than relying 
         // Register templates
         for (const template of defaultTemplates) {
             this.templates.set(template.id, template);
+        }
+    }
+
+    /**
+     * Initialize file-based templates integration
+     */
+    private initializeFileBasedTemplates(): void {
+        // Register commonly used file-based templates
+        const fileBasedTemplates = [
+            'workspace-analysis-template.md',
+            'code-analysis-template.md',
+            'debug-assistant-template.md',
+            'error-template.md'
+        ];
+
+        for (const templateName of fileBasedTemplates) {
+            this.templates.set(templateName, {
+                id: templateName,
+                name: templateName,
+                template: '', // Will be loaded dynamically via PromptTemplateLoader
+                variables: []
+            });
         }
     }
 }
