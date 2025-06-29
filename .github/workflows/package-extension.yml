@@ -69,7 +69,7 @@ jobs:
         git commit -m "chore: bump version to v$NEW_VERSION"
 
         # Push the branch
-        git push origin "$BRANCH_NAME"
+        git push -f origin "$BRANCH_NAME"
 
         # Create pull request using GitHub CLI
         PR_URL=$(gh pr create \
