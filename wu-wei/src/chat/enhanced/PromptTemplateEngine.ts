@@ -62,7 +62,7 @@ Remember: Your goal is to provide the most helpful and accurate response possibl
             return this.generateGenericToolPrompt(toolName, userIntent, context);
         }
 
-        return this.interpolateTemplate(template, {
+        return this.interpolateTemplate(template.template, {
             userIntent,
             toolName,
             contextInfo: this.summarizeContext(context)
@@ -110,7 +110,7 @@ Remember: Your goal is to provide the most helpful and accurate response possibl
             return this.generateGenericMultiRoundPrompt(roundNumber, resultsSummary, context);
         }
 
-        return this.interpolateTemplate(template, {
+        return this.interpolateTemplate(template.template, {
             roundNumber: roundNumber.toString(),
             resultsSummary,
             userIntent: context.userIntent,
@@ -119,40 +119,351 @@ Remember: Your goal is to provide the most helpful and accurate response possibl
     }
 
     /**
-     * Generate error recovery prompts
+     * Generate error recovery prompt for failed tool execution
      */
     generateErrorRecoveryPrompt(
-        failedToolName: string,
-        error: string,
+        error: any,
+        classification: any,
+        context: ToolCallContext,
+        recoverySuggestions: string[]
+    ): string {
+        try {
+            const template = this.templates.get('error-recovery');
+            if (!template) {
+                return this.generateBasicErrorRecoveryPrompt(error, recoverySuggestions);
+            }
+
+            // Build template variables
+            const variables = {
+                TOOL_NAME: error.toolName,
+                ERROR_MESSAGE: error.error,
+                ERROR_TYPE: classification.type,
+                ERROR_SEVERITY: classification.severity,
+                RECOVERABLE: classification.recoverable ? 'Yes' : 'No',
+                RECOVERY_CONFIDENCE: Math.round(classification.confidence * 100),
+                ERROR_DESCRIPTION: recoverySuggestions[0] || 'Tool execution failed',
+                RECOVERY_STRATEGY_DESCRIPTION: this.getRecoveryStrategyDescription(classification.suggestedStrategy),
+                ALTERNATIVE_TOOLS: context.availableTools
+                    .filter(tool => tool.name !== error.toolName)
+                    .slice(0, 3), // Show top 3 alternatives
+                RECOVERY_INSTRUCTIONS: this.getRecoveryInstructions(classification.suggestedStrategy)
+            };
+
+            return this.interpolateTemplate(template.template, variables);
+
+        } catch (templateError) {
+            logger.warn('PromptTemplateEngine: Failed to generate error recovery prompt', { templateError });
+            return this.generateBasicErrorRecoveryPrompt(error, recoverySuggestions);
+        }
+    }
+
+    /**
+     * Generate brief error recovery message for user display
+     */
+    generateBriefErrorRecoveryMessage(
+        error: any,
+        recoveryResult: any
+    ): string {
+        try {
+            const template = this.templates.get('error-recovery-brief');
+            if (!template) {
+                return `⚠️ ${error.toolName} encountered an issue - continuing with alternative approach.`;
+            }
+
+            const variables = {
+                TOOL_NAME: error.toolName,
+                ERROR_TYPE: error.errorType || 'unknown',
+                RECOVERY_SUCCESS: recoveryResult.success,
+                RECOVERY_ACTION_DESCRIPTION: recoveryResult.action?.description || 'Alternative approach selected',
+                ALTERNATIVE_APPROACH: recoveryResult.alternativeApproach || 'Continuing without this tool',
+                USER_ACTION_REQUIRED: recoveryResult.action?.strategy === 'user_intervention',
+                USER_ACTION_MESSAGE: recoveryResult.userMessage || ''
+            };
+
+            return this.interpolateTemplate(template.template, variables);
+
+        } catch (templateError) {
+            logger.warn('PromptTemplateEngine: Failed to generate brief error recovery message', { templateError });
+            return `⚠️ ${error.toolName} encountered an issue - continuing with alternative approach.`;
+        }
+    }
+
+    /**
+     * Generate troubleshooting guide for users
+     */
+    generateTroubleshootingGuide(): string {
+        try {
+            const template = this.templates.get('error-troubleshooting-guide');
+            return template ? template.template : this.getBasicTroubleshootingGuide();
+        } catch (error) {
+            logger.warn('PromptTemplateEngine: Failed to generate troubleshooting guide', { error });
+            return this.getBasicTroubleshootingGuide();
+        }
+    }
+
+    /**
+     * Generate tool guidance based on available tools and context
+     */
+    private generateToolGuidance(
+        availableTools: vscode.LanguageModelToolInformation[],
         context: ToolCallContext
     ): string {
-        const template = this.templates.get('error-recovery');
-
-        if (!template) {
-            return `The tool "${failedToolName}" encountered an error: ${error}. Please try an alternative approach or explain what information you need to help the user.`;
+        if (availableTools.length === 0) {
+            return "No tools are currently available.";
         }
 
-        return this.interpolateTemplate(template, {
-            failedToolName,
-            error,
-            userIntent: context.userIntent,
-            alternativeTools: this.suggestAlternativeTools(failedToolName, context).join(', ')
+        const toolList = availableTools
+            .map(tool => `- **${tool.name}**: ${tool.description}`)
+            .join('\n');
+
+        return `Available tools:\n${toolList}`;
+    }
+
+    /**
+     * Generate contextual guidance based on the current context
+     */
+    private generateContextualGuidance(context: ToolCallContext): string {
+        let guidance = '';
+
+        if (context.roundNumber > 1) {
+            guidance += `This is round ${context.roundNumber} of our conversation. `;
+        }
+
+        if (Object.keys(context.previousResults).length > 0) {
+            guidance += `You have ${Object.keys(context.previousResults).length} previous tool results to consider. `;
+        }
+
+        return guidance;
+    }
+
+    /**
+     * Get tool-specific template
+     */
+    private getToolSpecificTemplate(toolName: string): PromptTemplate | null {
+        const template = this.templates.get(`tool-${toolName}`);
+        return template || null;
+    }
+
+    /**
+     * Generate generic tool prompt
+     */
+    private generateGenericToolPrompt(
+        toolName: string,
+        userIntent: string,
+        context: ToolCallContext
+    ): string {
+        return `Using tool "${toolName}" for: ${userIntent}
+        
+Context: ${this.summarizeContext(context)}`;
+    }
+
+    /**
+     * Interpolate template with variables
+     */
+    private interpolateTemplate(template: string, variables: Record<string, any>): string {
+        let result = template;
+        
+        for (const [key, value] of Object.entries(variables)) {
+            const placeholder = `{{${key}}}`;
+            result = result.replace(new RegExp(placeholder, 'g'), String(value));
+        }
+
+        return result;
+    }
+
+    /**
+     * Summarize context for template usage
+     */
+    private summarizeContext(context: ToolCallContext): string {
+        const parts = [];
+        
+        if (context.userIntent) {
+            parts.push(`Intent: ${context.userIntent}`);
+        }
+        
+        if (context.roundNumber > 1) {
+            parts.push(`Round: ${context.roundNumber}`);
+        }
+        
+        if (Object.keys(context.previousResults).length > 0) {
+            parts.push(`Previous results: ${Object.keys(context.previousResults).length}`);
+        }
+
+        return parts.join(', ');
+    }
+
+    /**
+     * Extract user intent from prompt
+     */
+    private extractUserIntent(userPrompt: string): string {
+        // Simple intent extraction - could be enhanced with NLP
+        const prompt = userPrompt.toLowerCase();
+        
+        if (prompt.includes('analyze') || prompt.includes('analysis')) {
+            return 'analysis';
+        } else if (prompt.includes('debug') || prompt.includes('error')) {
+            return 'debugging';
+        } else if (prompt.includes('refactor')) {
+            return 'refactoring';
+        } else if (prompt.includes('test')) {
+            return 'testing';
+        } else if (prompt.includes('search') || prompt.includes('find')) {
+            return 'search';
+        }
+        
+        return 'general';
+    }
+
+    /**
+     * Match tools to user intent
+     */
+    private matchToolsToIntent(
+        intent: string,
+        availableTools: vscode.LanguageModelToolInformation[]
+    ): vscode.LanguageModelToolInformation[] {
+        const intentKeywords: Record<string, string[]> = {
+            analysis: ['analyze', 'inspect', 'review', 'examine'],
+            debugging: ['debug', 'error', 'troubleshoot', 'diagnose'],
+            refactoring: ['refactor', 'restructure', 'reorganize'],
+            testing: ['test', 'verify', 'validate', 'check'],
+            search: ['search', 'find', 'locate', 'grep']
+        };
+
+        const keywords = intentKeywords[intent] || [];
+        
+        return availableTools.filter(tool => {
+            const toolText = `${tool.name} ${tool.description}`.toLowerCase();
+            return keywords.some(keyword => toolText.includes(keyword));
         });
     }
 
     /**
-     * Add or update a custom template
+     * Calculate confidence score for tool selection
+     */
+    private calculateConfidence(
+        intent: string,
+        relevantTools: vscode.LanguageModelToolInformation[]
+    ): number {
+        if (relevantTools.length === 0) return 0;
+        if (relevantTools.length >= 3) return 0.9;
+        if (relevantTools.length >= 2) return 0.7;
+        return 0.5;
+    }
+
+    /**
+     * Generate reasoning for tool selection
+     */
+    private generateSelectionReasoning(
+        intent: string,
+        relevantTools: vscode.LanguageModelToolInformation[]
+    ): string {
+        if (relevantTools.length === 0) {
+            return `No specific tools found for ${intent} tasks.`;
+        }
+        
+        const toolNames = relevantTools.map(t => t.name).join(', ');
+        return `Selected ${relevantTools.length} tools for ${intent}: ${toolNames}`;
+    }
+
+    /**
+     * Summarize previous results
+     */
+    private summarizePreviousResults(
+        previousResults: Record<string, vscode.LanguageModelToolResult>
+    ): string {
+        const resultCount = Object.keys(previousResults).length;
+        if (resultCount === 0) {
+            return 'No previous results.';
+        }
+        
+        return `${resultCount} previous tool results available.`;
+    }
+
+    /**
+     * Generate generic multi-round prompt
+     */
+    private generateGenericMultiRoundPrompt(
+        roundNumber: number,
+        resultsSummary: string,
+        context: ToolCallContext
+    ): string {
+        return `This is round ${roundNumber} of our conversation.
+        
+${resultsSummary}
+
+Continue building on the previous results to provide a comprehensive response.`;
+    }
+
+    /**
+     * Generate basic error recovery prompt
+     */
+    private generateBasicErrorRecoveryPrompt(
+        error: any,
+        recoverySuggestions: string[]
+    ): string {
+        return `⚠️ Tool Error: ${error.toolName} failed with: ${error.error}
+
+Recovery suggestions:
+${recoverySuggestions.map(s => `• ${s}`).join('\n')}
+
+I'll continue with an alternative approach.`;
+    }
+
+    /**
+     * Get recovery strategy description
+     */
+    private getRecoveryStrategyDescription(strategy: string): string {
+        const descriptions: Record<string, string> = {
+            retry: 'Retry the operation after a brief delay',
+            fallback_tool: 'Use an alternative tool with similar capabilities',
+            parameter_correction: 'Correct the parameters and retry',
+            graceful_degradation: 'Continue without this specific tool',
+            user_intervention: 'Requires user action to resolve',
+            abort: 'Cannot recover from this error'
+        };
+
+        return descriptions[strategy] || 'Unknown recovery strategy';
+    }
+
+    /**
+     * Get recovery instructions
+     */
+    private getRecoveryInstructions(strategy: string): string {
+        const instructions: Record<string, string> = {
+            retry: 'I will automatically retry this operation.',
+            fallback_tool: 'I will try using a similar tool instead.',
+            parameter_correction: 'I will adjust the parameters and try again.',
+            graceful_degradation: 'I will continue and provide the best response possible without this tool.',
+            user_intervention: 'Please check the tool configuration and try again.',
+            abort: 'This operation cannot be completed due to the error.'
+        };
+
+        return instructions[strategy] || 'No specific instructions available.';
+    }
+
+    /**
+     * Get basic troubleshooting guide
+     */
+    private getBasicTroubleshootingGuide(): string {
+        return `## Common Tool Issues
+
+**Permission Errors**: Check VS Code workspace trust and file permissions
+**Tool Not Found**: Install required extensions and restart VS Code
+**Timeout Issues**: Try smaller operations or check network connectivity
+**Parameter Errors**: Verify parameter names, types, and formats
+
+The Wu Wei assistant adapts to work around tool limitations while still helping you achieve your goals.`;
+    }
+
+    /**
+     * Add a custom template
      */
     addTemplate(template: PromptTemplate): void {
         this.templates.set(template.id, template);
-        logger.debug(`PromptTemplateEngine: Added template ${template.id}`, {
-            templateName: template.name,
-            toolSpecific: template.toolSpecific
-        });
     }
 
     /**
-     * Get all available templates
+     * Get available templates
      */
     getAvailableTemplates(): PromptTemplate[] {
         return Array.from(this.templates.values());
@@ -185,327 +496,12 @@ Guidelines:
 
 This will help you provide accurate, up-to-date information rather than relying on potentially outdated training data.`,
                 variables: ['userIntent', 'suggestedTools']
-            },
-            {
-                id: 'multi-round-context',
-                name: 'Multi-round Context',
-                template: `This is round {{roundNumber}} of tool execution.
-
-Previous results summary:
-{{resultsSummary}}
-
-Continue working on: {{userIntent}}
-
-{{contextInfo}}`,
-                variables: ['roundNumber', 'resultsSummary', 'userIntent', 'contextInfo']
-            },
-            {
-                id: 'error-recovery',
-                name: 'Error Recovery',
-                template: `The tool "{{failedToolName}}" failed with error: {{error}}
-
-For the user's request about "{{userIntent}}", consider these alternatives:
-{{alternativeTools}}
-
-Please try a different approach or explain what information you need.`,
-                variables: ['failedToolName', 'error', 'userIntent', 'alternativeTools']
             }
         ];
 
+        // Register templates
         for (const template of defaultTemplates) {
             this.templates.set(template.id, template);
         }
-
-        logger.debug(`PromptTemplateEngine: Initialized ${defaultTemplates.length} default templates`);
     }
-
-    /**
-     * Generate tool guidance based on available tools and context
-     */
-    private generateToolGuidance(
-        availableTools: vscode.LanguageModelToolInformation[],
-        context: ToolCallContext
-    ): string {
-        if (availableTools.length === 0) {
-            return 'Currently no tools are available.';
-        }
-
-        const toolCategories = this.categorizeTools(availableTools);
-        const relevantTools = this.identifyRelevantTools(context.userIntent, availableTools);
-
-        let guidance = `Here are your available tools:\n`;
-
-        // Add categorized tool information
-        for (const [category, tools] of Object.entries(toolCategories)) {
-            if (tools.length > 0) {
-                guidance += `\n**${category}**: ${tools.map(t => t.name).join(', ')}`;
-            }
-        }
-
-        // Add specific recommendations
-        if (relevantTools.length > 0) {
-            guidance += `\n\n**Recommended for this request**: ${relevantTools.map(t => t.name).join(', ')}`;
-        }
-
-        return guidance;
-    }
-
-    /**
-     * Generate contextual guidance based on the current context
-     */
-    private generateContextualGuidance(context: ToolCallContext): string {
-        let guidance = '';
-
-        if (context.roundNumber > 1) {
-            guidance += `\n## Context: This is round ${context.roundNumber} of our conversation.`;
-
-            if (Object.keys(context.previousResults).length > 0) {
-                guidance += ` You have previous tool results to build upon.`;
-            }
-        }
-
-        if (context.userIntent) {
-            guidance += `\n## User's Goal: ${context.userIntent}`;
-        }
-
-        return guidance;
-    }
-
-    /**
-     * Get tool-specific template if available
-     */
-    private getToolSpecificTemplate(toolName: string): PromptTemplate | undefined {
-        return Array.from(this.templates.values()).find(
-            t => t.toolSpecific && t.targetTool === toolName
-        );
-    }
-
-    /**
-     * Generate generic tool prompt
-     */
-    private generateGenericToolPrompt(
-        toolName: string,
-        userIntent: string,
-        context: ToolCallContext
-    ): string {
-        return `Use the "${toolName}" tool to help with: ${userIntent}
-
-Context: ${this.summarizeContext(context)}
-
-Please use this tool effectively and explain the results clearly.`;
-    }
-
-    /**
-     * Interpolate template variables
-     */
-    private interpolateTemplate(template: PromptTemplate, variables: Record<string, string>): string {
-        let result = template.template;
-
-        for (const [key, value] of Object.entries(variables)) {
-            const placeholder = `{{${key}}}`;
-            result = result.replace(new RegExp(placeholder, 'g'), value || '');
-        }
-
-        return result;
-    }
-
-    /**
-     * Summarize context for prompt inclusion
-     */
-    private summarizeContext(context: ToolCallContext): string {
-        const parts: string[] = [];
-
-        if (context.availableTools.length > 0) {
-            parts.push(`${context.availableTools.length} tools available`);
-        }
-
-        if (context.conversationHistory.length > 0) {
-            parts.push(`${context.conversationHistory.length} previous messages`);
-        }
-
-        if (Object.keys(context.previousResults).length > 0) {
-            parts.push(`${Object.keys(context.previousResults).length} previous tool results`);
-        }
-
-        return parts.length > 0 ? parts.join(', ') : 'No additional context';
-    }
-
-    /**
-     * Extract user intent from prompt
-     */
-    private extractUserIntent(userPrompt: string): string {
-        // Simplified intent extraction - in a production system, this could use NLP
-        const prompt = userPrompt.toLowerCase();
-
-        if (prompt.includes('analyze') || prompt.includes('review')) {
-            return 'analysis';
-        }
-        if (prompt.includes('find') || prompt.includes('search')) {
-            return 'search';
-        }
-        if (prompt.includes('create') || prompt.includes('generate')) {
-            return 'creation';
-        }
-        if (prompt.includes('fix') || prompt.includes('debug')) {
-            return 'debugging';
-        }
-        if (prompt.includes('explain') || prompt.includes('understand')) {
-            return 'explanation';
-        }
-
-        return 'general';
-    }
-
-    /**
-     * Match tools to user intent
-     */
-    private matchToolsToIntent(
-        intent: string,
-        availableTools: vscode.LanguageModelToolInformation[]
-    ): vscode.LanguageModelToolInformation[] {
-        // Simplified tool matching - in production, this could be more sophisticated
-        const intentKeywords: Record<string, string[]> = {
-            'analysis': ['analyze', 'review', 'inspect', 'examine'],
-            'search': ['find', 'search', 'locate', 'query'],
-            'creation': ['create', 'generate', 'build', 'make'],
-            'debugging': ['debug', 'fix', 'diagnose', 'troubleshoot'],
-            'explanation': ['explain', 'describe', 'detail', 'clarify']
-        };
-
-        const keywords = intentKeywords[intent] || [];
-
-        return availableTools.filter(tool => {
-            const toolDesc = (tool.description || '').toLowerCase();
-            const toolName = tool.name.toLowerCase();
-
-            return keywords.some(keyword =>
-                toolDesc.includes(keyword) || toolName.includes(keyword)
-            );
-        });
-    }
-
-    /**
-     * Calculate confidence score for tool selection
-     */
-    private calculateConfidence(
-        intent: string,
-        relevantTools: vscode.LanguageModelToolInformation[]
-    ): number {
-        if (relevantTools.length === 0) return 0;
-        if (intent === 'general') return 0.3;
-
-        // Higher confidence for specific intents with matching tools
-        return Math.min(0.9, 0.5 + (relevantTools.length * 0.1));
-    }
-
-    /**
-     * Generate reasoning for tool selection
-     */
-    private generateSelectionReasoning(
-        intent: string,
-        relevantTools: vscode.LanguageModelToolInformation[]
-    ): string {
-        if (relevantTools.length === 0) {
-            return `No tools specifically match the intent "${intent}"`;
-        }
-
-        return `Selected ${relevantTools.length} tools that match the intent "${intent}": ${relevantTools.map(t => t.name).join(', ')}`;
-    }
-
-    /**
-     * Categorize tools by type/purpose
-     */
-    private categorizeTools(
-        tools: vscode.LanguageModelToolInformation[]
-    ): Record<string, vscode.LanguageModelToolInformation[]> {
-        const categories: Record<string, vscode.LanguageModelToolInformation[]> = {
-            'File Operations': [],
-            'Code Analysis': [],
-            'Search & Query': [],
-            'Development': [],
-            'Other': []
-        };
-
-        for (const tool of tools) {
-            const name = tool.name.toLowerCase();
-            const desc = (tool.description || '').toLowerCase();
-
-            if (name.includes('file') || desc.includes('file')) {
-                categories['File Operations'].push(tool);
-            } else if (name.includes('code') || desc.includes('analyze')) {
-                categories['Code Analysis'].push(tool);
-            } else if (name.includes('search') || name.includes('find')) {
-                categories['Search & Query'].push(tool);
-            } else if (name.includes('git') || name.includes('debug')) {
-                categories['Development'].push(tool);
-            } else {
-                categories['Other'].push(tool);
-            }
-        }
-
-        return categories;
-    }
-
-    /**
-     * Identify relevant tools for user intent
-     */
-    private identifyRelevantTools(
-        userIntent: string,
-        availableTools: vscode.LanguageModelToolInformation[]
-    ): vscode.LanguageModelToolInformation[] {
-        const intent = this.extractUserIntent(userIntent);
-        return this.matchToolsToIntent(intent, availableTools);
-    }
-
-    /**
-     * Summarize previous tool results
-     */
-    private summarizePreviousResults(results: Record<string, vscode.LanguageModelToolResult>): string {
-        if (Object.keys(results).length === 0) {
-            return 'No previous results';
-        }
-
-        const summaries: string[] = [];
-        for (const [callId, result] of Object.entries(results)) {
-            try {
-                const summary = String(result).substring(0, 100);
-                summaries.push(`${callId}: ${summary}${String(result).length > 100 ? '...' : ''}`);
-            } catch (error) {
-                summaries.push(`${callId}: [Result processing failed]`);
-            }
-        }
-
-        return summaries.join('\n');
-    }
-
-    /**
-     * Generate generic multi-round prompt
-     */
-    private generateGenericMultiRoundPrompt(
-        roundNumber: number,
-        resultsSummary: string,
-        context: ToolCallContext
-    ): string {
-        return `This is round ${roundNumber} of tool execution.
-
-Previous results:
-${resultsSummary}
-
-Continue working on: ${context.userIntent}
-
-Use the available tools to build upon the previous results and provide a comprehensive response.`;
-    }
-
-    /**
-     * Suggest alternative tools when one fails
-     */
-    private suggestAlternativeTools(failedToolName: string, context: ToolCallContext): string[] {
-        // Simple alternative suggestion based on tool categories
-        const alternatives = context.availableTools
-            .filter(tool => tool.name !== failedToolName)
-            .slice(0, 3) // Limit to 3 alternatives
-            .map(tool => tool.name);
-
-        return alternatives;
-    }
-} 
+}

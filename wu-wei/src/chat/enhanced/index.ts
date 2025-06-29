@@ -15,6 +15,7 @@ export { EnhancedToolParticipant } from './EnhancedToolParticipant';
 export { ToolCallOrchestrator } from './ToolCallOrchestrator';
 export { ToolResultManager } from './ToolResultManager';
 export { PromptTemplateEngine } from './PromptTemplateEngine';
+export { ErrorRecoveryEngine } from './ErrorRecoveryEngine';
 
 // Types and interfaces
 export * from './types';
@@ -22,4 +23,4 @@ export * from './types';
 // Re-export for convenience
 export {
     DEFAULT_TOOL_PARTICIPANT_CONFIG
-} from './types'; 
+} from './types';

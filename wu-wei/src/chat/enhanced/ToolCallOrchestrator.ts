@@ -10,6 +10,7 @@ import {
 } from './types';
 import { ToolResultManager } from './ToolResultManager';
 import { PromptTemplateEngine } from './PromptTemplateEngine';
+import { ErrorRecoveryEngine } from './ErrorRecoveryEngine';
 
 /**
  * Orchestrates complex tool calling workflows
@@ -18,6 +19,7 @@ export class ToolCallOrchestrator {
     private config: ToolParticipantConfig;
     private toolResultManager: ToolResultManager;
     private promptTemplateEngine: PromptTemplateEngine;
+    private errorRecoveryEngine: ErrorRecoveryEngine;
 
     constructor(
         config: Partial<ToolParticipantConfig> = {},
@@ -27,6 +29,7 @@ export class ToolCallOrchestrator {
         this.config = { ...DEFAULT_TOOL_PARTICIPANT_CONFIG, ...config };
         this.toolResultManager = toolResultManager || new ToolResultManager(this.config.enableCaching);
         this.promptTemplateEngine = promptTemplateEngine || new PromptTemplateEngine();
+        this.errorRecoveryEngine = new ErrorRecoveryEngine(this.config);
     }
 
     /**
@@ -73,11 +76,26 @@ export class ToolCallOrchestrator {
                 if (roundResult.toolCalls.length > 0) {
                     toolCallRounds.push(roundResult);
 
-                    // Process tool calls
+                    // Build context for error recovery
+                    const toolCallContext = {
+                        userIntent,
+                        availableTools: (options.tools || []).map(tool => ({
+                            name: tool.name,
+                            description: tool.description,
+                            inputSchema: tool.inputSchema || {},
+                            tags: []
+                        })),
+                        conversationHistory: messages,
+                        previousResults: toolCallResults,
+                        roundNumber: currentRound
+                    };
+
+                    // Process tool calls with enhanced error recovery
                     const roundResults = await this.processToolCalls(
                         roundResult.toolCalls,
                         stream,
-                        errors
+                        errors,
+                        toolCallContext
                     );
 
                     // Merge results
@@ -91,7 +109,8 @@ export class ToolCallOrchestrator {
                         currentRound,
                         toolCallResults,
                         errors,
-                        roundResult.response
+                        roundResult.response,
+                        toolCallContext
                     );
                 } else {
                     // No tools called, workflow complete
@@ -255,19 +274,20 @@ export class ToolCallOrchestrator {
     }
 
     /**
-     * Process tool calls with caching and error handling
+     * Process tool calls with caching and enhanced error handling
      */
     private async processToolCalls(
         toolCalls: vscode.LanguageModelToolCallPart[],
         stream: vscode.ChatResponseStream,
-        errors: ToolError[]
+        errors: ToolError[],
+        context?: any
     ): Promise<Record<string, vscode.LanguageModelToolResult>> {
         const results: Record<string, vscode.LanguageModelToolResult> = {};
 
         if (this.config.enableParallelExecution && toolCalls.length > 1) {
             // Execute tools in parallel
             const promises = toolCalls.map(toolCall =>
-                this.executeToolCallWithRetry(toolCall, errors)
+                this.executeToolCallWithRetry(toolCall, errors, context)
             );
 
             const parallelResults = await Promise.allSettled(promises);
@@ -281,19 +301,34 @@ export class ToolCallOrchestrator {
                     this.showToolResult(stream, toolCall.name, result.value);
                 } else {
                     logger.warn(`ToolCallOrchestrator: Parallel tool execution failed for ${toolCall.name}`);
+                    
+                    // Show user-friendly error message with recovery suggestions
+                    if (this.config.enableAdvancedErrorRecovery && context) {
+                        this.showErrorRecoveryMessage(stream, toolCall.name, errors, context);
+                    }
                 }
             }
         } else {
             // Execute tools sequentially
             for (const toolCall of toolCalls) {
                 try {
-                    const result = await this.executeToolCallWithRetry(toolCall, errors);
+                    const result = await this.executeToolCallWithRetry(toolCall, errors, context);
                     if (result) {
                         results[toolCall.callId] = result;
                         this.showToolResult(stream, toolCall.name, result);
+                    } else {
+                        // Show user-friendly error message with recovery suggestions
+                        if (this.config.enableAdvancedErrorRecovery && context) {
+                            this.showErrorRecoveryMessage(stream, toolCall.name, errors, context);
+                        }
                     }
                 } catch (error) {
                     logger.warn(`ToolCallOrchestrator: Sequential tool execution failed for ${toolCall.name}`, { error });
+                    
+                    // Show user-friendly error message
+                    if (this.config.enableAdvancedErrorRecovery && context) {
+                        this.showErrorRecoveryMessage(stream, toolCall.name, errors, context);
+                    }
                 }
             }
         }
@@ -302,11 +337,12 @@ export class ToolCallOrchestrator {
     }
 
     /**
-     * Execute a single tool call with retry logic and caching
+     * Execute a single tool call with enhanced retry logic, caching, and error recovery
      */
     private async executeToolCallWithRetry(
         toolCall: vscode.LanguageModelToolCallPart,
-        errors: ToolError[]
+        errors: ToolError[],
+        context?: any
     ): Promise<vscode.LanguageModelToolResult | null> {
         // Check cache first
         const cachedResult = this.toolResultManager.getCachedResult(toolCall.name, toolCall.input);
@@ -316,6 +352,7 @@ export class ToolCallOrchestrator {
         }
 
         let lastError: Error | null = null;
+        let recoveryAttempts = 0;
 
         for (let attempt = 0; attempt < this.config.errorRetryAttempts; attempt++) {
             try {
@@ -342,23 +379,58 @@ export class ToolCallOrchestrator {
                     maxAttempts: this.config.errorRetryAttempts
                 });
 
-                // Wait before retry (exponential backoff)
+                // Create tool error for advanced recovery analysis
+                const toolError: ToolError = {
+                    toolName: toolCall.name,
+                    callId: toolCall.callId,
+                    error: lastError.message,
+                    timestamp: Date.now(),
+                    retryCount: attempt + 1
+                };
+
+                // Try advanced error recovery if enabled
+                if (this.config.enableAdvancedErrorRecovery && context && recoveryAttempts < this.config.maxRecoveryAttempts) {
+                    const recoveryResult = await this.attemptErrorRecovery(toolError, context);
+                    
+                    if (recoveryResult.success && recoveryResult.shouldContinue) {
+                        recoveryAttempts++;
+                        
+                        // If recovery suggests parameter correction, modify the tool call
+                        if (recoveryResult.action.strategy === 'parameter_correction') {
+                            // Note: In a real implementation, you might modify toolCall.input here
+                            logger.info(`ToolCallOrchestrator: Attempting parameter correction for ${toolCall.name}`);
+                        }
+                        
+                        // Continue with retry after recovery
+                        continue;
+                    } else if (!recoveryResult.shouldContinue) {
+                        // Recovery suggests stopping
+                        toolError.errorType = recoveryResult.action.strategy;
+                        toolError.recoveryAttempts = recoveryAttempts;
+                        errors.push(toolError);
+                        return null;
+                    }
+                }
+
+                // Standard exponential backoff before retry
                 if (attempt < this.config.errorRetryAttempts - 1) {
                     await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
                 }
             }
         }
 
-        // All attempts failed, record error
-        const errorDetails: ToolError = {
+        // All attempts failed, record enhanced error details
+        const finalError: ToolError = {
             toolName: toolCall.name,
             callId: toolCall.callId,
             error: lastError?.message || 'Unknown error',
             timestamp: Date.now(),
-            retryCount: this.config.errorRetryAttempts
+            retryCount: this.config.errorRetryAttempts,
+            recoveryAttempts,
+            severity: recoveryAttempts > 0 ? 'high' : 'medium'
         };
-        errors.push(errorDetails);
 
+        errors.push(finalError);
         return null;
     }
 
@@ -400,13 +472,14 @@ export class ToolCallOrchestrator {
     }
 
     /**
-     * Determine if workflow should continue
+     * Determine if workflow should continue using enhanced error analysis
      */
     private shouldContinueExecution(
         currentRound: number,
         toolCallResults: Record<string, vscode.LanguageModelToolResult>,
         errors: ToolError[],
-        lastResponse: string
+        lastResponse: string,
+        context?: any
     ): boolean {
         // Don't continue if we've reached max rounds
         if (currentRound >= this.config.maxToolRounds) {
@@ -414,15 +487,45 @@ export class ToolCallOrchestrator {
             return false;
         }
 
-        // Don't continue if too many errors
-        if (errors.length > currentRound * 2) {
-            logger.warn('ToolCallOrchestrator: Too many errors, stopping workflow');
-            return false;
+        // Enhanced error analysis with recovery engine
+        if (this.config.enableAdvancedErrorRecovery && errors.length > 0 && context) {
+            const recentErrors = errors.filter(e => Date.now() - e.timestamp < 60000); // Last minute
+            
+            for (const error of recentErrors) {
+                const toolCallContext = {
+                    userIntent: context.userIntent || '',
+                    availableTools: context.availableTools || [],
+                    conversationHistory: context.conversationHistory || [],
+                    previousResults: toolCallResults,
+                    roundNumber: currentRound
+                };
+
+                const shouldContinue = this.errorRecoveryEngine.shouldContinueWorkflow(
+                    error,
+                    toolCallContext,
+                    errors.length
+                );
+
+                if (!shouldContinue) {
+                    logger.warn('ToolCallOrchestrator: Error recovery engine suggests stopping workflow', {
+                        toolName: error.toolName,
+                        errorType: error.errorType,
+                        totalErrors: errors.length
+                    });
+                    return false;
+                }
+            }
+        } else {
+            // Fallback to basic error checking
+            if (errors.length > currentRound * 2) {
+                logger.warn('ToolCallOrchestrator: Too many errors, stopping workflow');
+                return false;
+            }
         }
 
         // Continue if the response suggests more tool usage is needed
         const responseText = lastResponse.toLowerCase();
-        const continueIndicators = ['let me', 'i need to', 'i should', 'next i will'];
+        const continueIndicators = ['let me', 'i need to', 'i should', 'next i will', 'i\'ll try'];
 
         return continueIndicators.some(indicator => responseText.includes(indicator));
     }
@@ -491,4 +594,174 @@ export class ToolCallOrchestrator {
             stream.markdown(`📄 **${toolName} completed**\n\n`);
         }
     }
-} 
+
+    /**
+     * Show user-friendly error recovery message
+     */
+    private showErrorRecoveryMessage(
+        stream: vscode.ChatResponseStream,
+        toolName: string,
+        errors: ToolError[],
+        context: any
+    ): void {
+        const recentError = errors.find(e => e.toolName === toolName);
+        
+        if (!recentError) {
+            stream.markdown(`⚠️ **${toolName} encountered an issue** - Continuing with alternative approach.\n\n`);
+            return;
+        }
+
+        try {
+            // Build tool call context
+            const toolCallContext = {
+                userIntent: context.userIntent || '',
+                availableTools: context.availableTools || [],
+                conversationHistory: context.conversationHistory || [],
+                previousResults: context.previousResults || {},
+                roundNumber: context.roundNumber || 1
+            };
+
+            // Get error classification and recovery suggestions
+            const classification = this.errorRecoveryEngine.classifyError(recentError, toolCallContext);
+            const suggestions = this.errorRecoveryEngine.getRecoverySuggestions(classification, recentError, toolCallContext);
+
+            // Show contextual error message
+            stream.markdown(`⚠️ **${toolName} Error Recovery**\n\n`);
+            
+            if (classification.recoverable) {
+                stream.markdown(`The ${toolName} tool encountered an issue, but I can continue with an alternative approach.\n\n`);
+                
+                if (this.config.fallbackToolSuggestions && suggestions.length > 0) {
+                    stream.markdown(`**What happened:** ${suggestions[0]}\n\n`);
+                    if (suggestions.length > 1) {
+                        stream.markdown(`**Alternative approach:** ${suggestions[1]}\n\n`);
+                    }
+                }
+            } else {
+                stream.markdown(`The ${toolName} tool is currently unavailable.\n\n`);
+                suggestions.forEach(suggestion => {
+                    stream.markdown(`• ${suggestion}\n`);
+                });
+                stream.markdown('\n');
+            }
+
+        } catch (error) {
+            // Fallback to simple error message
+            stream.markdown(`⚠️ **${toolName} is currently unavailable** - Continuing with alternative approach.\n\n`);
+        }
+    }
+
+    /**
+     * Attempt advanced error recovery for a failed tool call
+     */
+    private async attemptErrorRecovery(
+        error: ToolError,
+        context: any
+    ): Promise<any> {
+        try {
+            // Build tool call context for error recovery
+            const toolCallContext = {
+                userIntent: context.userIntent || '',
+                availableTools: context.availableTools || [],
+                conversationHistory: context.conversationHistory || [],
+                previousResults: context.previousResults || {},
+                roundNumber: context.roundNumber || 1
+            };
+
+            // Classify the error
+            const classification = this.errorRecoveryEngine.classifyError(error, toolCallContext);
+            
+            logger.info('ToolCallOrchestrator: Error classified for recovery', {
+                toolName: error.toolName,
+                errorType: classification.type,
+                severity: classification.severity,
+                recoverable: classification.recoverable,
+                strategy: classification.suggestedStrategy
+            });
+
+            // Generate recovery action
+            const recoveryAction = this.errorRecoveryEngine.generateRecoveryAction(
+                classification,
+                error,
+                toolCallContext
+            );
+
+            // Execute recovery
+            const recoveryResult = await this.errorRecoveryEngine.executeRecovery(
+                recoveryAction,
+                error,
+                toolCallContext
+            );
+
+            return recoveryResult;
+
+        } catch (recoveryError) {
+            logger.error('ToolCallOrchestrator: Error recovery attempt failed', {
+                originalError: error.error,
+                recoveryError: recoveryError instanceof Error ? recoveryError.message : 'Unknown error'
+            });
+
+            // Return a failed recovery result
+            return {
+                success: false,
+                shouldContinue: false,
+                action: { strategy: 'abort', description: 'Recovery failed' }
+            };
+        }
+    }
+
+    /**
+     * Get error recovery statistics
+     */
+    getErrorRecoveryStatistics(): any {
+        return this.errorRecoveryEngine.getRecoveryStatistics();
+    }
+
+    /**
+     * Clear error recovery history (useful for testing)
+     */
+    clearErrorRecoveryHistory(): void {
+        this.errorRecoveryEngine.clearRecoveryHistory();
+    }
+
+    /**
+     * Generate enhanced error summary for debugging
+     */
+    generateErrorSummary(errors: ToolError[]): string {
+        if (errors.length === 0) {
+            return 'No errors encountered during workflow execution.';
+        }
+
+        const errorsByTool: Record<string, ToolError[]> = {};
+        const errorsByType: Record<string, number> = {};
+
+        for (const error of errors) {
+            // Group by tool
+            if (!errorsByTool[error.toolName]) {
+                errorsByTool[error.toolName] = [];
+            }
+            errorsByTool[error.toolName].push(error);
+
+            // Count by type
+            const errorType = error.errorType || 'unknown';
+            errorsByType[errorType] = (errorsByType[errorType] || 0) + 1;
+        }
+
+        let summary = `**Error Summary** (${errors.length} total errors)\n\n`;
+
+        // Tools with errors
+        summary += '**Tools with Issues:**\n';
+        for (const [toolName, toolErrors] of Object.entries(errorsByTool)) {
+            const avgRetries = toolErrors.reduce((sum, e) => sum + e.retryCount, 0) / toolErrors.length;
+            summary += `• ${toolName}: ${toolErrors.length} errors (avg ${avgRetries.toFixed(1)} retries)\n`;
+        }
+
+        // Error types
+        summary += '\n**Error Types:**\n';
+        for (const [errorType, count] of Object.entries(errorsByType)) {
+            summary += `• ${errorType}: ${count}\n`;
+        }
+
+        return summary;
+    }
+}

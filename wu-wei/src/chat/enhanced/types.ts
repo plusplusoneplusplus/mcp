@@ -32,6 +32,11 @@ export interface ToolError {
     error: string;
     timestamp: number;
     retryCount: number;
+    // Enhanced error recovery fields
+    errorType?: string;
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    recoveryAttempts?: number;
+    lastRecoveryStrategy?: string;
 }
 
 export interface ToolParticipantConfig {
@@ -41,6 +46,11 @@ export interface ToolParticipantConfig {
     enableParallelExecution: boolean; // Default: true
     errorRetryAttempts: number; // Default: 3
     debugMode: boolean; // Default: false
+    // Enhanced error recovery configuration
+    enableAdvancedErrorRecovery: boolean; // Default: true
+    maxRecoveryAttempts: number; // Default: 2
+    errorRecoveryTimeout: number; // Default: 10000ms
+    fallbackToolSuggestions: boolean; // Default: true
 }
 
 export interface ToolCallContext {
@@ -92,5 +102,10 @@ export const DEFAULT_TOOL_PARTICIPANT_CONFIG: ToolParticipantConfig = {
     enableCaching: true,
     enableParallelExecution: true,
     errorRetryAttempts: 3,
-    debugMode: false
-}; 
+    debugMode: false,
+    // Enhanced error recovery defaults
+    enableAdvancedErrorRecovery: true,
+    maxRecoveryAttempts: 2,
+    errorRecoveryTimeout: 10000,
+    fallbackToolSuggestions: true
+};
