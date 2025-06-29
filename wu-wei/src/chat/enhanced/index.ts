@@ -16,6 +16,7 @@ export { ToolCallOrchestrator } from './ToolCallOrchestrator';
 export { ToolResultManager } from './ToolResultManager';
 export { PromptTemplateEngine } from './PromptTemplateEngine';
 export { ErrorRecoveryEngine } from './ErrorRecoveryEngine';
+export { ToolDiscoveryEngine } from './ToolDiscoveryEngine';
 
 // Types and interfaces
 export * from './types';

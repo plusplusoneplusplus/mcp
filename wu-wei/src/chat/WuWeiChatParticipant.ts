@@ -8,6 +8,7 @@ import { RequestHandlers } from './RequestHandlers';
 import { WorkspaceAnalyzer } from './WorkspaceAnalyzer';
 import { ConversationOrchestrator } from './ConversationOrchestrator';
 import { WuWeiToolMetadata } from './types';
+import { EnhancedToolParticipant, DEFAULT_TOOL_PARTICIPANT_CONFIG } from './enhanced';
 
 // Re-export types for backward compatibility
 export { WuWeiToolMetadata, ToolCallsMetadata, ToolCallRound, isWuWeiToolMetadata } from './types';
@@ -33,6 +34,8 @@ export class WuWeiChatParticipant {
     private requestHandlers: RequestHandlers;
     private workspaceAnalyzer: WorkspaceAnalyzer;
     private conversationOrchestrator: ConversationOrchestrator;
+    private enhancedToolParticipant?: EnhancedToolParticipant;
+    private useEnhancedMode: boolean;
 
     constructor(context: vscode.ExtensionContext) {
         // Initialize modular components
@@ -43,6 +46,20 @@ export class WuWeiChatParticipant {
         this.requestHandlers = new RequestHandlers(this.toolManager, this.workspaceAnalyzer);
         this.conversationOrchestrator = new ConversationOrchestrator(this.toolManager, this.messageBuilder);
 
+        // Initialize enhanced tool participant
+        const config = vscode.workspace.getConfiguration('wu-wei');
+        this.useEnhancedMode = config.get<boolean>('enhancedToolCalling', true);
+
+        if (this.useEnhancedMode) {
+            this.enhancedToolParticipant = new EnhancedToolParticipant({
+                ...DEFAULT_TOOL_PARTICIPANT_CONFIG,
+                debugMode: config.get<boolean>('debugMode', false),
+                maxToolRounds: config.get<number>('maxToolRounds', 5),
+                enableCaching: config.get<boolean>('enableToolCaching', true),
+                enableParallelExecution: config.get<boolean>('enableParallelToolExecution', true)
+            });
+        }
+
         // Register the chat participant
         this.participant = vscode.chat.createChatParticipant(
             'wu-wei.assistant',
@@ -52,7 +69,7 @@ export class WuWeiChatParticipant {
         // Set participant properties
         this.participant.iconPath = new vscode.ThemeIcon('code');
 
-        logger.info('Wu Wei Coding Assistant initialized in AGENT MODE with modular architecture - ready to autonomously assist with development tasks 🤖');
+        logger.info(`Wu Wei Coding Assistant initialized in ${this.useEnhancedMode ? 'ENHANCED' : 'STANDARD'} MODE with modular architecture - ready to autonomously assist with development tasks 🤖`);
 
         // Log available tools on initialization
         this.toolManager.logAvailableTools();
@@ -115,8 +132,25 @@ export class WuWeiChatParticipant {
             logger.info(`Wu Wei Coding Assistant: Tool setup for request`, {
                 toolsAvailable: tools.length,
                 toolNames: tools.map(t => t.name).slice(0, 10),
-                hasTools: tools.length > 0
+                hasTools: tools.length > 0,
+                enhancedMode: this.useEnhancedMode
             });
+
+            // Use enhanced tool participant if enabled and tools are available
+            if (this.useEnhancedMode && this.enhancedToolParticipant && tools.length > 0) {
+                logger.info('Wu Wei Coding Assistant: Using enhanced tool calling mode');
+                return await this.enhancedToolParticipant.handleChatRequest(
+                    request,
+                    context,
+                    stream,
+                    token,
+                    model,
+                    tools
+                );
+            }
+
+            // Fall back to standard mode
+            logger.info('Wu Wei Coding Assistant: Using standard tool calling mode');
 
             // Set up options for the language model
             const options: vscode.LanguageModelChatRequestOptions = {
@@ -165,5 +199,68 @@ export class WuWeiChatParticipant {
     public dispose(): void {
         this.participant?.dispose();
         logger.info('Wu Wei Coding Assistant disposed 🔧');
+    }
+
+    /**
+     * Toggle enhanced tool calling mode
+     */
+    public toggleEnhancedMode(enabled: boolean): void {
+        const wasEnabled = this.useEnhancedMode;
+        this.useEnhancedMode = enabled;
+
+        if (enabled && !this.enhancedToolParticipant) {
+            // Initialize enhanced participant if not already done
+            const config = vscode.workspace.getConfiguration('wu-wei');
+            this.enhancedToolParticipant = new EnhancedToolParticipant({
+                ...DEFAULT_TOOL_PARTICIPANT_CONFIG,
+                debugMode: config.get<boolean>('debugMode', false),
+                maxToolRounds: config.get<number>('maxToolRounds', 5),
+                enableCaching: config.get<boolean>('enableToolCaching', true),
+                enableParallelExecution: config.get<boolean>('enableParallelToolExecution', true)
+            });
+        }
+
+        logger.info(`Wu Wei Coding Assistant: Enhanced mode ${enabled ? 'enabled' : 'disabled'}`, {
+            previousState: wasEnabled,
+            newState: enabled
+        });
+    }
+
+    /**
+     * Get enhanced tool participant statistics
+     */
+    public getEnhancedModeStats(): any {
+        if (this.useEnhancedMode && this.enhancedToolParticipant) {
+            return {
+                enabled: this.useEnhancedMode,
+                cacheStats: this.enhancedToolParticipant.getCacheStatistics(),
+                config: this.enhancedToolParticipant.getConfig()
+            };
+        }
+        return {
+            enabled: false,
+            cacheStats: null,
+            config: null
+        };
+    }
+
+    /**
+     * Clear enhanced mode cache
+     */
+    public clearEnhancedCache(): void {
+        if (this.enhancedToolParticipant) {
+            this.enhancedToolParticipant.clearCache();
+            logger.info('Wu Wei Coding Assistant: Enhanced mode cache cleared');
+        }
+    }
+
+    /**
+     * Update enhanced mode configuration
+     */
+    public updateEnhancedConfig(config: any): void {
+        if (this.enhancedToolParticipant) {
+            this.enhancedToolParticipant.updateConfig(config);
+            logger.info('Wu Wei Coding Assistant: Enhanced mode configuration updated', { config });
+        }
     }
 }
