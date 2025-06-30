@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-cs"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP configuration based server"
 authors = [
     {name = "Yiheng Tao", email = "example@example.com"}
