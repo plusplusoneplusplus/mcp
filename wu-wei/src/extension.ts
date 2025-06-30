@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { DebugPanelProvider } from './providers/debugPanelProvider';
-import { AgentPanelProvider } from './providers/agentPanelProvider';
+import { AgentPanelProvider } from './agentManager';
 import { UnifiedChatProvider } from './providers/unifiedChatProvider';
 import { WuWeiChatParticipant } from './chat/WuWeiChatParticipant';
 import { PromptStoreProvider } from './promptStore/PromptStoreProvider';

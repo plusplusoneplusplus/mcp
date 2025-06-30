@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { BaseWebviewProvider, WebviewResourceConfig } from './BaseWebviewProvider';
+import { BaseWebviewProvider, WebviewResourceConfig } from '../providers/BaseWebviewProvider';
 import { logger } from '../logger';
 import {
     AbstractAgent,
@@ -9,13 +9,13 @@ import {
     WuWeiExampleAgent,
     GitHubCopilotAgent,
     AgentMessage
-} from '../interfaces/agentInterface';
+} from './agentInterface';
 import { PromptService, PromptUsageContext } from '../shared/promptManager/types';
 import { PromptServiceFactory } from '../shared/promptManager/PromptServiceFactory';
 import { ExecutionTracker, CompletionRecord } from '../tools/ExecutionTracker';
 import { CopilotCompletionSignalTool } from '../tools/CopilotCompletionSignalTool';
-import { ExecutionRegistry, ActiveExecution } from '../execution/ExecutionRegistry';
-import { PromptEnhancer, ExecutionContext } from '../execution/PromptEnhancer';
+import { ExecutionRegistry, ActiveExecution } from './ExecutionRegistry';
+import { PromptEnhancer, ExecutionContext } from './PromptEnhancer';
 
 /**
  * Configuration interface for agent prompt handling

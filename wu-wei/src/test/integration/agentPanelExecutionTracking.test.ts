@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { AgentPanelProvider } from '../../providers/agentPanelProvider';
+import { AgentPanelProvider } from '../../agentManager';
 import { CopilotCompletionSignalTool } from '../../tools/CopilotCompletionSignalTool';
 import { ExecutionTracker } from '../../tools/ExecutionTracker';
 
