@@ -49,7 +49,17 @@ export class CompletionHistoryCommands {
             const history = this.executionTracker.getCompletionHistory(50); // Get last 50 records
             const stats = this.executionTracker.getCompletionStats();
 
+            logger.info('Completion history retrieved', {
+                historyCount: history.length,
+                statsTotal: stats.total
+            });
+
             if (history.length === 0) {
+                // Show more detailed debug info when no history is found
+                logger.warn('No completion history found', {
+                    executionTracker: !!this.executionTracker,
+                    stats: stats
+                });
                 vscode.window.showInformationMessage('Wu Wei: No completion history found');
                 return;
             }

@@ -43,6 +43,14 @@ export class ExecutionTracker {
         // Persist to storage
         if (this.context) {
             await this.saveHistory();
+            logger.debug('Completion recorded and saved to storage', {
+                executionId: completionRecord.executionId,
+                totalRecords: this.completionHistory.length
+            });
+        } else {
+            logger.warn('No context available, completion not persisted', {
+                executionId: completionRecord.executionId
+            });
         }
 
         logger.info('Recorded completion', {
@@ -54,6 +62,12 @@ export class ExecutionTracker {
     }
 
     getCompletionHistory(limit?: number): CompletionRecord[] {
+        logger.debug('Getting completion history', {
+            totalRecords: this.completionHistory.length,
+            limit: limit,
+            hasContext: !!this.context
+        });
+
         const history = [...this.completionHistory].reverse(); // Most recent first
         return limit ? history.slice(0, limit) : history;
     }
@@ -109,7 +123,7 @@ export class ExecutionTracker {
                 timestamp: new Date(record.timestamp), // Ensure timestamp is Date object
             }));
 
-            logger.debug(`Loaded ${this.completionHistory.length} completion records`);
+            logger.debug(`Loaded ${this.completionHistory.length} completion records from storage`);
         } catch (error) {
             logger.error('Failed to load completion history', { error });
             this.completionHistory = [];

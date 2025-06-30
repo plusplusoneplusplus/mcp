@@ -18,8 +18,8 @@ export class CopilotCompletionSignalTool implements vscode.LanguageModelTool<ICo
     private static readonly TOOL_NAME = 'wu-wei_copilot_completion_signal';
     private executionTracker: ExecutionTracker;
 
-    constructor() {
-        this.executionTracker = new ExecutionTracker();
+    constructor(executionTracker: ExecutionTracker) {
+        this.executionTracker = executionTracker;
     }
 
     async prepareInvocation(
@@ -175,11 +175,6 @@ export class CopilotCompletionSignalTool implements vscode.LanguageModelTool<ICo
 
     // Static event for external listeners
     static onCompletion: vscode.Event<CompletionRecord> | undefined;
-
-    // Method to set context for dependency injection
-    setContext(context: vscode.ExtensionContext): void {
-        this.executionTracker.setContext(context);
-    }
 
     dispose(): void {
         this.executionTracker.dispose();

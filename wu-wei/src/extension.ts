@@ -38,8 +38,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize execution tracker and completion signal tool
     const executionTracker = new ExecutionTracker(context);
-    const completionSignalTool = new CopilotCompletionSignalTool();
-    completionSignalTool.setContext(context);
+    const completionSignalTool = new CopilotCompletionSignalTool(executionTracker);
 
     // Initialize completion history commands
     const completionHistoryCommands = new CompletionHistoryCommands(executionTracker);
