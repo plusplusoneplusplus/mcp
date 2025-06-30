@@ -8,7 +8,8 @@
         "src/test/unit/**/*",
         "src/test/runUnitTests.ts",
         "src/shared/**/*",
-        "src/promptStore/**/*"
+        "src/promptStore/**/*",
+        "src/tools/**/*"
     ],
     "exclude": [
         "src/test/integration/**/*",

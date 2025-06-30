@@ -10,6 +10,9 @@ import { SessionStateManager } from './promptStore/SessionStateManager';
 import { FileOperationManager } from './promptStore/FileOperationManager';
 import { TemplateManager } from './promptStore/TemplateManager';
 import { FileOperationCommands } from './promptStore/commands';
+import { CopilotCompletionSignalTool } from './tools/CopilotCompletionSignalTool';
+import { ExecutionTracker } from './tools/ExecutionTracker';
+import { CompletionHistoryCommands } from './tools/CompletionHistoryCommands';
 import { logger } from './logger';
 
 /**
@@ -32,6 +35,20 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize Wu Wei Chat Participant (MVP)
     const chatParticipant = new WuWeiChatParticipant(context);
+
+    // Initialize execution tracker and completion signal tool
+    const executionTracker = new ExecutionTracker(context);
+    const completionSignalTool = new CopilotCompletionSignalTool();
+    completionSignalTool.setContext(context);
+
+    // Initialize completion history commands
+    const completionHistoryCommands = new CompletionHistoryCommands(executionTracker);
+
+    // Register completion signal tool
+    const toolRegistration = vscode.lm.registerTool('wu-wei_copilot_completion_signal', completionSignalTool);
+    context.subscriptions.push(toolRegistration);
+
+    logger.info('Copilot Completion Signal Tool registered successfully');
 
     // Initialize prompt store with configuration management
     const configManager = new ConfigurationManager(context);
@@ -262,6 +279,19 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Register completion history commands
+    const completionHistoryCommandDisposables = completionHistoryCommands.registerCommands(context);
+
+    // Listen for completion events
+    if (CopilotCompletionSignalTool.onCompletion) {
+        CopilotCompletionSignalTool.onCompletion(record => {
+            logger.info('Copilot execution completed', {
+                executionId: record.executionId,
+                status: record.status
+            });
+        });
+    }
+
     context.subscriptions.push(
         chatViewProvider,
         debugViewProvider,
@@ -284,6 +314,10 @@ export function activate(context: vscode.ExtensionContext) {
         promptStoreRefreshCommand,
         debugPromptStoreCommand,
         refreshPromptsCommand,
+        ...completionHistoryCommandDisposables,
+        executionTracker,
+        completionSignalTool,
+        completionHistoryCommands,
         promptManager,
         configManager,
         sessionStateManager,
