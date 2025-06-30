@@ -17,6 +17,9 @@ export interface ICopilotCompletionParameters {
 export class CopilotCompletionSignalTool implements vscode.LanguageModelTool<ICopilotCompletionParameters> {
     private static readonly TOOL_NAME = 'wu-wei_copilot_completion_signal';
     private executionTracker: ExecutionTracker;
+    // Phase 2: Static event emitter for completion signals
+    private static _completionEventEmitter: vscode.EventEmitter<CompletionRecord> = new vscode.EventEmitter<CompletionRecord>();
+    public static readonly onCompletion: vscode.Event<CompletionRecord> = CopilotCompletionSignalTool._completionEventEmitter.event;
 
     constructor(executionTracker: ExecutionTracker) {
         this.executionTracker = executionTracker;
@@ -165,16 +168,15 @@ export class CopilotCompletionSignalTool implements vscode.LanguageModelTool<ICo
     }
 
     private async emitCompletionEvent(record: CompletionRecord): Promise<void> {
-        // Emit custom event for other systems to listen to
-        if (CopilotCompletionSignalTool.onCompletion) {
-            const event = new vscode.EventEmitter<CompletionRecord>();
-            CopilotCompletionSignalTool.onCompletion = event.event;
-            event.fire(record);
-        }
+        // Phase 2: Emit custom event for AgentPanelProvider and other systems to listen to
+        CopilotCompletionSignalTool._completionEventEmitter.fire(record);
+        logger.debug('Completion event emitted', { executionId: record.executionId });
     }
 
-    // Static event for external listeners
-    static onCompletion: vscode.Event<CompletionRecord> | undefined;
+    // Phase 2: Static method to dispose event emitter
+    public static dispose(): void {
+        CopilotCompletionSignalTool._completionEventEmitter.dispose();
+    }
 
     dispose(): void {
         this.executionTracker.dispose();

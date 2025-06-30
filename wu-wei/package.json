@@ -423,6 +423,21 @@
                     "default": true,
                     "description": "Show notifications when Copilot execution completes"
                 },
+                "wu-wei.showExecutionCompletionNotifications": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show notifications when agent execution completes in the Agent Panel"
+                },
+                "wu-wei.execution.trackingEnabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable execution tracking for agent panel operations"
+                },
+                "wu-wei.execution.showProgressIndicators": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show progress indicators during agent execution"
+                },
                 "wu-wei.completionHistory.maxRecords": {
                     "type": "number",
                     "default": 1000,

@@ -12,6 +12,22 @@ import {
 } from '../interfaces/agentInterface';
 import { PromptService, PromptUsageContext } from '../shared/promptManager/types';
 import { PromptServiceFactory } from '../shared/promptManager/PromptServiceFactory';
+import { ExecutionTracker, CompletionRecord } from '../tools/ExecutionTracker';
+import { CopilotCompletionSignalTool } from '../tools/CopilotCompletionSignalTool';
+
+/**
+ * Interface for tracking pending agent executions
+ */
+interface PendingExecution {
+    executionId: string;
+    agentName: string;
+    method: string;
+    taskDescription: string;
+    startTime: Date;
+    status: 'pending' | 'executing' | 'completed' | 'failed';
+    params: any;
+    promptContext?: any;
+}
 
 /**
  * Configuration interface for agent prompt handling
@@ -22,9 +38,19 @@ interface AgentPromptConfig {
 }
 
 /**
- * Wu Wei Agent Panel Provider (Enhanced with Prompt Integration)
+ * Wu Wei Agent Panel Provider (Enhanced with Prompt Integration and Execution Tracking)
  * Provides a panel for triggering agents with messages using separated HTML, CSS, and JavaScript files
- * Phase 4: Added prompt selection and integration capabilities
+ * 
+ * Features:
+ * - Phase 1: Basic agent execution and communication
+ * - Phase 2: Execution tracking and completion signal integration
+ * - Phase 4: Prompt selection and integration capabilities
+ * 
+ * Phase 2 adds complete execution lifecycle management:
+ * - Real-time execution status tracking
+ * - Completion signal integration with CopilotCompletionSignalTool
+ * - Execution history and analytics
+ * - UI status updates and progress indicators
  */
 export class AgentPanelProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
     private _agentRegistry: AgentRegistry;
@@ -36,9 +62,23 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         historyMessageCount: 4
     };
 
+    // Phase 2: Execution tracking and completion signal integration
+    // These components provide complete execution lifecycle management:
+    // - _executionTracker: Persistent storage and history of all executions
+    // - _pendingExecutions: Real-time tracking of currently running executions
+    // - _completionEventEmitter: Event system for completion signal distribution
+    private _executionTracker: ExecutionTracker;
+    private _pendingExecutions: Map<string, PendingExecution> = new Map();
+    private _completionEventEmitter: vscode.EventEmitter<CompletionRecord> = new vscode.EventEmitter<CompletionRecord>();
+    public readonly onCompletionSignal: vscode.Event<CompletionRecord> = this._completionEventEmitter.event;
+
     constructor(context: vscode.ExtensionContext) {
         super(context);
         logger.debug('Wu Wei Agent Panel Provider initialized with prompt integration');
+
+        // Phase 2: Initialize execution tracking system for complete lifecycle management
+        // This enables real-time monitoring of agent executions from start to completion
+        this._executionTracker = new ExecutionTracker(context);
 
         // Initialize prompt service
         this._promptService = PromptServiceFactory.createService(context);
@@ -57,6 +97,10 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         // Register GitHub Copilot agent
         const copilotAgent = new GitHubCopilotAgent();
         this._agentRegistry.registerAgent(copilotAgent);
+
+        // Phase 2: Setup completion signal monitoring system
+        // This establishes the connection for receiving completion signals from CopilotCompletionSignalTool
+        this.setupCompletionSignalMonitoring();
 
         // Activate the example agent
         exampleAgent.activate().then(() => {
@@ -136,7 +180,12 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         this.sendMessageHistory();
         this.sendAvailablePrompts();
 
-        logger.debug('Wu Wei Agent Panel webview resolved with prompt integration');
+        // Phase 2: Send initial execution state to newly connected webview
+        // This ensures the UI has current execution status and history immediately
+        this.sendPendingExecutions();
+        this.sendExecutionHistory();
+
+        logger.debug('Wu Wei Agent Panel webview resolved with prompt integration and execution tracking');
     }
 
     protected async handleMessage(message: any): Promise<void> {
@@ -163,6 +212,17 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 break;
             case 'getAgentCapabilities':
                 this.sendAgentCapabilities();
+                break;
+            // Phase 2: Enhanced webview commands for execution management
+            // These commands provide real-time execution control and monitoring capabilities
+            case 'getPendingExecutions':
+                this.sendPendingExecutions();
+                break;
+            case 'cancelExecution':
+                await this.handleCancelExecution(message.executionId);
+                break;
+            case 'getExecutionHistory':
+                await this.sendExecutionHistory();
                 break;
             default:
                 logger.warn('Unknown command received from agent panel:', message.command);
@@ -214,16 +274,32 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         params: any,
         promptContext?: any
     ): Promise<void> {
+        // Phase 2: Generate unique execution ID and initialize comprehensive tracking
+        // This creates a complete execution lifecycle from start to completion signal
+        const executionId = this.generateExecutionId();
+
         try {
-            logger.info(`Processing agent request with prompt: ${agentName}.${method}`, { params, promptContext });
+            logger.info(`Processing agent request with prompt: ${agentName}.${method}`, {
+                executionId,
+                params,
+                promptContext
+            });
 
             const agent = this._agentRegistry.getAgent(agentName);
             if (!agent) {
                 throw new Error(`Agent '${agentName}' not found`);
             }
 
+            // Phase 2: Start comprehensive execution tracking with state management
+            // This begins monitoring the execution lifecycle and enables completion correlation
+            this.startExecutionTracking(executionId, agentName, method, params, promptContext);
+
             // Enhance parameters with prompt context
             const enhancedParams = await this.enhanceParamsWithPrompt(params, promptContext, agent);
+
+            // Phase 2: Inject execution ID for completion signal correlation
+            // This enables the CopilotCompletionSignalTool to link completions back to this execution
+            enhancedParams.executionId = executionId;
 
             // Process the request
             const request: AgentRequest = {
@@ -233,17 +309,22 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 timestamp: new Date()
             };
 
-            const response = await agent.processRequest(request);
-
-            // Add to message history
+            // Add request to message history with execution correlation
+            // Phase 2: Include execution ID to enable tracking across the entire execution lifecycle
             this.addMessageToHistory({
                 id: request.id,
                 timestamp: request.timestamp,
                 type: 'request',
                 method: request.method,
-                params: request.params
+                params: {
+                    ...request.params,
+                    executionId // Links this request to its eventual completion signal
+                }
             });
 
+            const response = await agent.processRequest(request);
+
+            // Add response to message history
             this.addMessageToHistory({
                 id: response.id,
                 timestamp: response.timestamp,
@@ -252,7 +333,21 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 error: response.error
             });
 
+            // Phase 2: Handle immediate completion for non-Copilot agents
+            // GitHub Copilot will signal completion via CopilotCompletionSignalTool,
+            // but other agents complete immediately and need manual completion handling
+            if (agentName !== 'github-copilot') {
+                // For non-Copilot agents, mark as completed immediately
+                setTimeout(() => {
+                    this.handleImmediateCompletion(executionId, response);
+                }, 100); // Small delay to ensure UI updates are processed
+            }
+
         } catch (error) {
+            // Phase 2: Comprehensive error handling with execution state cleanup
+            // Mark execution as failed and notify UI of the error condition
+            this.handleExecutionError(executionId, error);
+
             this.addMessageToHistory({
                 id: this.generateMessageId(),
                 timestamp: new Date(),
@@ -477,12 +572,82 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 this.sendAgentCapabilities();
                 this.sendMessageHistory();
                 this.sendAvailablePrompts();
+                // Phase 2: Include execution data in webview refresh
+                // Ensure execution state and history are available after UI refresh
+                this.sendPendingExecutions();
+                this.sendExecutionHistory();
             }, 100);
         }
     }
 
     private generateMessageId(): string {
         return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    /**
+     * Phase 2: Generate unique execution ID for tracking
+     * Creates a time-based unique identifier for correlating execution start with completion signals
+     */
+    private generateExecutionId(): string {
+        return `wu-wei-agent-exec-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    /**
+     * Phase 2: Handle immediate completion for non-Copilot agents
+     * 
+     * Non-Copilot agents (like WuWeiExampleAgent) complete synchronously and don't use
+     * the CopilotCompletionSignalTool. This method creates a synthetic completion record
+     * to maintain consistent execution tracking across all agent types.
+     */
+    private handleImmediateCompletion(executionId: string, response: AgentResponse): void {
+        const pendingExecution = this._pendingExecutions.get(executionId);
+        if (!pendingExecution) {
+            logger.warn('Attempted to complete unknown execution', { executionId });
+            return;
+        }
+
+        // Create a completion record for immediate completion
+        const completionRecord: CompletionRecord = {
+            executionId,
+            taskDescription: pendingExecution.taskDescription,
+            status: response.error ? 'error' : 'success',
+            summary: response.result?.message || response.result?.content || 'Agent execution completed',
+            metadata: {
+                duration: new Date().getTime() - pendingExecution.startTime.getTime(),
+                toolsUsed: [pendingExecution.agentName]
+            },
+            timestamp: new Date()
+        };
+
+        // Process the completion
+        this.onCopilotCompletionSignal(completionRecord);
+    }
+
+    /**
+     * Phase 2: Handle execution errors with comprehensive cleanup
+     * 
+     * Manages error conditions by updating execution state, notifying the UI,
+     * and ensuring proper cleanup of tracking resources.
+     */
+    private handleExecutionError(executionId: string, error: any): void {
+        const pendingExecution = this._pendingExecutions.get(executionId);
+        if (pendingExecution) {
+            pendingExecution.status = 'failed';
+
+            // Send error status update to UI
+            this.sendExecutionStatusUpdate(executionId, 'failed', {
+                error: error instanceof Error ? error.message : String(error),
+                duration: new Date().getTime() - pendingExecution.startTime.getTime()
+            });
+
+            // Remove from pending executions
+            this._pendingExecutions.delete(executionId);
+        }
+
+        logger.error('Agent execution failed', {
+            executionId,
+            error: error instanceof Error ? error.message : String(error)
+        });
     }
 
     /**
@@ -511,5 +676,400 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         } catch (error) {
             logger.error('Failed to initialize prompt service for agent panel', error);
         }
+    }
+
+    /**
+     * Phase 2: Setup completion signal monitoring system
+     * 
+     * Establishes the infrastructure for receiving completion signals from the
+     * CopilotCompletionSignalTool. The actual event wiring is done in extension.ts
+     * to connect the tool's static event emitter to this provider's handler.
+     */
+    private setupCompletionSignalMonitoring(): void {
+        // Listen for completion events from the completion signal tool
+        // This will be connected when the tool is registered in extension.ts
+        logger.debug('Setting up completion signal monitoring for agent panel');
+    }
+
+    /**
+     * Phase 2: Handle completion signal from CopilotCompletionSignalTool
+     * 
+     * This is the core integration point that completes the execution tracking loop.
+     * When a completion signal is received:
+     * 1. Correlates the signal with the pending execution using executionId
+     * 2. Updates execution status and calculates duration
+     * 3. Adds completion details to message history
+     * 4. Notifies the UI of completion
+     * 5. Shows user notification if configured
+     * 6. Cleans up tracking resources
+     */
+    public onCopilotCompletionSignal(completionRecord: CompletionRecord): void {
+        try {
+            logger.info('Received completion signal', {
+                executionId: completionRecord.executionId,
+                status: completionRecord.status
+            });
+
+            // Find and update the pending execution
+            const pendingExecution = this._pendingExecutions.get(completionRecord.executionId);
+            if (pendingExecution) {
+                // Update execution status
+                pendingExecution.status = completionRecord.status === 'success' ? 'completed' : 'failed';
+
+                // Calculate duration if we have start time
+                const duration = new Date().getTime() - pendingExecution.startTime.getTime();
+
+                // Add completion details to message history
+                this.addCompletionToHistory(pendingExecution, completionRecord, duration);
+
+                // Remove from pending executions
+                this._pendingExecutions.delete(completionRecord.executionId);
+
+                // Send completion update to UI
+                this.sendExecutionStatusUpdate(completionRecord.executionId, 'completed', {
+                    completionRecord,
+                    duration
+                });
+
+                // Show completion notification
+                this.showExecutionCompletionNotification(pendingExecution, completionRecord);
+
+                logger.debug('Successfully processed completion signal', {
+                    executionId: completionRecord.executionId,
+                    duration
+                });
+            } else {
+                logger.warn('Received completion signal for unknown execution', {
+                    executionId: completionRecord.executionId
+                });
+            }
+
+            // Emit completion event for any external listeners
+            this._completionEventEmitter.fire(completionRecord);
+
+        } catch (error) {
+            logger.error('Failed to process completion signal', {
+                executionId: completionRecord.executionId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    /**
+     * Phase 2: Initialize execution tracking and register for completion signals
+     * 
+     * Begins the execution lifecycle tracking by:
+     * 1. Creating a PendingExecution record with metadata
+     * 2. Adding it to the tracking map for completion correlation
+     * 3. Sending initial status update to the UI
+     * 4. Logging the execution start for debugging
+     */
+    private startExecutionTracking(
+        executionId: string,
+        agentName: string,
+        method: string,
+        params: any,
+        promptContext?: any
+    ): void {
+        // Extract task description from params
+        const taskDescription = this.extractTaskDescription(params, promptContext);
+
+        const pendingExecution: PendingExecution = {
+            executionId,
+            agentName,
+            method,
+            taskDescription,
+            startTime: new Date(),
+            status: 'executing',
+            params,
+            promptContext
+        };
+
+        // Store pending execution
+        this._pendingExecutions.set(executionId, pendingExecution);
+
+        // Send execution start event to UI
+        this.sendExecutionStatusUpdate(executionId, 'executing', {
+            agentName,
+            method,
+            taskDescription,
+            startTime: pendingExecution.startTime
+        });
+
+        logger.info('Started execution tracking', {
+            executionId,
+            agentName,
+            method,
+            taskDescription
+        });
+    }
+
+    /**
+     * Phase 2: Extract meaningful task description from execution parameters
+     * 
+     * Attempts to find a human-readable description of what the execution will do
+     * by checking various parameter fields in priority order. Falls back to
+     * prompt information or a generic description if no specific task is found.
+     */
+    private extractTaskDescription(params: any, promptContext?: any): string {
+        // Try to extract meaningful task description
+        if (params.message) return params.message;
+        if (params.query) return params.query;
+        if (params.input) return params.input;
+        if (params.question) return params.question;
+        if (promptContext?.promptId) return `Execute prompt: ${promptContext.promptId}`;
+        return 'Agent execution';
+    }
+
+    /**
+     * Phase 2: Add completion details to message history with enhanced metadata
+     * 
+     * Creates a specialized completion message that includes:
+     * - Original execution context (agent, method, start time)
+     * - Completion details (status, summary, duration)
+     * - Enhanced metadata for analytics and debugging
+     * This provides a complete audit trail of the execution lifecycle.
+     */
+    private addCompletionToHistory(
+        pendingExecution: PendingExecution,
+        completionRecord: CompletionRecord,
+        duration: number
+    ): void {
+        // Add enhanced completion message to history
+        const completionMessage: AgentMessage = {
+            id: this.generateMessageId(),
+            timestamp: completionRecord.timestamp,
+            type: 'response',
+            result: {
+                type: 'completion-signal',
+                executionId: completionRecord.executionId,
+                status: completionRecord.status,
+                taskDescription: completionRecord.taskDescription,
+                summary: completionRecord.summary,
+                duration,
+                agentName: pendingExecution.agentName,
+                method: pendingExecution.method,
+                metadata: {
+                    ...completionRecord.metadata,
+                    startTime: pendingExecution.startTime.toISOString(),
+                    endTime: completionRecord.timestamp.toISOString(),
+                    duration
+                }
+            }
+        };
+
+        this.addMessageToHistory(completionMessage);
+    }
+
+    /**
+     * Phase 2: Send real-time execution status updates to the UI
+     * 
+     * Provides live feedback to the webview about execution state changes.
+     * Used for progress indicators, completion notifications, and status displays.
+     */
+    private sendExecutionStatusUpdate(
+        executionId: string,
+        status: string,
+        details?: any
+    ): void {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'executionStatusUpdate',
+                executionId,
+                status,
+                details,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }
+
+    /**
+     * Phase 2: Show execution completion notification to user
+     * 
+     * Displays appropriate notification based on completion status and user preferences.
+     * Respects the showExecutionCompletionNotifications configuration setting.
+     */
+    private showExecutionCompletionNotification(
+        pendingExecution: PendingExecution,
+        completionRecord: CompletionRecord
+    ): void {
+        const config = vscode.workspace.getConfiguration('wu-wei');
+        const showNotifications = config.get<boolean>('showExecutionCompletionNotifications', true);
+
+        if (!showNotifications) {
+            return;
+        }
+
+        const statusIcon = this.getExecutionStatusIcon(completionRecord.status);
+        const message = `${statusIcon} ${pendingExecution.agentName}: ${completionRecord.taskDescription}`;
+
+        if (completionRecord.status === 'success') {
+            vscode.window.showInformationMessage(message);
+        } else if (completionRecord.status === 'partial') {
+            vscode.window.showWarningMessage(message);
+        } else {
+            vscode.window.showErrorMessage(message);
+        }
+    }
+
+    /**
+     * Phase 2: Get appropriate icon for execution status display
+     * 
+     * Provides consistent visual indicators for different execution states
+     * used in notifications and UI status displays.
+     */
+    private getExecutionStatusIcon(status: string): string {
+        switch (status) {
+            case 'success': return '✅';
+            case 'partial': return '⚠️';
+            case 'error': return '❌';
+            case 'executing': return '⏳';
+            case 'pending': return '🟡';
+            default: return '📝';
+        }
+    }
+
+    /**
+     * Phase 2: Send current pending executions to UI
+     * 
+     * Provides real-time view of all currently executing operations
+     * including execution metadata, duration, and status for UI display.
+     */
+    private sendPendingExecutions(): void {
+        if (!this._view) {
+            return;
+        }
+
+        const pendingExecutions = Array.from(this._pendingExecutions.values()).map(execution => ({
+            executionId: execution.executionId,
+            agentName: execution.agentName,
+            method: execution.method,
+            taskDescription: execution.taskDescription,
+            status: execution.status,
+            startTime: execution.startTime.toISOString(),
+            duration: new Date().getTime() - execution.startTime.getTime()
+        }));
+
+        this._view.webview.postMessage({
+            command: 'updatePendingExecutions',
+            executions: pendingExecutions
+        });
+    }
+
+    /**
+     * Phase 2: Handle user-initiated execution cancellation
+     * 
+     * Allows users to cancel running executions through the UI.
+     * Note: This marks the execution as cancelled in our tracking system,
+     * but cannot actually stop the underlying agent execution (e.g., Copilot chat).
+     */
+    private async handleCancelExecution(executionId: string): Promise<void> {
+        const pendingExecution = this._pendingExecutions.get(executionId);
+        if (!pendingExecution) {
+            logger.warn('Attempted to cancel unknown execution', { executionId });
+            return;
+        }
+
+        try {
+            // Mark as cancelled
+            pendingExecution.status = 'failed';
+
+            // Send cancellation status update to UI
+            this.sendExecutionStatusUpdate(executionId, 'cancelled', {
+                reason: 'User cancelled',
+                duration: new Date().getTime() - pendingExecution.startTime.getTime()
+            });
+
+            // Remove from pending executions
+            this._pendingExecutions.delete(executionId);
+
+            // Add cancellation message to history
+            this.addMessageToHistory({
+                id: this.generateMessageId(),
+                timestamp: new Date(),
+                type: 'error',
+                error: {
+                    code: -32000,
+                    message: 'Execution cancelled by user',
+                    data: { executionId, taskDescription: pendingExecution.taskDescription }
+                }
+            });
+
+            logger.info('Execution cancelled by user', { executionId });
+
+        } catch (error) {
+            logger.error('Failed to cancel execution', {
+                executionId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    /**
+     * Phase 2: Send execution history and statistics to UI
+     * 
+     * Provides comprehensive execution analytics including:
+     * - Recent execution history (last 50 executions)
+     * - Success/failure statistics
+     * - Performance metrics (average duration, etc.)
+     * Used for execution history views and performance dashboards.
+     */
+    private async sendExecutionHistory(): Promise<void> {
+        if (!this._view) {
+            return;
+        }
+
+        try {
+            const history = this._executionTracker.getCompletionHistory(50); // Last 50 executions
+            const stats = this._executionTracker.getCompletionStats();
+
+            this._view.webview.postMessage({
+                command: 'updateExecutionHistory',
+                history: history.map(record => ({
+                    executionId: record.executionId,
+                    taskDescription: record.taskDescription,
+                    status: record.status,
+                    summary: record.summary,
+                    timestamp: record.timestamp.toISOString(),
+                    duration: record.metadata?.duration,
+                    toolsUsed: record.metadata?.toolsUsed,
+                    filesModified: record.metadata?.filesModified
+                })),
+                stats
+            });
+
+        } catch (error) {
+            logger.error('Failed to send execution history', {
+                error: error instanceof Error ? error.message : String(error)
+            });
+
+            this._view.webview.postMessage({
+                command: 'updateExecutionHistory',
+                history: [],
+                stats: { total: 0, successful: 0, partial: 0, errors: 0 }
+            });
+        }
+    }
+
+    /**
+     * Phase 2: Cleanup and resource disposal
+     * 
+     * Properly disposes of all Phase 2 resources including:
+     * - Pending execution tracking
+     * - Completion event emitter
+     * - Execution tracker persistent storage
+     * Ensures no memory leaks when the provider is disposed.
+     */
+    public dispose(): void {
+        // Clean up pending executions
+        this._pendingExecutions.clear();
+
+        // Dispose event emitter
+        this._completionEventEmitter.dispose();
+
+        // Dispose execution tracker
+        this._executionTracker.dispose();
+
+        logger.debug('Agent Panel Provider disposed');
     }
 }

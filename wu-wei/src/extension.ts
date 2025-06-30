@@ -40,6 +40,15 @@ export function activate(context: vscode.ExtensionContext) {
     const executionTracker = new ExecutionTracker(context);
     const completionSignalTool = new CopilotCompletionSignalTool(executionTracker);
 
+    // Phase 2: Wire up completion signal integration with agent panel provider
+    const completionSignalSubscription = CopilotCompletionSignalTool.onCompletion(
+        (completionRecord) => {
+            // Forward completion signals to agent panel provider
+            agentPanelProvider.onCopilotCompletionSignal(completionRecord);
+        }
+    );
+    context.subscriptions.push(completionSignalSubscription);
+
     // Initialize completion history commands
     const completionHistoryCommands = new CompletionHistoryCommands(executionTracker);
 
@@ -47,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
     const toolRegistration = vscode.lm.registerTool('wu-wei_copilot_completion_signal', completionSignalTool);
     context.subscriptions.push(toolRegistration);
 
-    logger.info('Copilot Completion Signal Tool registered successfully');
+    logger.info('Copilot Completion Signal Tool registered successfully with Agent Panel Provider integration');
 
     // Initialize prompt store with configuration management
     const configManager = new ConfigurationManager(context);
@@ -335,6 +344,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 export function deactivate() {
     logger.lifecycle('deactivate', 'Wu Wei extension deactivated - flowing like water');
+
+    // Phase 2: Clean up completion signal tool resources
+    CopilotCompletionSignalTool.dispose();
+
     logger.dispose();
 }
 
