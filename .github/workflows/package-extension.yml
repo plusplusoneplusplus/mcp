@@ -1,8 +1,8 @@
 name: Package Wu Wei Extension
 
 on:
-  schedule:
-    - cron: "0 0 * * *"  # Every day at midnight UTC
+  # schedule:
+  #   - cron: "0 0 * * *"  # Every day at midnight UTC
   workflow_dispatch:
 
 jobs:
