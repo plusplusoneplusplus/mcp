@@ -3,20 +3,51 @@ import { ExecutionTracker } from './ExecutionTracker';
 import { logger } from '../logger';
 
 /**
+ * Virtual document provider for completion history
+ */
+class CompletionHistoryDocumentProvider implements vscode.TextDocumentContentProvider {
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+    public readonly onDidChange = this._onDidChange.event;
+
+    private content: Map<string, string> = new Map();
+
+    provideTextDocumentContent(uri: vscode.Uri): string {
+        return this.content.get(uri.toString()) || '';
+    }
+
+    setContent(uri: vscode.Uri, content: string): void {
+        this.content.set(uri.toString(), content);
+        this._onDidChange.fire(uri);
+    }
+
+    dispose(): void {
+        this._onDidChange.dispose();
+    }
+}
+
+/**
  * Commands for managing and displaying Copilot completion history
  */
 export class CompletionHistoryCommands {
     private executionTracker: ExecutionTracker;
     private disposables: vscode.Disposable[] = [];
+    private documentProvider: CompletionHistoryDocumentProvider;
 
     constructor(executionTracker: ExecutionTracker) {
         this.executionTracker = executionTracker;
+        this.documentProvider = new CompletionHistoryDocumentProvider();
     }
 
     /**
      * Register all completion history commands
      */
     public registerCommands(context: vscode.ExtensionContext): vscode.Disposable[] {
+        // Register the virtual document provider
+        const providerRegistration = vscode.workspace.registerTextDocumentContentProvider(
+            'wu-wei-history',
+            this.documentProvider
+        );
+
         const showHistoryCommand = vscode.commands.registerCommand(
             'wu-wei.showCompletionHistory',
             this.showCompletionHistory.bind(this)
@@ -27,7 +58,7 @@ export class CompletionHistoryCommands {
             this.clearCompletionHistory.bind(this)
         );
 
-        this.disposables = [showHistoryCommand, clearHistoryCommand];
+        this.disposables = [providerRegistration, showHistoryCommand, clearHistoryCommand];
         return this.disposables;
     }
 
@@ -37,6 +68,7 @@ export class CompletionHistoryCommands {
     public dispose(): void {
         this.disposables.forEach(disposable => disposable.dispose());
         this.disposables = [];
+        this.documentProvider.dispose();
     }
 
     /**
@@ -66,12 +98,16 @@ export class CompletionHistoryCommands {
 
             const historyDocument = this.formatHistoryDocument(history, stats);
 
-            // Show in a new document
-            const doc = await vscode.workspace.openTextDocument({
-                content: historyDocument,
-                language: 'markdown'
-            });
-            await vscode.window.showTextDocument(doc);
+            // Create a virtual document URI that won't trigger save prompts
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const uri = vscode.Uri.parse(`wu-wei-history:Wu Wei Completion History - ${timestamp}.md`);
+
+            // Set the content for the virtual document
+            this.documentProvider.setContent(uri, historyDocument);
+
+            // Open the virtual document
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc, { preview: false });
 
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
