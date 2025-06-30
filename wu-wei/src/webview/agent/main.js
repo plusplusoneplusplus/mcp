@@ -146,13 +146,20 @@ function updateUIForCombinedMode() {
     const hasVariables = selectedPromptContext?.parameters?.length > 0;
     variableEditorContainer.style.display = selectedPromptContext && hasVariables ? 'block' : 'none';
     promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
+
+    // Update subtitle based on whether a prompt is selected
+    if (selectedPromptContext) {
+        parameterSubtitle.textContent = 'Selected prompt will be combined with your custom message';
+    } else {
+        parameterSubtitle.textContent = 'Optionally select a prompt template and/or add your custom message';
+    }
 }
 
 function updateInputLabelsAndPlaceholders() {
-    // Always use combined mode labels
-    parameterSubtitle.textContent = 'Select a prompt template and add your custom message';
-    parametersLabel.textContent = 'Additional Message';
-    paramsInput.placeholder = 'Enter additional message to combine with prompt...';
+    // Update labels to reflect optional prompt usage
+    parameterSubtitle.textContent = 'Optionally select a prompt template and/or add your custom message';
+    parametersLabel.textContent = 'Message';
+    paramsInput.placeholder = 'Enter your message or combine with a prompt template...';
 }
 
 // Prompt Search and Selection
@@ -182,7 +189,7 @@ function updatePromptSelectorList(prompts) {
         return;
     }
 
-    promptSelector.innerHTML = '<option value="">Select a prompt...</option>';
+    promptSelector.innerHTML = '<option value="">No prompt (message only)</option>';
     prompts.forEach(prompt => {
         const option = document.createElement('option');
         option.value = prompt.id;
@@ -549,35 +556,32 @@ function sendAgentRequest() {
         return;
     }
 
-    // Always use combined mode (prompt + custom message)
-    if (!selectedPromptContext) {
-        alert('Please select a prompt template');
+    // Check if we have either a prompt template or a message
+    if (!selectedPromptContext && !paramsText.trim()) {
+        alert('Please either select a prompt template or enter a message');
         return;
     }
 
-    if (!paramsText.trim()) {
-        alert('Please enter a custom message to combine with the prompt');
-        return;
+    // If prompt is selected, validate required variables
+    if (selectedPromptContext) {
+        const validationErrors = validatePromptVariables();
+        if (validationErrors.length > 0) {
+            alert(`Please fill in required fields:\n${validationErrors.join('\n')}`);
+            return;
+        }
     }
 
-    // Validate required variables
-    const validationErrors = validatePromptVariables();
-    if (validationErrors.length > 0) {
-        alert(`Please fill in required fields:\n${validationErrors.join('\n')}`);
-        return;
-    }
-
-    // Send request with prompt context
+    // Send request with optional prompt context
     vscode.postMessage({
         command: 'sendAgentRequestWithPrompt',
         agentName,
         method,
         params: parseParams(paramsText),
-        promptContext: {
+        promptContext: selectedPromptContext ? {
             promptId: selectedPromptContext.id,
             variables: promptVariables,
             mode: promptMode
-        }
+        } : null
     });
 
     // Clear input after sending
