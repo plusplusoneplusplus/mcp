@@ -37,6 +37,11 @@ paramsInput.addEventListener('keydown', handleKeyDown);
 promptSearch.addEventListener('input', debounce(handlePromptSearch, 300));
 promptSelector.addEventListener('change', handlePromptSelection);
 
+// Execution tracking state
+let pendingExecutions = [];
+let executionHistory = [];
+let durationUpdateInterval = null;
+
 // Handle messages from extension
 window.addEventListener('message', event => {
     const message = event.data;
@@ -63,6 +68,18 @@ window.addEventListener('message', event => {
             break;
         case 'error':
             showError(message.error);
+            break;
+        // Phase 2: Execution tracking message handlers
+        case 'executionStatusUpdate':
+            handleExecutionStatusUpdate(message);
+            break;
+        case 'updatePendingExecutions':
+            pendingExecutions = message.executions || [];
+            updatePendingExecutionsDisplay();
+            break;
+        case 'updateExecutionHistory':
+            executionHistory = message.history || [];
+            updateExecutionHistoryDisplay(message.stats);
             break;
     }
 });
@@ -404,6 +421,38 @@ function showError(errorMessage) {
     // You could also show a visual error notification here
 }
 
+// Phase 2: Execution tracking utility functions
+function formatDuration(milliseconds) {
+    if (milliseconds < 1000) {
+        return `${milliseconds}ms`;
+    } else if (milliseconds < 60000) {
+        return `${Math.round(milliseconds / 1000)}s`;
+    } else {
+        const minutes = Math.floor(milliseconds / 60000);
+        const seconds = Math.round((milliseconds % 60000) / 1000);
+        return `${minutes}m ${seconds}s`;
+    }
+}
+
+function getStatusIcon(status) {
+    switch (status) {
+        case 'success': return '✅';
+        case 'partial': return '⚠️';
+        case 'error': return '❌';
+        case 'executing': return '⏳';
+        case 'pending': return '🟡';
+        case 'cancelled': return '⏹️';
+        case 'completed': return '✅';
+        case 'failed': return '❌';
+        default: return '📝';
+    }
+}
+
+function truncateText(text, maxLength = 50) {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+}
+
 // Existing functions (updated to work with prompt integration)
 function updateAgentSelect() {
     agentSelect.innerHTML = '';
@@ -587,6 +636,208 @@ function clearHistory() {
     vscode.postMessage({ command: 'clearHistory' });
 }
 
+// Phase 2: Execution tracking functions
+function handleExecutionStatusUpdate(message) {
+    const { executionId, status, details } = message;
+
+    // Update the pending execution status in real-time
+    const execution = pendingExecutions.find(e => e.executionId === executionId);
+    if (execution) {
+        execution.status = status;
+        if (details) {
+            execution.details = details;
+        }
+    }
+
+    // Refresh the pending executions display
+    updatePendingExecutionsDisplay();
+
+    // Show visual feedback for status changes
+    if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        showExecutionStatusNotification(status, details);
+    }
+}
+
+function updatePendingExecutionsDisplay() {
+    const container = document.getElementById('pendingExecutionsContainer');
+    if (!container) {
+        // Create the pending executions container if it doesn't exist
+        createPendingExecutionsSection();
+        return;
+    }
+
+    const list = container.querySelector('.pending-executions-list');
+    if (!list) return;
+
+    if (pendingExecutions.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">⏳</div>
+                <h4>No running executions</h4>
+                <p>All agent executions are complete.</p>
+            </div>
+        `;
+        container.style.display = 'none';
+
+        // Clear the duration update interval when no executions are pending
+        if (durationUpdateInterval) {
+            clearInterval(durationUpdateInterval);
+            durationUpdateInterval = null;
+        }
+        return;
+    }
+
+    container.style.display = 'block';
+
+    // Start duration update interval if not already running
+    if (!durationUpdateInterval) {
+        durationUpdateInterval = setInterval(() => {
+            updateExecutionDurations();
+        }, 1000); // Update every second
+    }
+
+    renderPendingExecutions(list);
+}
+
+function renderPendingExecutions(list) {
+    list.innerHTML = pendingExecutions.map(execution => {
+        const statusIcon = getStatusIcon(execution.status);
+        const currentTime = new Date().getTime();
+        const startTime = new Date(execution.startTime).getTime();
+        const duration = formatDuration(currentTime - startTime);
+        const startTimeFormatted = new Date(execution.startTime).toLocaleTimeString();
+
+        return `
+            <div class="execution-item ${execution.status}" data-execution-id="${execution.executionId}">
+                <div class="execution-header">
+                    <span class="execution-status">${statusIcon} ${execution.status}</span>
+                    <span class="execution-duration" data-start-time="${execution.startTime}">${duration}</span>
+                </div>
+                <div class="execution-details">
+                    <div class="execution-agent">${execution.agentName}.${execution.method}</div>
+                    <div class="execution-task">${truncateText(execution.taskDescription)}</div>
+                    <div class="execution-time">Started: ${startTimeFormatted}</div>
+                </div>
+                <div class="execution-actions">
+                    <button class="btn-cancel" onclick="cancelExecution('${execution.executionId}')" 
+                            ${execution.status !== 'executing' ? 'disabled' : ''}>
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                            <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/>
+                        </svg>
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateExecutionDurations() {
+    // Update duration displays for running executions
+    const durationElements = document.querySelectorAll('.execution-duration[data-start-time]');
+    const currentTime = new Date().getTime();
+
+    durationElements.forEach(element => {
+        const startTime = new Date(element.getAttribute('data-start-time')).getTime();
+        const duration = formatDuration(currentTime - startTime);
+        element.textContent = duration;
+    });
+}
+
+function updateExecutionHistoryDisplay(stats) {
+    // This function can be implemented later for execution history display
+    console.log('Execution history updated:', executionHistory.length, 'entries');
+    console.log('Stats:', stats);
+}
+
+function showExecutionStatusNotification(status, details) {
+    // Create a temporary notification element
+    const notification = document.createElement('div');
+    notification.className = `execution-notification ${status}`;
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${getStatusIcon(status)}</span>
+            <span class="notification-text">Execution ${status}</span>
+        </div>
+    `;
+
+    // Add to the page temporarily
+    document.body.appendChild(notification);
+
+    // Animate in
+    setTimeout(() => notification.classList.add('show'), 10);
+
+    // Remove after delay
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => document.body.removeChild(notification), 300);
+    }, 2000);
+}
+
+function cancelExecution(executionId) {
+    vscode.postMessage({
+        command: 'cancelExecution',
+        executionId: executionId
+    });
+}
+
+function createPendingExecutionsSection() {
+    // Find the input section to insert the pending executions section after it
+    const inputSection = document.querySelector('.input-section');
+    if (!inputSection) return;
+
+    const pendingSection = document.createElement('div');
+    pendingSection.className = 'section pending-executions-section';
+    pendingSection.id = 'pendingExecutionsContainer';
+    pendingSection.style.display = 'none'; // Initially hidden
+
+    pendingSection.innerHTML = `
+        <div class="section-header">
+            <div class="section-title">
+                <span class="icon">⏳</span>
+                <span>Running Executions</span>
+                <button class="collapse-toggle" id="pendingToggle" onclick="togglePendingCollapse()"
+                        title="Toggle pending executions visibility">
+                    <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="section-subtitle">Real-time status of agent executions</div>
+        </div>
+        <div class="collapsible-content" id="pendingContent">
+            <div class="pending-executions-list">
+                <!-- Pending executions will be populated here -->
+            </div>
+        </div>
+    `;
+
+    // Insert after the input section
+    inputSection.parentNode.insertBefore(pendingSection, inputSection.nextSibling);
+}
+
+function togglePendingCollapse() {
+    const pendingSection = document.querySelector('.pending-executions-section');
+
+    if (!pendingSection) {
+        console.error('Pending executions section not found');
+        return;
+    }
+
+    const isCollapsed = pendingSection.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        pendingSection.classList.remove('collapsed');
+        localStorage.setItem('pendingCollapsed', 'false');
+        console.log('Expanded pending executions section');
+    } else {
+        pendingSection.classList.add('collapsed');
+        localStorage.setItem('pendingCollapsed', 'true');
+        console.log('Collapsed pending executions section');
+    }
+}
+
 function updateMessageHistory() {
     if (messageHistory.length === 0) {
         messageList.innerHTML = `
@@ -646,8 +897,32 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeCollapseState();
     updateInputLabelsAndPlaceholders();
     updateUIForCombinedMode();
+
+    // Create pending executions section
+    createPendingExecutionsSection();
+
+    // Initialize pending executions collapse state after a short delay
+    // to ensure the section is fully created
+    setTimeout(() => {
+        const savedPendingState = localStorage.getItem('pendingCollapsed');
+        const pendingSection = document.querySelector('.pending-executions-section');
+        const isPendingCollapsed = savedPendingState === 'true';
+
+        if (isPendingCollapsed && pendingSection) {
+            pendingSection.classList.add('collapsed');
+        }
+    }, 100);
 });
 
 // Request initial data
 vscode.postMessage({ command: 'getAgentCapabilities' });
 vscode.postMessage({ command: 'getAvailablePrompts' });
+vscode.postMessage({ command: 'getPendingExecutions' });
+vscode.postMessage({ command: 'getExecutionHistory' });
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function () {
+    if (durationUpdateInterval) {
+        clearInterval(durationUpdateInterval);
+    }
+});
