@@ -141,8 +141,6 @@ export class CopilotCompletionSignalTool implements vscode.LanguageModelTool<ICo
             }
         }
 
-        response += '\n🧘 *Wu Wei execution flows like water - effortless and complete*';
-
         return response;
     }
 
