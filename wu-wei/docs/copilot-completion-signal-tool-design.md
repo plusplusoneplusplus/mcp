@@ -728,19 +728,138 @@ describe('Completion Signal Integration', () => {
 
 ## Future Enhancements
 
-### Phase 2: Workflow Integration
+### Phase 2: Agent Panel Provider Integration
 
-1. **Automation Triggers**: Use completion signals to trigger workflows
-2. **Performance Analytics**: Track and analyze completion patterns
-3. **Custom Callbacks**: Allow extensions to register completion handlers
-4. **Batch Operations**: Support for multiple completion signals
+The completion signal tool will be integrated with the Wu Wei Agent Panel Provider to create a complete execution tracking loop. This integration addresses the current gap where agent executions (particularly GitHub Copilot) are initiated but there's no reliable way to detect completion.
 
-### Phase 3: Advanced Features
+#### Integration Architecture
 
-1. **Completion Chaining**: Support for dependent completion signals
-2. **Error Recovery**: Automatic retry mechanisms for failed completions
-3. **Integration APIs**: REST/GraphQL APIs for external systems
-4. **Machine Learning**: Predict completion times and optimize workflows
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Agent Panel Provider UI                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │ User Input  │→ │ Agent       │→ │ Execution Status:       │ │
+│  │ + Prompt    │  │ Selection   │  │ "Executing..."          │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+         │                                        ▲
+         ▼                                        │
+┌─────────────────────────────────────────────────────────────────┐
+│                AgentPanelProvider Logic                        │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ handleAgentRequestWithPrompt()                          │   │
+│  │ 1. Generate executionId                                 │   │
+│  │ 2. Set execution state: "executing"                     │   │
+│  │ 3. Send execution start event to UI                     │   │
+│  │ 4. Call agent.processRequest()                          │   │
+│  │ 5. Register completion listener                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+         │                                        ▲
+         ▼                                        │
+┌─────────────────────────────────────────────────────────────────┐
+│                    Agent Execution                             │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │ GitHub Copilot  │→ │ VS Code Chat    │→ │ LM Tool Chain   │ │
+│  │ Agent           │  │ Interface       │  │ (including      │ │
+│  │                 │  │                 │  │ completion      │ │
+│  │                 │  │                 │  │ signal tool)    │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                                              │
+                                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               Completion Signal Tool                           │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ invoke()                                                │   │
+│  │ 1. Record completion in ExecutionTracker               │   │
+│  │ 2. Emit completion event                                │   │
+│  │ 3. Return completion response to Copilot               │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│            Agent Panel Provider Completion Handler             │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ onCopilotCompletionSignal()                             │   │
+│  │ 1. Match executionId with pending execution             │   │
+│  │ 2. Update execution state: "completed"                  │   │
+│  │ 3. Add completion details to message history            │   │
+│  │ 4. Send completion update to UI                         │   │
+│  │ 5. Show completion notification                         │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Key Integration Features
+
+1. **Execution State Management**
+   - Track execution states: `pending`, `executing`, `completed`, `failed`
+   - Associate completion signals with specific agent executions
+   - Provide real-time execution status updates to the UI
+
+2. **Bi-directional Communication**
+   - Agent Panel Provider registers completion listeners before agent execution
+   - Completion Signal Tool emits events that Agent Panel Provider can catch
+   - UI receives live updates about execution progress and completion
+
+3. **Enhanced Message History**
+   - Execution start and end timestamps
+   - Completion status and duration tracking
+   - Rich metadata about what was accomplished
+
+4. **User Experience Improvements**
+   - Visual execution progress indicators in the Agent Panel
+   - Clear completion notifications with execution summaries
+   - Ability to track multiple concurrent executions
+
+#### Implementation Components
+
+1. **AgentPanelProvider Enhancements**
+   - `PendingExecution` interface to track ongoing executions
+   - `onCopilotCompletionSignal()` event handler for completion events
+   - UI status updates for execution state changes
+   - Enhanced message history with execution metadata
+
+2. **Completion Signal Integration**
+   - Modified `invoke()` method to include executionId correlation
+   - Event emission system for completion notifications
+   - Integration with AgentPanelProvider's completion handlers
+
+3. **UI/UX Enhancements**
+   - Execution status indicators in the webview
+   - Progress spinners during agent execution
+   - Completion notifications with success/failure status
+   - Detailed execution history with timing information
+
+#### Workflow Integration Benefits
+
+1. **Complete Execution Loop**: Know exactly when agent tasks start and finish
+2. **Better User Feedback**: Real-time status updates and clear completion signals
+3. **Execution Analytics**: Track performance and success rates of different agent operations
+4. **Error Handling**: Detect and handle failed or hung executions
+5. **Automation Foundation**: Enable future workflow automation based on completion events
+
+#### Future Automation Capabilities
+
+Building on this integration, Phase 3 will enable:
+- **Triggered Workflows**: Use completion signals to trigger follow-up actions
+- **Performance Analytics**: Analyze execution patterns and optimize workflows
+- **Custom Callbacks**: Allow extensions to register completion handlers
+- **Batch Operations**: Support for multiple coordinated completion signals
+- **Dependency Chains**: Execute dependent tasks based on completion status
+
+### Phase 3: Advanced Workflow Automation
+
+Building on the Agent Panel Provider integration from Phase 2, this phase focuses on advanced automation and workflow capabilities.
+
+1. **Workflow Orchestration**: Complex multi-step workflows triggered by completion signals
+2. **Completion Chaining**: Support for dependent completion signals and task sequencing  
+3. **Error Recovery**: Automatic retry mechanisms for failed completions with intelligent backoff
+4. **Integration APIs**: REST/GraphQL APIs for external systems to consume completion events
+5. **Machine Learning**: Predict completion times and optimize workflows based on historical data
+6. **Advanced Analytics**: Deep insights into execution patterns, bottlenecks, and optimization opportunities
 
 ## Implementation Timeline
 
