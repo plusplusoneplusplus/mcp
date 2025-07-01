@@ -1082,11 +1082,15 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             const doc = await vscode.workspace.openTextDocument(uri);
             const editor = await vscode.window.showTextDocument(doc, {
                 preview: false,
-                preserveFocus: false
+                preserveFocus: false,
+                viewColumn: vscode.ViewColumn.One
             });
 
             // Set the language to markdown for better formatting
             await vscode.languages.setTextDocumentLanguage(doc, 'markdown');
+
+            // Make the editor read-only by setting the document as read-only
+            // Note: Virtual documents (with custom schemes) are inherently read-only in VS Code
 
             // Dispose the provider after a delay to allow the document to load
             setTimeout(() => {

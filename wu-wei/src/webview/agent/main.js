@@ -110,17 +110,6 @@ window.addEventListener('message', event => {
 
 // Initialize collapse state from localStorage
 function initializeCollapseState() {
-    // Initialize history section collapse state
-    const savedHistoryState = localStorage.getItem('historyCollapsed');
-    const historySection = document.querySelector('.history-section');
-
-    // Default to collapsed if no saved state exists, otherwise use saved state
-    const isHistoryCollapsed = savedHistoryState === null ? true : savedHistoryState === 'true';
-
-    if (isHistoryCollapsed) {
-        historySection.classList.add('collapsed');
-    }
-
     // Initialize agent selection collapse state
     const savedAgentState = localStorage.getItem('agentCollapsed');
     const agentSection = document.querySelector('.agent-selection');
@@ -141,20 +130,6 @@ function initializeCollapseState() {
 
     if (promptOverviewSection && isPromptOverviewCollapsed) {
         promptOverviewSection.classList.add('collapsed');
-    }
-}
-
-// Toggle history collapse state
-function toggleHistoryCollapse() {
-    const historySection = document.querySelector('.history-section');
-    const isCollapsed = historySection.classList.contains('collapsed');
-
-    if (isCollapsed) {
-        historySection.classList.remove('collapsed');
-        localStorage.setItem('historyCollapsed', 'false');
-    } else {
-        historySection.classList.add('collapsed');
-        localStorage.setItem('historyCollapsed', 'true');
     }
 }
 

@@ -99,7 +99,6 @@
     transition: transform 0.2s ease;
 }
 
-.history-section.collapsed .collapse-icon,
 .agent-selection.collapsed .collapse-icon,
 .pending-executions-section.collapsed .collapse-icon,
 .prompt-overview-section.collapsed .collapse-icon {
@@ -113,7 +112,6 @@
     opacity: 1;
 }
 
-.history-section.collapsed .collapsible-content,
 .agent-selection.collapsed .collapsible-content,
 .pending-executions-section.collapsed .collapsible-content,
 .prompt-overview-section.collapsed .collapsible-content {
@@ -122,11 +120,41 @@
     margin-bottom: 0;
 }
 
-.history-section.collapsed .section-subtitle,
 .agent-selection.collapsed .section-subtitle,
 .pending-executions-section.collapsed .section-subtitle,
 .prompt-overview-section.collapsed .section-subtitle {
     display: none;
+}
+
+/* History content - always visible, non-collapsible */
+.history-content {
+    overflow: hidden;
+    max-height: none;
+    opacity: 1;
+    padding: 8px 0;
+}
+
+.history-section {
+    background: var(--vscode-sideBar-background, #252526);
+    border: 1px solid var(--vscode-sideBarSectionHeader-border, #3c3c3c);
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 8px;
+}
+
+.history-section .section-header {
+    margin-bottom: 8px;
+}
+
+.history-section .section-title {
+    color: var(--vscode-foreground);
+    font-weight: 600;
+}
+
+.history-section .section-subtitle {
+    color: var(--vscode-descriptionForeground, #9c9c9c);
+    font-size: 11px;
+    margin-top: 2px;
 }
 
 .form-row {

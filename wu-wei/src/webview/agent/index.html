@@ -153,22 +153,15 @@
 
         <!-- Message History Section -->
         <div class="section history-section">
-            <div class="section-header clickable-header" onclick="toggleHistoryCollapse()">
+            <div class="section-header">
                 <div class="section-title">
                     <span class="icon">📋</span>
                     <span>Message History</span>
-                    <button class="collapse-toggle" id="historyToggle"
-                        onclick="event.stopPropagation(); toggleHistoryCollapse()" title="Toggle history visibility">
-                        <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path
-                                d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
-                        </svg>
-                    </button>
                 </div>
                 <div class="section-subtitle">Recent agent interactions and responses</div>
             </div>
 
-            <div class="collapsible-content" id="historyContent">
+            <div class="history-content">
                 <div class="message-list" id="messageList">
                     <div class="empty-state">
                         <div class="empty-icon">💬</div>
