@@ -30,6 +30,76 @@
     "enabledApiProposals": [],
     "main": "./out/extension.js",
     "contributes": {
+        "languageModelTools": [
+            {
+                "name": "wu-wei_copilot_completion_signal",
+                "displayName": "Copilot Completion Signal",
+                "tags": [
+                    "completion",
+                    "signal",
+                    "wu-wei"
+                ],
+                "toolReferenceName": "copilot_complete",
+                "canBeReferencedInPrompt": true,
+                "icon": "$(check-all)",
+                "modelDescription": "Signals that GitHub Copilot execution has completed. This tool should be invoked as the final step in any Copilot execution flow to indicate completion. It records the completion timestamp, execution context, and provides confirmation that the task has finished. Use this tool when you need to signal that all processing has been completed successfully.",
+                "userDescription": "Signals completion of GitHub Copilot execution",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "executionId": {
+                            "type": "string",
+                            "description": "Unique identifier for this execution session. If not provided, a new ID will be generated."
+                        },
+                        "taskDescription": {
+                            "type": "string",
+                            "description": "Brief description of the completed task or operation."
+                        },
+                        "status": {
+                            "type": "string",
+                            "enum": [
+                                "success",
+                                "partial",
+                                "error"
+                            ],
+                            "default": "success",
+                            "description": "Completion status of the execution."
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Optional summary of what was accomplished during execution."
+                        },
+                        "metadata": {
+                            "type": "object",
+                            "description": "Additional metadata about the execution (optional).",
+                            "properties": {
+                                "duration": {
+                                    "type": "number",
+                                    "description": "Execution duration in milliseconds"
+                                },
+                                "toolsUsed": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "description": "List of tools used during execution"
+                                },
+                                "filesModified": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    },
+                                    "description": "List of files that were modified"
+                                }
+                            }
+                        }
+                    },
+                    "required": [
+                        "taskDescription"
+                    ]
+                }
+            }
+        ],
         "chatParticipants": [
             {
                 "id": "wu-wei.assistant",
@@ -175,6 +245,18 @@
                 "title": "Wu Wei: Batch Delete Prompts",
                 "category": "Wu Wei",
                 "icon": "$(trash)"
+            },
+            {
+                "command": "wu-wei.showCompletionHistory",
+                "title": "Wu Wei: Show Copilot Completion History",
+                "category": "Wu Wei",
+                "icon": "$(history)"
+            },
+            {
+                "command": "wu-wei.clearCompletionHistory",
+                "title": "Wu Wei: Clear Completion History",
+                "category": "Wu Wei",
+                "icon": "$(clear-all)"
             }
         ],
         "views": {
@@ -335,6 +417,38 @@
                     "default": [],
                     "description": "User-defined custom prompt templates",
                     "scope": "application"
+                },
+                "wu-wei.showCompletionNotifications": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show notifications when Copilot execution completes"
+                },
+                "wu-wei.showExecutionCompletionNotifications": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Show notifications when agent execution completes in the Agent Panel"
+                },
+                "wu-wei.execution.trackingEnabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable execution tracking for agent panel operations"
+                },
+                "wu-wei.execution.showProgressIndicators": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show progress indicators during agent execution"
+                },
+                "wu-wei.completionHistory.maxRecords": {
+                    "type": "number",
+                    "default": 1000,
+                    "minimum": 100,
+                    "maximum": 10000,
+                    "description": "Maximum number of completion records to keep in history"
+                },
+                "wu-wei.completionHistory.autoCleanup": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically clean up old completion records"
                 }
             }
         }

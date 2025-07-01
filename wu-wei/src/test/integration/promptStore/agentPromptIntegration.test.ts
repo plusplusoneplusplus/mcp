@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { AgentPrompt } from '../../../shared/promptManager/tsx/components/AgentPrompt';
 import { PromptManagerServiceAdapter } from '../../../promptStore/PromptManagerServiceAdapter';
 import { PromptManager } from '../../../promptStore/PromptManager';
-import { AbstractAgent, AgentCapabilities, AgentRequest, AgentResponse } from '../../../interfaces/agentInterface';
+import { AbstractAgent, AgentCapabilities, AgentRequest, AgentResponse } from '../../../agentManager/agentInterface';
 import { DEFAULT_PRIORITIES, ChatMessage } from '../../../shared/promptManager/tsx/types';
 
 /**
