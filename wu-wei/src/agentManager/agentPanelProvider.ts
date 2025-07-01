@@ -13,9 +13,8 @@ import {
 import { PromptService, PromptUsageContext } from '../shared/promptManager/types';
 import { PromptServiceFactory } from '../shared/promptManager/PromptServiceFactory';
 import { ExecutionTracker, CompletionRecord } from '../tools/ExecutionTracker';
-import { CopilotCompletionSignalTool } from '../tools/CopilotCompletionSignalTool';
 import { ExecutionRegistry, ActiveExecution } from './ExecutionRegistry';
-import { PromptEnhancer, ExecutionContext } from './PromptEnhancer';
+import { PromptEnhancer } from './PromptEnhancer';
 
 /**
  * Configuration interface for agent prompt handling
@@ -111,17 +110,47 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         this._promptService.onPromptSelected(this.handlePromptSelected.bind(this));
     }
 
+    /**
+     * Format prompt data for UI display
+     */
+    private formatPromptForUI(prompt: any) {
+        return {
+            id: prompt.id,
+            title: prompt.metadata.title,
+            category: prompt.metadata.category,
+            description: prompt.metadata.description,
+            tags: prompt.metadata.tags
+        };
+    }
+
+    /**
+     * Format prompt context for UI display
+     */
+    private formatPromptContextForUI(context: PromptUsageContext) {
+        return {
+            id: context.prompt.id,
+            title: context.prompt.metadata.title,
+            content: context.prompt.content,
+            parameters: context.metadata.parameters || [],
+            usageInstructions: context.metadata.usageInstructions
+        };
+    }
+
+    /**
+     * Send error message to webview
+     */
+    private sendErrorToWebview(action: string, error: unknown): void {
+        this._view?.webview.postMessage({
+            command: 'error',
+            error: `Failed to ${action}: ${error instanceof Error ? error.message : String(error)}`
+        });
+    }
+
     private async handlePromptsChanged(prompts: any[]): Promise<void> {
         if (this._view) {
             this._view.webview.postMessage({
                 command: 'updateAvailablePrompts',
-                prompts: prompts.map(p => ({
-                    id: p.id,
-                    title: p.metadata.title,
-                    category: p.metadata.category,
-                    description: p.metadata.description,
-                    tags: p.metadata.tags
-                }))
+                prompts: prompts.map(p => this.formatPromptForUI(p))
             });
         }
     }
@@ -132,13 +161,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         if (this._view) {
             this._view.webview.postMessage({
                 command: 'promptSelected',
-                promptContext: {
-                    id: context.prompt.id,
-                    title: context.prompt.metadata.title,
-                    content: context.prompt.content,
-                    parameters: context.metadata.parameters || [],
-                    usageInstructions: context.metadata.usageInstructions
-                }
+                promptContext: this.formatPromptContextForUI(context)
             });
         }
     }
@@ -225,19 +248,10 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
 
             this._view?.webview.postMessage({
                 command: 'promptSelected',
-                promptContext: {
-                    id: context.prompt.id,
-                    title: context.prompt.metadata.title,
-                    content: context.prompt.content,
-                    parameters: context.metadata.parameters || [],
-                    usageInstructions: context.metadata.usageInstructions
-                }
+                promptContext: this.formatPromptContextForUI(context)
             });
         } catch (error) {
-            this._view?.webview.postMessage({
-                command: 'error',
-                error: `Failed to select prompt: ${error instanceof Error ? error.message : String(error)}`
-            });
+            this.sendErrorToWebview('select prompt', error);
         }
     }
 
@@ -250,10 +264,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 rendered
             });
         } catch (error) {
-            this._view?.webview.postMessage({
-                command: 'error',
-                error: `Failed to render prompt: ${error instanceof Error ? error.message : String(error)}`
-            });
+            this.sendErrorToWebview('render prompt', error);
         }
     }
 
@@ -407,18 +418,6 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
     }
 
     /**
-     * Extract content from AgentMessage for conversation history
-     */
-    private extractMessageContent(message: AgentMessage): string {
-        if (message.type === 'request') {
-            return message.params?.message || message.params?.query || message.params?.input || 'Request';
-        } else if (message.type === 'response') {
-            return message.result?.message || message.result?.content || JSON.stringify(message.result || {});
-        }
-        return 'Unknown message';
-    }
-
-    /**
      * Update agent prompt configuration
      */
     public updateAgentPromptConfig(config: Partial<AgentPromptConfig>): void {
@@ -440,13 +439,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             if (this._view) {
                 this._view.webview.postMessage({
                     command: 'updateAvailablePrompts',
-                    prompts: prompts.map(p => ({
-                        id: p.id,
-                        title: p.metadata.title,
-                        category: p.metadata.category,
-                        description: p.metadata.description,
-                        tags: p.metadata.tags
-                    }))
+                    prompts: prompts.map(p => this.formatPromptForUI(p))
                 });
             }
         } catch (error) {
@@ -459,8 +452,6 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             }
         }
     }
-
-
 
     private addMessageToHistory(message: AgentMessage): void {
         this._messageHistory.push(message);
