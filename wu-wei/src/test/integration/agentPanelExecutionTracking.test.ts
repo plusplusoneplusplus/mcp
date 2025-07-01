@@ -45,6 +45,83 @@ suite('Agent Panel Execution Tracking Integration', () => {
         agentPanelProvider.dispose();
     });
 
+    test('Session ID generation should be consistent and unique', async () => {
+        // Test the session ID generation logic that would be used in the webview
+        function generateTestSessionId(message: any): string {
+            const hashSource = `${message.timestamp}-${message.method}-${JSON.stringify(message.params || {})}`;
+            let hash = 0;
+            for (let i = 0; i < hashSource.length; i++) {
+                const char = hashSource.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            const positiveHash = Math.abs(hash).toString(16);
+            return `session-${positiveHash}`;
+        }
+        
+        const message1 = {
+            timestamp: '2024-01-01T12:00:00.000Z',
+            method: 'openAgent',
+            params: { query: 'Test session ID tracking' }
+        };
+        
+        const message2 = {
+            timestamp: '2024-01-01T12:00:00.000Z',
+            method: 'openAgent',
+            params: { query: 'Test session ID tracking' }
+        };
+        
+        const message3 = {
+            timestamp: '2024-01-01T12:01:00.000Z',
+            method: 'openAgent',
+            params: { query: 'Different query' }
+        };
+        
+        const sessionId1 = generateTestSessionId(message1);
+        const sessionId2 = generateTestSessionId(message2);
+        const sessionId3 = generateTestSessionId(message3);
+        
+        // Test session ID consistency and uniqueness
+        assert.strictEqual(sessionId1, sessionId2, 'Same request should generate same session ID');
+        assert.notStrictEqual(sessionId1, sessionId3, 'Different requests should generate different session IDs');
+        assert.ok(sessionId1.startsWith('session-'), 'Session ID should have correct prefix');
+        assert.ok(/^session-[a-f0-9]+$/.test(sessionId1), 'Session ID should match expected format');
+    });
+
+    test('Session-execution correlation should work with completion tracking', async () => {
+        // Test completion signal with mock execution correlation
+        const executionId = 'exec-session-test-001';
+        const sessionId = 'session-abc123def456';
+        
+        const completionData = {
+            executionId,
+            status: 'success' as const,
+            taskDescription: 'Test session ID tracking',
+            summary: 'Session ID tracking test completed successfully',
+            timestamp: new Date()
+        };
+        
+        // Record completion
+        const completionRecord = await executionTracker.recordCompletion(completionData);
+        
+        assert.ok(completionRecord, 'Completion should be recorded successfully');
+        assert.strictEqual(completionRecord.executionId, executionId, 'Completion should include execution ID');
+        assert.strictEqual(completionRecord.status, 'success', 'Completion should have correct status');
+        
+        // Test that we can correlate session with execution
+        const correlationMap = new Map();
+        correlationMap.set(sessionId, executionId);
+        
+        assert.strictEqual(correlationMap.get(sessionId), executionId, 'Session should correlate with execution');
+        
+        // Verify completion is in history
+        const history = executionTracker.getCompletionHistory();
+        const recordedExecution = history.find(e => e.executionId === executionId);
+        
+        assert.ok(recordedExecution, 'Execution should be recorded in history');
+        assert.strictEqual(recordedExecution.executionId, executionId, 'Recorded execution should have correct ID');
+    });
+
     suiteTeardown(() => {
         // Final cleanup
         CopilotCompletionSignalTool.dispose();

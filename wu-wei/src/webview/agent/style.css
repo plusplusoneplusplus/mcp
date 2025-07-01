@@ -987,6 +987,23 @@
     font-family: var(--vscode-editor-font-family, monospace);
 }
 
+.session-id {
+    font-size: 9px;
+    color: var(--vscode-badge-foreground, #cccccc);
+    background: var(--vscode-badge-background, #4d4d4d);
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    border: 1px solid var(--vscode-widget-border, #3c3c3c);
+    opacity: 0.8;
+}
+
+.session-id:hover {
+    opacity: 1;
+    background: var(--vscode-symbolIcon-numberForeground, #b5cea8);
+    color: var(--vscode-editor-background, #1e1e1e);
+}
+
 .message-status {
     display: flex;
     align-items: center;
@@ -1721,4 +1738,59 @@
 .conversation-separator,
 .processing-conversation {
     display: none;
+}
+
+/* Execution ID display styles */
+.execution-id-info {
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: var(--vscode-badge-background, #4d4d4d);
+    border: 1px solid var(--vscode-badge-foreground, #cccccc);
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: var(--vscode-editor-font-family);
+    color: var(--vscode-badge-foreground, #cccccc);
+}
+
+.execution-id-info strong {
+    color: var(--vscode-symbolIcon-numberForeground, #b5cea8);
+    font-weight: 600;
+}
+
+/* Enhanced execution ID highlighting in different contexts */
+.detail-item.request-detail .execution-id-info {
+    border-left: 3px solid var(--vscode-symbolIcon-functionForeground, #dcdcaa);
+}
+
+.detail-item.completion .execution-id-info {
+    border-left: 3px solid var(--vscode-symbolIcon-variableForeground, #9cdcfe);
+}
+
+.detail-item.error .execution-id-info {
+    border-left: 3px solid var(--vscode-inputValidation-errorForeground, #f14c4c);
+}
+
+.detail-item.standalone-completion .execution-id-info {
+    border-left: 3px solid var(--vscode-symbolIcon-keywordForeground, #569cd6);
+}
+
+.detail-item.acknowledgment .execution-id-info {
+    border-left: 3px solid var(--vscode-symbolIcon-classForeground, #4ec9b0);
+}
+
+/* Execution ID in session headers and summaries */
+.session-execution-id {
+    display: inline-block;
+    padding: 2px 6px;
+    background: var(--vscode-badge-background, #4d4d4d);
+    color: var(--vscode-badge-foreground, #cccccc);
+    border-radius: 3px;
+    font-size: 8px;
+    font-family: var(--vscode-editor-font-family);
+    margin-left: 8px;
+    opacity: 0.8;
+}
+
+.session-execution-id:hover {
+    opacity: 1;
 }
