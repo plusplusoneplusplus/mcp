@@ -72,13 +72,31 @@
 
             <!-- Prompt Selector -->
             <div class="prompt-selector-container" id="promptSelectorContainer">
-                <div class="form-group">
-                    <label class="form-label">Search Prompts</label>
-                    <input type="text" id="promptSearch" placeholder="Search prompts..." class="prompt-search">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Search Prompts</label>
+                        <input type="text" id="promptSearch" placeholder="Search prompts..." class="prompt-search">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Filter by Category</label>
+                        <select id="categoryFilter" class="category-filter">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Available Prompts (Optional)</label>
+                    <div class="prompt-filter-status" id="promptFilterStatus">
+                        <span class="filter-count">0 prompts available</span>
+                        <button class="btn-clear-filters" id="clearFilters" onclick="clearAllFilters()" title="Clear all filters" style="display: none;">
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+                            </svg>
+                            Clear Filters
+                        </button>
+                    </div>
                     <select id="promptSelector" size="5" class="prompt-list">
                         <option value="">Loading prompts...</option>
                     </select>
