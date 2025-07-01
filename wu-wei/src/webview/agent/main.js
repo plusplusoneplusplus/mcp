@@ -23,6 +23,9 @@ const agentTooltip = document.getElementById('agentTooltip');
 const messageList = document.getElementById('messageList');
 const historyIndicator = document.getElementById('historyIndicator');
 
+// Message progress tracking
+let processingMessages = new Map(); // Maps message IDs to their processing state
+
 // DOM elements - new prompt integration
 const promptSelectorContainer = document.getElementById('promptSelectorContainer');
 const promptSearch = document.getElementById('promptSearch');
@@ -67,6 +70,9 @@ window.addEventListener('message', event => {
         case 'updateMessageHistory':
             messageHistory = message.messages;
             updateMessageHistory();
+            break;
+        case 'messageProcessingComplete':
+            handleMessageProcessingComplete(message.messageId, message.success);
             break;
         case 'updateAvailablePrompts':
             availablePrompts = message.prompts || [];
@@ -779,9 +785,21 @@ function sendAgentRequest() {
     // Add input to history before sending
     addToInputHistory(paramsText);
 
-    // Send request with optional prompt context
+    // Generate a unique message ID for tracking
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Track this message as processing
+    processingMessages.set(messageId, {
+        agentName,
+        method,
+        startTime: new Date(),
+        status: 'processing'
+    });
+
+    // Send request with optional prompt context and message ID
     vscode.postMessage({
         command: 'sendAgentRequestWithPrompt',
+        messageId,
         agentName,
         method,
         params: parseParams(paramsText),
@@ -797,6 +815,9 @@ function sendAgentRequest() {
     historyIndex = -1;
     currentInput = '';
     hideHistoryIndicator();
+
+    // Refresh message history to show the processing indicator
+    updateMessageHistory();
 }
 
 function parseParams(paramsText) {
@@ -848,7 +869,24 @@ function validatePromptVariables() {
 }
 
 function clearHistory() {
+    // Clear processing messages tracking
+    processingMessages.clear();
+
+    // Clear the processing duration interval if active
+    if (window.messageProcessingInterval) {
+        clearInterval(window.messageProcessingInterval);
+        window.messageProcessingInterval = null;
+    }
+
     vscode.postMessage({ command: 'clearHistory' });
+}
+
+// Handle message processing completion
+function handleMessageProcessingComplete(messageId, success) {
+    if (processingMessages.has(messageId)) {
+        processingMessages.delete(messageId);
+        updateMessageHistory(); // Refresh to remove the progress indicator
+    }
 }
 
 // Phase 2: Execution tracking functions
@@ -1054,7 +1092,11 @@ function togglePendingCollapse() {
 }
 
 function updateMessageHistory() {
-    if (messageHistory.length === 0) {
+    // Check if we have processing messages or regular messages
+    const hasProcessingMessages = processingMessages.size > 0;
+    const hasMessages = messageHistory.length > 0;
+
+    if (!hasMessages && !hasProcessingMessages) {
         messageList.innerHTML = `
             <div class="empty-state">
                 <div class="empty-icon">💬</div>
@@ -1065,38 +1107,77 @@ function updateMessageHistory() {
         return;
     }
 
-    messageList.innerHTML = messageHistory.map(message => {
-        const timestamp = new Date(message.timestamp).toLocaleString();
+    let messagesHtml = '';
 
-        let content = '';
-        let typeClass = message.type;
+    // Add regular messages
+    if (hasMessages) {
+        messagesHtml += messageHistory.map(message => {
+            const timestamp = new Date(message.timestamp).toLocaleString();
 
-        if (message.type === 'request') {
-            content = `Method: ${message.method}\nParams: ${JSON.stringify(message.params, null, 2)}`;
-        } else if (message.type === 'response') {
-            if (message.error) {
-                content = `Error: ${message.error.message}\nCode: ${message.error.code}`;
-                if (message.error.data) {
-                    content += `\nData: ${JSON.stringify(message.error.data, null, 2)}`;
+            let content = '';
+            let typeClass = message.type;
+
+            if (message.type === 'request') {
+                content = `Method: ${message.method}\nParams: ${JSON.stringify(message.params, null, 2)}`;
+            } else if (message.type === 'response') {
+                if (message.error) {
+                    content = `Error: ${message.error.message}\nCode: ${message.error.code}`;
+                    if (message.error.data) {
+                        content += `\nData: ${JSON.stringify(message.error.data, null, 2)}`;
+                    }
+                    typeClass = 'error';
+                } else {
+                    content = `Result: ${JSON.stringify(message.result, null, 2)}`;
                 }
-                typeClass = 'error';
-            } else {
-                content = `Result: ${JSON.stringify(message.result, null, 2)}`;
+            } else if (message.type === 'error') {
+                content = `Error: ${message.error?.message || 'Unknown error'}\nCode: ${message.error?.code || 'N/A'}`;
             }
-        } else if (message.type === 'error') {
-            content = `Error: ${message.error?.message || 'Unknown error'}\nCode: ${message.error?.code || 'N/A'}`;
-        }
 
-        return `
-            <div class="message-item ${typeClass}">
-                <div class="message-header">
-                    <span class="message-type ${typeClass}">${message.type}</span>
-                    <span class="message-timestamp">${timestamp}</span>
+            return `
+                <div class="message-item ${typeClass}">
+                    <div class="message-header">
+                        <span class="message-type ${typeClass}">${message.type}</span>
+                        <span class="message-timestamp">${timestamp}</span>
+                    </div>
+                    <div class="message-content">${content}</div>
                 </div>
-                <div class="message-content">${content}</div>
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+    }
+
+    // Add processing messages at the end
+    if (hasProcessingMessages) {
+        processingMessages.forEach((processingInfo, messageId) => {
+            const timestamp = new Date(processingInfo.startTime).toLocaleString();
+            const duration = formatDuration(new Date().getTime() - processingInfo.startTime.getTime());
+
+            messagesHtml += `
+                <div class="message-item processing" data-message-id="${messageId}">
+                    <div class="message-header">
+                        <span class="message-type processing">processing</span>
+                        <span class="message-timestamp">${timestamp}</span>
+                        <span class="processing-duration">${duration}</span>
+                    </div>
+                    <div class="message-content">
+                        <div class="processing-indicator">
+                            <div class="processing-spinner"></div>
+                            <span class="processing-text">Agent ${processingInfo.agentName} is processing your ${processingInfo.method} request...</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    messageList.innerHTML = messagesHtml;
+
+    // Start/stop duration updates for processing messages
+    if (hasProcessingMessages && !window.messageProcessingInterval) {
+        window.messageProcessingInterval = setInterval(updateProcessingMessageDurations, 1000);
+    } else if (!hasProcessingMessages && window.messageProcessingInterval) {
+        clearInterval(window.messageProcessingInterval);
+        window.messageProcessingInterval = null;
+    }
 
     // Scroll to bottom with smooth animation
     setTimeout(() => {
@@ -1105,6 +1186,19 @@ function updateMessageHistory() {
             behavior: 'smooth'
         });
     }, 100);
+}
+
+// Update duration displays for processing messages
+function updateProcessingMessageDurations() {
+    const currentTime = new Date().getTime();
+
+    processingMessages.forEach((processingInfo, messageId) => {
+        const messageElement = document.querySelector(`[data-message-id="${messageId}"] .processing-duration`);
+        if (messageElement) {
+            const duration = formatDuration(currentTime - processingInfo.startTime.getTime());
+            messageElement.textContent = duration;
+        }
+    });
 }
 
 // Initialize the panel
@@ -1142,5 +1236,8 @@ vscode.postMessage({ command: 'getExecutionHistory' });
 window.addEventListener('beforeunload', function () {
     if (durationUpdateInterval) {
         clearInterval(durationUpdateInterval);
+    }
+    if (window.messageProcessingInterval) {
+        clearInterval(window.messageProcessingInterval);
     }
 });

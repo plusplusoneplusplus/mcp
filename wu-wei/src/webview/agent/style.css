@@ -667,6 +667,11 @@
     background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
 }
 
+.message-item.processing {
+    border-left: 2px solid var(--vscode-progressBar-background, #0e70c0);
+    background: var(--vscode-editor-inactiveSelectionBackground, rgba(255, 255, 255, 0.05));
+}
+
 .message-header {
     display: flex;
     justify-content: space-between;
@@ -697,6 +702,11 @@
 
 .message-type.error {
     background-color: var(--vscode-inputValidation-errorForeground, #f14c4c);
+    color: var(--vscode-editor-background, #1e1e1e);
+}
+
+.message-type.processing {
+    background-color: var(--vscode-progressBar-background, #0e70c0);
     color: var(--vscode-editor-background, #1e1e1e);
 }
 
@@ -1043,5 +1053,47 @@
 
     100% {
         opacity: 1;
+    }
+}
+
+/* Processing indicator styles */
+.processing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.processing-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--vscode-widget-border, #3c3c3c);
+    border-top: 2px solid var(--vscode-progressBar-background, #0e70c0);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.processing-text {
+    font-size: 9px;
+    color: var(--vscode-foreground, #cccccc);
+    font-style: italic;
+}
+
+.processing-duration {
+    font-size: 8px;
+    color: var(--vscode-descriptionForeground);
+    font-family: var(--vscode-editor-font-family);
+    margin-left: 6px;
+    padding: 1px 3px;
+    background: var(--vscode-badge-background, #4d4d4d);
+    border-radius: 2px;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
     }
 }

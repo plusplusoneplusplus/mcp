@@ -207,7 +207,8 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                     message.agentName,
                     message.method,
                     message.params,
-                    message.promptContext
+                    message.promptContext,
+                    message.messageId
                 );
                 break;
             case 'selectPrompt':
@@ -272,7 +273,8 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         agentName: string,
         method: string,
         params: any,
-        promptContext?: any
+        promptContext?: any,
+        messageId?: string
     ): Promise<void> {
         // Phase 3: Generate unique execution ID and register with ExecutionRegistry
         const executionId = this.generateExecutionId();
@@ -392,7 +394,21 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 // For non-Copilot agents, mark as completed immediately
                 setTimeout(() => {
                     this.handleImmediateCompletion(executionId, response);
+                    // Also signal message processing completion
+                    if (messageId) {
+                        this.signalMessageProcessingComplete(messageId, !response.error);
+                    }
                 }, 100); // Small delay to ensure UI updates are processed
+            } else {
+                // For GitHub Copilot, we still need to signal message completion
+                // when we receive the execution completion signal
+                if (messageId) {
+                    // Store the messageId with the execution for later completion signaling
+                    const activeExecution = this._executionRegistry.getActiveExecution(executionId);
+                    if (activeExecution) {
+                        (activeExecution as any).messageId = messageId;
+                    }
+                }
             }
 
         } catch (error) {
@@ -653,6 +669,12 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
 
                     // Show completion notification
                     this.showExecutionCompletionNotification(completedExecution, completionRecord);
+
+                    // Signal message processing completion if this execution has a messageId
+                    const messageId = (completedExecution as any).messageId;
+                    if (messageId) {
+                        this.signalMessageProcessingComplete(messageId, completionRecord.status === 'success');
+                    }
 
                     logger.debug('Successfully processed completion signal', {
                         executionId: completionRecord.executionId,
@@ -941,6 +963,22 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 command: 'updateExecutionHistory',
                 history: [],
                 stats: { total: 0, successful: 0, partial: 0, errors: 0 }
+            });
+        }
+    }
+
+    /**
+     * Signal message processing completion to the UI
+     * 
+     * Notifies the webview that a message has finished processing,
+     * allowing the UI to remove the progress indicator.
+     */
+    private signalMessageProcessingComplete(messageId: string, success: boolean): void {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'messageProcessingComplete',
+                messageId,
+                success
             });
         }
     }
