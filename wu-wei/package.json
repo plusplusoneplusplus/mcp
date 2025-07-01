@@ -456,7 +456,7 @@
     "scripts": {
         "vscode:prepublish": "npm run package",
         "compile": "npm run clean && tsc -p ./ && npm run copy-webview",
-        "copy-webview": "cp -r src/webview out/",
+        "copy-webview": "node -e \"require('fs').cpSync('src/webview', 'out/webview', {recursive: true})\"",
         "watch": "npm run esbuild-watch",
         "package": "npm run clean && node esbuild.js --production && npm run copy-webview",
         "esbuild": "node esbuild.js",
