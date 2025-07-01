@@ -86,7 +86,8 @@ This document provides a high-level overview of the utilities available in the `
 - Supports persistent or in-memory storage and collection management.
 
 **Usage:**
-- Main class: `ChromaVectorStore`
+- Interface: `VectorStore`
+- Default implementation: `ChromaVectorStore`
     - `add(ids, embeddings, metadatas, documents)` to store data
     - `query(query_embeddings, n_results, where)` to retrieve similar vectors
     - `delete(ids)` to remove vectors
