@@ -10,12 +10,18 @@ let selectedPromptContext = null;
 let promptVariables = {};
 let promptMode = 'combined'; // Always use combined mode
 
+// Input history navigation state
+let inputHistory = [];
+let historyIndex = -1;
+let currentInput = '';
+
 // DOM elements
 const agentSelect = document.getElementById('agentSelect');
 const methodSelect = document.getElementById('methodSelect');
 const paramsInput = document.getElementById('paramsInput');
 const agentTooltip = document.getElementById('agentTooltip');
 const messageList = document.getElementById('messageList');
+const historyIndicator = document.getElementById('historyIndicator');
 
 // DOM elements - new prompt integration
 const promptSelectorContainer = document.getElementById('promptSelectorContainer');
@@ -23,7 +29,7 @@ const promptSearch = document.getElementById('promptSearch');
 const promptSelector = document.getElementById('promptSelector');
 const variableEditorContainer = document.getElementById('variableEditorContainer');
 const variableEditor = document.getElementById('variableEditor');
-const promptPreviewContainer = document.getElementById('promptPreviewContainer');
+const promptOverviewContainer = document.getElementById('promptOverviewContainer');
 const promptPreview = document.getElementById('promptPreview');
 const parameterSubtitle = document.getElementById('parameterSubtitle');
 const parametersLabel = document.getElementById('parametersLabel');
@@ -32,10 +38,17 @@ const parametersLabel = document.getElementById('parametersLabel');
 agentSelect.addEventListener('change', updateMethodSelect);
 methodSelect.addEventListener('change', updatePlaceholder);
 paramsInput.addEventListener('keydown', handleKeyDown);
+paramsInput.addEventListener('click', handleInputClick);
+paramsInput.addEventListener('focus', handleInputFocus);
 
 // Event listeners - new prompt integration
 promptSearch.addEventListener('input', debounce(handlePromptSearch, 300));
 promptSelector.addEventListener('change', handlePromptSelection);
+
+// Initialize DOM content
+document.addEventListener('DOMContentLoaded', function () {
+    // DOM initialization handled in main initialization
+});
 
 // Execution tracking state
 let pendingExecutions = [];
@@ -107,6 +120,17 @@ function initializeCollapseState() {
     if (isAgentCollapsed) {
         agentSection.classList.add('collapsed');
     }
+
+    // Initialize prompt overview collapse state - collapsed by default
+    const savedPromptOverviewState = localStorage.getItem('promptOverviewCollapsed');
+    const promptOverviewSection = document.querySelector('.prompt-overview-section');
+
+    // Default to collapsed if no saved state exists, otherwise use saved state
+    const isPromptOverviewCollapsed = savedPromptOverviewState === null ? true : savedPromptOverviewState === 'true';
+
+    if (promptOverviewSection && isPromptOverviewCollapsed) {
+        promptOverviewSection.classList.add('collapsed');
+    }
 }
 
 // Toggle history collapse state
@@ -137,6 +161,20 @@ function toggleAgentCollapse() {
     }
 }
 
+// Toggle prompt overview collapse state
+function togglePromptOverviewCollapse() {
+    const promptOverviewSection = document.querySelector('.prompt-overview-section');
+    const isCollapsed = promptOverviewSection.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        promptOverviewSection.classList.remove('collapsed');
+        localStorage.setItem('promptOverviewCollapsed', 'false');
+    } else {
+        promptOverviewSection.classList.add('collapsed');
+        localStorage.setItem('promptOverviewCollapsed', 'true');
+    }
+}
+
 // UI Management for Combined Mode
 function updateUIForCombinedMode() {
     // Always show prompt selector
@@ -145,7 +183,9 @@ function updateUIForCombinedMode() {
     // Only show variable editor if prompt has variables
     const hasVariables = selectedPromptContext?.parameters?.length > 0;
     variableEditorContainer.style.display = selectedPromptContext && hasVariables ? 'block' : 'none';
-    promptPreviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
+
+    // Show prompt overview section if prompt is selected
+    promptOverviewContainer.style.display = selectedPromptContext ? 'block' : 'none';
 
     // Update subtitle based on whether a prompt is selected
     if (selectedPromptContext) {
@@ -225,7 +265,7 @@ function handlePromptContextUpdate() {
     // Update variable editor
     generateVariableEditor(selectedPromptContext.parameters || []);
 
-    // Update prompt preview
+    // Update prompt preview (both full and collapsed)
     renderPromptPreview();
 
     // Show appropriate containers for combined mode
@@ -371,7 +411,12 @@ function renderPromptPreview() {
         return;
     }
 
-    // Request prompt rendering from extension
+    // If we have the initial content, show it immediately
+    if (selectedPromptContext.content) {
+        updatePromptPreview(selectedPromptContext.content);
+    }
+
+    // Request prompt rendering from extension with current variables
     vscode.postMessage({
         command: 'renderPromptWithVariables',
         promptId: selectedPromptContext.id,
@@ -385,13 +430,18 @@ function updatePromptPreview(rendered) {
         return;
     }
 
+    const formattedContent = formatPreviewContent(rendered);
+
+    // Update the full preview
     promptPreview.innerHTML = `
         <div class="preview-content">
             <h4>Rendered Prompt:</h4>
-            <div class="preview-text">${formatPreviewContent(rendered)}</div>
+            <div class="preview-text">${formattedContent}</div>
         </div>
     `;
 }
+
+// Removed updateCollapsedPreview function - no longer needed
 
 function formatPreviewContent(content) {
     // Basic markdown-to-HTML conversion for preview
@@ -532,7 +582,162 @@ function handleKeyDown(event) {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
         sendAgentRequest();
+        return;
     }
+
+    // Handle arrow key navigation for input history
+    if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        navigateInputHistory('up');
+        return;
+    }
+
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        navigateInputHistory('down');
+        return;
+    }
+
+    // Reset history navigation when user starts typing
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown' && historyIndex !== -1) {
+        // If user was navigating history and starts typing, save the current state
+        if (historyIndex === inputHistory.length) {
+            // User was at the "current input" position, update it
+            currentInput = paramsInput.value;
+        }
+        historyIndex = -1;
+        hideHistoryIndicator();
+    }
+}
+
+function navigateInputHistory(direction) {
+    if (inputHistory.length === 0) {
+        return;
+    }
+
+    // Initialize navigation if not already started
+    if (historyIndex === -1) {
+        // Save current input before starting navigation
+        currentInput = paramsInput.value;
+
+        if (direction === 'up') {
+            historyIndex = inputHistory.length - 1;
+        } else {
+            historyIndex = inputHistory.length; // Start at "current input" position
+        }
+    } else {
+        // Navigate through history
+        if (direction === 'up') {
+            historyIndex = Math.max(0, historyIndex - 1);
+        } else {
+            historyIndex = Math.min(inputHistory.length, historyIndex + 1);
+        }
+    }
+
+    // Update the input field
+    if (historyIndex === inputHistory.length) {
+        // Show current input (what user was typing before navigation)
+        paramsInput.value = currentInput;
+    } else {
+        // Show historical input
+        paramsInput.value = inputHistory[historyIndex];
+    }
+
+    // Show history indicator
+    updateHistoryIndicator();
+
+    // Move cursor to end of input
+    setTimeout(() => {
+        paramsInput.setSelectionRange(paramsInput.value.length, paramsInput.value.length);
+    }, 0);
+}
+
+function addToInputHistory(input) {
+    if (!input || input.trim() === '') {
+        return;
+    }
+
+    const trimmedInput = input.trim();
+
+    // Remove duplicate if it already exists
+    const existingIndex = inputHistory.indexOf(trimmedInput);
+    if (existingIndex !== -1) {
+        inputHistory.splice(existingIndex, 1);
+    }
+
+    // Add to end of history
+    inputHistory.push(trimmedInput);
+
+    // Keep only last 50 entries
+    if (inputHistory.length > 50) {
+        inputHistory.shift();
+    }
+
+    // Save to localStorage for persistence
+    saveInputHistoryToStorage();
+}
+
+function saveInputHistoryToStorage() {
+    try {
+        localStorage.setItem('wu-wei-input-history', JSON.stringify(inputHistory));
+    } catch (error) {
+        console.warn('Failed to save input history to localStorage:', error);
+    }
+}
+
+function loadInputHistoryFromStorage() {
+    try {
+        const stored = localStorage.getItem('wu-wei-input-history');
+        if (stored) {
+            inputHistory = JSON.parse(stored);
+            // Ensure it's an array and limit size
+            if (!Array.isArray(inputHistory)) {
+                inputHistory = [];
+            } else if (inputHistory.length > 50) {
+                inputHistory = inputHistory.slice(-50);
+                saveInputHistoryToStorage();
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to load input history from localStorage:', error);
+        inputHistory = [];
+    }
+}
+
+function updateHistoryIndicator() {
+    if (!historyIndicator || historyIndex === -1) {
+        return;
+    }
+
+    const totalEntries = inputHistory.length + 1; // +1 for current input
+    const currentPosition = historyIndex + 1;
+
+    if (historyIndex === inputHistory.length) {
+        historyIndicator.textContent = `Current`;
+    } else {
+        historyIndicator.textContent = `${currentPosition}/${totalEntries - 1}`;
+    }
+
+    historyIndicator.classList.add('show');
+}
+
+function hideHistoryIndicator() {
+    if (historyIndicator) {
+        historyIndicator.classList.remove('show');
+    }
+}
+
+function handleInputClick() {
+    // If user clicks in input while navigating history, stop navigation
+    if (historyIndex !== -1) {
+        historyIndex = -1;
+        hideHistoryIndicator();
+    }
+}
+
+function handleInputFocus() {
+    // Optional: Could show some indication that history navigation is available
+    // For now, just ensure any existing navigation state is cleared if needed
 }
 
 function updatePlaceholder() {
@@ -571,6 +776,9 @@ function sendAgentRequest() {
         }
     }
 
+    // Add input to history before sending
+    addToInputHistory(paramsText);
+
     // Send request with optional prompt context
     vscode.postMessage({
         command: 'sendAgentRequestWithPrompt',
@@ -584,8 +792,11 @@ function sendAgentRequest() {
         } : null
     });
 
-    // Clear input after sending
+    // Clear input after sending and reset navigation state
     paramsInput.value = '';
+    historyIndex = -1;
+    currentInput = '';
+    hideHistoryIndicator();
 }
 
 function parseParams(paramsText) {
@@ -901,6 +1112,9 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeCollapseState();
     updateInputLabelsAndPlaceholders();
     updateUIForCombinedMode();
+
+    // Load input history from storage
+    loadInputHistoryFromStorage();
 
     // Create pending executions section
     createPendingExecutionsSection();

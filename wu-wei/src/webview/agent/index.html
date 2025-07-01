@@ -14,11 +14,12 @@
     <div class="agent-container">
         <!-- Agent Selection Section -->
         <div class="section agent-selection">
-            <div class="section-header">
+            <div class="section-header clickable-header" onclick="toggleAgentCollapse()">
                 <div class="section-title">
                     <span class="icon">🤖</span>
                     <span>Agent Selection</span>
-                    <button class="collapse-toggle" id="agentToggle" onclick="toggleAgentCollapse()"
+                    <button class="collapse-toggle" id="agentToggle"
+                        onclick="event.stopPropagation(); toggleAgentCollapse()"
                         title="Toggle agent selection visibility">
                         <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                             <path
@@ -95,26 +96,38 @@
                 </div>
             </div>
 
-            <!-- Prompt Preview -->
-            <div class="prompt-preview-container" id="promptPreviewContainer" style="display: none;">
-                <div class="subsection-title">
-                    <span class="icon">👁️</span>
-                    <span>Prompt Preview</span>
+            <!-- Prompt Overview Section -->
+            <div class="section prompt-overview-section" id="promptOverviewContainer" style="display: none;">
+                <div class="section-header clickable-header" onclick="togglePromptOverviewCollapse()">
+                    <div class="section-title">
+                        <span class="icon">👁️</span>
+                        <span>Prompt Overview</span>
+                        <button class="collapse-toggle" id="promptOverviewToggle"
+                            onclick="event.stopPropagation(); togglePromptOverviewCollapse()"
+                            title="Toggle prompt overview visibility">
+                            <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <path
+                                    d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="section-subtitle">Review the selected prompt and its rendered content</div>
                 </div>
-                <div class="prompt-preview" id="promptPreview">
-                    <p class="no-preview">Select a prompt to see preview</p>
+
+                <div class="collapsible-content" id="promptOverviewContent">
+                    <!-- Full Prompt Preview -->
+                    <div class="prompt-preview" id="promptPreview">
+                        <p class="no-preview">Select a prompt to see preview</p>
+                    </div>
                 </div>
             </div>
 
             <div class="form-group">
                 <label class="form-label" id="parametersLabel">Message/Parameters</label>
-                <textarea id="paramsInput" placeholder="Enter your message or JSON parameters...
-
-Examples:
-• Plain text: Ask a question about my code
-• JSON: { &quot;question&quot;: &quot;How do I optimize this function?&quot; }"></textarea>
+                <textarea id="paramsInput" placeholder="Enter your message or JSON parameters..."></textarea>
+                <div class="history-indicator" id="historyIndicator"></div>
                 <div class="input-hint">
-                    <span class="keyboard-hint">💡 Tip: Use Ctrl+Enter to send quickly</span>
+                    <span class="keyboard-hint">💡 Tips: Use Ctrl+Enter to send, ↑↓ arrows to navigate history</span>
                 </div>
             </div>
 
@@ -140,12 +153,12 @@ Examples:
 
         <!-- Message History Section -->
         <div class="section history-section">
-            <div class="section-header">
+            <div class="section-header clickable-header" onclick="toggleHistoryCollapse()">
                 <div class="section-title">
                     <span class="icon">📋</span>
                     <span>Message History</span>
-                    <button class="collapse-toggle" id="historyToggle" onclick="toggleHistoryCollapse()"
-                        title="Toggle history visibility">
+                    <button class="collapse-toggle" id="historyToggle"
+                        onclick="event.stopPropagation(); toggleHistoryCollapse()" title="Toggle history visibility">
                         <svg class="collapse-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                             <path
                                 d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z" />
