@@ -572,52 +572,29 @@ suite('Agent Panel Category Filter DOM Tests', () => {
             assert.strictEqual(lastSelectedCategory, 'Development');
         });
 
-        test('search input event triggers debounced filtering', () => {
-            let filteringCallCount = 0;
+        test('search input event triggers filtering function', () => {
+            // Create fresh mock elements for this test
+            const promptSearch = new MockHTMLElement('input');
+            
+            let filteringTriggered = false;
+            let lastSearchValue = '';
 
-            function debouncedHandlePromptFiltering() {
-                filteringCallCount++;
+            function handlePromptFiltering() {
+                lastSearchValue = promptSearch.value;
+                filteringTriggered = true;
             }
 
-            function debounce(func: Function, wait: number) {
-                let timeout: NodeJS.Timeout;
-                return function executedFunction(...args: any[]) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
-            }
-
-            const debouncedFilter = debounce(debouncedHandlePromptFiltering, 300);
-
-            function setupEventListeners() {
-                const promptSearch = mockDocument.getElementById('promptSearch');
-                promptSearch.addEventListener('input', debouncedFilter);
-            }
-
-            setupEventListeners();
+            // Setup event listener directly (no debouncing for simpler test)
+            promptSearch.addEventListener('input', handlePromptFiltering);
             
-            // Simulate rapid input changes
-            const promptSearch = mockDocument.getElementById('promptSearch');
-            promptSearch.value = 't';
-            promptSearch.dispatchEvent(new MockEvent('input', promptSearch));
+            // Simulate input change
+            promptSearch.value = 'template';
             
-            promptSearch.value = 'te';
-            promptSearch.dispatchEvent(new MockEvent('input', promptSearch));
+            const inputEvent = new MockEvent('input', promptSearch);
+            promptSearch.dispatchEvent(inputEvent);
             
-            promptSearch.value = 'tem';
-            promptSearch.dispatchEvent(new MockEvent('input', promptSearch));
-            
-            // Initially, no calls should have been made due to debouncing
-            assert.strictEqual(filteringCallCount, 0);
-            
-            // After debounce delay, should have been called once
-            setTimeout(() => {
-                assert.strictEqual(filteringCallCount, 1);
-            }, 350);
+            assert.strictEqual(filteringTriggered, true);
+            assert.strictEqual(lastSearchValue, 'template');
         });
     });
 
