@@ -25,6 +25,7 @@ const historyIndicator = document.getElementById('historyIndicator');
 
 // Message progress tracking
 let processingMessages = new Map(); // Maps message IDs to their processing state
+let messageExecutionMap = new Map(); // Maps message IDs to execution IDs for cancellation
 
 // DOM elements - new prompt integration
 const promptSelectorContainer = document.getElementById('promptSelectorContainer');
@@ -99,6 +100,10 @@ window.addEventListener('message', event => {
         case 'updateExecutionHistory':
             executionHistory = message.history || [];
             updateExecutionHistoryDisplay(message.stats);
+            break;
+        case 'messageExecutionLink':
+            // Store the link between messageId and executionId for cancellation
+            messageExecutionMap.set(message.messageId, message.executionId);
             break;
     }
 });
@@ -871,6 +876,7 @@ function validatePromptVariables() {
 function clearHistory() {
     // Clear processing messages tracking
     processingMessages.clear();
+    messageExecutionMap.clear();
 
     // Clear the processing duration interval if active
     if (window.messageProcessingInterval) {
@@ -885,6 +891,7 @@ function clearHistory() {
 function handleMessageProcessingComplete(messageId, success) {
     if (processingMessages.has(messageId)) {
         processingMessages.delete(messageId);
+        messageExecutionMap.delete(messageId); // Clean up the execution mapping
         updateMessageHistory(); // Refresh to remove the progress indicator
     }
 }
@@ -1035,6 +1042,13 @@ function cancelExecution(executionId) {
     });
 }
 
+function cancelMessageExecution(messageId) {
+    vscode.postMessage({
+        command: 'cancelMessageExecution',
+        messageId: messageId
+    });
+}
+
 function createPendingExecutionsSection() {
     // Find the input section to insert the pending executions section after it
     const inputSection = document.querySelector('.input-section');
@@ -1109,64 +1123,15 @@ function updateMessageHistory() {
 
     let messagesHtml = '';
 
-    // Add regular messages
+    // Build tree structure from messages grouped by session/request
     if (hasMessages) {
-        messagesHtml += messageHistory.map(message => {
-            const timestamp = new Date(message.timestamp).toLocaleString();
-
-            let content = '';
-            let typeClass = message.type;
-
-            if (message.type === 'request') {
-                content = `Method: ${message.method}\nParams: ${JSON.stringify(message.params, null, 2)}`;
-            } else if (message.type === 'response') {
-                if (message.error) {
-                    content = `Error: ${message.error.message}\nCode: ${message.error.code}`;
-                    if (message.error.data) {
-                        content += `\nData: ${JSON.stringify(message.error.data, null, 2)}`;
-                    }
-                    typeClass = 'error';
-                } else {
-                    content = `Result: ${JSON.stringify(message.result, null, 2)}`;
-                }
-            } else if (message.type === 'error') {
-                content = `Error: ${message.error?.message || 'Unknown error'}\nCode: ${message.error?.code || 'N/A'}`;
-            }
-
-            return `
-                <div class="message-item ${typeClass}">
-                    <div class="message-header">
-                        <span class="message-type ${typeClass}">${message.type}</span>
-                        <span class="message-timestamp">${timestamp}</span>
-                    </div>
-                    <div class="message-content">${content}</div>
-                </div>
-            `;
-        }).join('');
+        const sessionTree = buildSessionTree(messageHistory);
+        messagesHtml += renderSessionTree(sessionTree);
     }
 
     // Add processing messages at the end
     if (hasProcessingMessages) {
-        processingMessages.forEach((processingInfo, messageId) => {
-            const timestamp = new Date(processingInfo.startTime).toLocaleString();
-            const duration = formatDuration(new Date().getTime() - processingInfo.startTime.getTime());
-
-            messagesHtml += `
-                <div class="message-item processing" data-message-id="${messageId}">
-                    <div class="message-header">
-                        <span class="message-type processing">processing</span>
-                        <span class="message-timestamp">${timestamp}</span>
-                        <span class="processing-duration">${duration}</span>
-                    </div>
-                    <div class="message-content">
-                        <div class="processing-indicator">
-                            <div class="processing-spinner"></div>
-                            <span class="processing-text">Agent ${processingInfo.agentName} is processing your ${processingInfo.method} request...</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
+        messagesHtml += renderProcessingMessages();
     }
 
     messageList.innerHTML = messagesHtml;
@@ -1188,6 +1153,376 @@ function updateMessageHistory() {
     }, 100);
 }
 
+// Build a tree structure from messages grouped by session/request
+function buildSessionTree(messages) {
+    const sessions = [];
+    let currentSession = null;
+
+    for (let i = 0; i < messages.length; i++) {
+        const message = messages[i];
+
+        if (message.type === 'request') {
+            // Start a new session
+            currentSession = {
+                id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                request: message,
+                responses: [],
+                timestamp: message.timestamp,
+                summary: generateRequestSummary(message),
+                executionId: message.params?.executionId || null,
+                expanded: false // Default to collapsed
+            };
+            sessions.push(currentSession);
+        } else if (currentSession) {
+            // Add response to current session
+            currentSession.responses.push(message);
+        }
+    }
+
+    return sessions;
+}
+
+// Generate a short summary for a request (first 10 words or method name)
+function generateRequestSummary(request) {
+    // Try to extract meaningful text from parameters
+    let text = '';
+
+    if (request.params?.message) {
+        text = request.params.message;
+    } else if (request.params?.query) {
+        text = request.params.query;
+    } else if (request.params?.input) {
+        text = request.params.input;
+    } else if (request.method) {
+        text = `${request.method} request`;
+    } else {
+        text = 'Agent request';
+    }
+
+    // Clean and truncate to first 10 words
+    const words = text.replace(/\n/g, ' ').split(' ').filter(word => word.trim());
+    const summary = words.slice(0, 10).join(' ');
+
+    return summary.length > 60 ? summary.substring(0, 57) + '...' : summary;
+}
+
+// Render the session tree structure
+function renderSessionTree(sessions) {
+    if (!sessions.length) return '';
+
+    return `
+        <div class="session-tree">
+            ${sessions.map(session => renderSessionNode(session)).join('')}
+        </div>
+    `;
+}
+
+// Render a single session node (request + responses)
+function renderSessionNode(session) {
+    const timestamp = new Date(session.timestamp).toLocaleString();
+    const responseCount = session.responses.length;
+    const hasResponses = responseCount > 0;
+    const isExpanded = session.expanded;
+
+    // Determine session status based on responses
+    let sessionStatus = 'pending';
+    let statusIcon = '⏳';
+    let statusText = 'Pending';
+
+    if (hasResponses) {
+        const hasCompletionSignal = session.responses.some(r =>
+            r.result?.type === 'completion-signal' || r.result?.type === 'standalone-completion-signal'
+        );
+        const hasErrors = session.responses.some(r => r.error || r.type === 'error');
+
+        if (hasCompletionSignal) {
+            const completionResponse = session.responses.find(r =>
+                r.result?.type === 'completion-signal' || r.result?.type === 'standalone-completion-signal'
+            );
+            const status = completionResponse?.result?.status || 'success';
+            sessionStatus = status;
+            statusIcon = getStatusIcon(status);
+            statusText = status.charAt(0).toUpperCase() + status.slice(1);
+        } else if (hasErrors) {
+            sessionStatus = 'error';
+            statusIcon = '❌';
+            statusText = 'Error';
+        } else {
+            sessionStatus = 'processing';
+            statusIcon = '🔄';
+            statusText = 'Processing';
+        }
+    }
+
+    return `
+        <div class="session-node ${sessionStatus}" data-session-id="${session.id}">
+            <div class="session-header">
+                <div class="session-expand-icon ${isExpanded ? 'expanded' : ''}" data-action="toggle" data-session-id="${session.id}" title="${isExpanded ? 'Collapse' : 'Expand'}">
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M6 12L10 8L6 4" />
+                    </svg>
+                </div>
+                <div class="session-info" data-action="open-editor" data-session-id="${session.id}">
+                    <div class="session-summary">${session.summary}</div>
+                    <div class="session-meta">
+                        <span class="session-timestamp">${timestamp}</span>
+                        <span class="session-status ${sessionStatus}">
+                            <span class="status-icon">${statusIcon}</span>
+                            ${statusText}
+                        </span>
+                        ${hasResponses ? `<span class="response-count">${responseCount} response${responseCount > 1 ? 's' : ''}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            ${isExpanded ? `
+                <div class="session-content">
+                    <div class="request-details">
+                        ${formatRequestDetails(session.request)}
+                    </div>
+                    ${hasResponses ? `
+                        <div class="responses-list">
+                            ${session.responses.map(response => formatResponseDetails(response)).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
+// Open session details in main editor
+function openSessionInEditor(sessionId) {
+    console.log('openSessionInEditor called with sessionId:', sessionId);
+
+    // Check if vscode API is available
+    if (typeof vscode === 'undefined') {
+        console.error('vscode API is not available');
+        return;
+    }
+
+    // Find the session data
+    const sessions = buildSessionTree(messageHistory);
+    console.log('Available sessions:', sessions);
+    const session = sessions.find(s => s.id === sessionId);
+
+    if (!session) {
+        console.error('Session not found:', sessionId, 'Available sessions:', sessions.map(s => s.id));
+        return;
+    }
+
+    console.log('Found session:', session);
+
+    try {
+        // Send message to backend to open detailed view
+        vscode.postMessage({
+            command: 'openSessionDetails',
+            sessionId: sessionId,
+            session: {
+                id: session.id,
+                summary: session.summary,
+                timestamp: session.timestamp,
+                executionId: session.executionId,
+                request: session.request,
+                responses: session.responses
+            }
+        });
+
+        console.log('Sent openSessionDetails message to backend');
+    } catch (error) {
+        console.error('Error sending message to backend:', error);
+    }
+}
+
+// Make sure the function is globally accessible
+window.openSessionInEditor = openSessionInEditor;
+window.toggleSession = toggleSession;
+
+// Format request details for expanded view
+function formatRequestDetails(request) {
+    const displayParams = { ...request.params };
+    delete displayParams.executionId; // Hide internal fields
+
+    return `
+        <div class="detail-item request-detail">
+            <div class="detail-header">
+                <span class="detail-type request">📤 Request</span>
+                <span class="detail-method">${request.method}</span>
+            </div>
+            <div class="detail-content">
+                <div class="params-block">
+                    <div class="params-label">Parameters:</div>
+                    <pre class="params-code">${JSON.stringify(displayParams, null, 2)}</pre>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Format response details for expanded view
+function formatResponseDetails(response) {
+    let responseType = 'response';
+    let typeIcon = '✅';
+    let typeLabel = 'Response';
+    let content = '';
+
+    if (response.error || response.type === 'error') {
+        responseType = 'error';
+        typeIcon = '❌';
+        typeLabel = 'Error';
+        const error = response.error || { message: 'Unknown error', code: 'N/A' };
+        content = `
+            <div class="error-block">
+                <div class="error-message"><strong>Error:</strong> ${error.message}</div>
+                <div class="error-code"><strong>Code:</strong> ${error.code}</div>
+                ${error.data ? `<div class="error-data"><strong>Details:</strong></div><pre class="error-data-code">${JSON.stringify(error.data, null, 2)}</pre>` : ''}
+            </div>
+        `;
+    } else if (response.result?.type === 'completion-signal') {
+        responseType = 'completion';
+        const status = response.result.status;
+        typeIcon = getStatusIcon(status);
+        typeLabel = 'Task Completion';
+
+        content = `
+            <div class="completion-block">
+                <div class="completion-status"><strong>Status:</strong> ${status}</div>
+                <div class="completion-task"><strong>Task:</strong> ${response.result.taskDescription}</div>
+                <div class="completion-summary-text"><strong>Summary:</strong> ${response.result.summary}</div>
+                ${response.result.duration ? `<div class="completion-duration"><strong>Duration:</strong> ${formatDuration(response.result.duration)}</div>` : ''}
+                ${response.result.agentName ? `<div class="completion-agent"><strong>Agent:</strong> ${response.result.agentName}</div>` : ''}
+            </div>
+        `;
+    } else if (response.result?.type === 'standalone-completion-signal') {
+        responseType = 'standalone-completion';
+        const status = response.result.status;
+        typeIcon = getStatusIcon(status);
+        typeLabel = 'Standalone Completion';
+
+        content = `
+            <div class="completion-block standalone">
+                <div class="completion-status"><strong>Status:</strong> ${status}</div>
+                <div class="completion-task"><strong>Task:</strong> ${response.result.taskDescription}</div>
+                <div class="completion-summary-text"><strong>Summary:</strong> ${response.result.summary}</div>
+                <div class="standalone-note"><em>Note: This completion could not be correlated with a specific request.</em></div>
+            </div>
+        `;
+    } else {
+        // Regular response (acknowledgment)
+        responseType = 'acknowledgment';
+        typeIcon = '✅';
+        typeLabel = 'Agent Acknowledgment';
+
+        content = `
+            <div class="response-block">
+                <pre class="response-code">${JSON.stringify(response.result, null, 2)}</pre>
+                <div class="response-note"><em>Initial response - waiting for task completion...</em></div>
+            </div>
+        `;
+    }
+
+    const timestamp = new Date(response.timestamp).toLocaleString();
+
+    return `
+        <div class="detail-item response-detail ${responseType}">
+            <div class="detail-header">
+                <span class="detail-type ${responseType}">${typeIcon} ${typeLabel}</span>
+                <span class="detail-timestamp">${timestamp}</span>
+            </div>
+            <div class="detail-content">
+                ${content}
+            </div>
+        </div>
+    `;
+}
+
+// Render processing messages
+function renderProcessingMessages() {
+    if (processingMessages.size === 0) return '';
+
+    let html = '<div class="processing-sessions">';
+
+    processingMessages.forEach((processingInfo, messageId) => {
+        const timestamp = new Date(processingInfo.startTime).toLocaleString();
+        const duration = formatDuration(new Date().getTime() - processingInfo.startTime.getTime());
+        const hasExecutionId = messageExecutionMap.has(messageId);
+
+        // Generate summary for processing request
+        const summary = `${processingInfo.method} request`;
+
+        html += `
+            <div class="session-node processing" data-message-id="${messageId}">
+                <div class="session-header processing">
+                    <div class="session-info">
+                        <div class="session-summary">${summary}</div>
+                        <div class="session-meta">
+                            <span class="session-timestamp">${timestamp}</span>
+                            <span class="session-status processing">
+                                <span class="status-icon processing-spinner-small">🔄</span>
+                                Processing
+                            </span>
+                            <span class="processing-duration">${duration}</span>
+                        </div>
+                    </div>
+                    ${hasExecutionId ? `
+                        <button class="btn-cancel-session" onclick="cancelMessageExecution('${messageId}')" title="Cancel execution">
+                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+                            </svg>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    return html;
+}
+
+// Toggle session expansion state
+function toggleSession(sessionId) {
+    const sessionNode = document.querySelector(`[data-session-id="${sessionId}"]`);
+    if (!sessionNode) return;
+
+    const expandIcon = sessionNode.querySelector('.session-expand-icon');
+    const isCurrentlyExpanded = expandIcon.classList.contains('expanded');
+
+    // Toggle the expanded state
+    if (isCurrentlyExpanded) {
+        expandIcon.classList.remove('expanded');
+        sessionNode.classList.remove('expanded');
+        // Remove content
+        const content = sessionNode.querySelector('.session-content');
+        if (content) {
+            content.remove();
+        }
+    } else {
+        expandIcon.classList.add('expanded');
+        sessionNode.classList.add('expanded');
+
+        // Find the session data and render content
+        const sessions = buildSessionTree(messageHistory);
+        const session = sessions.find(s => s.id === sessionId);
+        if (session) {
+            session.expanded = true;
+            const contentHtml = `
+                <div class="session-content">
+                    <div class="request-details">
+                        ${formatRequestDetails(session.request)}
+                    </div>
+                    ${session.responses.length ? `
+                        <div class="responses-list">
+                            ${session.responses.map(response => formatResponseDetails(response)).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            sessionNode.insertAdjacentHTML('beforeend', contentHtml);
+        }
+    }
+}
+
 // Update duration displays for processing messages
 function updateProcessingMessageDurations() {
     const currentTime = new Date().getTime();
@@ -1199,6 +1534,12 @@ function updateProcessingMessageDurations() {
             messageElement.textContent = duration;
         }
     });
+
+    // If there are no more processing messages, clear the interval
+    if (processingMessages.size === 0 && window.messageProcessingInterval) {
+        clearInterval(window.messageProcessingInterval);
+        window.messageProcessingInterval = null;
+    }
 }
 
 // Initialize the panel
@@ -1213,6 +1554,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Create pending executions section
     createPendingExecutionsSection();
 
+    // Add event delegation for session clicks
+    setupSessionEventHandlers();
+
     // Initialize pending executions collapse state after a short delay
     // to ensure the section is fully created
     setTimeout(() => {
@@ -1225,6 +1569,38 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }, 100);
 });
+
+// Setup event delegation for session interactions
+function setupSessionEventHandlers() {
+    // Add click event delegation for session interactions
+    document.addEventListener('click', function (event) {
+        const target = event.target.closest('[data-action]');
+        if (!target) return;
+
+        const action = target.getAttribute('data-action');
+        const sessionId = target.getAttribute('data-session-id');
+
+        console.log('Session click detected:', { action, sessionId, target });
+
+        if (!sessionId) {
+            console.error('No session ID found for action:', action);
+            return;
+        }
+
+        switch (action) {
+            case 'toggle':
+                console.log('Toggling session:', sessionId);
+                toggleSession(sessionId);
+                break;
+            case 'open-editor':
+                console.log('Opening session in editor:', sessionId);
+                openSessionInEditor(sessionId);
+                break;
+            default:
+                console.warn('Unknown session action:', action);
+        }
+    });
+}
 
 // Request initial data
 vscode.postMessage({ command: 'getAgentCapabilities' });

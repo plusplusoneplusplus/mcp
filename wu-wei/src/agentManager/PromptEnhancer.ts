@@ -308,7 +308,7 @@ export class PromptEnhancer {
     private static generateExecutionInstructions(context: ExecutionContext): string {
         return `
 ==============
-**IMPORTANT**: When you have completed this request, please call the \`@wu-wei_copilot_completion_signal\` tool with executionId="${context.executionId}".`;
+**CRITICAL - DO NOT IGNORE**: Whatever the result of this request (success, failure, or partial completion), you MUST call the \`@wu-wei_copilot_completion_signal\` tool with executionId="${context.executionId}" to signal completion. This step is mandatory and must not be skipped under any circumstances.`;
     }
 
     /**
@@ -412,7 +412,7 @@ export class PromptEnhancer {
         // Remove the execution instructions section
         const lines = withoutComments.split('\n');
         const importantIndex = lines.findIndex(line =>
-            line.includes('**IMPORTANT**') && line.includes('wu-wei_copilot_completion_signal')
+            (line.includes('**IMPORTANT**') || line.includes('**CRITICAL')) && line.includes('wu-wei_copilot_completion_signal')
         );
 
         if (importantIndex >= 0) {

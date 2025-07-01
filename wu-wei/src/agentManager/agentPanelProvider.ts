@@ -226,6 +226,9 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
             case 'getAgentCapabilities':
                 this.sendAgentCapabilities();
                 break;
+            case 'openSessionDetails':
+                await this.handleOpenSessionDetails(message.sessionId, message.session);
+                break;
             // Phase 2: Enhanced webview commands for execution management
             // These commands provide real-time execution control and monitoring capabilities
             case 'getPendingExecutions':
@@ -233,6 +236,9 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 break;
             case 'cancelExecution':
                 await this.handleCancelExecution(message.executionId);
+                break;
+            case 'cancelMessageExecution':
+                await this.handleCancelMessageExecution(message.messageId);
                 break;
             case 'getExecutionHistory':
                 await this.sendExecutionHistory();
@@ -375,6 +381,11 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 taskDescription,
                 startTime: new Date()
             });
+
+            // Link the messageId to the executionId for cancellation support
+            if (messageId) {
+                this.sendMessageExecutionLink(messageId, executionId);
+            }
 
             const response = await agent.processRequest(request);
 
@@ -910,6 +921,12 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                     }
                 });
 
+                // Signal message processing completion for cancellation
+                const messageId = (activeExecution as any).messageId;
+                if (messageId) {
+                    this.signalMessageProcessingComplete(messageId, false);
+                }
+
                 logger.info('Execution cancelled by user', { executionId });
             }
 
@@ -919,6 +936,28 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 error: error instanceof Error ? error.message : String(error)
             });
         }
+    }
+
+    /**
+     * Handle cancellation of execution by message ID
+     * 
+     * This method finds the execution associated with a message ID and cancels it.
+     * Used when cancelling from the message history UI.
+     */
+    private async handleCancelMessageExecution(messageId: string): Promise<void> {
+        // Find the active execution that has this messageId
+        const activeExecutions = this._executionRegistry.getActiveExecutions();
+        const targetExecution = activeExecutions.find(execution =>
+            (execution as any).messageId === messageId
+        );
+
+        if (!targetExecution) {
+            logger.warn('Attempted to cancel execution with unknown message ID', { messageId });
+            return;
+        }
+
+        // Cancel using the existing method
+        await this.handleCancelExecution(targetExecution.executionId);
     }
 
     /**
@@ -984,6 +1023,22 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
     }
 
     /**
+     * Link messageId to executionId for cancellation support
+     * 
+     * Sends the connection between messageId and executionId to the UI
+     * so that processing messages can be cancelled via their execution ID.
+     */
+    private sendMessageExecutionLink(messageId: string, executionId: string): void {
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'messageExecutionLink',
+                messageId,
+                executionId
+            });
+        }
+    }
+
+    /**
      * Phase 2: Cleanup and resource disposal
      * 
      * Properly disposes of all Phase 2 resources including:
@@ -1003,5 +1058,165 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         this._executionTracker.dispose();
 
         logger.debug('Agent Panel Provider disposed');
+    }
+
+    private async handleOpenSessionDetails(sessionId: string, session: any): Promise<void> {
+        try {
+            // Generate a readable document content from the session data
+            const content = this.generateSessionDetailsContent(session);
+
+            // Create a virtual document URI
+            const uri = vscode.Uri.parse(`wu-wei-session://${sessionId}.md`);
+
+            // Register a temporary text document content provider
+            const provider = new class implements vscode.TextDocumentContentProvider {
+                provideTextDocumentContent(uri: vscode.Uri): string {
+                    return content;
+                }
+            };
+
+            // Register the provider
+            const disposable = vscode.workspace.registerTextDocumentContentProvider('wu-wei-session', provider);
+
+            // Open the document in the editor
+            const doc = await vscode.workspace.openTextDocument(uri);
+            const editor = await vscode.window.showTextDocument(doc, {
+                preview: false,
+                preserveFocus: false
+            });
+
+            // Set the language to markdown for better formatting
+            await vscode.languages.setTextDocumentLanguage(doc, 'markdown');
+
+            // Dispose the provider after a delay to allow the document to load
+            setTimeout(() => {
+                disposable.dispose();
+            }, 1000);
+
+            logger.info(`Opened session details in editor for session: ${sessionId}`);
+
+        } catch (error) {
+            logger.error('Failed to open session details', error);
+            vscode.window.showErrorMessage(`Failed to open session details: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    private generateSessionDetailsContent(session: any): string {
+        const timestamp = new Date(session.timestamp).toLocaleString();
+        const responseCount = session.responses?.length || 0;
+
+        // Determine overall status
+        let overallStatus = 'Pending';
+        if (responseCount > 0) {
+            const hasCompletionSignal = session.responses.some((r: any) =>
+                r.result?.type === 'completion-signal' || r.result?.type === 'standalone-completion-signal'
+            );
+            const hasErrors = session.responses.some((r: any) => r.error || r.type === 'error');
+
+            if (hasCompletionSignal) {
+                const completionResponse = session.responses.find((r: any) =>
+                    r.result?.type === 'completion-signal' || r.result?.type === 'standalone-completion-signal'
+                );
+                overallStatus = completionResponse?.result?.status || 'Success';
+            } else if (hasErrors) {
+                overallStatus = 'Error';
+            } else {
+                overallStatus = 'Processing';
+            }
+        }
+
+        let content = `# Agent Execution Session Details
+
+## Session Overview
+- **Summary:** ${session.summary}
+- **Timestamp:** ${timestamp}
+- **Status:** ${overallStatus}
+- **Session ID:** ${session.id}
+- **Execution ID:** ${session.executionId || 'N/A'}
+- **Response Count:** ${responseCount}
+
+---
+
+## 📤 Request Details
+
+### Method
+\`${session.request.method}\`
+
+### Parameters
+\`\`\`json
+${JSON.stringify(this.cleanParamsForDisplay(session.request.params), null, 2)}
+\`\`\`
+
+---
+
+## 📥 Responses
+
+`;
+
+        if (responseCount === 0) {
+            content += '*No responses yet.*\n';
+        } else {
+            session.responses.forEach((response: any, index: number) => {
+                const responseTimestamp = new Date(response.timestamp).toLocaleString();
+                content += `### Response ${index + 1}\n\n`;
+                content += `**Timestamp:** ${responseTimestamp}\n\n`;
+
+                if (response.error || response.type === 'error') {
+                    content += `**Type:** Error\n\n`;
+                    const error = response.error || { message: 'Unknown error', code: 'N/A' };
+                    content += `**Error Message:** ${error.message}\n\n`;
+                    content += `**Error Code:** ${error.code}\n\n`;
+                    if (error.data) {
+                        content += `**Error Details:**\n\`\`\`json\n${JSON.stringify(error.data, null, 2)}\n\`\`\`\n\n`;
+                    }
+                } else if (response.result?.type === 'completion-signal') {
+                    content += `**Type:** Task Completion\n\n`;
+                    content += `**Status:** ${response.result.status}\n\n`;
+                    content += `**Task Description:** ${response.result.taskDescription}\n\n`;
+                    content += `**Summary:** ${response.result.summary}\n\n`;
+                    if (response.result.duration) {
+                        content += `**Duration:** ${response.result.duration}ms\n\n`;
+                    }
+                    if (response.result.agentName) {
+                        content += `**Agent:** ${response.result.agentName}\n\n`;
+                    }
+                    if (response.result.metadata) {
+                        content += `**Metadata:**\n\`\`\`json\n${JSON.stringify(response.result.metadata, null, 2)}\n\`\`\`\n\n`;
+                    }
+                } else if (response.result?.type === 'standalone-completion-signal') {
+                    content += `**Type:** Standalone Completion\n\n`;
+                    content += `**Status:** ${response.result.status}\n\n`;
+                    content += `**Task Description:** ${response.result.taskDescription}\n\n`;
+                    content += `**Summary:** ${response.result.summary}\n\n`;
+                    content += `*Note: This completion could not be correlated with a specific request.*\n\n`;
+                } else {
+                    content += `**Type:** Agent Acknowledgment\n\n`;
+                    content += `**Response Data:**\n\`\`\`json\n${JSON.stringify(response.result, null, 2)}\n\`\`\`\n\n`;
+                    content += `*This is the initial response from the agent. Waiting for task completion...*\n\n`;
+                }
+
+                if (index < responseCount - 1) {
+                    content += '---\n\n';
+                }
+            });
+        }
+
+        content += `\n---
+
+*Generated by Wu Wei Agent Panel on ${new Date().toLocaleString()}*
+*This is a read-only view of the execution session.*`;
+
+        return content;
+    }
+
+    private cleanParamsForDisplay(params: any): any {
+        if (!params) return {};
+
+        const cleaned = { ...params };
+
+        // Remove internal fields
+        delete cleaned.executionId;
+
+        return cleaned;
     }
 }

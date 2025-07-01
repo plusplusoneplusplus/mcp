@@ -385,7 +385,7 @@ suite('PromptEnhancer Tests', () => {
             assert.ok(result.includes('System prompt'));
             assert.ok(result.includes('User Request:'));
             assert.ok(result.includes('User input'));
-            assert.ok(result.includes('**IMPORTANT**'));
+            assert.ok(result.includes('**CRITICAL'));
             assert.ok(result.includes('wu-wei_copilot_completion_signal'));
             assert.ok(result.includes('test-exec-123'));
         });
@@ -404,7 +404,7 @@ suite('PromptEnhancer Tests', () => {
                 executionContext
             );
 
-            assert.ok(result.includes('**IMPORTANT**'));
+            assert.ok(result.includes('**CRITICAL'));
             assert.ok(result.includes('test-exec-123'));
         });
     });
@@ -546,7 +546,7 @@ suite('PromptEnhancer Tests', () => {
             );
 
             assert.ok(result.includes('Original prompt content'));
-            assert.ok(result.includes('**IMPORTANT**'));
+            assert.ok(result.includes('**CRITICAL'));
             assert.ok(result.includes('test-123'));
         });
 
@@ -560,7 +560,7 @@ suite('PromptEnhancer Tests', () => {
 
             const result = PromptEnhancer.enhancePromptWithExecutionContext('', context);
 
-            assert.ok(result.includes('**IMPORTANT**'));
+            assert.ok(result.includes('**CRITICAL'));
             assert.ok(result.includes('test-123'));
             assert.ok(!result.includes('undefined'));
         });
@@ -687,10 +687,10 @@ suite('PromptEnhancer Tests', () => {
 
         test('should remove execution instructions', () => {
             const prompt = `Content
-**IMPORTANT**: When you have completed this request, please call the \`@wu-wei_copilot_completion_signal\` tool.
+**CRITICAL - DO NOT IGNORE**: Whatever the result of this request, you MUST call the \`@wu-wei_copilot_completion_signal\` tool.
 More content`;
             const result = PromptEnhancer.cleanPromptForDisplay(prompt);
-            assert.ok(!result.includes('**IMPORTANT**'));
+            assert.ok(!result.includes('**CRITICAL'));
             assert.ok(!result.includes('completion_signal'));
             assert.ok(result.includes('Content'));
         });
@@ -915,16 +915,16 @@ More content`;
             const complexPrompt = `
 Original content here
 
-**IMPORTANT**: First instruction with wu-wei_copilot_completion_signal tool.
+**CRITICAL - DO NOT IGNORE**: First instruction with wu-wei_copilot_completion_signal tool.
 Some middle content
 
-**IMPORTANT**: Second instruction also mentioning @wu-wei_copilot_completion_signal.
+**CRITICAL - DO NOT IGNORE**: Second instruction also mentioning @wu-wei_copilot_completion_signal.
 Final content
 `;
 
             const cleaned = PromptEnhancer.cleanPromptForDisplay(complexPrompt);
 
-            assert.ok(!cleaned.includes('**IMPORTANT**'));
+            assert.ok(!cleaned.includes('**CRITICAL'));
             assert.ok(!cleaned.includes('wu-wei_copilot_completion_signal'));
             assert.ok(cleaned.includes('Original content here'));
         });
