@@ -287,6 +287,62 @@
     border-top: 1px solid var(--vscode-widget-border, #3c3c3c);
 }
 
+/* Category Filter Styles */
+.category-filter {
+    width: 100%;
+    padding: 3px 4px;
+    border: 1px solid var(--vscode-input-border, #3c3c3c);
+    border-radius: 2px;
+    background-color: var(--vscode-input-background, #3c3c3c);
+    color: var(--vscode-input-foreground, #cccccc);
+    font-size: 10px;
+    box-sizing: border-box;
+}
+
+.category-filter:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+}
+
+.prompt-filter-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    padding: 2px 0;
+    font-size: 9px;
+}
+
+.filter-count {
+    color: var(--vscode-descriptionForeground, #9c9c9c);
+    font-style: italic;
+}
+
+.btn-clear-filters {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 4px;
+    border: 1px solid var(--vscode-button-border, transparent);
+    border-radius: 2px;
+    background: var(--vscode-button-secondaryBackground, #3c3c3c);
+    color: var(--vscode-button-secondaryForeground, #cccccc);
+    font-size: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-clear-filters:hover {
+    background: var(--vscode-button-secondaryHoverBackground, #464647);
+    transform: scale(1.05);
+}
+
+.btn-clear-filters svg {
+    width: 8px;
+    height: 8px;
+}
+
 .prompt-search {
     width: 100%;
     padding: 3px 4px;

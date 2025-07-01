@@ -30,7 +30,10 @@ let messageExecutionMap = new Map(); // Maps message IDs to execution IDs for ca
 // DOM elements - new prompt integration
 const promptSelectorContainer = document.getElementById('promptSelectorContainer');
 const promptSearch = document.getElementById('promptSearch');
+const categoryFilter = document.getElementById('categoryFilter');
 const promptSelector = document.getElementById('promptSelector');
+const promptFilterStatus = document.getElementById('promptFilterStatus');
+const clearFiltersBtn = document.getElementById('clearFilters');
 const variableEditorContainer = document.getElementById('variableEditorContainer');
 const variableEditor = document.getElementById('variableEditor');
 const promptOverviewContainer = document.getElementById('promptOverviewContainer');
@@ -46,7 +49,8 @@ paramsInput.addEventListener('click', handleInputClick);
 paramsInput.addEventListener('focus', handleInputFocus);
 
 // Event listeners - new prompt integration
-promptSearch.addEventListener('input', debounce(handlePromptSearch, 300));
+promptSearch.addEventListener('input', debounce(handlePromptFiltering, 300));
+categoryFilter.addEventListener('change', handlePromptFiltering);
 promptSelector.addEventListener('change', handlePromptSelection);
 
 // Initialize DOM content
@@ -188,40 +192,83 @@ function updateInputLabelsAndPlaceholders() {
     paramsInput.placeholder = 'Enter your message or combine with a prompt template...';
 }
 
-// Prompt Search and Selection
-function handlePromptSearch(event) {
-    const query = event.target.value.toLowerCase();
+// Prompt Search and Selection with Category Filtering
+function handlePromptFiltering(event) {
+    const query = promptSearch.value.toLowerCase();
+    const selectedCategory = categoryFilter.value;
 
-    // Filter prompts based on search query
+    // Filter prompts based on search query and category
     const filteredPrompts = availablePrompts.filter(prompt => {
-        return prompt.title.toLowerCase().includes(query) ||
+        // Category filter
+        const categoryMatch = !selectedCategory || prompt.category === selectedCategory;
+        
+        // Search filter
+        const searchMatch = !query || 
+            prompt.title.toLowerCase().includes(query) ||
             (prompt.description && prompt.description.toLowerCase().includes(query)) ||
             (prompt.category && prompt.category.toLowerCase().includes(query)) ||
             (prompt.tags && prompt.tags.some(tag => tag.toLowerCase().includes(query)));
+
+        return categoryMatch && searchMatch;
     });
 
     updatePromptSelectorList(filteredPrompts);
+    updateFilterStatus(filteredPrompts.length, query, selectedCategory);
 }
 
 function updatePromptSelector() {
+    updateCategoryFilter();
     updatePromptSelectorList(availablePrompts);
+    updateFilterStatus(availablePrompts.length, '', '');
 }
 
 function updatePromptSelectorList(prompts) {
     promptSelector.innerHTML = '';
 
     if (prompts.length === 0) {
-        promptSelector.innerHTML = '<option value="">No prompts available</option>';
+        promptSelector.innerHTML = '<option value="">No matching prompts found</option>';
         return;
     }
 
     promptSelector.innerHTML = '<option value="">No prompt (message only)</option>';
-    prompts.forEach(prompt => {
-        const option = document.createElement('option');
-        option.value = prompt.id;
-        option.textContent = `${prompt.title} ${prompt.category ? `(${prompt.category})` : ''}`;
-        option.title = prompt.description || prompt.title;
-        promptSelector.appendChild(option);
+    
+    // Group prompts by category for better organization
+    const groupedPrompts = groupPromptsByCategory(prompts);
+    
+    Object.keys(groupedPrompts).sort().forEach(category => {
+        if (category && category !== 'undefined') {
+            // Add category header if there are multiple categories
+            if (Object.keys(groupedPrompts).length > 1) {
+                const categoryHeader = document.createElement('optgroup');
+                categoryHeader.label = category;
+                groupedPrompts[category].forEach(prompt => {
+                    const option = document.createElement('option');
+                    option.value = prompt.id;
+                    option.textContent = prompt.title;
+                    option.title = prompt.description || prompt.title;
+                    categoryHeader.appendChild(option);
+                });
+                promptSelector.appendChild(categoryHeader);
+            } else {
+                // Single category, don't use optgroup
+                groupedPrompts[category].forEach(prompt => {
+                    const option = document.createElement('option');
+                    option.value = prompt.id;
+                    option.textContent = `${prompt.title} (${category})`;
+                    option.title = prompt.description || prompt.title;
+                    promptSelector.appendChild(option);
+                });
+            }
+        } else {
+            // Uncategorized prompts
+            groupedPrompts[category].forEach(prompt => {
+                const option = document.createElement('option');
+                option.value = prompt.id;
+                option.textContent = prompt.title;
+                option.title = prompt.description || prompt.title;
+                promptSelector.appendChild(option);
+            });
+        }
     });
 }
 
@@ -388,6 +435,74 @@ function createVariableInput(param) {
 function clearVariableEditor() {
     variableEditor.innerHTML = '<p class="no-variables">Select a prompt to configure variables</p>';
     promptVariables = {};
+}
+
+// Category Filter Helper Functions
+function updateCategoryFilter() {
+    const categories = getAvailableCategories();
+    categoryFilter.innerHTML = '<option value="">All Categories</option>';
+    
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categoryFilter.appendChild(option);
+    });
+}
+
+function getAvailableCategories() {
+    const categories = new Set();
+    availablePrompts.forEach(prompt => {
+        if (prompt.category && prompt.category.trim()) {
+            categories.add(prompt.category.trim());
+        }
+    });
+    return Array.from(categories).sort();
+}
+
+function groupPromptsByCategory(prompts) {
+    const grouped = {};
+    prompts.forEach(prompt => {
+        const category = prompt.category || 'Uncategorized';
+        if (!grouped[category]) {
+            grouped[category] = [];
+        }
+        grouped[category].push(prompt);
+    });
+    
+    // Sort prompts within each category by title
+    Object.keys(grouped).forEach(category => {
+        grouped[category].sort((a, b) => a.title.localeCompare(b.title));
+    });
+    
+    return grouped;
+}
+
+function updateFilterStatus(count, searchQuery, selectedCategory) {
+    const countElement = promptFilterStatus.querySelector('.filter-count');
+    countElement.textContent = `${count} prompt${count !== 1 ? 's' : ''} available`;
+    
+    // Show/hide clear filters button
+    const hasActiveFilters = searchQuery || selectedCategory;
+    clearFiltersBtn.style.display = hasActiveFilters ? 'inline-flex' : 'none';
+    
+    // Update status text with active filters
+    if (hasActiveFilters) {
+        let filterText = '';
+        if (searchQuery) {
+            filterText += `search: "${searchQuery}"`;
+        }
+        if (selectedCategory) {
+            filterText += (filterText ? ', ' : '') + `category: "${selectedCategory}"`;
+        }
+        countElement.textContent += ` (filtered by ${filterText})`;
+    }
+}
+
+function clearAllFilters() {
+    promptSearch.value = '';
+    categoryFilter.value = '';
+    handlePromptFiltering();
 }
 
 // Prompt Preview
