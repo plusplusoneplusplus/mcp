@@ -1545,36 +1545,50 @@ document.addEventListener('DOMContentLoaded', function () {
     }, 100);
 });
 
+// Global reference to prevent duplicate event handlers
+let sessionClickHandler = null;
+
 // Setup event delegation for session interactions
 function setupSessionEventHandlers() {
-    // Add click event delegation for session interactions
-    document.addEventListener('click', function (event) {
+    // Remove existing handler if it exists to prevent duplicates
+    if (sessionClickHandler) {
+        document.removeEventListener('click', sessionClickHandler);
+    }
+
+    // Create new handler
+    sessionClickHandler = function (event) {
         const target = event.target.closest('[data-action]');
-        if (!target) return;
+
+        if (!target) {
+            return;
+        }
 
         const action = target.getAttribute('data-action');
         const sessionId = target.getAttribute('data-session-id');
-
-        console.log('Session click detected:', { action, sessionId, target });
 
         if (!sessionId) {
             console.error('No session ID found for action:', action);
             return;
         }
 
+        // Prevent default behavior and stop propagation
+        event.preventDefault();
+        event.stopPropagation();
+
         switch (action) {
             case 'toggle':
-                console.log('Toggling session:', sessionId);
                 toggleSession(sessionId);
                 break;
             case 'open-editor':
-                console.log('Opening session in editor:', sessionId);
                 openSessionInEditor(sessionId);
                 break;
             default:
                 console.warn('Unknown session action:', action);
         }
-    });
+    };
+
+    // Add the new handler
+    document.addEventListener('click', sessionClickHandler);
 }
 
 // Request initial data
