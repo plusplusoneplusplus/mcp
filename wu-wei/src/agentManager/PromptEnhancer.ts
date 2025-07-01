@@ -6,6 +6,9 @@
  * completion signal tool with the appropriate execution context.
  */
 
+import { PromptService } from '../shared/promptManager/types';
+import { AbstractAgent } from './agentInterface';
+
 export interface ExecutionContext {
     executionId: string;
     taskDescription: string;
@@ -13,7 +16,271 @@ export interface ExecutionContext {
     startTime: Date;
 }
 
+/**
+ * Interface for prompt enhancement configuration
+ */
+export interface PromptEnhancementConfig {
+    promptService: PromptService;
+    promptContext?: any;
+    agent: AbstractAgent;
+    userParams: any;
+}
+
 export class PromptEnhancer {
+    /**
+     * Comprehensive method to enhance parameters with prompts and user input
+     * 
+     * This consolidates all prompt stitching logic from AgentPanelProvider
+     * and provides a unified approach to combining prompts with user input.
+     */
+    static async enhanceParamsWithPrompt(config: PromptEnhancementConfig): Promise<any> {
+        const { promptService, promptContext, agent, userParams } = config;
+
+        if (!promptContext) {
+            return userParams;
+        }
+
+        // If no promptId is provided, this is message-only mode
+        if (!promptContext.promptId) {
+            return userParams;
+        }
+
+        // Check if both prompt and user input are empty - do nothing in this case
+        const userInput = this.extractUserInput(userParams);
+        if (!promptContext.promptId && !userInput) {
+            throw new Error('Please provide either a prompt template or a message');
+        }
+
+        // Get agent capabilities for prompt support detection
+        const capabilities = agent.getCapabilities();
+        const promptSupport = capabilities.metadata?.promptSupport;
+
+        if (promptSupport?.supportsPrompts) {
+            return await this.enhanceWithNativePromptSupport(
+                promptService,
+                promptContext,
+                userParams,
+                promptSupport
+            );
+        }
+
+        // Fallback: add prompt as message parameter for agents without native support
+        return await this.enhanceWithFallbackStitching(
+            promptService,
+            promptContext,
+            userParams
+        );
+    }
+
+    /**
+     * Enhance parameters for agents with native prompt support
+     */
+    private static async enhanceWithNativePromptSupport(
+        promptService: PromptService,
+        promptContext: any,
+        userParams: any,
+        promptSupport: any
+    ): Promise<any> {
+        const promptParam = promptSupport.promptParameterName || 'prompt';
+
+        // Check if the prompt has variables that need rendering
+        const hasVariables = promptContext.variables && Object.keys(promptContext.variables).length > 0;
+
+        let rendered: string;
+        if (hasVariables) {
+            // Render the prompt with variables
+            rendered = await promptService.renderPromptWithVariables(
+                promptContext.promptId,
+                promptContext.variables
+            );
+        } else {
+            // Get the prompt file path for direct reference
+            const promptData = await promptService.getPrompt(promptContext.promptId);
+            if (!promptData) {
+                throw new Error(`Prompt with id '${promptContext.promptId}' not found`);
+            }
+            rendered = promptData.filePath ? `#${promptData.filePath}` : promptData.content;
+        }
+
+        const enhancedParams = {
+            ...userParams,
+            [promptParam]: rendered
+        };
+
+        if (promptSupport.variableResolution) {
+            enhancedParams.variables = promptContext.variables;
+        }
+
+        // Support optional user input - can use prompt alone or combined with user message
+        const userInput = this.extractUserInput(userParams);
+        if (userInput) {
+            enhancedParams.additionalMessage = userInput;
+        }
+
+        return enhancedParams;
+    }
+
+    /**
+     * Enhance parameters using fallback string concatenation for agents without native prompt support
+     */
+    private static async enhanceWithFallbackStitching(
+        promptService: PromptService,
+        promptContext: any,
+        userParams: any
+    ): Promise<any> {
+        if (!promptContext.promptId) {
+            return userParams;
+        }
+
+        // Check if the prompt has variables that need rendering
+        const hasVariables = promptContext.variables && Object.keys(promptContext.variables).length > 0;
+
+        let promptContent: string;
+        if (hasVariables) {
+            // Render the prompt with variables
+            const rendered = await promptService.renderPromptWithVariables(
+                promptContext.promptId,
+                promptContext.variables
+            );
+            promptContent = "System Instructions:\n" + rendered;
+        } else {
+            // Get the prompt file path for direct reference
+            const promptData = await promptService.getPrompt(promptContext.promptId);
+            if (!promptData) {
+                throw new Error(`Prompt with id '${promptContext.promptId}' not found`);
+            }
+            promptContent = promptData.filePath
+                ? `Follow Instructions in ${promptData.filePath}`
+                : "System Instructions:\n" + promptData.content;
+        }
+
+        // Support optional user input - can use prompt alone or combined with user message
+        const userInput = this.extractUserInput(userParams);
+
+        if (userInput) {
+            // Combine prompt with user input
+            return {
+                ...userParams,
+                message: `${promptContent}\n\nUser Request:\n${userInput}`
+            };
+        } else {
+            // Use prompt alone
+            return {
+                ...userParams,
+                message: promptContent
+            };
+        }
+    }
+
+    /**
+     * Extract user input from various parameter fields
+     * 
+     * This standardizes the extraction of user input across different parameter formats
+     */
+    static extractUserInput(params: any): string | null {
+        // Try each field in priority order, but only accept string values
+        const candidates = [params.message, params.question, params.query, params.input];
+
+        for (const candidate of candidates) {
+            if (candidate && typeof candidate === 'string') {
+                const trimmed = candidate.trim();
+                if (trimmed.length > 0) {
+                    return trimmed;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Create a comprehensive prompt combination with execution context
+     * 
+     * This method combines prompt content, user input, and execution tracking
+     * into a single cohesive message for GitHub Copilot
+     */
+    static async createComprehensivePrompt(
+        promptContent: string,
+        userInput: string | null,
+        executionContext?: ExecutionContext
+    ): Promise<string> {
+        let combinedPrompt = '';
+
+        // Add prompt content if provided
+        if (promptContent.trim()) {
+            combinedPrompt += promptContent;
+        }
+
+        // Add user input if provided
+        if (userInput && userInput.trim()) {
+            if (combinedPrompt) {
+                combinedPrompt += '\n\nUser Request:\n';
+            }
+            combinedPrompt += userInput;
+        }
+
+        // Add execution tracking if provided
+        if (executionContext) {
+            const executionInstructions = this.generateExecutionInstructions(executionContext);
+            if (combinedPrompt) {
+                combinedPrompt += '\n\n';
+            }
+            combinedPrompt += executionInstructions;
+        }
+
+        return combinedPrompt;
+    }
+
+    /**
+     * Validate prompt enhancement configuration
+     */
+    static validateEnhancementConfig(config: PromptEnhancementConfig): string[] {
+        const errors: string[] = [];
+
+        if (!config.promptService) {
+            errors.push('PromptService is required');
+        }
+
+        if (!config.agent) {
+            errors.push('Agent is required');
+        }
+
+        if (!config.userParams) {
+            errors.push('User parameters are required');
+        }
+
+        return errors;
+    }
+
+    /**
+     * Check if parameters contain any user input
+     */
+    static hasUserInput(params: any): boolean {
+        const userInput = this.extractUserInput(params);
+        return userInput !== null && userInput.length > 0;
+    }
+
+    /**
+     * Check if prompt context contains a valid prompt
+     */
+    static hasValidPrompt(promptContext: any): boolean {
+        return !!(promptContext && promptContext.promptId && promptContext.promptId.trim().length > 0);
+    }
+
+    /**
+     * Determine the enhancement strategy based on agent capabilities
+     */
+    static getEnhancementStrategy(agent: AbstractAgent): 'native' | 'fallback' | 'none' {
+        const capabilities = agent.getCapabilities();
+        const promptSupport = capabilities.metadata?.promptSupport;
+
+        if (!promptSupport) {
+            return 'none';
+        }
+
+        return promptSupport.supportsPrompts ? 'native' : 'fallback';
+    }
+
     /**
      * Inject execution context into a user prompt
      * 

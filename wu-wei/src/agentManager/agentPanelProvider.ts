@@ -293,8 +293,13 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 promptContext
             });
 
-            // Enhance parameters with prompt context
-            let enhancedParams = await this.enhanceParamsWithPrompt(params, promptContext, agent);
+            // Enhance parameters with prompt context using PromptEnhancer
+            let enhancedParams = await PromptEnhancer.enhanceParamsWithPrompt({
+                promptService: this._promptService,
+                promptContext,
+                agent,
+                userParams: params
+            });
 
             // Phase 3: For GitHub Copilot, inject execution context into the prompt itself
             // This ensures Copilot gets clear instructions to call the completion signal tool
@@ -399,113 +404,6 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 error: error instanceof Error ? error.message : String(error)
             });
         }
-    }
-
-    private async enhanceParamsWithPrompt(
-        params: any,
-        promptContext: any,
-        agent: AbstractAgent
-    ): Promise<any> {
-        if (!promptContext) {
-            return params;
-        }
-
-        // If no promptId is provided, this is message-only mode
-        if (!promptContext.promptId) {
-            return params;
-        }
-
-        // Check if both prompt and user input are empty - do nothing in this case
-        const userInput = params.message || params.question || params.query || params.input;
-        if (!promptContext.promptId && !userInput) {
-            throw new Error('Please provide either a prompt template or a message');
-        }
-
-        // String concatenation logic
-        const capabilities = agent.getCapabilities();
-        const promptSupport = capabilities.metadata?.promptSupport;
-
-        if (promptSupport?.supportsPrompts) {
-            const promptParam = promptSupport.promptParameterName || 'prompt';
-
-            // Check if the prompt has variables that need rendering
-            const hasVariables = promptContext.variables && Object.keys(promptContext.variables).length > 0;
-
-            let rendered: string;
-            if (hasVariables) {
-                // Render the prompt with variables
-                rendered = await this._promptService.renderPromptWithVariables(
-                    promptContext.promptId,
-                    promptContext.variables
-                );
-            } else {
-                // Get the prompt file path for direct reference
-                const promptData = await this._promptService.getPrompt(promptContext.promptId);
-                if (!promptData) {
-                    throw new Error(`Prompt with id '${promptContext.promptId}' not found`);
-                }
-                rendered = promptData.filePath ? `#${promptData.filePath}` : promptData.content;
-            }
-
-            const enhancedParams = {
-                ...params,
-                [promptParam]: rendered
-            };
-
-            if (promptSupport.variableResolution) {
-                enhancedParams.variables = promptContext.variables;
-            }
-
-            // Support optional user input - can use prompt alone or combined with user message
-            const userInput = params.message || params.question || params.query || params.input;
-            if (userInput) {
-                enhancedParams.additionalMessage = userInput;
-            }
-
-            return enhancedParams;
-        }
-
-        // Fallback: add prompt as message parameter
-        if (promptContext.promptId) {
-            // Check if the prompt has variables that need rendering
-            const hasVariables = promptContext.variables && Object.keys(promptContext.variables).length > 0;
-
-            let promptContent: string;
-            if (hasVariables) {
-                // Render the prompt with variables
-                const rendered = await this._promptService.renderPromptWithVariables(
-                    promptContext.promptId,
-                    promptContext.variables
-                );
-                promptContent = "System Instructions:\n" + rendered;
-            } else {
-                // Get the prompt file path for direct reference
-                const promptData = await this._promptService.getPrompt(promptContext.promptId);
-                if (!promptData) {
-                    throw new Error(`Prompt with id '${promptContext.promptId}' not found`);
-                }
-                promptContent = promptData.filePath ? `Follow Instances in ${promptData.filePath}` : "System Instructions:\n" + promptData.content;
-            }
-
-            // Support optional user input - can use prompt alone or combined with user message
-            const userInput = params.message || params.question || params.query || params.input;
-
-            if (userInput) {
-                // Combine prompt with user input
-                return {
-                    ...params,
-                    message: `${promptContent}\n\nUser Request:\n${userInput}`
-                };
-            } else {
-                // Use prompt alone
-                return {
-                    ...params,
-                    message: promptContent
-                };
-            }
-        }
-
-        return params;
     }
 
     /**
