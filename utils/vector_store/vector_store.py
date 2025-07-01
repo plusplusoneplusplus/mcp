@@ -1,7 +1,9 @@
-from typing import List, Optional, Any, Dict
+from typing import Any, Dict, List, Optional
+
+from .base import VectorStore
 
 
-class ChromaVectorStore:
+class ChromaVectorStore(VectorStore):
     """
     Utility class for storing and accessing data through ChromaDB vector database.
     """

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional, Dict, List, Any
 
 from utils.vector_store.vector_store import ChromaVectorStore
+from utils.vector_store.base import VectorStore
 from utils.vector_store.markdown_segmenter import MarkdownSegmenter
 from utils.segmenter.types import (
     SegmenterConfig,
