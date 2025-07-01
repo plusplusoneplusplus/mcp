@@ -227,7 +227,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 this.sendAgentCapabilities();
                 break;
             case 'openSessionDetails':
-                await this.handleOpenSessionDetails(message.sessionId, message.session);
+                await this.handleOpenSessionDetails(message.sessionId, message.session, message.textContent);
                 break;
             // Phase 2: Enhanced webview commands for execution management
             // These commands provide real-time execution control and monitoring capabilities
@@ -1060,13 +1060,13 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         logger.debug('Agent Panel Provider disposed');
     }
 
-    private async handleOpenSessionDetails(sessionId: string, session: any): Promise<void> {
+    private async handleOpenSessionDetails(sessionId: string, session: any, textContent?: string): Promise<void> {
         try {
-            // Generate a readable document content from the session data
-            const content = this.generateSessionDetailsContent(session);
+            // Use provided textContent if available, otherwise generate from session data
+            const content = textContent || this.generateSessionDetailsContent(session);
 
             // Create a virtual document URI
-            const uri = vscode.Uri.parse(`wu-wei-session://${sessionId}.md`);
+            const uri = vscode.Uri.parse(`wu-wei-session://${sessionId}.txt`);
 
             // Register a temporary text document content provider
             const provider = new class implements vscode.TextDocumentContentProvider {
@@ -1086,8 +1086,8 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
                 viewColumn: vscode.ViewColumn.One
             });
 
-            // Set the language to markdown for better formatting
-            await vscode.languages.setTextDocumentLanguage(doc, 'markdown');
+            // Set the language to plaintext for better formatting
+            await vscode.languages.setTextDocumentLanguage(doc, 'plaintext');
 
             // Make the editor read-only by setting the document as read-only
             // Note: Virtual documents (with custom schemes) are inherently read-only in VS Code

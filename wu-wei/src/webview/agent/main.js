@@ -1098,15 +1098,15 @@ function updateMessageHistory() {
 
     let messagesHtml = '';
 
-    // Build tree structure from messages grouped by session/request
+    // Build simplified list from messages grouped by session/request
     if (hasMessages) {
         const sessionTree = buildSessionTree(messageHistory);
-        messagesHtml += renderSessionTree(sessionTree);
+        messagesHtml += renderSimplifiedMessageList(sessionTree);
     }
 
     // Add processing messages at the end
     if (hasProcessingMessages) {
-        messagesHtml += renderProcessingMessages();
+        messagesHtml += renderSimplifiedProcessingMessages();
     }
 
     messageList.innerHTML = messagesHtml;
@@ -1137,9 +1137,12 @@ function buildSessionTree(messages) {
         const message = messages[i];
 
         if (message.type === 'request') {
+            // Create a stable session ID based on message content and timestamp
+            const stableId = generateStableSessionId(message);
+
             // Start a new session
             currentSession = {
-                id: `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                id: stableId,
                 request: message,
                 responses: [],
                 timestamp: message.timestamp,
@@ -1155,6 +1158,24 @@ function buildSessionTree(messages) {
     }
 
     return sessions;
+}
+
+// Generate a stable session ID based on message content
+function generateStableSessionId(message) {
+    // Create a simple hash based on message properties
+    const hashSource = `${message.timestamp}-${message.method}-${JSON.stringify(message.params || {})}`;
+
+    // Simple string hash function
+    let hash = 0;
+    for (let i = 0; i < hashSource.length; i++) {
+        const char = hashSource.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+
+    // Convert to positive hex string
+    const positiveHash = Math.abs(hash).toString(16);
+    return `session-${positiveHash}`;
 }
 
 // Generate a short summary for a request (first 10 words or method name)
@@ -1268,31 +1289,64 @@ function renderSessionNode(session) {
 
 // Open session details in main editor
 function openSessionInEditor(sessionId) {
-    console.log('openSessionInEditor called with sessionId:', sessionId);
+    console.log('=== openSessionInEditor called ===');
+    console.log('sessionId:', sessionId);
+    console.log('messageHistory length:', messageHistory.length);
+    console.log('messageHistory:', messageHistory);
 
     // Check if vscode API is available
     if (typeof vscode === 'undefined') {
-        console.error('vscode API is not available');
+        console.error('ERROR: vscode API is not available');
+        alert('VS Code API not available. Cannot open session details.');
+        return;
+    }
+
+    // Validate sessionId
+    if (!sessionId || typeof sessionId !== 'string') {
+        console.error('ERROR: Invalid sessionId:', sessionId);
+        alert('Invalid session ID. Cannot open session details.');
         return;
     }
 
     // Find the session data
-    const sessions = buildSessionTree(messageHistory);
-    console.log('Available sessions:', sessions);
-    const session = sessions.find(s => s.id === sessionId);
-
-    if (!session) {
-        console.error('Session not found:', sessionId, 'Available sessions:', sessions.map(s => s.id));
+    let sessions;
+    try {
+        sessions = buildSessionTree(messageHistory);
+        console.log('Built session tree with', sessions.length, 'sessions');
+        console.log('Available session IDs:', sessions.map(s => s.id));
+    } catch (error) {
+        console.error('ERROR: Failed to build session tree:', error);
+        alert('Failed to process message history. Cannot open session details.');
         return;
     }
 
-    console.log('Found session:', session);
+    const session = sessions.find(s => s.id === sessionId);
+
+    if (!session) {
+        console.error('ERROR: Session not found');
+        console.error('Looking for sessionId:', sessionId);
+        console.error('Available sessions:', sessions.map(s => ({ id: s.id, summary: s.summary })));
+        alert(`Session ${sessionId} not found. Cannot open session details.`);
+        return;
+    }
+
+    console.log('SUCCESS: Found session:', {
+        id: session.id,
+        summary: session.summary,
+        responseCount: session.responses.length
+    });
 
     try {
+        // Format session as text content
+        console.log('Formatting session as text...');
+        const textContent = formatSessionAsText(session);
+        console.log('Text content length:', textContent.length);
+
         // Send message to backend to open detailed view
-        vscode.postMessage({
+        const message = {
             command: 'openSessionDetails',
             sessionId: sessionId,
+            textContent: textContent,
             session: {
                 id: session.id,
                 summary: session.summary,
@@ -1301,17 +1355,122 @@ function openSessionInEditor(sessionId) {
                 request: session.request,
                 responses: session.responses
             }
+        };
+
+        console.log('Sending message to backend:', {
+            command: message.command,
+            sessionId: message.sessionId,
+            textContentLength: message.textContent.length
         });
 
-        console.log('Sent openSessionDetails message to backend');
+        vscode.postMessage(message);
+
+        console.log('SUCCESS: Message sent to backend');
+
+        // Show a brief confirmation
+        setTimeout(() => {
+            console.log('Session details should now be opening in VS Code editor...');
+        }, 100);
+
     } catch (error) {
-        console.error('Error sending message to backend:', error);
+        console.error('ERROR: Failed to process or send session data:', error);
+        alert('Failed to open session details. Check console for details.');
     }
 }
 
-// Make sure the function is globally accessible
+// Format session data as readable text content
+function formatSessionAsText(session) {
+    const timestamp = new Date(session.timestamp).toLocaleString();
+    let content = '';
+
+    // Header
+    content += `Agent Session Details\n`;
+    content += `${'='.repeat(50)}\n\n`;
+    content += `Session ID: ${session.id}\n`;
+    content += `Timestamp: ${timestamp}\n`;
+    content += `Summary: ${session.summary}\n`;
+    if (session.executionId) {
+        content += `Execution ID: ${session.executionId}\n`;
+    }
+    content += `\n`;
+
+    // Request details
+    content += `REQUEST\n`;
+    content += `${'─'.repeat(30)}\n`;
+    content += `Agent: ${session.request.agentName || 'Unknown'}\n`;
+    content += `Method: ${session.request.method || 'Unknown'}\n`;
+    content += `Timestamp: ${new Date(session.request.timestamp).toLocaleString()}\n`;
+
+    // Request parameters
+    if (session.request.params) {
+        content += `\nParameters:\n`;
+        const displayParams = { ...session.request.params };
+        delete displayParams.executionId; // Hide internal fields
+        content += JSON.stringify(displayParams, null, 2);
+    }
+    content += `\n\n`;
+
+    // Responses
+    if (session.responses && session.responses.length > 0) {
+        content += `RESPONSES (${session.responses.length})\n`;
+        content += `${'─'.repeat(30)}\n\n`;
+
+        session.responses.forEach((response, index) => {
+            content += `Response ${index + 1}:\n`;
+            content += `  Timestamp: ${new Date(response.timestamp).toLocaleString()}\n`;
+
+            if (response.error || response.type === 'error') {
+                content += `  Type: Error\n`;
+                const error = response.error || { message: 'Unknown error', code: 'N/A' };
+                content += `  Error Message: ${error.message}\n`;
+                content += `  Error Code: ${error.code}\n`;
+                if (error.data) {
+                    content += `  Error Details:\n`;
+                    content += `${JSON.stringify(error.data, null, 4).split('\n').map(line => `    ${line}`).join('\n')}\n`;
+                }
+            } else if (response.result?.type === 'completion-signal') {
+                content += `  Type: Task Completion\n`;
+                content += `  Status: ${response.result.status}\n`;
+                content += `  Task: ${response.result.taskDescription}\n`;
+                content += `  Summary: ${response.result.summary}\n`;
+                if (response.result.duration) {
+                    content += `  Duration: ${formatDuration(response.result.duration)}\n`;
+                }
+                if (response.result.agentName) {
+                    content += `  Agent: ${response.result.agentName}\n`;
+                }
+            } else if (response.result?.type === 'standalone-completion-signal') {
+                content += `  Type: Standalone Completion\n`;
+                content += `  Status: ${response.result.status}\n`;
+                content += `  Task: ${response.result.taskDescription}\n`;
+                content += `  Summary: ${response.result.summary}\n`;
+                content += `  Note: This completion could not be correlated with a specific request.\n`;
+            } else {
+                content += `  Type: Agent Acknowledgment\n`;
+                content += `  Response Data:\n`;
+                content += `${JSON.stringify(response.result, null, 4).split('\n').map(line => `    ${line}`).join('\n')}\n`;
+                content += `  Note: Initial response - waiting for task completion...\n`;
+            }
+            content += `\n`;
+        });
+    } else {
+        content += `RESPONSES\n`;
+        content += `${'─'.repeat(30)}\n`;
+        content += `No responses yet - request may still be processing.\n\n`;
+    }
+
+    // Footer
+    content += `${'='.repeat(50)}\n`;
+    content += `Generated at: ${new Date().toLocaleString()}\n`;
+
+    return content;
+}
+
+// Make sure the functions are globally accessible
 window.openSessionInEditor = openSessionInEditor;
 window.toggleSession = toggleSession;
+window.cancelExecution = cancelExecution;
+window.cancelMessageExecution = cancelMessageExecution;
 
 // Format request details for expanded view
 function formatRequestDetails(request) {
@@ -1411,14 +1570,77 @@ function formatResponseDetails(response) {
     `;
 }
 
-// Render processing messages
-function renderProcessingMessages() {
+// Render simplified message list
+function renderSimplifiedMessageList(sessions) {
+    if (!sessions.length) return '';
+
+    return `
+        <div class="simplified-message-list">
+            ${sessions.map(session => renderSimplifiedMessageItem(session)).join('')}
+        </div>
+    `;
+}
+
+// Render a simplified message item
+function renderSimplifiedMessageItem(session) {
+    const timestamp = new Date(session.timestamp).toLocaleTimeString();
+    const responseCount = session.responses.length;
+    const hasResponses = responseCount > 0;
+
+    // Determine session status based on responses
+    let sessionStatus = 'pending';
+    let statusIcon = '⏳';
+    let statusText = 'Pending';
+
+    if (hasResponses) {
+        const hasCompletionSignal = session.responses.some(r =>
+            r.result?.type === 'completion-signal' || r.result?.type === 'standalone-completion-signal'
+        );
+        const hasErrors = session.responses.some(r => r.error || r.type === 'error');
+
+        if (hasCompletionSignal) {
+            const completionResponse = session.responses.find(r =>
+                r.result?.type === 'completion-signal' || r.result?.type === 'standalone-completion-signal'
+            );
+            const status = completionResponse?.result?.status || 'success';
+            sessionStatus = status;
+            statusIcon = getStatusIcon(status);
+            statusText = status.charAt(0).toUpperCase() + status.slice(1);
+        } else if (hasErrors) {
+            sessionStatus = 'error';
+            statusIcon = '❌';
+            statusText = 'Error';
+        } else {
+            sessionStatus = 'processing';
+            statusIcon = '🔄';
+            statusText = 'Processing';
+        }
+    }
+
+    return `
+        <div class="message-item ${sessionStatus}" data-session-id="${session.id}" data-action="open-session" title="Click to view details">
+            <div class="message-preview">
+                <div class="message-text">${session.summary}</div>
+                <div class="message-meta">
+                    <span class="message-timestamp">${timestamp}</span>
+                    <span class="message-status ${sessionStatus}">
+                        <span class="status-icon">${statusIcon}</span>
+                        ${statusText}
+                    </span>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Render simplified processing messages
+function renderSimplifiedProcessingMessages() {
     if (processingMessages.size === 0) return '';
 
-    let html = '<div class="processing-sessions">';
+    let html = '<div class="simplified-processing-messages">';
 
     processingMessages.forEach((processingInfo, messageId) => {
-        const timestamp = new Date(processingInfo.startTime).toLocaleString();
+        const timestamp = new Date(processingInfo.startTime).toLocaleTimeString();
         const duration = formatDuration(new Date().getTime() - processingInfo.startTime.getTime());
         const hasExecutionId = messageExecutionMap.has(messageId);
 
@@ -1426,26 +1648,24 @@ function renderProcessingMessages() {
         const summary = `${processingInfo.method} request`;
 
         html += `
-            <div class="session-node processing" data-message-id="${messageId}">
-                <div class="session-header processing">
-                    <div class="session-info">
-                        <div class="session-summary">${summary}</div>
-                        <div class="session-meta">
-                            <span class="session-timestamp">${timestamp}</span>
-                            <span class="session-status processing">
-                                <span class="status-icon processing-spinner-small">🔄</span>
-                                Processing
-                            </span>
-                            <span class="processing-duration">${duration}</span>
-                        </div>
+            <div class="message-item processing" data-message-id="${messageId}">
+                <div class="message-preview">
+                    <div class="message-text">${summary}</div>
+                    <div class="message-meta">
+                        <span class="message-timestamp">${timestamp}</span>
+                        <span class="message-status processing">
+                            <span class="status-icon">🔄</span>
+                            Processing
+                        </span>
+                        <span class="processing-duration">${duration}</span>
+                        ${hasExecutionId ? `
+                            <button class="btn-cancel-inline" onclick="event.stopPropagation(); cancelMessageExecution('${messageId}')" title="Cancel execution">
+                                <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
+                                </svg>
+                            </button>
+                        ` : ''}
                     </div>
-                    ${hasExecutionId ? `
-                        <button class="btn-cancel-session" onclick="cancelMessageExecution('${messageId}')" title="Cancel execution">
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8 2.146 2.854Z"/>
-                            </svg>
-                        </button>
-                    ` : ''}
                 </div>
             </div>
         `;
@@ -1453,6 +1673,11 @@ function renderProcessingMessages() {
 
     html += '</div>';
     return html;
+}
+
+// Legacy function - keep for compatibility but not used in simplified view
+function renderProcessingMessages() {
+    return renderSimplifiedProcessingMessages();
 }
 
 // Toggle session expansion state
@@ -1548,11 +1773,80 @@ document.addEventListener('DOMContentLoaded', function () {
 // Global reference to prevent duplicate event handlers
 let sessionClickHandler = null;
 
+// Test function to verify event handling
+function testSessionClick() {
+    console.log('=== TEST: Creating test session ===');
+    const testSession = {
+        id: 'test-session-123',
+        summary: 'Test session for debugging',
+        timestamp: new Date().toISOString(),
+        request: {
+            method: 'test',
+            params: { test: true },
+            agentName: 'test-agent',
+            timestamp: new Date().toISOString()
+        },
+        responses: []
+    };
+
+    // Add to messageHistory temporarily for testing
+    const originalHistory = [...messageHistory];
+    messageHistory.push({
+        type: 'request',
+        ...testSession.request
+    });
+
+    console.log('Test session created, calling openSessionInEditor...');
+    openSessionInEditor(testSession.id);
+
+    // Restore original history
+    messageHistory.length = 0;
+    messageHistory.push(...originalHistory);
+}
+
+// Debug function to inspect current state
+function debugCurrentState() {
+    console.log('=== DEBUG: Current State ===');
+    console.log('messageHistory length:', messageHistory.length);
+    console.log('messageHistory:', messageHistory);
+
+    if (messageHistory.length > 0) {
+        const sessions = buildSessionTree(messageHistory);
+        console.log('Built sessions:', sessions.length);
+        sessions.forEach((session, index) => {
+            console.log(`Session ${index}:`, {
+                id: session.id,
+                summary: session.summary,
+                responseCount: session.responses.length
+            });
+        });
+
+        // Test click on first session if available
+        if (sessions.length > 0) {
+            console.log('Testing click on first session...');
+            openSessionInEditor(sessions[0].id);
+        }
+    } else {
+        console.log('No messages in history');
+    }
+
+    // Check for message items in DOM
+    const messageItems = document.querySelectorAll('[data-action="open-session"]');
+    console.log(`Found ${messageItems.length} clickable message items in DOM`);
+}
+
+// Make test functions available globally
+window.testSessionClick = testSessionClick;
+window.debugCurrentState = debugCurrentState;
+
 // Setup event delegation for session interactions
 function setupSessionEventHandlers() {
+    console.log('=== Setting up session event handlers ===');
+
     // Remove existing handler if it exists to prevent duplicates
     if (sessionClickHandler) {
         document.removeEventListener('click', sessionClickHandler);
+        console.log('Removed existing click handler');
     }
 
     // Create new handler
@@ -1566,6 +1860,8 @@ function setupSessionEventHandlers() {
         const action = target.getAttribute('data-action');
         const sessionId = target.getAttribute('data-session-id');
 
+        console.log('Event handler triggered:', { action, sessionId, target });
+
         if (!sessionId) {
             console.error('No session ID found for action:', action);
             return;
@@ -1575,20 +1871,39 @@ function setupSessionEventHandlers() {
         event.preventDefault();
         event.stopPropagation();
 
-        switch (action) {
-            case 'toggle':
-                toggleSession(sessionId);
-                break;
-            case 'open-editor':
-                openSessionInEditor(sessionId);
-                break;
-            default:
-                console.warn('Unknown session action:', action);
+        try {
+            switch (action) {
+                case 'toggle':
+                    console.log('Toggling session:', sessionId);
+                    toggleSession(sessionId);
+                    break;
+                case 'open-editor':
+                case 'open-session':
+                    console.log('Opening session in editor:', sessionId);
+                    openSessionInEditor(sessionId);
+                    break;
+                default:
+                    console.warn('Unknown session action:', action);
+            }
+        } catch (error) {
+            console.error('Error handling session action:', error);
         }
     };
 
     // Add the new handler
     document.addEventListener('click', sessionClickHandler);
+    console.log('Added new click handler to document');
+
+    // Test that the handler is working by adding a temporary test element
+    setTimeout(() => {
+        const testElements = document.querySelectorAll('[data-action="open-session"]');
+        console.log(`Found ${testElements.length} elements with data-action="open-session"`);
+
+        if (testElements.length > 0) {
+            console.log('First element:', testElements[0]);
+            console.log('Session ID:', testElements[0].getAttribute('data-session-id'));
+        }
+    }, 1000);
 }
 
 // Request initial data
