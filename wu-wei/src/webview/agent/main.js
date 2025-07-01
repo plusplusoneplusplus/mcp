@@ -1148,12 +1148,53 @@ function buildSessionTree(messages) {
                 timestamp: message.timestamp,
                 summary: generateRequestSummary(message),
                 executionId: message.params?.executionId || null,
+                responseExecutionIds: [], // Track execution IDs from responses
                 expanded: false // Default to collapsed
             };
             sessions.push(currentSession);
+
+            // Log session creation with execution ID info
+            if (currentSession.executionId) {
+                console.log(`🆕 Created session ${currentSession.id} with initial execution ID: ${currentSession.executionId}`);
+            } else {
+                console.log(`🆕 Created session ${currentSession.id} without initial execution ID`);
+            }
         } else if (currentSession) {
             // Add response to current session
             currentSession.responses.push(message);
+
+            // Extract and track execution IDs from responses
+            if (message.result) {
+                if (message.result.executionId) {
+                    // Direct execution ID in response
+                    if (!currentSession.responseExecutionIds.includes(message.result.executionId)) {
+                        currentSession.responseExecutionIds.push(message.result.executionId);
+                        console.log(`🔍 Captured execution ID from response: ${message.result.executionId} for session ${currentSession.id}`);
+                    }
+
+                    // Update session execution ID if not already set
+                    if (!currentSession.executionId) {
+                        currentSession.executionId = message.result.executionId;
+                        console.log(`📌 Set primary execution ID: ${message.result.executionId} for session ${currentSession.id}`);
+                    }
+                }
+
+                // Check for execution ID in completion signals
+                if (message.result.type === 'completion-signal' || message.result.type === 'standalone-completion-signal') {
+                    if (message.result.executionId) {
+                        if (!currentSession.responseExecutionIds.includes(message.result.executionId)) {
+                            currentSession.responseExecutionIds.push(message.result.executionId);
+                            console.log(`✅ Captured execution ID from ${message.result.type}: ${message.result.executionId} for session ${currentSession.id}`);
+                        }
+
+                        // Update session execution ID if not already set
+                        if (!currentSession.executionId) {
+                            currentSession.executionId = message.result.executionId;
+                            console.log(`🎯 Set primary execution ID from completion signal: ${message.result.executionId} for session ${currentSession.id}`);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1333,8 +1374,22 @@ function openSessionInEditor(sessionId) {
     console.log('SUCCESS: Found session:', {
         id: session.id,
         summary: session.summary,
-        responseCount: session.responses.length
+        responseCount: session.responses.length,
+        executionId: session.executionId,
+        responseExecutionIds: session.responseExecutionIds
     });
+
+    // Log execution ID summary for this session
+    const allExecutionIds = [];
+    if (session.executionId) allExecutionIds.push(session.executionId);
+    if (session.responseExecutionIds) allExecutionIds.push(...session.responseExecutionIds);
+    const uniqueExecutionIds = [...new Set(allExecutionIds)];
+
+    if (uniqueExecutionIds.length > 0) {
+        console.log(`📊 Session ${session.id} execution ID summary:`, uniqueExecutionIds);
+    } else {
+        console.log(`⚠️ Session ${session.id} has no execution IDs tracked`);
+    }
 
     try {
         // Format session as text content
@@ -1383,15 +1438,46 @@ function formatSessionAsText(session) {
     const timestamp = new Date(session.timestamp).toLocaleString();
     let content = '';
 
+    // Log execution ID processing for this session format
+    console.log(`📝 Formatting session ${session.id} text with execution data:`, {
+        primaryExecutionId: session.executionId,
+        responseExecutionIds: session.responseExecutionIds,
+        responsesCount: session.responses?.length || 0
+    });
+
     // Header
     content += `Agent Session Details\n`;
     content += `${'='.repeat(50)}\n\n`;
     content += `Session ID: ${session.id}\n`;
     content += `Timestamp: ${timestamp}\n`;
     content += `Summary: ${session.summary}\n`;
+
+    // Enhanced execution ID logging
     if (session.executionId) {
-        content += `Execution ID: ${session.executionId}\n`;
+        content += `Primary Execution ID: ${session.executionId}\n`;
     }
+
+    if (session.responseExecutionIds && session.responseExecutionIds.length > 0) {
+        content += `Response Execution IDs: ${session.responseExecutionIds.join(', ')}\n`;
+
+        // If there are multiple execution IDs, log them all
+        if (session.responseExecutionIds.length > 1) {
+            content += `Total Execution IDs Found: ${session.responseExecutionIds.length}\n`;
+        }
+    }
+
+    // Also check for execution IDs in messageExecutionMap for this session
+    let messageExecutionId = null;
+    processingMessages.forEach((processingInfo, messageId) => {
+        if (messageExecutionMap.has(messageId)) {
+            messageExecutionId = messageExecutionMap.get(messageId);
+        }
+    });
+
+    if (messageExecutionId && messageExecutionId !== session.executionId) {
+        content += `Message Execution ID: ${messageExecutionId}\n`;
+    }
+
     content += `\n`;
 
     // Request details
@@ -1405,8 +1491,18 @@ function formatSessionAsText(session) {
     if (session.request.params) {
         content += `\nParameters:\n`;
         const displayParams = { ...session.request.params };
-        delete displayParams.executionId; // Hide internal fields
-        content += JSON.stringify(displayParams, null, 2);
+
+        // Show execution ID in params if present, don't hide it
+        if (displayParams.executionId) {
+            content += `Request Execution ID: ${displayParams.executionId}\n`;
+        }
+
+        // Remove executionId from the JSON display to avoid duplication
+        delete displayParams.executionId;
+
+        if (Object.keys(displayParams).length > 0) {
+            content += JSON.stringify(displayParams, null, 2);
+        }
     }
     content += `\n\n`;
 
@@ -1418,6 +1514,11 @@ function formatSessionAsText(session) {
         session.responses.forEach((response, index) => {
             content += `Response ${index + 1}:\n`;
             content += `  Timestamp: ${new Date(response.timestamp).toLocaleString()}\n`;
+
+            // Enhanced execution ID logging for responses
+            if (response.result?.executionId) {
+                content += `  Execution ID: ${response.result.executionId}\n`;
+            }
 
             if (response.error || response.type === 'error') {
                 content += `  Type: Error\n`;
@@ -1439,12 +1540,20 @@ function formatSessionAsText(session) {
                 if (response.result.agentName) {
                     content += `  Agent: ${response.result.agentName}\n`;
                 }
+                // Log execution ID again for completion signals for emphasis
+                if (response.result.executionId) {
+                    content += `  Completion Execution ID: ${response.result.executionId}\n`;
+                }
             } else if (response.result?.type === 'standalone-completion-signal') {
                 content += `  Type: Standalone Completion\n`;
                 content += `  Status: ${response.result.status}\n`;
                 content += `  Task: ${response.result.taskDescription}\n`;
                 content += `  Summary: ${response.result.summary}\n`;
                 content += `  Note: This completion could not be correlated with a specific request.\n`;
+                // Log execution ID for standalone completions
+                if (response.result.executionId) {
+                    content += `  Standalone Execution ID: ${response.result.executionId}\n`;
+                }
             } else {
                 content += `  Type: Agent Acknowledgment\n`;
                 content += `  Response Data:\n`;
@@ -1457,6 +1566,24 @@ function formatSessionAsText(session) {
         content += `RESPONSES\n`;
         content += `${'─'.repeat(30)}\n`;
         content += `No responses yet - request may still be processing.\n\n`;
+    }
+
+    // Execution ID Summary Section
+    const allExecutionIds = [];
+    if (session.executionId) allExecutionIds.push(session.executionId);
+    if (session.responseExecutionIds) allExecutionIds.push(...session.responseExecutionIds);
+    if (messageExecutionId && !allExecutionIds.includes(messageExecutionId)) {
+        allExecutionIds.push(messageExecutionId);
+    }
+
+    if (allExecutionIds.length > 0) {
+        content += `EXECUTION ID SUMMARY\n`;
+        content += `${'─'.repeat(30)}\n`;
+        const uniqueExecutionIds = [...new Set(allExecutionIds)];
+        uniqueExecutionIds.forEach((execId, index) => {
+            content += `  ${index + 1}. ${execId}\n`;
+        });
+        content += `\nTotal Unique Execution IDs: ${uniqueExecutionIds.length}\n\n`;
     }
 
     // Footer
@@ -1475,7 +1602,13 @@ window.cancelMessageExecution = cancelMessageExecution;
 // Format request details for expanded view
 function formatRequestDetails(request) {
     const displayParams = { ...request.params };
-    delete displayParams.executionId; // Hide internal fields
+
+    // Extract execution ID for prominent display
+    let executionIdDisplay = '';
+    if (displayParams.executionId) {
+        executionIdDisplay = `<div class="execution-id-info"><strong>Request Execution ID:</strong> ${displayParams.executionId}</div>`;
+        delete displayParams.executionId; // Remove from params to avoid duplication
+    }
 
     return `
         <div class="detail-item request-detail">
@@ -1484,6 +1617,7 @@ function formatRequestDetails(request) {
                 <span class="detail-method">${request.method}</span>
             </div>
             <div class="detail-content">
+                ${executionIdDisplay}
                 <div class="params-block">
                     <div class="params-label">Parameters:</div>
                     <pre class="params-code">${JSON.stringify(displayParams, null, 2)}</pre>
@@ -1500,12 +1634,19 @@ function formatResponseDetails(response) {
     let typeLabel = 'Response';
     let content = '';
 
+    // Enhanced execution ID display for all response types
+    let executionIdDisplay = '';
+    if (response.result?.executionId) {
+        executionIdDisplay = `<div class="execution-id-info"><strong>Execution ID:</strong> ${response.result.executionId}</div>`;
+    }
+
     if (response.error || response.type === 'error') {
         responseType = 'error';
         typeIcon = '❌';
         typeLabel = 'Error';
         const error = response.error || { message: 'Unknown error', code: 'N/A' };
         content = `
+            ${executionIdDisplay}
             <div class="error-block">
                 <div class="error-message"><strong>Error:</strong> ${error.message}</div>
                 <div class="error-code"><strong>Code:</strong> ${error.code}</div>
@@ -1519,6 +1660,7 @@ function formatResponseDetails(response) {
         typeLabel = 'Task Completion';
 
         content = `
+            ${executionIdDisplay}
             <div class="completion-block">
                 <div class="completion-status"><strong>Status:</strong> ${status}</div>
                 <div class="completion-task"><strong>Task:</strong> ${response.result.taskDescription}</div>
@@ -1534,6 +1676,7 @@ function formatResponseDetails(response) {
         typeLabel = 'Standalone Completion';
 
         content = `
+            ${executionIdDisplay}
             <div class="completion-block standalone">
                 <div class="completion-status"><strong>Status:</strong> ${status}</div>
                 <div class="completion-task"><strong>Task:</strong> ${response.result.taskDescription}</div>
@@ -1548,6 +1691,7 @@ function formatResponseDetails(response) {
         typeLabel = 'Agent Acknowledgment';
 
         content = `
+            ${executionIdDisplay}
             <div class="response-block">
                 <pre class="response-code">${JSON.stringify(response.result, null, 2)}</pre>
                 <div class="response-note"><em>Initial response - waiting for task completion...</em></div>
@@ -1623,6 +1767,7 @@ function renderSimplifiedMessageItem(session) {
                 <div class="message-text">${session.summary}</div>
                 <div class="message-meta">
                     <span class="message-timestamp">${timestamp}</span>
+                    <span class="session-id" title="Session ID">${session.id}</span>
                     <span class="message-status ${sessionStatus}">
                         <span class="status-icon">${statusIcon}</span>
                         ${statusText}
