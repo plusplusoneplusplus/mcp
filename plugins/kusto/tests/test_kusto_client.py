@@ -232,7 +232,7 @@ async def test_execute_tool_always_formats(kusto_client):
 
         # Verify execute_query was called with format_results=True
         mock_execute_query.assert_called_once_with(
-            database="test_db", query="test_query", cluster=None, format_results=True
+            database="test_db", query="test_query", cluster=None, format_results=True, output_limits=None
         )
 
         # Verify the result is the formatted one
@@ -249,3 +249,194 @@ async def test_execute_tool_invalid_operation(kusto_client):
     # Verify error is handled properly
     assert result["success"] is False
     assert "Unknown operation" in result["result"]
+
+
+def test_format_results_with_small_output(kusto_client):
+    """Test format_results with output that is under the size limit."""
+    # Create a mock response with small output
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_table = MagicMock()
+    small_output = "This is a small result"
+    mock_table.__str__.return_value = small_output
+
+    mock_response.primary_results = [mock_table]
+
+    # Format with default limits (50KB)
+    result = kusto_client.format_results(mock_response)
+
+    # Should return without truncation
+    assert result["success"] is True
+    assert result["result"] == small_output
+    assert "metadata" not in result
+
+
+def test_format_results_with_large_output_truncation(kusto_client):
+    """Test format_results with output that exceeds the size limit."""
+    # Create a mock response with large output (over 50KB)
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_table = MagicMock()
+    large_output = "x" * (60 * 1024)  # 60KB of data
+    mock_table.__str__.return_value = large_output
+
+    mock_response.primary_results = [mock_table]
+
+    # Format with default limits (50KB)
+    result = kusto_client.format_results(mock_response)
+
+    # Should return with truncation
+    assert result["success"] is True
+    assert len(result["result"]) < len(large_output)
+    assert "metadata" in result
+    assert result["metadata"]["truncated"] is True
+    assert result["metadata"]["original_size"] == len(large_output)
+    assert result["metadata"]["truncated_size"] == len(result["result"])
+    assert result["metadata"]["truncation_strategy"] == "smart"
+    assert "size_reduction" in result["metadata"]
+
+
+def test_format_results_with_custom_output_limits(kusto_client):
+    """Test format_results with custom output limits configuration."""
+    # Create a mock response with medium-sized output
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_table = MagicMock()
+    medium_output = "y" * 2000  # 2KB of data
+    mock_table.__str__.return_value = medium_output
+
+    mock_response.primary_results = [mock_table]
+
+    # Set custom limits (1KB max)
+    custom_limits = {
+        "max_total_length": 1024,  # 1KB
+        "truncate_strategy": "end",
+        "truncate_message": " [CUSTOM TRUNCATED]"
+    }
+
+    # Format with custom limits
+    result = kusto_client.format_results(mock_response, custom_limits)
+
+    # Should return with truncation using custom settings
+    assert result["success"] is True
+    assert len(result["result"]) <= 1024
+    assert "metadata" in result
+    assert result["metadata"]["truncated"] is True
+    assert result["metadata"]["truncation_strategy"] == "end"
+    assert "[CUSTOM TRUNCATED]" in result["result"]
+
+
+def test_format_results_with_preserve_raw_enabled(kusto_client):
+    """Test format_results with preserve_raw option enabled."""
+    # Create a mock response with large output
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_table = MagicMock()
+    large_output = "z" * (60 * 1024)  # 60KB of data
+    mock_table.__str__.return_value = large_output
+
+    mock_response.primary_results = [mock_table]
+
+    # Enable preserve_raw
+    limits = {
+        "max_total_length": 10 * 1024,  # 10KB
+        "preserve_raw": True
+    }
+
+    # Format with preserve_raw enabled
+    result = kusto_client.format_results(mock_response, limits)
+
+    # Should return with both truncated and raw results
+    assert result["success"] is True
+    assert len(result["result"]) <= 10 * 1024
+    assert "metadata" in result
+    assert result["metadata"]["truncated"] is True
+    assert "raw_result" in result
+    assert result["raw_result"] == large_output
+    assert len(result["raw_result"]) == 60 * 1024
+
+
+@pytest.mark.asyncio
+async def test_execute_query_with_output_limits(kusto_client):
+    """Test execute_query with output_limits parameter."""
+    # Setup a mock kusto client
+    with patch("plugins.kusto.tool.AzureKustoClient") as mock_azure_client:
+        # Mock the response with large output
+        mock_response = MagicMock(spec=KustoResponseDataSet)
+        mock_table = MagicMock()
+        large_output = "Large result data " * 1000  # Create large output
+        mock_table.__str__.return_value = large_output
+
+        mock_response.primary_results = [mock_table]
+
+        # Configure the mock client instance
+        mock_client_instance = mock_azure_client.return_value
+        mock_client_instance.execute.return_value = mock_response
+
+        # Custom output limits
+        output_limits = {
+            "max_total_length": 500,  # 500 bytes
+            "truncate_strategy": "middle",
+            "preserve_raw": True
+        }
+
+        # Patch get_kusto_client to return our mock
+        with patch.object(
+            kusto_client, "get_kusto_client", return_value=mock_client_instance
+        ):
+            # Execute the query with custom output limits
+            result = await kusto_client.execute_query(
+                database="test_db",
+                query="test_query",
+                format_results=True,
+                output_limits=output_limits
+            )
+
+            # Verify truncation was applied
+            assert result["success"] is True
+            assert len(result["result"]) <= 500
+            assert "metadata" in result
+            assert result["metadata"]["truncated"] is True
+            assert result["metadata"]["truncation_strategy"] == "middle"
+            assert "raw_result" in result
+            assert result["raw_result"] == large_output
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_with_output_limits(kusto_client):
+    """Test execute_tool with output_limits in arguments."""
+    # Mock execute_query to capture the output_limits parameter
+    with patch.object(kusto_client, "execute_query", AsyncMock()) as mock_execute_query:
+        # Set up the mock to return a truncated result
+        mock_execute_query.return_value = {
+            "success": True,
+            "result": "Truncated result",
+            "metadata": {"truncated": True, "original_size": 1000, "truncated_size": 100}
+        }
+
+        # Custom output limits
+        output_limits = {
+            "max_total_length": 100,
+            "truncate_strategy": "smart"
+        }
+
+        # Call execute_tool with output_limits
+        result = await kusto_client.execute_tool(
+            {
+                "operation": "execute_query",
+                "database": "test_db",
+                "query": "test_query",
+                "output_limits": output_limits
+            }
+        )
+
+        # Verify execute_query was called with output_limits
+        mock_execute_query.assert_called_once_with(
+            database="test_db",
+            query="test_query",
+            cluster=None,
+            format_results=True,
+            output_limits=output_limits
+        )
+
+        # Verify the result includes truncation metadata
+        assert result["success"] is True
+        assert result["result"] == "Truncated result"
+        assert "metadata" in result
+        assert result["metadata"]["truncated"] is True
