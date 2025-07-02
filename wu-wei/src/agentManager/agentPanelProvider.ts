@@ -40,6 +40,7 @@ interface AgentPromptConfig {
  * - UI status updates and progress indicators
  */
 export class AgentPanelProvider extends BaseWebviewProvider implements vscode.WebviewViewProvider {
+    private static readonly MESSAGE_HISTORY_STORAGE_KEY = 'wu-wei.agent.messageHistory';
     private _agentRegistry: AgentRegistry;
     private _messageHistory: AgentMessage[] = [];
     private _promptService: PromptService;
@@ -65,7 +66,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
 
         // Phase 2: Initialize execution tracking system for complete lifecycle management
         // This enables real-time monitoring of agent executions from start to completion
-        this._executionRegistry = new ExecutionRegistry();
+        this._executionRegistry = new ExecutionRegistry(context);
         this._executionTracker = new ExecutionTracker(context);
 
         // Initialize prompt service
@@ -74,6 +75,9 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
 
         // Initialize prompt service asynchronously
         this.initializePromptService();
+
+        // Load message history from storage
+        this.loadMessageHistory();
 
         // Initialize agent registry
         this._agentRegistry = new AgentRegistry();
@@ -489,6 +493,7 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         }
 
         this.sendMessageHistory();
+        this.saveMessageHistory();
     }
 
     private sendAgentCapabilities(): void {
@@ -514,9 +519,10 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
         });
     }
 
-    private clearMessageHistory(): void {
+    public clearMessageHistory(): void {
         logger.info('Clearing agent message history');
         this._messageHistory = [];
+        this.saveMessageHistory();
         this.sendMessageHistory();
         vscode.window.showInformationMessage('Wu Wei: Message history cleared');
     }
@@ -1048,6 +1054,9 @@ export class AgentPanelProvider extends BaseWebviewProvider implements vscode.We
      * Ensures no memory leaks when the provider is disposed.
      */
     public dispose(): void {
+        // Save message history before disposing
+        this.saveMessageHistory();
+
         // Clean up execution registry
         this._executionRegistry.dispose();
 
@@ -1223,4 +1232,41 @@ ${JSON.stringify(this.cleanParamsForDisplay(session.request.params), null, 2)}
 
         return cleaned;
     }
+
+    /**
+     * Load message history from persistent storage
+     */
+    private loadMessageHistory(): void {
+        try {
+            const stored = this.context.globalState.get<any[]>(AgentPanelProvider.MESSAGE_HISTORY_STORAGE_KEY, []);
+            this._messageHistory = stored.map(msg => ({
+                ...msg,
+                timestamp: new Date(msg.timestamp) // Ensure timestamp is Date object
+            }));
+
+            logger.debug(`Loaded ${this._messageHistory.length} messages from storage`);
+        } catch (error) {
+            logger.error('Failed to load message history', { error });
+            this._messageHistory = [];
+        }
+    }
+
+    /**
+     * Save message history to persistent storage
+     */
+    private saveMessageHistory(): void {
+        try {
+            // Convert to serializable format
+            const serializableMessages = this._messageHistory.map(msg => ({
+                ...msg,
+                timestamp: msg.timestamp.toISOString() // Convert Date to string for storage
+            }));
+
+            this.context.globalState.update(AgentPanelProvider.MESSAGE_HISTORY_STORAGE_KEY, serializableMessages);
+            logger.debug(`Saved ${serializableMessages.length} messages to storage`);
+        } catch (error) {
+            logger.error('Failed to save message history', { error });
+        }
+    }
+
 }

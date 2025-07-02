@@ -275,6 +275,432 @@ suite('Agent Panel Execution Tracking Integration', () => {
             assert.ok(executionId.length > 20, 'Should generate sufficiently unique IDs');
         });
     });
+
+    suite('Persistence Integration', () => {
+        test('should persist ExecutionTracker data across sessions', async () => {
+            const completionData = {
+                executionId: 'persist-integration-test',
+                status: 'success' as const,
+                taskDescription: 'Persistence integration test',
+                timestamp: new Date(),
+                metadata: {
+                    duration: 2500,
+                    toolsUsed: ['github-copilot'],
+                    filesModified: ['test.ts']
+                }
+            };
+
+            // Record completion in tracker
+            await executionTracker.recordCompletion(completionData);
+
+            // Create new tracker instance to simulate session restart
+            const newTracker = new ExecutionTracker(context);
+            const restoredHistory = newTracker.getCompletionHistory();
+
+            assert.ok(restoredHistory.length > 0, 'Should restore completion history');
+            const restored = restoredHistory.find(r => r.executionId === 'persist-integration-test');
+            assert.ok(restored, 'Should restore specific completion record');
+            assert.strictEqual(restored.status, 'success', 'Should restore correct status');
+            assert.ok(restored.metadata?.duration, 'Should restore metadata');
+        });
+
+        test('should maintain execution statistics across restarts', async () => {
+            // Add multiple completions with different statuses
+            const completions = [
+                { id: 'stats-persist-1', status: 'success' as const },
+                { id: 'stats-persist-2', status: 'success' as const },
+                { id: 'stats-persist-3', status: 'error' as const },
+                { id: 'stats-persist-4', status: 'partial' as const }
+            ];
+
+            for (const completion of completions) {
+                await executionTracker.recordCompletion({
+                    executionId: completion.id,
+                    status: completion.status,
+                    taskDescription: `Statistics persistence test ${completion.id}`,
+                    timestamp: new Date()
+                });
+            }
+
+            // Create new tracker to simulate restart
+            const newTracker = new ExecutionTracker(context);
+            const stats = newTracker.getCompletionStats();
+
+            assert.ok(stats.total >= 4, 'Should maintain total count across restarts');
+            assert.ok(stats.successful >= 2, 'Should maintain success count');
+            assert.ok(stats.errors >= 1, 'Should maintain error count');
+            assert.ok(stats.partial >= 1, 'Should maintain partial count');
+        });
+
+        test('should handle storage migration gracefully', () => {
+            // Test scenario where storage format might change
+            const mockLegacyData = [
+                {
+                    executionId: 'legacy-exec-1',
+                    status: 'success',
+                    taskDescription: 'Legacy execution',
+                    timestamp: '2024-01-01T10:00:00.000Z' // String format
+                }
+            ];
+
+            // Mock legacy data in storage
+            context.globalState.update('wu-wei.copilot.executions', mockLegacyData);
+
+            // New tracker should handle legacy data format
+            const newTracker = new ExecutionTracker(context);
+            const history = newTracker.getCompletionHistory();
+
+            assert.ok(history.length > 0, 'Should load legacy data');
+            const legacyRecord = history.find(r => r.executionId === 'legacy-exec-1');
+            assert.ok(legacyRecord, 'Should find legacy record');
+            assert.ok(legacyRecord.timestamp instanceof Date, 'Should convert legacy timestamp format');
+        });
+
+        test('should handle concurrent persistence operations', async () => {
+            // Simulate multiple rapid completion recordings
+            const concurrentCompletions = Array.from({ length: 10 }, (_, i) => ({
+                executionId: `concurrent-test-${i}`,
+                status: 'success' as const,
+                taskDescription: `Concurrent test ${i}`,
+                timestamp: new Date()
+            }));
+
+            // Record all completions concurrently
+            const promises = concurrentCompletions.map(completion => 
+                executionTracker.recordCompletion(completion)
+            );
+
+            await Promise.all(promises);
+
+            // Verify all completions were recorded
+            const history = executionTracker.getCompletionHistory();
+            const concurrentRecords = history.filter(r => 
+                r.executionId.startsWith('concurrent-test-')
+            );
+
+            assert.strictEqual(concurrentRecords.length, 10, 'Should record all concurrent completions');
+        });
+
+        test('should respect storage limits and cleanup old data', async () => {
+            // Create ExecutionTracker with reduced limit for testing
+            const tracker = new ExecutionTracker(context);
+
+            // Add more records than the typical limit
+            for (let i = 0; i < 1005; i++) {
+                await tracker.recordCompletion({
+                    executionId: `limit-test-${i}`,
+                    status: 'success',
+                    taskDescription: `Limit test ${i}`,
+                    timestamp: new Date()
+                });
+            }
+
+            // Create new tracker to test restoration with limits
+            const newTracker = new ExecutionTracker(context);
+            const history = newTracker.getCompletionHistory();
+
+            // Should respect the 1000 record limit
+            assert.ok(history.length <= 1000, 'Should respect storage limit');
+            
+            // Should keep most recent records
+            const lastRecord = history.find(r => r.executionId === 'limit-test-1004');
+            assert.ok(lastRecord, 'Should keep most recent records');
+        });
+    });
+
+    suite('Message History Persistence', () => {
+        let messageHistoryStorage: any = {};
+        let messageHistoryContext: any;
+
+        setup(() => {
+            // Create a mock context that actually stores data for message history tests
+            messageHistoryStorage = {};
+            messageHistoryContext = {
+                subscriptions: [],
+                globalState: {
+                    get: (key: string, defaultValue?: any) => messageHistoryStorage[key] || defaultValue,
+                    update: (key: string, value: any) => {
+                        messageHistoryStorage[key] = value;
+                        return Promise.resolve();
+                    }
+                },
+                extensionUri: vscode.Uri.file('/mock/extension/path')
+            };
+        });
+
+        test('should persist message history across sessions', async () => {
+            // Create first provider with message history context
+            const firstProvider = new AgentPanelProvider(messageHistoryContext);
+
+            // Create test messages
+            const testMessages = [
+                {
+                    id: 'msg-1',
+                    timestamp: new Date(),
+                    type: 'request' as const,
+                    method: 'test-method',
+                    params: { query: 'Test request 1' }
+                },
+                {
+                    id: 'msg-2',
+                    timestamp: new Date(),
+                    type: 'response' as const,
+                    result: { data: 'Test response 1' }
+                }
+            ];
+
+            // Add messages to history through the private method
+            testMessages.forEach(msg => {
+                (firstProvider as any).addMessageToHistory(msg);
+            });
+
+            // Verify messages are in memory
+            const currentHistory = (firstProvider as any)._messageHistory;
+            assert.strictEqual(currentHistory.length, 2, 'Should have 2 messages in memory');
+
+            // Dispose first provider to save data
+            firstProvider.dispose();
+
+            // Create new provider instance to simulate restart (using same context)
+            const newProvider = new AgentPanelProvider(messageHistoryContext);
+            const restoredHistory = (newProvider as any)._messageHistory;
+
+            assert.strictEqual(restoredHistory.length, 2, 'Should restore message history');
+            assert.strictEqual(restoredHistory[0].id, 'msg-1', 'Should restore first message');
+            assert.strictEqual(restoredHistory[1].id, 'msg-2', 'Should restore second message');
+            assert.ok(restoredHistory[0].timestamp instanceof Date, 'Should deserialize timestamps as Date objects');
+
+            newProvider.dispose();
+        });
+
+        test('should maintain message history limit of 100', async () => {
+            const limitProvider = new AgentPanelProvider(messageHistoryContext);
+
+            // Add more than 100 messages
+            for (let i = 0; i < 105; i++) {
+                const msg = {
+                    id: `msg-${i}`,
+                    timestamp: new Date(),
+                    type: 'request' as const,
+                    method: 'test-method',
+                    params: { query: `Test request ${i}` }
+                };
+                (limitProvider as any).addMessageToHistory(msg);
+            }
+
+            // Verify limit is enforced
+            const currentHistory = (limitProvider as any)._messageHistory;
+            assert.strictEqual(currentHistory.length, 100, 'Should limit to 100 messages');
+            assert.strictEqual(currentHistory[0].id, 'msg-5', 'Should keep most recent messages');
+            assert.strictEqual(currentHistory[99].id, 'msg-104', 'Should keep latest message');
+
+            limitProvider.dispose();
+
+            // Verify persistence respects limit
+            const newProvider = new AgentPanelProvider(messageHistoryContext);
+            const restoredHistory = (newProvider as any)._messageHistory;
+
+            assert.strictEqual(restoredHistory.length, 100, 'Should persist only 100 messages');
+            assert.strictEqual(restoredHistory[0].id, 'msg-5', 'Should persist most recent messages');
+
+            newProvider.dispose();
+        });
+
+        test('should handle message history storage errors gracefully', () => {
+            // Mock storage that throws errors
+            const errorContext = {
+                ...messageHistoryContext,
+                globalState: {
+                    get: () => { throw new Error('Storage read error'); },
+                    update: () => { throw new Error('Storage write error'); }
+                }
+            } as any;
+
+            // Should not throw during initialization
+            assert.doesNotThrow(() => {
+                const errorProvider = new AgentPanelProvider(errorContext);
+                
+                // Should handle adding messages even with storage errors
+                const testMsg = {
+                    id: 'error-test',
+                    timestamp: new Date(),
+                    type: 'request' as const,
+                    method: 'test',
+                    params: {}
+                };
+                
+                assert.doesNotThrow(() => {
+                    (errorProvider as any).addMessageToHistory(testMsg);
+                }, 'Should handle storage write errors gracefully');
+
+                errorProvider.dispose();
+            }, 'Should handle storage errors gracefully');
+        });
+
+        test('should clear message history', () => {
+            const clearProvider = new AgentPanelProvider(messageHistoryContext);
+
+            // Add test messages
+            const testMessages = [
+                {
+                    id: 'clear-test-1',
+                    timestamp: new Date(),
+                    type: 'request' as const,
+                    method: 'test',
+                    params: {}
+                },
+                {
+                    id: 'clear-test-2',
+                    timestamp: new Date(),
+                    type: 'response' as const,
+                    result: {}
+                }
+            ];
+
+            testMessages.forEach(msg => {
+                (clearProvider as any).addMessageToHistory(msg);
+            });
+
+            // Verify messages exist
+            let currentHistory = (clearProvider as any)._messageHistory;
+            assert.strictEqual(currentHistory.length, 2, 'Should have messages before clearing');
+
+            // Clear history
+            clearProvider.clearMessageHistory();
+
+            // Verify history is cleared
+            currentHistory = (clearProvider as any)._messageHistory;
+            assert.strictEqual(currentHistory.length, 0, 'Should clear message history');
+
+            clearProvider.dispose();
+
+            // Verify persistence is also cleared
+            const newProvider = new AgentPanelProvider(messageHistoryContext);
+            const restoredHistory = (newProvider as any)._messageHistory;
+            assert.strictEqual(restoredHistory.length, 0, 'Should persist cleared state');
+
+            newProvider.dispose();
+        });
+
+        test('should handle different message types', () => {
+            const typesProvider = new AgentPanelProvider(messageHistoryContext);
+
+            const messageTypes = [
+                {
+                    id: 'req-1',
+                    timestamp: new Date(),
+                    type: 'request' as const,
+                    method: 'test-method',
+                    params: { data: 'request data' }
+                },
+                {
+                    id: 'res-1',
+                    timestamp: new Date(),
+                    type: 'response' as const,
+                    result: { data: 'response data' }
+                },
+                {
+                    id: 'err-1',
+                    timestamp: new Date(),
+                    type: 'error' as const,
+                    error: {
+                        code: 500,
+                        message: 'Test error',
+                        data: { details: 'Error details' }
+                    }
+                }
+            ];
+
+            // Add all message types
+            messageTypes.forEach(msg => {
+                (typesProvider as any).addMessageToHistory(msg);
+            });
+
+            // Verify all types are stored
+            const currentHistory = (typesProvider as any)._messageHistory;
+            assert.strictEqual(currentHistory.length, 3, 'Should store all message types');
+
+            typesProvider.dispose();
+
+            // Verify persistence handles all types
+            const newProvider = new AgentPanelProvider(messageHistoryContext);
+            const restoredHistory = (newProvider as any)._messageHistory;
+
+            assert.strictEqual(restoredHistory.length, 3, 'Should restore all message types');
+            assert.strictEqual(restoredHistory[0].type, 'request', 'Should restore request message');
+            assert.strictEqual(restoredHistory[1].type, 'response', 'Should restore response message');
+            assert.strictEqual(restoredHistory[2].type, 'error', 'Should restore error message');
+
+            newProvider.dispose();
+        });
+
+        test('should save message history on disposal', () => {
+            const disposalProvider = new AgentPanelProvider(messageHistoryContext);
+
+            // Add test message
+            const testMsg = {
+                id: 'disposal-test',
+                timestamp: new Date(),
+                type: 'request' as const,
+                method: 'test',
+                params: { test: 'disposal' }
+            };
+
+            (disposalProvider as any).addMessageToHistory(testMsg);
+
+            // Dispose should save message history
+            disposalProvider.dispose();
+
+            // Verify data was saved by creating new provider
+            const newProvider = new AgentPanelProvider(messageHistoryContext);
+            const restoredHistory = (newProvider as any)._messageHistory;
+
+            assert.ok(restoredHistory.length > 0, 'Should save message history on disposal');
+            const restoredMsg = restoredHistory.find((msg: any) => msg.id === 'disposal-test');
+            assert.ok(restoredMsg, 'Should restore specific message after disposal');
+
+            newProvider.dispose();
+        });
+
+        test('should handle concurrent message additions', () => {
+            const concurrentProvider = new AgentPanelProvider(messageHistoryContext);
+
+            // Simulate rapid message additions
+            const messages = Array.from({ length: 10 }, (_, i) => ({
+                id: `concurrent-${i}`,
+                timestamp: new Date(),
+                type: 'request' as const,
+                method: 'concurrent-test',
+                params: { index: i }
+            }));
+
+            // Add all messages rapidly
+            messages.forEach(msg => {
+                (concurrentProvider as any).addMessageToHistory(msg);
+            });
+
+            // Verify all messages were added
+            const currentHistory = (concurrentProvider as any)._messageHistory;
+            const concurrentMessages = currentHistory.filter((msg: any) => 
+                msg.id.startsWith('concurrent-')
+            );
+
+            assert.strictEqual(concurrentMessages.length, 10, 'Should handle concurrent message additions');
+
+            concurrentProvider.dispose();
+
+            // Verify persistence handles concurrent additions
+            const newProvider = new AgentPanelProvider(messageHistoryContext);
+            const restoredHistory = (newProvider as any)._messageHistory;
+            const restoredConcurrent = restoredHistory.filter((msg: any) => 
+                msg.id.startsWith('concurrent-')
+            );
+
+            assert.strictEqual(restoredConcurrent.length, 10, 'Should persist concurrent messages');
+
+            newProvider.dispose();
+        });
+    });
 });
 
 /**
