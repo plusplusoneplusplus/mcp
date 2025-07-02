@@ -3,15 +3,31 @@
     "allow": [
       "Read(**)",
       "Edit(**)",
+      "Write(**)",
       "Bash(*)",
-      "WebFetch(*)"
+      "WebFetch(*)",
+      "Git(*)",
+      "MultiEdit(**)",
+      "Agent(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "LS(*)",
+      "NotebookEdit(**)",
+      "NotebookRead(**)",
+      "TodoRead(*)",
+      "TodoWrite(*)"
     ],
     "deny": [
       "Read(**/.env)",
       "Read(.env)",
       "Edit(**/.env)",
       "Edit(.env)",
-      "Bash(rm -rf:*)"
-    ]
+      "Bash(rm -rf:*)",
+      "Bash(sudo rm:*)",
+      "Bash(format:*)",
+      "Bash(mkfs:*)",
+      "Bash(dd:*)"
+    ],
+    "defaultMode": "allowEdits"
   }
 }
