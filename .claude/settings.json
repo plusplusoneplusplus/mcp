@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(**)",
+      "Edit(**)",
+      "Bash(*)",
+      "WebFetch(*)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(.env)",
+      "Edit(**/.env)",
+      "Edit(.env)",
+      "Bash(rm -rf:*)"
+    ]
+  }
+}
