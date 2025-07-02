@@ -34,15 +34,17 @@ def mock_kusto_response():
 
 def test_format_results(kusto_client, mock_kusto_response):
     """Test the format_results method with a KustoResponseDataSet."""
-    # Format the response
-    formatted = kusto_client.format_results(mock_kusto_response)
+    # Mock DataFrame conversion to return None to force fallback to raw formatting
+    with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+        # Format the response
+        formatted = kusto_client.format_results(mock_kusto_response)
 
-    # Check the structure
-    assert formatted["success"] is True
-    assert isinstance(formatted["result"], str)
+        # Check the structure
+        assert formatted["success"] is True
+        assert isinstance(formatted["result"], str)
 
-    # Check that the result is the string representation of the primary_results table
-    assert formatted["result"] == "Table with 3 rows (id, name, value)"
+        # Check that the result is the string representation of the primary_results table
+        assert formatted["result"] == "Table with 3 rows (id, name, value)"
 
 
 def test_format_results_with_complex_values(kusto_client):
@@ -57,12 +59,14 @@ def test_format_results_with_complex_values(kusto_client):
     # Set up the primary results
     mock_response.primary_results = [mock_table]
 
-    # Format the results
-    formatted = kusto_client.format_results(mock_response)
+    # Mock DataFrame conversion to return None to force fallback to raw formatting
+    with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+        # Format the results
+        formatted = kusto_client.format_results(mock_response)
 
-    # Check the content
-    assert formatted["success"] is True
-    assert formatted["result"] == "Table with complex data types"
+        # Check the content
+        assert formatted["success"] is True
+        assert formatted["result"] == "Table with complex data types"
 
 
 def test_format_results_no_primary_results(kusto_client):
@@ -119,18 +123,20 @@ async def test_execute_query_with_formatting(kusto_client):
         with patch.object(
             kusto_client, "get_kusto_client", return_value=mock_client_instance
         ):
-            # Execute the query with formatting (default is True)
-            result = await kusto_client.execute_query(
-                database="test_db", query="test_query"
-            )
+            # Mock DataFrame conversion to return None to force fallback to raw formatting
+            with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+                # Execute the query with formatting (default is True)
+                result = await kusto_client.execute_query(
+                    database="test_db", query="test_query"
+                )
 
-            # Verify result has success and result keys
-            assert "success" in result
-            assert "result" in result
-            assert result["success"] is True
+                # Verify result has success and result keys
+                assert "success" in result
+                assert "result" in result
+                assert result["success"] is True
 
-            # Verify formatted result contains expected data
-            assert result["result"] == "Table with id and name columns"
+                # Verify formatted result contains expected data
+                assert result["result"] == "Table with id and name columns"
 
 
 @pytest.mark.asyncio
@@ -209,8 +215,8 @@ async def test_execute_query_execution_error(kusto_client):
 
 
 @pytest.mark.asyncio
-async def test_execute_tool_always_formats(kusto_client):
-    """Test that execute_tool always returns formatted results."""
+async def test_execute_tool_respects_format_results(kusto_client):
+    """Test that execute_tool respects the format_results parameter."""
     # Mock execute_query to avoid real API calls
     with patch.object(kusto_client, "execute_query", AsyncMock()) as mock_execute_query:
         # Set up the mock to return a specific value
@@ -220,7 +226,6 @@ async def test_execute_tool_always_formats(kusto_client):
         }
 
         # Call execute_tool with format_results=False
-        # This should be ignored as execute_tool always uses format_results=True
         result = await kusto_client.execute_tool(
             {
                 "operation": "execute_query",
@@ -230,12 +235,17 @@ async def test_execute_tool_always_formats(kusto_client):
             }
         )
 
-        # Verify execute_query was called with format_results=True
+        # Verify execute_query was called with format_results=False
         mock_execute_query.assert_called_once_with(
-            database="test_db", query="test_query", cluster=None, format_results=True, output_limits=None
+            database="test_db",
+            query="test_query",
+            cluster=None,
+            format_results=False,
+            formatting_options=None,
+            output_limits=None
         )
 
-        # Verify the result is the formatted one
+        # Verify the result is returned
         assert result["success"] is True
         assert result["result"] == "Formatted result string"
 
@@ -261,13 +271,15 @@ def test_format_results_with_small_output(kusto_client):
 
     mock_response.primary_results = [mock_table]
 
-    # Format with default limits (50KB)
-    result = kusto_client.format_results(mock_response)
+    # Mock DataFrame conversion to return None to force fallback to raw formatting
+    with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+        # Format with default limits (50KB)
+        result = kusto_client.format_results(mock_response)
 
-    # Should return without truncation
-    assert result["success"] is True
-    assert result["result"] == small_output
-    assert "metadata" not in result
+        # Should return without truncation
+        assert result["success"] is True
+        assert result["result"] == small_output
+        assert "metadata" not in result
 
 
 def test_format_results_with_large_output_truncation(kusto_client):
@@ -280,18 +292,20 @@ def test_format_results_with_large_output_truncation(kusto_client):
 
     mock_response.primary_results = [mock_table]
 
-    # Format with default limits (50KB)
-    result = kusto_client.format_results(mock_response)
+    # Mock DataFrame conversion to return None to force fallback to raw formatting
+    with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+        # Format with default limits (50KB)
+        result = kusto_client.format_results(mock_response)
 
-    # Should return with truncation
-    assert result["success"] is True
-    assert len(result["result"]) < len(large_output)
-    assert "metadata" in result
-    assert result["metadata"]["truncated"] is True
-    assert result["metadata"]["original_size"] == len(large_output)
-    assert result["metadata"]["truncated_size"] == len(result["result"])
-    assert result["metadata"]["truncation_strategy"] == "smart"
-    assert "size_reduction" in result["metadata"]
+        # Should return with truncation
+        assert result["success"] is True
+        assert len(result["result"]) < len(large_output)
+        assert "metadata" in result
+        assert result["metadata"]["truncated"] is True
+        assert result["metadata"]["original_size"] == len(large_output)
+        assert result["metadata"]["truncated_size"] == len(result["result"])
+        assert result["metadata"]["truncation_strategy"] == "smart"
+        assert "size_reduction" in result["metadata"]
 
 
 def test_format_results_with_custom_output_limits(kusto_client):
@@ -311,16 +325,18 @@ def test_format_results_with_custom_output_limits(kusto_client):
         "truncate_message": " [CUSTOM TRUNCATED]"
     }
 
-    # Format with custom limits
-    result = kusto_client.format_results(mock_response, custom_limits)
+    # Mock DataFrame conversion to return None to force fallback to raw formatting
+    with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+        # Format with custom limits
+        result = kusto_client.format_results(mock_response, custom_limits)
 
-    # Should return with truncation using custom settings
-    assert result["success"] is True
-    assert len(result["result"]) <= 1024
-    assert "metadata" in result
-    assert result["metadata"]["truncated"] is True
-    assert result["metadata"]["truncation_strategy"] == "end"
-    assert "[CUSTOM TRUNCATED]" in result["result"]
+        # Should return with truncation using custom settings
+        assert result["success"] is True
+        assert len(result["result"]) <= 1024
+        assert "metadata" in result
+        assert result["metadata"]["truncated"] is True
+        assert result["metadata"]["truncation_strategy"] == "end"
+        assert "[CUSTOM TRUNCATED]" in result["result"]
 
 
 def test_format_results_with_preserve_raw_enabled(kusto_client):
@@ -339,17 +355,19 @@ def test_format_results_with_preserve_raw_enabled(kusto_client):
         "preserve_raw": True
     }
 
-    # Format with preserve_raw enabled
-    result = kusto_client.format_results(mock_response, limits)
+    # Mock DataFrame conversion to return None to force fallback to raw formatting
+    with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+        # Format with preserve_raw enabled
+        result = kusto_client.format_results(mock_response, limits)
 
-    # Should return with both truncated and raw results
-    assert result["success"] is True
-    assert len(result["result"]) <= 10 * 1024
-    assert "metadata" in result
-    assert result["metadata"]["truncated"] is True
-    assert "raw_result" in result
-    assert result["raw_result"] == large_output
-    assert len(result["raw_result"]) == 60 * 1024
+        # Should return with both truncated and raw results
+        assert result["success"] is True
+        assert len(result["result"]) <= 10 * 1024
+        assert "metadata" in result
+        assert result["metadata"]["truncated"] is True
+        assert "raw_result" in result
+        assert result["raw_result"] == large_output
+        assert len(result["raw_result"]) == 60 * 1024
 
 
 @pytest.mark.asyncio
@@ -380,22 +398,24 @@ async def test_execute_query_with_output_limits(kusto_client):
         with patch.object(
             kusto_client, "get_kusto_client", return_value=mock_client_instance
         ):
-            # Execute the query with custom output limits
-            result = await kusto_client.execute_query(
-                database="test_db",
-                query="test_query",
-                format_results=True,
-                output_limits=output_limits
-            )
+            # Mock DataFrame conversion to return None to force fallback to raw formatting
+            with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+                # Execute the query with custom output limits
+                result = await kusto_client.execute_query(
+                    database="test_db",
+                    query="test_query",
+                    format_results=True,
+                    output_limits=output_limits
+                )
 
-            # Verify truncation was applied
-            assert result["success"] is True
-            assert len(result["result"]) <= 500
-            assert "metadata" in result
-            assert result["metadata"]["truncated"] is True
-            assert result["metadata"]["truncation_strategy"] == "middle"
-            assert "raw_result" in result
-            assert result["raw_result"] == large_output
+                # Verify truncation was applied
+                assert result["success"] is True
+                assert len(result["result"]) <= 500
+                assert "metadata" in result
+                assert result["metadata"]["truncated"] is True
+                assert result["metadata"]["truncation_strategy"] == "middle"
+                assert "raw_result" in result
+                assert result["raw_result"] == large_output
 
 
 @pytest.mark.asyncio
@@ -432,6 +452,7 @@ async def test_execute_tool_with_output_limits(kusto_client):
             query="test_query",
             cluster=None,
             format_results=True,
+            formatting_options=None,
             output_limits=output_limits
         )
 
@@ -440,3 +461,348 @@ async def test_execute_tool_with_output_limits(kusto_client):
         assert result["result"] == "Truncated result"
         assert "metadata" in result
         assert result["metadata"]["truncated"] is True
+
+
+def test_kusto_response_to_dataframe_success(kusto_client):
+    """Test successful conversion of Kusto response to DataFrame."""
+    import pandas as pd
+
+    # Create a mock KustoResponseDataSet with proper structure
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_primary_result = MagicMock()
+
+    # Mock columns
+    mock_col1 = MagicMock()
+    mock_col1.column_name = "id"
+    mock_col2 = MagicMock()
+    mock_col2.column_name = "name"
+    mock_col3 = MagicMock()
+    mock_col3.column_name = "value"
+
+    mock_primary_result.columns = [mock_col1, mock_col2, mock_col3]
+
+    # Mock row data
+    mock_rows = [
+        [1, "Alice", 100.5],
+        [2, "Bob", 200.0],
+        [3, "Charlie", 150.25]
+    ]
+
+    # Make the primary result iterable
+    mock_primary_result.__iter__ = lambda self: iter(mock_rows)
+
+    mock_response.primary_results = [mock_primary_result]
+
+    # Test DataFrame conversion
+    df = kusto_client._kusto_response_to_dataframe(mock_response)
+
+    # Verify DataFrame was created successfully
+    assert df is not None
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == 3
+    assert list(df.columns) == ["id", "name", "value"]
+    assert df.iloc[0]["id"] == 1
+    assert df.iloc[0]["name"] == "Alice"
+    assert df.iloc[0]["value"] == 100.5
+
+
+def test_kusto_response_to_dataframe_no_results(kusto_client):
+    """Test DataFrame conversion when there are no primary results."""
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_response.primary_results = []
+
+    # Test DataFrame conversion
+    df = kusto_client._kusto_response_to_dataframe(mock_response)
+
+    # Should return None when no results
+    assert df is None
+
+
+def test_kusto_response_to_dataframe_error_handling(kusto_client):
+    """Test DataFrame conversion error handling."""
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+
+    # Set up primary_results to raise an exception
+    type(mock_response).primary_results = PropertyMock(
+        side_effect=Exception("Test DataFrame conversion error")
+    )
+
+    # Test DataFrame conversion
+    df = kusto_client._kusto_response_to_dataframe(mock_response)
+
+    # Should return None on error
+    assert df is None
+
+
+def test_format_small_dataframe(kusto_client):
+    """Test formatting strategy for small DataFrames (≤20 rows)."""
+    import pandas as pd
+
+    # Create a small DataFrame
+    df = pd.DataFrame({
+        "id": [1, 2, 3],
+        "name": ["Alice", "Bob", "Charlie"],
+        "value": [100.5, 200.0, 150.25]
+    })
+
+    # Test small DataFrame formatting
+    result = kusto_client._format_small_dataframe(df)
+
+    # Verify the format includes expected elements
+    assert "Query Results (3 rows, 3 columns)" in result
+    assert "=" * 50 in result
+    assert "Alice" in result
+    assert "Bob" in result
+    assert "Charlie" in result
+
+
+def test_format_medium_dataframe(kusto_client):
+    """Test formatting strategy for medium DataFrames (21-1000 rows)."""
+    import pandas as pd
+    import numpy as np
+
+    # Create a medium DataFrame (50 rows)
+    df = pd.DataFrame({
+        "id": range(1, 51),
+        "name": [f"User_{i}" for i in range(1, 51)],
+        "value": np.random.random(50) * 1000,
+        "category": ["A"] * 25 + ["B"] * 25
+    })
+
+    # Test medium DataFrame formatting
+    result = kusto_client._format_medium_dataframe(df)
+
+    # Verify the format includes expected sections
+    assert "Query Results Summary (50 rows, 4 columns)" in result
+    assert "Dataset Overview:" in result
+    assert "Column Information:" in result
+    assert "Sample Data (first 10 rows):" in result
+    assert "Numeric Summary:" in result
+    assert "Total rows: 50" in result
+    assert "Total columns: 4" in result
+
+
+def test_format_large_dataframe(kusto_client):
+    """Test formatting strategy for large DataFrames (>1000 rows)."""
+    import pandas as pd
+    import numpy as np
+
+    # Create a large DataFrame (2000 rows)
+    df = pd.DataFrame({
+        "id": range(1, 2001),
+        "name": [f"User_{i}" for i in range(1, 2001)],
+        "value": np.random.random(2000) * 1000,
+        "timestamp": pd.date_range("2024-01-01", periods=2000, freq="H")
+    })
+
+    # Test large DataFrame formatting
+    result = kusto_client._format_large_dataframe(df)
+
+    # Verify the format includes expected sections
+    assert "Large Dataset Summary (2000 rows, 4 columns)" in result
+    assert "Dataset Overview:" in result
+    assert "Column Information:" in result
+    assert "First 5 rows:" in result
+    assert "Last 5 rows:" in result
+    assert "Numeric Summary" in result
+    assert "Total rows: 2,000" in result  # Check comma formatting
+    assert "Memory usage:" in result
+
+
+def test_format_dataframe_smart_strategy_selection(kusto_client):
+    """Test that the smart formatting selects the correct strategy based on size."""
+    import pandas as pd
+
+    # Test small DataFrame (≤20 rows)
+    small_df = pd.DataFrame({"id": range(5), "value": range(5)})
+    small_result = kusto_client._format_dataframe_smart(small_df)
+    assert "Query Results (5 rows, 2 columns)" in small_result
+
+    # Test medium DataFrame (21-1000 rows)
+    medium_df = pd.DataFrame({"id": range(100), "value": range(100)})
+    medium_result = kusto_client._format_dataframe_smart(medium_df)
+    assert "Query Results Summary (100 rows, 2 columns)" in medium_result
+
+    # Test large DataFrame (>1000 rows)
+    large_df = pd.DataFrame({"id": range(1500), "value": range(1500)})
+    large_result = kusto_client._format_dataframe_smart(large_df)
+    assert "Large Dataset Summary (1500 rows, 2 columns)" in large_result
+
+
+def test_get_formatting_strategy(kusto_client):
+    """Test the formatting strategy selection logic."""
+    assert kusto_client._get_formatting_strategy(10) == "small_full_table"
+    assert kusto_client._get_formatting_strategy(20) == "small_full_table"
+    assert kusto_client._get_formatting_strategy(21) == "medium_summary_sample"
+    assert kusto_client._get_formatting_strategy(500) == "medium_summary_sample"
+    assert kusto_client._get_formatting_strategy(1000) == "medium_summary_sample"
+    assert kusto_client._get_formatting_strategy(1001) == "large_summary_head_tail"
+    assert kusto_client._get_formatting_strategy(5000) == "large_summary_head_tail"
+
+
+def test_format_results_with_dataframe_success(kusto_client):
+    """Test format_results using successful DataFrame conversion."""
+    import pandas as pd
+
+    # Create a mock response that will convert to DataFrame
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_primary_result = MagicMock()
+
+    # Mock columns
+    mock_col1 = MagicMock()
+    mock_col1.column_name = "id"
+    mock_col2 = MagicMock()
+    mock_col2.column_name = "name"
+
+    mock_primary_result.columns = [mock_col1, mock_col2]
+
+    # Mock row data
+    mock_rows = [[1, "Alice"], [2, "Bob"]]
+    mock_primary_result.__iter__ = lambda self: iter(mock_rows)
+
+    mock_response.primary_results = [mock_primary_result]
+
+    # Test formatting with DataFrame
+    result = kusto_client.format_results(mock_response)
+
+    # Verify smart DataFrame formatting was used
+    assert result["success"] is True
+    assert "Query Results (2 rows, 2 columns)" in result["result"]
+    assert "metadata" in result
+    assert result["metadata"]["formatting"] == "smart_dataframe"
+    assert result["metadata"]["rows"] == 2
+    assert result["metadata"]["columns"] == 2
+    assert result["metadata"]["strategy"] == "small_full_table"
+
+
+def test_format_results_dataframe_fallback_to_raw(kusto_client):
+    """Test format_results falls back to raw formatting when DataFrame conversion fails."""
+    # Create a mock response that will fail DataFrame conversion
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_table = MagicMock()
+    mock_table.__str__.return_value = "Raw table output"
+
+    mock_response.primary_results = [mock_table]
+
+    # Mock DataFrame conversion to return None (failure)
+    with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
+        result = kusto_client.format_results(mock_response)
+
+    # Verify fallback to raw formatting
+    assert result["success"] is True
+    assert result["result"] == "Raw table output"
+    # Should not have DataFrame metadata since it fell back to raw
+
+
+def test_format_results_with_formatting_options(kusto_client):
+    """Test format_results respects formatting options."""
+    import pandas as pd
+
+    # Create a mock response for DataFrame conversion
+    mock_response = MagicMock(spec=KustoResponseDataSet)
+    mock_primary_result = MagicMock()
+
+    # Mock columns
+    mock_col1 = MagicMock()
+    mock_col1.column_name = "id"
+    mock_col2 = MagicMock()
+    mock_col2.column_name = "description"
+
+    mock_primary_result.columns = [mock_col1, mock_col2]
+
+    # Mock row data with long text
+    mock_rows = [[1, "This is a very long description that should be truncated"], [2, "Another long description"]]
+    mock_primary_result.__iter__ = lambda self: iter(mock_rows)
+
+    mock_response.primary_results = [mock_primary_result]
+
+    # Set formatting options
+    kusto_client._current_formatting_options = {
+        "max_column_width": 20,
+        "show_memory_usage": False
+    }
+
+    # Test formatting with options
+    result = kusto_client.format_results(mock_response)
+
+    # Verify formatting was applied
+    assert result["success"] is True
+    assert result["metadata"]["formatting"] == "smart_dataframe"
+
+
+@pytest.mark.asyncio
+async def test_execute_query_with_formatting_options(kusto_client):
+    """Test execute_query with formatting_options parameter."""
+    # Mock execute_query implementation for just the formatting options test
+    with patch("plugins.kusto.tool.AzureKustoClient") as mock_azure_client:
+        # Mock the response
+        mock_response = MagicMock(spec=KustoResponseDataSet)
+        mock_table = MagicMock()
+        mock_table.__str__.return_value = "Table data"
+
+        mock_response.primary_results = [mock_table]
+
+        # Configure the mock client instance
+        mock_client_instance = mock_azure_client.return_value
+        mock_client_instance.execute.return_value = mock_response
+
+        # Patch get_kusto_client to return our mock
+        with patch.object(
+            kusto_client, "get_kusto_client", return_value=mock_client_instance
+        ):
+            # Custom formatting options
+            formatting_options = {
+                "max_column_width": 30,
+                "show_memory_usage": True,
+                "force_dataframe": True
+            }
+
+            # Execute the query with formatting options
+            result = await kusto_client.execute_query(
+                database="test_db",
+                query="test_query",
+                formatting_options=formatting_options
+            )
+
+            # Verify formatting options were stored
+            assert hasattr(kusto_client, '_current_formatting_options')
+            assert kusto_client._current_formatting_options == formatting_options
+
+            # Verify result
+            assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_execute_tool_with_formatting_options(kusto_client):
+    """Test execute_tool passes formatting_options to execute_query."""
+    # Mock execute_query to capture parameters
+    with patch.object(kusto_client, "execute_query", AsyncMock()) as mock_execute_query:
+        mock_execute_query.return_value = {"success": True, "result": "Formatted output"}
+
+        # Custom formatting options
+        formatting_options = {
+            "max_column_width": 25,
+            "show_memory_usage": False
+        }
+
+        # Call execute_tool with formatting options
+        result = await kusto_client.execute_tool(
+            {
+                "operation": "execute_query",
+                "database": "test_db",
+                "query": "test_query",
+                "formatting_options": formatting_options
+            }
+        )
+
+        # Verify execute_query was called with formatting_options
+        mock_execute_query.assert_called_once_with(
+            database="test_db",
+            query="test_query",
+            cluster=None,
+            format_results=True,
+            formatting_options=formatting_options,
+            output_limits=None
+        )
+
+        assert result["success"] is True

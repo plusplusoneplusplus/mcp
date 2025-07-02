@@ -5,6 +5,8 @@ import json
 import re
 import traceback
 from typing import Dict, Any, Optional, Union, List
+import pandas as pd
+import numpy as np
 
 from azure.kusto.data import (
     KustoClient as AzureKustoClient,
@@ -76,8 +78,29 @@ class KustoClient(KustoClientInterface):
                 },
                 "format_results": {
                     "type": "boolean",
-                    "description": "Whether to format the results for LLM analysis",
+                    "description": "Whether to format the results for LLM analysis using smart DataFrame formatting",
                     "default": True,
+                },
+                "formatting_options": {
+                    "type": "object",
+                    "description": "Configuration for DataFrame formatting behavior",
+                    "properties": {
+                        "force_dataframe": {
+                            "type": "boolean",
+                            "description": "Force DataFrame conversion even if it fails initially",
+                            "default": True
+                        },
+                        "max_column_width": {
+                            "type": "integer",
+                            "description": "Maximum column width for display (characters)",
+                            "default": 50
+                        },
+                        "show_memory_usage": {
+                            "type": "boolean",
+                            "description": "Show memory usage for large datasets",
+                            "default": True
+                        }
+                    }
                 },
                 "output_limits": {
                     "type": "object",
@@ -236,9 +259,158 @@ class KustoClient(KustoClientInterface):
             f"or use az login to authenticate with Azure CLI."
         )
 
+    def _kusto_response_to_dataframe(self, response: KustoResponseDataSet) -> Optional[pd.DataFrame]:
+        """
+        Convert Kusto response to pandas DataFrame.
+
+        Args:
+            response: KustoResponseDataSet object
+
+        Returns:
+            pandas DataFrame or None if conversion fails
+        """
+        try:
+            if not hasattr(response, "primary_results") or not response.primary_results:
+                return None
+
+            primary_result = response.primary_results[0]
+
+            # Extract column names
+            columns = [col.column_name for col in primary_result.columns]
+
+            # Extract data rows
+            data = []
+            for row in primary_result:
+                data.append([row[i] for i in range(len(columns))])
+
+            # Create DataFrame
+            df = pd.DataFrame(data, columns=columns)
+            return df
+
+        except Exception as e:
+            self.logger.warning(f"Failed to convert Kusto response to DataFrame: {str(e)}")
+            return None
+
+    def _format_dataframe_smart(self, df: pd.DataFrame) -> str:
+        """
+        Apply smart formatting strategies based on DataFrame size.
+
+        Args:
+            df: pandas DataFrame to format
+
+        Returns:
+            Formatted string representation
+        """
+        row_count = len(df)
+
+        # Strategy 1: Small datasets (≤20 rows) - Show full table
+        if row_count <= 20:
+            return self._format_small_dataframe(df)
+
+        # Strategy 2: Medium datasets (≤1000 rows) - Show summary + sample
+        elif row_count <= 1000:
+            return self._format_medium_dataframe(df)
+
+        # Strategy 3: Large datasets (>1000 rows) - Show summary + head/tail
+        else:
+            return self._format_large_dataframe(df)
+
+    def _format_small_dataframe(self, df: pd.DataFrame) -> str:
+        """Format small DataFrames (≤20 rows) by showing the full table."""
+        output = []
+        output.append(f"Query Results ({len(df)} rows, {len(df.columns)} columns)")
+        output.append("=" * 50)
+
+        # Get max column width from formatting options
+        max_col_width = getattr(self, '_current_formatting_options', {}).get('max_column_width', 50)
+        output.append(df.to_string(index=False, max_colwidth=max_col_width))
+        return "\n".join(output)
+
+    def _format_medium_dataframe(self, df: pd.DataFrame) -> str:
+        """Format medium DataFrames (21-1000 rows) with summary and sample."""
+        output = []
+        output.append(f"Query Results Summary ({len(df)} rows, {len(df.columns)} columns)")
+        output.append("=" * 50)
+
+        # Dataset summary
+        output.append("\nDataset Overview:")
+        output.append(f"• Total rows: {len(df)}")
+        output.append(f"• Total columns: {len(df.columns)}")
+
+        # Column information
+        output.append("\nColumn Information:")
+        for col in df.columns:
+            dtype = str(df[col].dtype)
+            null_count = df[col].isnull().sum()
+            unique_count = df[col].nunique()
+            output.append(f"• {col}: {dtype} ({unique_count} unique, {null_count} nulls)")
+
+        # Sample data (first 10 rows)
+        max_col_width = getattr(self, '_current_formatting_options', {}).get('max_column_width', 40)
+        output.append(f"\nSample Data (first 10 rows):")
+        output.append(df.head(10).to_string(index=False, max_colwidth=max_col_width))
+
+        # If more than 10 rows, show summary statistics for numeric columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            output.append(f"\nNumeric Summary:")
+            output.append(df[numeric_cols].describe().to_string(max_colwidth=20))
+
+        return "\n".join(output)
+
+    def _format_large_dataframe(self, df: pd.DataFrame) -> str:
+        """Format large DataFrames (>1000 rows) with summary, head, and tail."""
+        output = []
+        output.append(f"Large Dataset Summary ({len(df)} rows, {len(df.columns)} columns)")
+        output.append("=" * 50)
+
+        # Dataset summary
+        output.append("\nDataset Overview:")
+        output.append(f"• Total rows: {len(df):,}")
+        output.append(f"• Total columns: {len(df.columns)}")
+
+        # Show memory usage if requested
+        formatting_options = getattr(self, '_current_formatting_options', {})
+        if formatting_options.get('show_memory_usage', True):
+            output.append(f"• Memory usage: ~{df.memory_usage(deep=True).sum() / 1024 / 1024:.1f} MB")
+
+        # Column information with data ranges
+        output.append("\nColumn Information:")
+        for col in df.columns:
+            dtype = str(df[col].dtype)
+            null_count = df[col].isnull().sum()
+            unique_count = df[col].nunique()
+
+            # Add data range for numeric columns
+            if pd.api.types.is_numeric_dtype(df[col]):
+                min_val = df[col].min()
+                max_val = df[col].max()
+                range_info = f", range: {min_val} to {max_val}"
+            else:
+                range_info = ""
+
+            output.append(f"• {col}: {dtype} ({unique_count:,} unique, {null_count:,} nulls{range_info})")
+
+        # First 5 rows
+        max_col_width = formatting_options.get('max_column_width', 30)
+        output.append(f"\nFirst 5 rows:")
+        output.append(df.head(5).to_string(index=False, max_colwidth=max_col_width))
+
+        # Last 5 rows
+        output.append(f"\nLast 5 rows:")
+        output.append(df.tail(5).to_string(index=False, max_colwidth=max_col_width))
+
+        # Summary statistics for numeric columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            output.append(f"\nNumeric Summary (top 5 columns):")
+            output.append(df[numeric_cols[:5]].describe().to_string(max_colwidth=15))
+
+        return "\n".join(output)
+
     def format_results(self, response: KustoResponseDataSet, output_limits: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Format the Kusto response with intelligent output limiting to handle large datasets.
+        Format the Kusto response with smart DataFrame formatting and intelligent output limiting.
 
         Args:
             response: A KustoResponseDataSet object returned from query execution
@@ -248,42 +420,84 @@ class KustoClient(KustoClientInterface):
             dict: A dictionary with "success", "result", and optional metadata keys
         """
         try:
-            # Get the raw result string
-            if hasattr(response, "primary_results") and response.primary_results:
-                raw_result = str(response.primary_results[0])
-            else:
-                raw_result = "No results found"
-
             # Use provided limits or defaults
             limits = output_limits or self.default_output_limits
 
-            # Check if output limiting is needed
-            if len(raw_result) <= limits.get("max_total_length", 50 * 1024):
-                # Result is within limits, return as-is
-                return {"success": True, "result": raw_result}
+            # Try to convert to DataFrame first for smart formatting
+            df = self._kusto_response_to_dataframe(response)
 
-            # Apply output limits using the OutputLimiter
-            mock_result = {"output": raw_result, "error": ""}
-            limited_result = self.output_limiter.apply_output_limits(mock_result, limits)
+            if df is not None:
+                # Use smart DataFrame formatting
+                formatted_result = self._format_dataframe_smart(df)
 
-            # Build response with metadata about truncation
-            response_dict = {
-                "success": True,
-                "result": limited_result["output"],
-                "metadata": {
-                    "truncated": True,
-                    "original_size": len(raw_result),
-                    "truncated_size": len(limited_result["output"]),
-                    "truncation_strategy": limits.get("truncate_strategy", "smart"),
-                    "size_reduction": f"{((len(raw_result) - len(limited_result['output'])) / len(raw_result) * 100):.1f}%"
+                # Check if output limiting is needed
+                if len(formatted_result) <= limits.get("max_total_length", 50 * 1024):
+                    # Result is within limits, return formatted DataFrame
+                    return {
+                        "success": True,
+                        "result": formatted_result,
+                        "metadata": {
+                            "formatting": "smart_dataframe",
+                            "rows": len(df),
+                            "columns": len(df.columns),
+                            "strategy": self._get_formatting_strategy(len(df))
+                        }
+                    }
+                else:
+                    # Apply output limits to the formatted DataFrame result
+                    mock_result = {"output": formatted_result, "error": ""}
+                    limited_result = self.output_limiter.apply_output_limits(mock_result, limits)
+
+                    return {
+                        "success": True,
+                        "result": limited_result["output"],
+                        "metadata": {
+                            "formatting": "smart_dataframe",
+                            "rows": len(df),
+                            "columns": len(df.columns),
+                            "strategy": self._get_formatting_strategy(len(df)),
+                            "truncated": True,
+                            "original_size": len(formatted_result),
+                            "truncated_size": len(limited_result["output"]),
+                            "truncation_strategy": limits.get("truncate_strategy", "smart"),
+                            "size_reduction": f"{((len(formatted_result) - len(limited_result['output'])) / len(formatted_result) * 100):.1f}%"
+                        }
+                    }
+            else:
+                # Fallback to raw string formatting if DataFrame conversion fails
+                if hasattr(response, "primary_results") and response.primary_results:
+                    raw_result = str(response.primary_results[0])
+                else:
+                    raw_result = "No results found"
+
+                # Check if output limiting is needed
+                if len(raw_result) <= limits.get("max_total_length", 50 * 1024):
+                    # Result is within limits, return as-is
+                    return {"success": True, "result": raw_result}
+
+                # Apply output limits using the OutputLimiter
+                mock_result = {"output": raw_result, "error": ""}
+                limited_result = self.output_limiter.apply_output_limits(mock_result, limits)
+
+                # Build response with metadata about truncation
+                response_dict = {
+                    "success": True,
+                    "result": limited_result["output"],
+                    "metadata": {
+                        "formatting": "raw_fallback",
+                        "truncated": True,
+                        "original_size": len(raw_result),
+                        "truncated_size": len(limited_result["output"]),
+                        "truncation_strategy": limits.get("truncate_strategy", "smart"),
+                        "size_reduction": f"{((len(raw_result) - len(limited_result['output'])) / len(raw_result) * 100):.1f}%"
+                    }
                 }
-            }
 
-            # Include raw output if requested
-            if limits.get("preserve_raw", False):
-                response_dict["raw_result"] = raw_result
+                # Include raw output if requested
+                if limits.get("preserve_raw", False):
+                    response_dict["raw_result"] = raw_result
 
-            return response_dict
+                return response_dict
 
         except Exception as e:
             self.logger.error(f"Error formatting results: {str(e)}")
@@ -294,6 +508,15 @@ class KustoClient(KustoClientInterface):
                 "traceback": traceback.format_exc(),
             }
 
+    def _get_formatting_strategy(self, row_count: int) -> str:
+        """Get the formatting strategy name based on row count."""
+        if row_count <= 20:
+            return "small_full_table"
+        elif row_count <= 1000:
+            return "medium_summary_sample"
+        else:
+            return "large_summary_head_tail"
+
     async def execute_query(
         self,
         database: str,
@@ -301,6 +524,7 @@ class KustoClient(KustoClientInterface):
         client: Optional[AzureKustoClient] = None,
         cluster: Optional[str] = None,
         format_results: bool = True,
+        formatting_options: Optional[Dict[str, Any]] = None,
         output_limits: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
@@ -311,11 +535,12 @@ class KustoClient(KustoClientInterface):
             query (str): The KQL query to execute
             client (AzureKustoClient, optional): An existing Kusto client to use
             cluster (str, optional): The name or URL of the Kusto cluster to connect to
-            format_results (bool, optional): Whether to format the results for LLM analysis. Default is True.
+            format_results (bool, optional): Whether to format the results using smart DataFrame formatting. Default is True.
+            formatting_options (Dict[str, Any], optional): Configuration for DataFrame formatting behavior
             output_limits (Dict[str, Any], optional): Configuration for output size limits and truncation
 
         Returns:
-            dict: The query results with either formatted output or raw response
+            dict: The query results with either smart DataFrame formatted output or raw response
         """
         # Validate database
         if not database:
@@ -350,6 +575,9 @@ class KustoClient(KustoClientInterface):
 
             # Return formatted results if requested
             if format_results:
+                # Store formatting options in the instance for use by format_results
+                if formatting_options:
+                    self._current_formatting_options = formatting_options
                 return self.format_results(response, output_limits)
 
             # Otherwise return the original structure for programmatic access
@@ -397,7 +625,8 @@ class KustoClient(KustoClientInterface):
                 database=arguments.get("database"),
                 query=arguments.get("query"),
                 cluster=arguments.get("cluster"),
-                format_results=True,  # Always format results
+                format_results=arguments.get("format_results", True),
+                formatting_options=arguments.get("formatting_options"),
                 output_limits=arguments.get("output_limits"),
             )
             return result
