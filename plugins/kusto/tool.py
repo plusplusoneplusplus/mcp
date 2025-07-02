@@ -18,6 +18,7 @@ from azure.identity import DefaultAzureCredential
 from mcp_tools.interfaces import ToolInterface, KustoClientInterface
 from mcp_tools.plugin import register_tool
 from config import env
+from utils.output_processor.output_limiter import OutputLimiter
 
 
 @register_tool(ecosystem="microsoft", os_type="all")
@@ -78,6 +79,28 @@ class KustoClient(KustoClientInterface):
                     "description": "Whether to format the results for LLM analysis",
                     "default": True,
                 },
+                "output_limits": {
+                    "type": "object",
+                    "description": "Configuration for output size limits and truncation",
+                    "properties": {
+                        "max_total_length": {
+                            "type": "integer",
+                            "description": "Maximum total output length in bytes (default: 50KB)",
+                            "default": 51200
+                        },
+                        "truncate_strategy": {
+                            "type": "string",
+                            "description": "Truncation strategy: 'start', 'end', 'middle', or 'smart'",
+                            "enum": ["start", "end", "middle", "smart"],
+                            "default": "smart"
+                        },
+                        "preserve_raw": {
+                            "type": "boolean",
+                            "description": "Whether to preserve raw output in metadata",
+                            "default": False
+                        }
+                    }
+                },
             },
             "required": ["operation", "query"],
         }
@@ -90,6 +113,17 @@ class KustoClient(KustoClientInterface):
         """
         self.config = config_dict
         self.logger = logging.getLogger(__name__)
+        self.output_limiter = OutputLimiter()
+
+        # Default output limits configuration (50KB max as specified in issue)
+        self.default_output_limits = {
+            "max_total_length": 50 * 1024,  # 50KB
+            "truncate_strategy": "smart",
+            "truncate_message": "\n... (output truncated due to size limit)",
+            "preserve_first_lines": 10,
+            "preserve_last_lines": 20,
+            "preserve_raw": False  # Set to True if raw data access is needed
+        }
 
     def normalize_cluster_url(self, cluster: Optional[str]) -> str:
         """
@@ -202,22 +236,55 @@ class KustoClient(KustoClientInterface):
             f"or use az login to authenticate with Azure CLI."
         )
 
-    def format_results(self, response: KustoResponseDataSet) -> Dict[str, Any]:
+    def format_results(self, response: KustoResponseDataSet, output_limits: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Format the Kusto response using a simple approach that directly returns the primary results.
+        Format the Kusto response with intelligent output limiting to handle large datasets.
 
         Args:
             response: A KustoResponseDataSet object returned from query execution
+            output_limits: Optional configuration for output limits and truncation
 
         Returns:
-            dict: A simplified dictionary with "success" and "result" keys
+            dict: A dictionary with "success", "result", and optional metadata keys
         """
         try:
-            # Simply return the primary results directly
+            # Get the raw result string
             if hasattr(response, "primary_results") and response.primary_results:
-                return {"success": True, "result": str(response.primary_results[0])}
+                raw_result = str(response.primary_results[0])
             else:
-                return {"success": True, "result": "No results found"}
+                raw_result = "No results found"
+
+            # Use provided limits or defaults
+            limits = output_limits or self.default_output_limits
+
+            # Check if output limiting is needed
+            if len(raw_result) <= limits.get("max_total_length", 50 * 1024):
+                # Result is within limits, return as-is
+                return {"success": True, "result": raw_result}
+
+            # Apply output limits using the OutputLimiter
+            mock_result = {"output": raw_result, "error": ""}
+            limited_result = self.output_limiter.apply_output_limits(mock_result, limits)
+
+            # Build response with metadata about truncation
+            response_dict = {
+                "success": True,
+                "result": limited_result["output"],
+                "metadata": {
+                    "truncated": True,
+                    "original_size": len(raw_result),
+                    "truncated_size": len(limited_result["output"]),
+                    "truncation_strategy": limits.get("truncate_strategy", "smart"),
+                    "size_reduction": f"{((len(raw_result) - len(limited_result['output'])) / len(raw_result) * 100):.1f}%"
+                }
+            }
+
+            # Include raw output if requested
+            if limits.get("preserve_raw", False):
+                response_dict["raw_result"] = raw_result
+
+            return response_dict
+
         except Exception as e:
             self.logger.error(f"Error formatting results: {str(e)}")
             return {
@@ -234,6 +301,7 @@ class KustoClient(KustoClientInterface):
         client: Optional[AzureKustoClient] = None,
         cluster: Optional[str] = None,
         format_results: bool = True,
+        output_limits: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Execute a Kusto query and return the results.
@@ -244,6 +312,7 @@ class KustoClient(KustoClientInterface):
             client (AzureKustoClient, optional): An existing Kusto client to use
             cluster (str, optional): The name or URL of the Kusto cluster to connect to
             format_results (bool, optional): Whether to format the results for LLM analysis. Default is True.
+            output_limits (Dict[str, Any], optional): Configuration for output size limits and truncation
 
         Returns:
             dict: The query results with either formatted output or raw response
@@ -281,7 +350,7 @@ class KustoClient(KustoClientInterface):
 
             # Return formatted results if requested
             if format_results:
-                return self.format_results(response)
+                return self.format_results(response, output_limits)
 
             # Otherwise return the original structure for programmatic access
             return {
@@ -329,6 +398,7 @@ class KustoClient(KustoClientInterface):
                 query=arguments.get("query"),
                 cluster=arguments.get("cluster"),
                 format_results=True,  # Always format results
+                output_limits=arguments.get("output_limits"),
             )
             return result
         else:
