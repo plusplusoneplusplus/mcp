@@ -136,6 +136,10 @@ export class ExecutionTracker {
         try {
             // Keep only last 1000 records to prevent storage bloat
             const recordsToSave = this.completionHistory.slice(-1000);
+            // Update in-memory array to match saved records if we trimmed
+            if (recordsToSave.length < this.completionHistory.length) {
+                this.completionHistory = recordsToSave;
+            }
             await this.context.globalState.update(ExecutionTracker.STORAGE_KEY, recordsToSave);
 
             logger.debug(`Saved ${recordsToSave.length} completion records`);
