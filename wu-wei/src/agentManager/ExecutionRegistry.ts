@@ -17,17 +17,50 @@ export interface ActiveExecution {
 }
 
 /**
+ * Serializable version of ActiveExecution for persistence
+ */
+interface SerializableExecution {
+    executionId: string;
+    agentName: string;
+    method: string;
+    taskDescription: string;
+    startTime: string; // ISO string
+    status: 'pending' | 'executing' | 'completed' | 'failed' | 'timeout';
+    originalParams: any;
+    promptContext?: any;
+}
+
+/**
  * Central registry for tracking active agent executions
  * 
  * This class provides reliable execution correlation by maintaining a registry
  * of all active executions and providing multiple strategies for matching
  * completion signals to their originating executions.
+ * 
+ * Supports persistence across VSCode sessions for completed executions.
  */
 export class ExecutionRegistry {
     private static readonly EXECUTION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+    private static readonly STORAGE_KEY = 'wu-wei.execution.registry.completed';
     private activeExecutions = new Map<string, ActiveExecution>();
     private completedExecutions: ActiveExecution[] = [];
     private readonly maxCompletedHistory = 100;
+    private context?: vscode.ExtensionContext;
+
+    constructor(context?: vscode.ExtensionContext) {
+        if (context) {
+            this.context = context;
+            this.loadCompletedHistory();
+        }
+    }
+
+    /**
+     * Set the extension context for persistence
+     */
+    setContext(context: vscode.ExtensionContext): void {
+        this.context = context;
+        this.loadCompletedHistory();
+    }
 
     /**
      * Register a new execution in the registry
@@ -68,6 +101,7 @@ export class ExecutionRegistry {
         // Move to completed history
         this.activeExecutions.delete(executionId);
         this.addToCompletedHistory(execution);
+        this.saveCompletedHistory();
 
         logger.info('Execution completed', {
             executionId,
@@ -93,6 +127,7 @@ export class ExecutionRegistry {
 
         this.activeExecutions.delete(executionId);
         this.addToCompletedHistory(execution);
+        this.saveCompletedHistory();
 
         logger.error('Execution failed', { executionId, error });
 
@@ -111,6 +146,7 @@ export class ExecutionRegistry {
         execution.status = 'timeout';
         this.activeExecutions.delete(executionId);
         this.addToCompletedHistory(execution);
+        this.saveCompletedHistory();
 
         logger.warn('Execution timed out', {
             executionId,
@@ -319,6 +355,7 @@ export class ExecutionRegistry {
 
         this.activeExecutions.delete(executionId);
         this.addToCompletedHistory(execution);
+        this.saveCompletedHistory();
 
         logger.info('Execution cancelled', { executionId });
         return true;
@@ -329,6 +366,7 @@ export class ExecutionRegistry {
      */
     clearHistory(): void {
         this.completedExecutions = [];
+        this.saveCompletedHistory();
         logger.info('Execution history cleared');
     }
 
@@ -336,6 +374,9 @@ export class ExecutionRegistry {
      * Dispose and cleanup all active executions
      */
     dispose(): void {
+        // Save completed history before disposing
+        this.saveCompletedHistory();
+
         // Clear all timeouts
         for (const execution of this.activeExecutions.values()) {
             if (execution.timeoutHandle) {
@@ -347,5 +388,56 @@ export class ExecutionRegistry {
         this.completedExecutions = [];
 
         logger.info('ExecutionRegistry disposed');
+    }
+
+    /**
+     * Load completed execution history from persistent storage
+     */
+    private loadCompletedHistory(): void {
+        if (!this.context) return;
+
+        try {
+            const stored = this.context.globalState.get<SerializableExecution[]>(ExecutionRegistry.STORAGE_KEY, []);
+            this.completedExecutions = stored.map(exec => ({
+                ...exec,
+                startTime: new Date(exec.startTime),
+                // Don't restore timeout handles - they should not be persisted
+                timeoutHandle: undefined
+            }));
+
+            logger.debug(`Loaded ${this.completedExecutions.length} completed executions from storage`);
+        } catch (error) {
+            logger.error('Failed to load completed execution history', { error });
+            this.completedExecutions = [];
+        }
+    }
+
+    /**
+     * Save completed execution history to persistent storage
+     */
+    private saveCompletedHistory(): void {
+        if (!this.context) return;
+
+        try {
+            // Convert to serializable format
+            const serializableExecutions: SerializableExecution[] = this.completedExecutions.map(exec => ({
+                executionId: exec.executionId,
+                agentName: exec.agentName,
+                method: exec.method,
+                taskDescription: exec.taskDescription,
+                startTime: exec.startTime.toISOString(),
+                status: exec.status,
+                originalParams: exec.originalParams,
+                promptContext: exec.promptContext
+            }));
+
+            // Keep only last maxCompletedHistory records
+            const recordsToSave = serializableExecutions.slice(-this.maxCompletedHistory);
+            this.context.globalState.update(ExecutionRegistry.STORAGE_KEY, recordsToSave);
+
+            logger.debug(`Saved ${recordsToSave.length} completed executions to storage`);
+        } catch (error) {
+            logger.error('Failed to save completed execution history', { error });
+        }
     }
 }
