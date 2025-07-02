@@ -253,14 +253,30 @@ export class GitHubCopilotAgent extends AbstractAgent {
             await vscode.commands.executeCommand('workbench.action.chat.newChat');
 
             // Wait a moment for the chat to initialize
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // Then open the agent with the query (don't prepend agentId if query already contains it)
             const finalQuery = query ? (query.includes('@') ? query : `${agentId} ${query}`) : agentId;
-            await vscode.commands.executeCommand('workbench.action.chat.openAgent', {
+
+            if (false) {
+                // old way
+                await vscode.commands.executeCommand('workbench.action.chat.openAgent', {
+                    query: finalQuery,
+                    isPartialQuery: !query
+                });
+            }
+
+            // Use workbench.action.chat.open with pre-filled query
+            await vscode.commands.executeCommand('workbench.action.chat.open', {
                 query: finalQuery,
-                isPartialQuery: !query
+                isPartialQuery: true // pre-fills input, doesn't send
             });
+
+            // Wait a moment for the chat to initialize
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Submit the query
+            await vscode.commands.executeCommand('workbench.action.chat.submit');
 
             return {
                 success: true,
@@ -293,10 +309,19 @@ export class GitHubCopilotAgent extends AbstractAgent {
             const fullQuery = context ? `${question} Context: ${context}` : question;
 
             // Then execute the ask command
-            await vscode.commands.executeCommand('workbench.action.chat.openAgent', {
+            // await vscode.commands.executeCommand('workbench.action.chat.openAgent', {
+            //     query: fullQuery,
+            //     isPartialQuery: false
+            // });
+
+            // Use workbench.action.chat.open with pre-filled query
+            await vscode.commands.executeCommand('workbench.action.chat.open', {
                 query: fullQuery,
-                isPartialQuery: false
+                isPartialQuery: true // pre-fills input, doesn't send
             });
+
+            // Submit the query
+            await vscode.commands.executeCommand('workbench.action.chat.submit');
 
             return {
                 success: true,
