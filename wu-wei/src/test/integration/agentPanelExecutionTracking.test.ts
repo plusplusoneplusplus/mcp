@@ -277,7 +277,28 @@ suite('Agent Panel Execution Tracking Integration', () => {
     });
 
     suite('Persistence Integration', () => {
+        let persistenceStorage: any = {};
+        let persistenceContext: any;
+
+        setup(() => {
+            // Create a mock context that actually stores data for persistence tests
+            persistenceStorage = {};
+            persistenceContext = {
+                subscriptions: [],
+                globalState: {
+                    get: (key: string, defaultValue?: any) => persistenceStorage[key] || defaultValue,
+                    update: (key: string, value: any) => {
+                        persistenceStorage[key] = value;
+                        return Promise.resolve();
+                    }
+                },
+                extensionUri: vscode.Uri.file('/mock/extension/path')
+            };
+        });
+
         test('should persist ExecutionTracker data across sessions', async () => {
+            const firstTracker = new ExecutionTracker(persistenceContext);
+
             const completionData = {
                 executionId: 'persist-integration-test',
                 status: 'success' as const,
@@ -291,10 +312,13 @@ suite('Agent Panel Execution Tracking Integration', () => {
             };
 
             // Record completion in tracker
-            await executionTracker.recordCompletion(completionData);
+            await firstTracker.recordCompletion(completionData);
+
+            // Dispose first tracker to save data
+            firstTracker.dispose();
 
             // Create new tracker instance to simulate session restart
-            const newTracker = new ExecutionTracker(context);
+            const newTracker = new ExecutionTracker(persistenceContext);
             const restoredHistory = newTracker.getCompletionHistory();
 
             assert.ok(restoredHistory.length > 0, 'Should restore completion history');
@@ -302,9 +326,13 @@ suite('Agent Panel Execution Tracking Integration', () => {
             assert.ok(restored, 'Should restore specific completion record');
             assert.strictEqual(restored.status, 'success', 'Should restore correct status');
             assert.ok(restored.metadata?.duration, 'Should restore metadata');
+            
+            newTracker.dispose();
         });
 
         test('should maintain execution statistics across restarts', async () => {
+            const statsTracker = new ExecutionTracker(persistenceContext);
+
             // Add multiple completions with different statuses
             const completions = [
                 { id: 'stats-persist-1', status: 'success' as const },
@@ -314,7 +342,7 @@ suite('Agent Panel Execution Tracking Integration', () => {
             ];
 
             for (const completion of completions) {
-                await executionTracker.recordCompletion({
+                await statsTracker.recordCompletion({
                     executionId: completion.id,
                     status: completion.status,
                     taskDescription: `Statistics persistence test ${completion.id}`,
@@ -322,14 +350,18 @@ suite('Agent Panel Execution Tracking Integration', () => {
                 });
             }
 
+            statsTracker.dispose();
+
             // Create new tracker to simulate restart
-            const newTracker = new ExecutionTracker(context);
+            const newTracker = new ExecutionTracker(persistenceContext);
             const stats = newTracker.getCompletionStats();
 
             assert.ok(stats.total >= 4, 'Should maintain total count across restarts');
             assert.ok(stats.successful >= 2, 'Should maintain success count');
             assert.ok(stats.errors >= 1, 'Should maintain error count');
             assert.ok(stats.partial >= 1, 'Should maintain partial count');
+            
+            newTracker.dispose();
         });
 
         test('should handle storage migration gracefully', () => {
@@ -344,19 +376,23 @@ suite('Agent Panel Execution Tracking Integration', () => {
             ];
 
             // Mock legacy data in storage
-            context.globalState.update('wu-wei.copilot.executions', mockLegacyData);
+            persistenceStorage['wu-wei.copilot.executions'] = mockLegacyData;
 
             // New tracker should handle legacy data format
-            const newTracker = new ExecutionTracker(context);
+            const newTracker = new ExecutionTracker(persistenceContext);
             const history = newTracker.getCompletionHistory();
 
             assert.ok(history.length > 0, 'Should load legacy data');
             const legacyRecord = history.find(r => r.executionId === 'legacy-exec-1');
             assert.ok(legacyRecord, 'Should find legacy record');
             assert.ok(legacyRecord.timestamp instanceof Date, 'Should convert legacy timestamp format');
+            
+            newTracker.dispose();
         });
 
         test('should handle concurrent persistence operations', async () => {
+            const concurrentTracker = new ExecutionTracker(persistenceContext);
+
             // Simulate multiple rapid completion recordings
             const concurrentCompletions = Array.from({ length: 10 }, (_, i) => ({
                 executionId: `concurrent-test-${i}`,
@@ -367,27 +403,29 @@ suite('Agent Panel Execution Tracking Integration', () => {
 
             // Record all completions concurrently
             const promises = concurrentCompletions.map(completion => 
-                executionTracker.recordCompletion(completion)
+                concurrentTracker.recordCompletion(completion)
             );
 
             await Promise.all(promises);
 
             // Verify all completions were recorded
-            const history = executionTracker.getCompletionHistory();
+            const history = concurrentTracker.getCompletionHistory();
             const concurrentRecords = history.filter(r => 
                 r.executionId.startsWith('concurrent-test-')
             );
 
             assert.strictEqual(concurrentRecords.length, 10, 'Should record all concurrent completions');
+            
+            concurrentTracker.dispose();
         });
 
         test('should respect storage limits and cleanup old data', async () => {
             // Create ExecutionTracker with reduced limit for testing
-            const tracker = new ExecutionTracker(context);
+            const limitTracker = new ExecutionTracker(persistenceContext);
 
             // Add more records than the typical limit
             for (let i = 0; i < 1005; i++) {
-                await tracker.recordCompletion({
+                await limitTracker.recordCompletion({
                     executionId: `limit-test-${i}`,
                     status: 'success',
                     taskDescription: `Limit test ${i}`,
@@ -395,8 +433,10 @@ suite('Agent Panel Execution Tracking Integration', () => {
                 });
             }
 
+            limitTracker.dispose();
+
             // Create new tracker to test restoration with limits
-            const newTracker = new ExecutionTracker(context);
+            const newTracker = new ExecutionTracker(persistenceContext);
             const history = newTracker.getCompletionHistory();
 
             // Should respect the 1000 record limit
@@ -405,6 +445,8 @@ suite('Agent Panel Execution Tracking Integration', () => {
             // Should keep most recent records
             const lastRecord = history.find(r => r.executionId === 'limit-test-1004');
             assert.ok(lastRecord, 'Should keep most recent records');
+            
+            newTracker.dispose();
         });
     });
 
