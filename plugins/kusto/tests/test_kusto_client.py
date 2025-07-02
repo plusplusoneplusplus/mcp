@@ -549,7 +549,7 @@ def test_format_small_dataframe(kusto_client):
     result = kusto_client._format_small_dataframe(df)
 
     # Verify the format includes expected elements
-    assert "📊 Query Results (3 rows, 3 columns)" in result
+    assert "Query Results (3 rows, 3 columns)" in result
     assert "=" * 50 in result
     assert "Alice" in result
     assert "Bob" in result
@@ -573,11 +573,11 @@ def test_format_medium_dataframe(kusto_client):
     result = kusto_client._format_medium_dataframe(df)
 
     # Verify the format includes expected sections
-    assert "📊 Query Results Summary (50 rows, 4 columns)" in result
-    assert "📋 Dataset Overview:" in result
-    assert "📝 Column Information:" in result
-    assert "🔍 Sample Data (first 10 rows):" in result
-    assert "📈 Numeric Summary:" in result
+    assert "Query Results Summary (50 rows, 4 columns)" in result
+    assert "Dataset Overview:" in result
+    assert "Column Information:" in result
+    assert "Sample Data (first 10 rows):" in result
+    assert "Numeric Summary:" in result
     assert "Total rows: 50" in result
     assert "Total columns: 4" in result
 
@@ -599,12 +599,12 @@ def test_format_large_dataframe(kusto_client):
     result = kusto_client._format_large_dataframe(df)
 
     # Verify the format includes expected sections
-    assert "📊 Large Dataset Summary (2000 rows, 4 columns)" in result
-    assert "📋 Dataset Overview:" in result
-    assert "📝 Column Information:" in result
-    assert "⬆️  First 5 rows:" in result
-    assert "⬇️  Last 5 rows:" in result
-    assert "📈 Numeric Summary" in result
+    assert "Large Dataset Summary (2000 rows, 4 columns)" in result
+    assert "Dataset Overview:" in result
+    assert "Column Information:" in result
+    assert "First 5 rows:" in result
+    assert "Last 5 rows:" in result
+    assert "Numeric Summary" in result
     assert "Total rows: 2,000" in result  # Check comma formatting
     assert "Memory usage:" in result
 
@@ -616,17 +616,17 @@ def test_format_dataframe_smart_strategy_selection(kusto_client):
     # Test small DataFrame (≤20 rows)
     small_df = pd.DataFrame({"id": range(5), "value": range(5)})
     small_result = kusto_client._format_dataframe_smart(small_df)
-    assert "📊 Query Results (5 rows, 2 columns)" in small_result
+    assert "Query Results (5 rows, 2 columns)" in small_result
 
     # Test medium DataFrame (21-1000 rows)
     medium_df = pd.DataFrame({"id": range(100), "value": range(100)})
     medium_result = kusto_client._format_dataframe_smart(medium_df)
-    assert "📊 Query Results Summary (100 rows, 2 columns)" in medium_result
+    assert "Query Results Summary (100 rows, 2 columns)" in medium_result
 
     # Test large DataFrame (>1000 rows)
     large_df = pd.DataFrame({"id": range(1500), "value": range(1500)})
     large_result = kusto_client._format_dataframe_smart(large_df)
-    assert "📊 Large Dataset Summary (1500 rows, 2 columns)" in large_result
+    assert "Large Dataset Summary (1500 rows, 2 columns)" in large_result
 
 
 def test_get_formatting_strategy(kusto_client):
@@ -667,7 +667,7 @@ def test_format_results_with_dataframe_success(kusto_client):
 
     # Verify smart DataFrame formatting was used
     assert result["success"] is True
-    assert "📊 Query Results (2 rows, 2 columns)" in result["result"]
+    assert "Query Results (2 rows, 2 columns)" in result["result"]
     assert "metadata" in result
     assert result["metadata"]["formatting"] == "smart_dataframe"
     assert result["metadata"]["rows"] == 2

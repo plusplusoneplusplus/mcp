@@ -318,7 +318,7 @@ class KustoClient(KustoClientInterface):
     def _format_small_dataframe(self, df: pd.DataFrame) -> str:
         """Format small DataFrames (≤20 rows) by showing the full table."""
         output = []
-        output.append(f"📊 Query Results ({len(df)} rows, {len(df.columns)} columns)")
+        output.append(f"Query Results ({len(df)} rows, {len(df.columns)} columns)")
         output.append("=" * 50)
 
         # Get max column width from formatting options
@@ -329,16 +329,16 @@ class KustoClient(KustoClientInterface):
     def _format_medium_dataframe(self, df: pd.DataFrame) -> str:
         """Format medium DataFrames (21-1000 rows) with summary and sample."""
         output = []
-        output.append(f"📊 Query Results Summary ({len(df)} rows, {len(df.columns)} columns)")
+        output.append(f"Query Results Summary ({len(df)} rows, {len(df.columns)} columns)")
         output.append("=" * 50)
 
         # Dataset summary
-        output.append("\n📋 Dataset Overview:")
+        output.append("\nDataset Overview:")
         output.append(f"• Total rows: {len(df)}")
         output.append(f"• Total columns: {len(df.columns)}")
 
         # Column information
-        output.append("\n📝 Column Information:")
+        output.append("\nColumn Information:")
         for col in df.columns:
             dtype = str(df[col].dtype)
             null_count = df[col].isnull().sum()
@@ -347,13 +347,13 @@ class KustoClient(KustoClientInterface):
 
         # Sample data (first 10 rows)
         max_col_width = getattr(self, '_current_formatting_options', {}).get('max_column_width', 40)
-        output.append(f"\n🔍 Sample Data (first 10 rows):")
+        output.append(f"\nSample Data (first 10 rows):")
         output.append(df.head(10).to_string(index=False, max_colwidth=max_col_width))
 
         # If more than 10 rows, show summary statistics for numeric columns
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) > 0:
-            output.append(f"\n📈 Numeric Summary:")
+            output.append(f"\nNumeric Summary:")
             output.append(df[numeric_cols].describe().to_string(max_colwidth=20))
 
         return "\n".join(output)
@@ -361,11 +361,11 @@ class KustoClient(KustoClientInterface):
     def _format_large_dataframe(self, df: pd.DataFrame) -> str:
         """Format large DataFrames (>1000 rows) with summary, head, and tail."""
         output = []
-        output.append(f"📊 Large Dataset Summary ({len(df)} rows, {len(df.columns)} columns)")
+        output.append(f"Large Dataset Summary ({len(df)} rows, {len(df.columns)} columns)")
         output.append("=" * 50)
 
         # Dataset summary
-        output.append("\n📋 Dataset Overview:")
+        output.append("\nDataset Overview:")
         output.append(f"• Total rows: {len(df):,}")
         output.append(f"• Total columns: {len(df.columns)}")
 
@@ -375,7 +375,7 @@ class KustoClient(KustoClientInterface):
             output.append(f"• Memory usage: ~{df.memory_usage(deep=True).sum() / 1024 / 1024:.1f} MB")
 
         # Column information with data ranges
-        output.append("\n📝 Column Information:")
+        output.append("\nColumn Information:")
         for col in df.columns:
             dtype = str(df[col].dtype)
             null_count = df[col].isnull().sum()
@@ -393,17 +393,17 @@ class KustoClient(KustoClientInterface):
 
         # First 5 rows
         max_col_width = formatting_options.get('max_column_width', 30)
-        output.append(f"\n⬆️  First 5 rows:")
+        output.append(f"\nFirst 5 rows:")
         output.append(df.head(5).to_string(index=False, max_colwidth=max_col_width))
 
         # Last 5 rows
-        output.append(f"\n⬇️  Last 5 rows:")
+        output.append(f"\nLast 5 rows:")
         output.append(df.tail(5).to_string(index=False, max_colwidth=max_col_width))
 
         # Summary statistics for numeric columns
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) > 0:
-            output.append(f"\n📈 Numeric Summary (top 5 columns):")
+            output.append(f"\nNumeric Summary (top 5 columns):")
             output.append(df[numeric_cols[:5]].describe().to_string(max_colwidth=15))
 
         return "\n".join(output)
