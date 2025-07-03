@@ -8,6 +8,9 @@ This plugin provides tools for executing KQL (Kusto Query Language) queries agai
 - **Multiple Authentication Methods**: Supports Service Principal, DefaultAzureCredential, and Azure CLI authentication
 - **Flexible Cluster URL Handling**: Accepts various cluster URL formats and normalizes them automatically
 - **Intelligent Result Formatting**: Automatically formats query results for optimal LLM analysis
+- **Large DataFrame Storage & Management**: Automatically stores large query results for interactive exploration (NEW - Issue #439)
+- **Interactive Dataset Querying**: Query stored large datasets with operations like head, tail, filter, describe
+- **Configurable Storage Thresholds**: Control when DataFrames are stored based on size and configuration
 - **Comprehensive Error Handling**: Detailed error reporting with specific error types and traces
 - **Environment-Based Configuration**: Automatic configuration loading from environment variables
 
@@ -37,11 +40,24 @@ KUSTO_APP_KEY=your-app-key
 KUSTO_TENANT_ID=your-tenant-id
 ```
 
+### DataFrame Storage Configuration
+
+Configure automatic storage of large query results:
+
+```bash
+# DataFrame Storage Settings
+KUSTO_DATAFRAME_STORAGE_ENABLED=true
+KUSTO_DATAFRAME_THRESHOLD_MB=10
+KUSTO_DATAFRAME_AUTO_SUMMARIZE=true
+KUSTO_DATAFRAME_SUMMARY_TYPE=auto
+```
+
 ### Configuration Benefits
 
 - **Convenience**: Set cluster and database once instead of passing them to every query
 - **Flexibility**: Override defaults by providing explicit parameters when needed
 - **Security**: Store sensitive authentication details in environment variables
+- **Smart Storage**: Automatically handle large datasets without overwhelming output
 
 ## Authentication
 
@@ -124,6 +140,75 @@ arguments = {
     """
 }
 result = await kusto_client.execute_tool(arguments)
+```
+
+### Large Dataset Handling
+
+When query results exceed the configured threshold (default 1MB), the plugin automatically stores them as managed DataFrames:
+
+```python
+# Large query that triggers DataFrame storage
+arguments = {
+    "operation": "execute_query",
+    "database": "BigDataDB",
+    "query": """
+        LargeTable
+        | where TimeGenerated > ago(30d)
+        | join kind=inner (
+            AnotherLargeTable
+            | where Category == "Important"
+        ) on CorrelationId
+    """
+}
+
+result = await kusto_client.execute_tool(arguments)
+
+# Result includes DataFrame ID and interactive options
+print(result["result"])
+# Output:
+# Large Dataset Stored for Interactive Query
+#
+# DataFrame ID: dataframe-abc123
+# Memory Usage: 45.2 MB
+# Rows: 150,000, Columns: 25
+#
+# [Summary of the data...]
+#
+# Next Steps:
+# • Use the DataFrame Query Tool with dataframe_id="dataframe-abc123" and operation="head"
+# • Use operation="describe" to get statistical summary
+# • Use operation="filter" with conditions to filter the data
+```
+
+### Interactive DataFrame Querying
+
+Use the stored DataFrame ID with the DataFrame Query Tool:
+
+```python
+# Explore the first 20 rows
+arguments = {
+    "dataframe_id": "dataframe-abc123",
+    "operation": "head",
+    "parameters": {"n": 20}
+}
+
+# Get statistical summary
+arguments = {
+    "dataframe_id": "dataframe-abc123",
+    "operation": "describe"
+}
+
+# Filter large dataset
+arguments = {
+    "dataframe_id": "dataframe-abc123",
+    "operation": "filter",
+    "parameters": {
+        "conditions": {
+            "score": {"gt": 80},
+            "category": {"eq": "premium"}
+        }
+    }
+}
 ```
 
 ### Programmatic Usage

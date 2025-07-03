@@ -60,6 +60,11 @@ class EnvironmentManager:
         "dataframe_max_dataframes": (1000, int),
         "dataframe_storage_backend": ("memory", str),
         "dataframe_persistent_storage_path": (".dataframes", str),
+        # Kusto DataFrame storage settings
+        "kusto_dataframe_storage_enabled": (True, bool),
+        "kusto_dataframe_threshold_mb": (1, int),
+        "kusto_dataframe_auto_summarize": (True, bool),
+        "kusto_dataframe_summary_type": ("auto", str),
     }
 
     # Default Azure repo settings with their types

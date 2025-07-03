@@ -21,6 +21,7 @@ from mcp_tools.interfaces import ToolInterface, KustoClientInterface
 from mcp_tools.plugin import register_tool
 from config import env
 from utils.output_processor.output_limiter import OutputLimiter
+from utils.dataframe_manager import get_dataframe_manager
 
 
 @register_tool(ecosystem="microsoft", os_type="all")
@@ -408,9 +409,89 @@ class KustoClient(KustoClientInterface):
 
         return "\n".join(output)
 
-    def format_results(self, response: KustoResponseDataSet, output_limits: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def _should_store_dataframe(self, df: pd.DataFrame) -> bool:
         """
-        Format the Kusto response with smart DataFrame formatting and intelligent output limiting.
+        Determine if a DataFrame should be stored based on configuration and size.
+
+        Args:
+            df: DataFrame to evaluate
+
+        Returns:
+            bool: True if DataFrame should be stored, False otherwise
+        """
+        # Check if DataFrame storage is enabled
+        if not env.get_setting("kusto_dataframe_storage_enabled", True):
+            return False
+
+        # Get size threshold from configuration
+        threshold_mb = env.get_setting("kusto_dataframe_threshold_mb", 10)
+
+        # Calculate DataFrame memory usage in MB
+        memory_usage_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
+
+        return memory_usage_mb > threshold_mb
+
+    async def _store_large_dataframe(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Store a large DataFrame and return metadata.
+
+        Args:
+            df: DataFrame to store
+
+        Returns:
+            dict: Storage result with DataFrame ID and metadata
+        """
+        try:
+            # Get DataFrame manager
+            df_manager = get_dataframe_manager()
+
+            # Store DataFrame with appropriate tags
+            df_id = await df_manager.store_dataframe(
+                df=df,
+                ttl_seconds=env.get_setting("dataframe_default_ttl_seconds", 3600),
+                tags={
+                    "source": "kusto",
+                    "tool": "kusto_client",
+                    "auto_stored": True
+                }
+            )
+
+            # Generate summary if enabled
+            summary = None
+            if env.get_setting("kusto_dataframe_auto_summarize", True):
+                # Use a reasonable size limit for summary (5KB)
+                summary = await df_manager.summarize_dataframe(
+                    df_id=df_id,
+                    max_size_bytes=5 * 1024,
+                    include_sample=True
+                )
+
+            return {
+                "stored": True,
+                "df_id": df_id,
+                "summary": summary,
+                "memory_usage_mb": df.memory_usage(deep=True).sum() / (1024 * 1024),
+                "available_operations": [
+                    "head", "tail", "sample", "describe", "info", "filter"
+                ],
+                "query_examples": [
+                    f'Use the DataFrame Query Tool with dataframe_id="{df_id}" and operation="head" to see the first rows',
+                    f'Use operation="describe" to get statistical summary',
+                    f'Use operation="filter" with conditions to filter the data'
+                ]
+            }
+
+        except Exception as e:
+            self.logger.error(f"Failed to store DataFrame: {str(e)}")
+            return {
+                "stored": False,
+                "error": str(e),
+                "fallback_reason": "DataFrame storage failed"
+            }
+
+    async def format_results(self, response: KustoResponseDataSet, output_limits: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Format the Kusto response with smart DataFrame formatting, intelligent output limiting, and DataFrame storage.
 
         Args:
             response: A KustoResponseDataSet object returned from query execution
@@ -427,7 +508,55 @@ class KustoClient(KustoClientInterface):
             df = self._kusto_response_to_dataframe(response)
 
             if df is not None:
-                # Use smart DataFrame formatting
+                # Check if DataFrame should be stored due to size
+                should_store = await self._should_store_dataframe(df)
+
+                if should_store:
+                    # Store the DataFrame and return enhanced metadata
+                    storage_result = await self._store_large_dataframe(df)
+
+                    if storage_result.get("stored", False):
+                        # DataFrame was successfully stored, return summary with ID
+                        summary_text = ""
+
+                        if storage_result.get("summary"):
+                            summary_text = storage_result["summary"].get("formatted_summary", "")
+
+                        # If no summary or summary is too small, generate a basic one
+                        if not summary_text or len(summary_text) < 200:
+                            summary_text = self._format_dataframe_smart(df.head(10))
+
+                        return {
+                            "success": True,
+                            "result": f"""Large Dataset Stored for Interactive Query
+
+DataFrame ID: {storage_result['df_id']}
+Memory Usage: {storage_result['memory_usage_mb']:.2f} MB
+Rows: {len(df):,}, Columns: {len(df.columns)}
+
+{summary_text}
+
+🔍 Next Steps:
+{chr(10).join(['• ' + example for example in storage_result['query_examples']])}
+
+Available Operations: {', '.join(storage_result['available_operations'])}""",
+                            "metadata": {
+                                "formatting": "stored_dataframe",
+                                "dataframe_id": storage_result['df_id'],
+                                "rows": len(df),
+                                "columns": len(df.columns),
+                                "memory_usage_mb": storage_result['memory_usage_mb'],
+                                "stored": True,
+                                "available_operations": storage_result['available_operations'],
+                                "query_examples": storage_result['query_examples'],
+                                "summary_included": bool(storage_result.get("summary"))
+                            }
+                        }
+                    else:
+                        # Storage failed, fall back to regular formatting with truncation if needed
+                        self.logger.warning(f"DataFrame storage failed: {storage_result.get('error', 'Unknown error')}")
+
+                # Regular formatting for small DataFrames or when storage fails
                 formatted_result = self._format_dataframe_smart(df)
 
                 # Check if output limiting is needed
@@ -440,7 +569,9 @@ class KustoClient(KustoClientInterface):
                             "formatting": "smart_dataframe",
                             "rows": len(df),
                             "columns": len(df.columns),
-                            "strategy": self._get_formatting_strategy(len(df))
+                            "strategy": self._get_formatting_strategy(len(df)),
+                            "dataframe_storage_attempted": should_store,
+                            "dataframe_storage_enabled": env.get_setting("kusto_dataframe_storage_enabled", True)
                         }
                     }
                 else:
@@ -460,7 +591,9 @@ class KustoClient(KustoClientInterface):
                             "original_size": len(formatted_result),
                             "truncated_size": len(limited_result["output"]),
                             "truncation_strategy": limits.get("truncate_strategy", "smart"),
-                            "size_reduction": f"{((len(formatted_result) - len(limited_result['output'])) / len(formatted_result) * 100):.1f}%"
+                            "size_reduction": f"{((len(formatted_result) - len(limited_result['output'])) / len(formatted_result) * 100):.1f}%",
+                            "dataframe_storage_attempted": should_store,
+                            "dataframe_storage_enabled": env.get_setting("kusto_dataframe_storage_enabled", True)
                         }
                     }
             else:
@@ -578,7 +711,7 @@ class KustoClient(KustoClientInterface):
                 # Store formatting options in the instance for use by format_results
                 if formatting_options:
                     self._current_formatting_options = formatting_options
-                return self.format_results(response, output_limits)
+                return await self.format_results(response, output_limits)
 
             # Otherwise return the original structure for programmatic access
             return {
