@@ -144,7 +144,7 @@ result = await kusto_client.execute_tool(arguments)
 
 ### Large Dataset Handling
 
-When query results exceed the configured threshold (default 10MB), the plugin automatically stores them as managed DataFrames:
+When query results exceed the configured threshold (default 1MB), the plugin automatically stores them as managed DataFrames:
 
 ```python
 # Large query that triggers DataFrame storage

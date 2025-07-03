@@ -62,7 +62,7 @@ class EnvironmentManager:
         "dataframe_persistent_storage_path": (".dataframes", str),
         # Kusto DataFrame storage settings
         "kusto_dataframe_storage_enabled": (True, bool),
-        "kusto_dataframe_threshold_mb": (10, int),
+        "kusto_dataframe_threshold_mb": (1, int),
         "kusto_dataframe_auto_summarize": (True, bool),
         "kusto_dataframe_summary_type": ("auto", str),
     }
