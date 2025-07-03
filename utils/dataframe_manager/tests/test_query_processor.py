@@ -172,7 +172,7 @@ class TestDataFrameQueryProcessor:
         assert isinstance(result, DataFrameQueryResult)
         assert result.operation == "filter"
         assert result.parameters == {"conditions": {"category": "A"}}
-        assert all(result.data["category"] == "A")
+        assert (result.data["category"] == "A").all()
         assert result.metadata["original_shape"] == (100, 6)
         assert result.metadata["rows_filtered"] > 0
         assert result.metadata["filter_ratio"] < 1.0
@@ -184,8 +184,8 @@ class TestDataFrameQueryProcessor:
         result = await processor.filter(sample_dataframe, conditions)
 
         assert result.parameters == {"conditions": conditions}
-        assert all(result.data["age"] > 30)
-        assert all(result.data["age"] < 50)
+        assert (result.data["age"] > 30).all()
+        assert (result.data["age"] < 50).all()
         assert "age gt 30" in result.metadata["applied_conditions"][0]
         assert "age lt 50" in result.metadata["applied_conditions"][1]
 
@@ -235,7 +235,7 @@ class TestDataFrameQueryProcessor:
 
         # All results should contain "user_1" in the name column
         if len(result.data) > 0:
-            assert all(result.data["name"].str.contains("user_1", case=False, na=False))
+            assert result.data["name"].str.contains("user_1", case=False, na=False).all()
 
     @pytest.mark.asyncio
     async def test_search_auto_detect_columns(self, processor, sample_dataframe):
@@ -322,6 +322,93 @@ class TestDataFrameQueryProcessor:
         """Test value_counts operation with non-existent column."""
         with pytest.raises(ValueError, match="Column 'nonexistent' not found"):
             await processor.value_counts(sample_dataframe, "nonexistent")
+
+    @pytest.mark.asyncio
+    async def test_query_operation_simple(self, processor, sample_dataframe):
+        """Test query operation with simple expression."""
+        result = await processor.query(sample_dataframe, "age > 30")
+
+        assert isinstance(result, DataFrameQueryResult)
+        assert result.operation == "query"
+        assert result.parameters == {"expr": "age > 30"}
+        assert result.metadata["query_expression"] == "age > 30"
+        assert result.metadata["original_shape"] == (100, 6)
+        assert result.metadata["rows_filtered"] > 0
+        assert result.metadata["filter_ratio"] < 1.0
+
+        # All results should have age > 30
+        if len(result.data) > 0:
+            assert (result.data["age"] > 30).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_complex(self, processor, sample_dataframe):
+        """Test query operation with complex expression."""
+        expr = "age > 30 and category == 'A'"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        assert result.metadata["query_expression"] == expr
+
+        # All results should match the complex condition
+        if len(result.data) > 0:
+            assert (result.data["age"] > 30).all()
+            assert (result.data["category"] == "A").all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_string_methods(self, processor, sample_dataframe):
+        """Test query operation with string methods."""
+        expr = "name.str.contains('user_1')"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        # All results should contain 'user_1' in name
+        if len(result.data) > 0:
+            assert result.data["name"].str.contains("user_1", na=False).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_between(self, processor, sample_dataframe):
+        """Test query operation with between method."""
+        expr = "age.between(25, 35)"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        # All results should have age between 25 and 35
+        if len(result.data) > 0:
+            assert result.data["age"].between(25, 35).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_isin(self, processor, sample_dataframe):
+        """Test query operation with isin method."""
+        expr = "category.isin(['A', 'B'])"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        # All results should have category in ['A', 'B']
+        if len(result.data) > 0:
+            assert result.data["category"].isin(["A", "B"]).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_empty_result(self, processor, sample_dataframe):
+        """Test query operation that returns empty result."""
+        expr = "age > 1000"  # Should return no results
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        assert result.data.empty
+        assert result.metadata["rows_filtered"] == len(sample_dataframe)
+        assert result.metadata["filter_ratio"] == 0.0
+
+    @pytest.mark.asyncio
+    async def test_query_operation_invalid_expression(self, processor, sample_dataframe):
+        """Test query operation with invalid expression."""
+        with pytest.raises(Exception):  # pandas will raise various exceptions for invalid queries
+            await processor.query(sample_dataframe, "invalid_column > 30")
+
+    @pytest.mark.asyncio
+    async def test_query_operation_syntax_error(self, processor, sample_dataframe):
+        """Test query operation with syntax error in expression."""
+        with pytest.raises(Exception):  # pandas will raise SyntaxError or similar
+            await processor.query(sample_dataframe, "age > 30 and")
 
     @pytest.mark.asyncio
     async def test_error_handling_with_logging(self, processor, sample_dataframe):

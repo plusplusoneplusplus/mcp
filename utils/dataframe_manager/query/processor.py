@@ -167,6 +167,34 @@ class DataFrameQueryProcessor(DataFrameQueryInterface):
             self._logger.error(f"Error in info operation: {e}")
             raise
 
+    async def query(
+        self,
+        df: pd.DataFrame,
+        expr: str,
+    ) -> DataFrameQueryResult:
+        """Query DataFrame using pandas query syntax."""
+        start_time = time.time()
+        try:
+            result_df = df.query(expr)
+            execution_time = (time.time() - start_time) * 1000
+
+            return DataFrameQueryResult(
+                data=result_df,
+                operation="query",
+                parameters={"expr": expr},
+                metadata={
+                    "original_shape": df.shape,
+                    "result_shape": result_df.shape,
+                    "rows_filtered": len(df) - len(result_df),
+                    "filter_ratio": len(result_df) / len(df) if len(df) > 0 else 0,
+                    "query_expression": expr,
+                },
+                execution_time_ms=execution_time,
+            )
+        except Exception as e:
+            self._logger.error(f"Error in query operation: {e}")
+            raise
+
     async def filter(
         self,
         df: pd.DataFrame,

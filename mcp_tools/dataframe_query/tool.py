@@ -1,7 +1,7 @@
 """DataFrame Query Tool for interactive data exploration.
 
 This module provides a dedicated tool for querying and manipulating stored DataFrames
-using their IDs. It supports operations like head, tail, sample, filter, describe, and info.
+using their IDs. It supports operations like head, tail, sample, query, describe, and info.
 """
 
 import logging
@@ -31,7 +31,7 @@ class DataFrameQueryTool(ToolInterface):
     def description(self) -> str:
         return (
             "Query and manipulate stored DataFrames by ID. "
-            "Supports operations: head, tail, sample, filter, describe, info. "
+            "Supports operations: head, tail, sample, query, describe, info. "
             "Works with DataFrames stored by other tools like Kusto, CSV import, etc. "
             "Use this tool to explore large DataFrames without having to reload them."
         )
@@ -48,7 +48,7 @@ class DataFrameQueryTool(ToolInterface):
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform on the DataFrame",
-                    "enum": ["head", "tail", "sample", "filter", "describe", "info"]
+                    "enum": ["head", "tail", "sample", "query", "describe", "info"]
                 },
                 "parameters": {
                     "type": "object",
@@ -72,45 +72,10 @@ class DataFrameQueryTool(ToolInterface):
                             "type": "integer",
                             "description": "Random seed for sampling (for sample)"
                         },
-                        # For filter operation
-                        "conditions": {
-                            "type": "object",
-                            "description": "Filter conditions as {column: condition} pairs",
-                            "additionalProperties": {
-                                "anyOf": [
-                                    {"type": "string"},
-                                    {"type": "number"},
-                                    {"type": "boolean"},
-                                    {
-                                        "type": "object",
-                                        "description": "Complex condition with operators",
-                                        "properties": {
-                                            "eq": {"description": "Equal to"},
-                                            "ne": {"description": "Not equal to"},
-                                            "gt": {"description": "Greater than"},
-                                            "gte": {"description": "Greater than or equal"},
-                                            "lt": {"description": "Less than"},
-                                            "lte": {"description": "Less than or equal"},
-                                            "in": {
-                                                "type": "array",
-                                                "description": "Value in list"
-                                            },
-                                            "contains": {
-                                                "type": "string",
-                                                "description": "String contains substring"
-                                            },
-                                            "startswith": {
-                                                "type": "string",
-                                                "description": "String starts with substring"
-                                            },
-                                            "endswith": {
-                                                "type": "string",
-                                                "description": "String ends with substring"
-                                            }
-                                        }
-                                    }
-                                ]
-                            }
+                        # For query operation (replaces complex filter)
+                        "expr": {
+                            "type": "string",
+                            "description": "Query expression using pandas query syntax (e.g., 'age > 30 and status == \"active\"')"
                         },
                         # For describe operation
                         "include": {
@@ -266,10 +231,10 @@ class DataFrameQueryTool(ToolInterface):
             if frac is not None and (not isinstance(frac, (int, float)) or frac <= 0 or frac > 1):
                 return "Parameter 'frac' must be a number between 0 and 1"
 
-        elif operation == "filter":
-            conditions = parameters.get("conditions")
-            if not conditions or not isinstance(conditions, dict):
-                return "Parameter 'conditions' is required and must be a dictionary for filter operation"
+        elif operation == "query":
+            expr = parameters.get("expr")
+            if not expr or not isinstance(expr, str):
+                return "Parameter 'expr' is required and must be a string for query operation"
 
         elif operation == "describe":
             include = parameters.get("include")
@@ -356,19 +321,23 @@ class DataFrameQueryTool(ToolInterface):
                     "parameters": {"n": 20, "random_state": 42}
                 }
             },
-            "filter": {
-                "description": "Filter DataFrame rows based on conditions",
+            "query": {
+                "description": "Filter DataFrame rows using pandas query syntax",
                 "example": {
                     "dataframe_id": "dataframe-abc123",
-                    "operation": "filter",
+                    "operation": "query",
                     "parameters": {
-                        "conditions": {
-                            "age": {"gt": 30},
-                            "status": "active",
-                            "name": {"contains": "John"}
-                        }
+                        "expr": "age > 30 and status == 'active' and name.str.contains('John')"
                     }
-                }
+                },
+                "additional_examples": [
+                    "age > 30",
+                    "price >= 100 and category == 'electronics'",
+                    "name.str.startswith('A')",
+                    "date >= '2023-01-01'",
+                    "score.between(80, 90)",
+                    "category.isin(['A', 'B', 'C'])"
+                ]
             },
             "describe": {
                 "description": "Generate descriptive statistics for the DataFrame",

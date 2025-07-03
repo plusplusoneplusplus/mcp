@@ -174,6 +174,8 @@ class DataFrameManager(DataFrameManagerInterface):
                 result = await self._query_processor.describe(df, **parameters)
             elif operation == "info":
                 result = await self._query_processor.info(df, **parameters)
+            elif operation == "query":
+                result = await self._query_processor.query(df, **parameters)
             elif operation == "filter":
                 result = await self._query_processor.filter(df, **parameters)
             elif operation == "search":
