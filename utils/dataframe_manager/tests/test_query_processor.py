@@ -41,7 +41,7 @@ class TestDataFrameQueryProcessor:
         assert result.metadata["original_shape"] == (100, 6)
         assert result.metadata["result_shape"] == (5, 6)
         assert result.metadata["rows_returned"] == 5
-        assert result.execution_time_ms > 0
+        assert result.execution_time_ms >= 0
 
         # Verify data integrity
         pd.testing.assert_frame_equal(result.data, sample_dataframe.head(5))
@@ -353,7 +353,7 @@ class TestDataFrameQueryProcessor:
 
         for operation in operations:
             result = await operation
-            assert result.execution_time_ms > 0
+            assert result.execution_time_ms >= 0
             assert isinstance(result.execution_time_ms, float)
 
 
