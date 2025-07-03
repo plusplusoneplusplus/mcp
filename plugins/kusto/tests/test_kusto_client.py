@@ -71,21 +71,23 @@ async def test_format_results_with_complex_values(kusto_client):
         assert formatted["result"] == "Table with complex data types"
 
 
-def test_format_results_no_primary_results(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_no_primary_results(kusto_client):
     """Test format_results when there are no primary results."""
     # Create a mock response with no primary results
     mock_response = MagicMock(spec=KustoResponseDataSet)
     mock_response.primary_results = []
 
     # Format the results
-    formatted = kusto_client.format_results(mock_response)
+    formatted = await kusto_client.format_results(mock_response)
 
     # Check the content
     assert formatted["success"] is True
     assert formatted["result"] == "No results found"
 
 
-def test_format_results_error_handling(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_error_handling(kusto_client):
     """Test that format_results handles errors during formatting."""
     # Create a mock response that will cause an error when formatting
     mock_response = MagicMock(spec=KustoResponseDataSet)
@@ -96,7 +98,7 @@ def test_format_results_error_handling(kusto_client):
     )
 
     # Format the results
-    formatted = kusto_client.format_results(mock_response)
+    formatted = await kusto_client.format_results(mock_response)
 
     # Check that error was handled
     assert formatted["success"] is False
@@ -263,7 +265,8 @@ async def test_execute_tool_invalid_operation(kusto_client):
     assert "Unknown operation" in result["result"]
 
 
-def test_format_results_with_small_output(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_with_small_output(kusto_client):
     """Test format_results with output that is under the size limit."""
     # Create a mock response with small output
     mock_response = MagicMock(spec=KustoResponseDataSet)
@@ -276,7 +279,7 @@ def test_format_results_with_small_output(kusto_client):
     # Mock DataFrame conversion to return None to force fallback to raw formatting
     with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
         # Format with default limits (50KB)
-        result = kusto_client.format_results(mock_response)
+        result = await kusto_client.format_results(mock_response)
 
         # Should return without truncation
         assert result["success"] is True
@@ -284,7 +287,8 @@ def test_format_results_with_small_output(kusto_client):
         assert "metadata" not in result
 
 
-def test_format_results_with_large_output_truncation(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_with_large_output_truncation(kusto_client):
     """Test format_results with output that exceeds the size limit."""
     # Create a mock response with large output (over 50KB)
     mock_response = MagicMock(spec=KustoResponseDataSet)
@@ -297,7 +301,7 @@ def test_format_results_with_large_output_truncation(kusto_client):
     # Mock DataFrame conversion to return None to force fallback to raw formatting
     with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
         # Format with default limits (50KB)
-        result = kusto_client.format_results(mock_response)
+        result = await kusto_client.format_results(mock_response)
 
         # Should return with truncation
         assert result["success"] is True
@@ -310,7 +314,8 @@ def test_format_results_with_large_output_truncation(kusto_client):
         assert "size_reduction" in result["metadata"]
 
 
-def test_format_results_with_custom_output_limits(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_with_custom_output_limits(kusto_client):
     """Test format_results with custom output limits configuration."""
     # Create a mock response with medium-sized output
     mock_response = MagicMock(spec=KustoResponseDataSet)
@@ -330,7 +335,7 @@ def test_format_results_with_custom_output_limits(kusto_client):
     # Mock DataFrame conversion to return None to force fallback to raw formatting
     with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
         # Format with custom limits
-        result = kusto_client.format_results(mock_response, custom_limits)
+        result = await kusto_client.format_results(mock_response, custom_limits)
 
         # Should return with truncation using custom settings
         assert result["success"] is True
@@ -341,7 +346,8 @@ def test_format_results_with_custom_output_limits(kusto_client):
         assert "[CUSTOM TRUNCATED]" in result["result"]
 
 
-def test_format_results_with_preserve_raw_enabled(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_with_preserve_raw_enabled(kusto_client):
     """Test format_results with preserve_raw option enabled."""
     # Create a mock response with large output
     mock_response = MagicMock(spec=KustoResponseDataSet)
@@ -360,7 +366,7 @@ def test_format_results_with_preserve_raw_enabled(kusto_client):
     # Mock DataFrame conversion to return None to force fallback to raw formatting
     with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
         # Format with preserve_raw enabled
-        result = kusto_client.format_results(mock_response, limits)
+        result = await kusto_client.format_results(mock_response, limits)
 
         # Should return with both truncated and raw results
         assert result["success"] is True
@@ -642,7 +648,8 @@ def test_get_formatting_strategy(kusto_client):
     assert kusto_client._get_formatting_strategy(5000) == "large_summary_head_tail"
 
 
-def test_format_results_with_dataframe_success(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_with_dataframe_success(kusto_client):
     """Test format_results using successful DataFrame conversion."""
     import pandas as pd
 
@@ -665,7 +672,7 @@ def test_format_results_with_dataframe_success(kusto_client):
     mock_response.primary_results = [mock_primary_result]
 
     # Test formatting with DataFrame
-    result = kusto_client.format_results(mock_response)
+    result = await kusto_client.format_results(mock_response)
 
     # Verify smart DataFrame formatting was used
     assert result["success"] is True
@@ -677,7 +684,8 @@ def test_format_results_with_dataframe_success(kusto_client):
     assert result["metadata"]["strategy"] == "small_full_table"
 
 
-def test_format_results_dataframe_fallback_to_raw(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_dataframe_fallback_to_raw(kusto_client):
     """Test format_results falls back to raw formatting when DataFrame conversion fails."""
     # Create a mock response that will fail DataFrame conversion
     mock_response = MagicMock(spec=KustoResponseDataSet)
@@ -688,7 +696,7 @@ def test_format_results_dataframe_fallback_to_raw(kusto_client):
 
     # Mock DataFrame conversion to return None (failure)
     with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
-        result = kusto_client.format_results(mock_response)
+        result = await kusto_client.format_results(mock_response)
 
     # Verify fallback to raw formatting
     assert result["success"] is True
@@ -696,7 +704,8 @@ def test_format_results_dataframe_fallback_to_raw(kusto_client):
     # Should not have DataFrame metadata since it fell back to raw
 
 
-def test_format_results_with_formatting_options(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_with_formatting_options(kusto_client):
     """Test format_results respects formatting options."""
     import pandas as pd
 
@@ -725,7 +734,7 @@ def test_format_results_with_formatting_options(kusto_client):
     }
 
     # Test formatting with options
-    result = kusto_client.format_results(mock_response)
+    result = await kusto_client.format_results(mock_response)
 
     # Verify formatting was applied
     assert result["success"] is True
