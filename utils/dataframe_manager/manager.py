@@ -97,7 +97,7 @@ class DataFrameManager(DataFrameManagerInterface):
         df: pd.DataFrame,
         ttl_seconds: Optional[int] = None,
         tags: Optional[Dict[str, Any]] = None,
-    ) -> UUID:
+    ) -> str:
         """Store a DataFrame and return its ID."""
         if not self._started:
             await self.start()
@@ -105,7 +105,8 @@ class DataFrameManager(DataFrameManagerInterface):
         if df.empty:
             raise ValueError("Cannot store empty DataFrame")
 
-        df_id = uuid4()
+        # Generate human-friendly DataFrame ID
+        df_id = f"dataframe-{str(uuid4())[:8]}"
 
         try:
             metadata = await self._storage.store(
@@ -126,7 +127,7 @@ class DataFrameManager(DataFrameManagerInterface):
             self._logger.error(f"Failed to store DataFrame {df_id}: {e}")
             raise
 
-    async def get_dataframe(self, df_id: UUID) -> Optional[pd.DataFrame]:
+    async def get_dataframe(self, df_id: str) -> Optional[pd.DataFrame]:
         """Retrieve a stored DataFrame."""
         if not self._started:
             await self.start()
@@ -146,7 +147,7 @@ class DataFrameManager(DataFrameManagerInterface):
 
     async def query_dataframe(
         self,
-        df_id: UUID,
+        df_id: str,
         operation: str,
         parameters: Optional[Dict[str, Any]] = None,
     ) -> Optional[DataFrameQueryResult]:
@@ -197,7 +198,7 @@ class DataFrameManager(DataFrameManagerInterface):
 
     async def summarize_dataframe(
         self,
-        df_id: UUID,
+        df_id: str,
         max_size_bytes: int,
         include_sample: bool = True,
     ) -> Optional[Dict[str, Any]]:
@@ -245,7 +246,7 @@ class DataFrameManager(DataFrameManagerInterface):
             self._logger.error(f"Failed to list DataFrames: {e}")
             raise
 
-    async def delete_dataframe(self, df_id: UUID) -> bool:
+    async def delete_dataframe(self, df_id: str) -> bool:
         """Delete a stored DataFrame."""
         if not self._started:
             await self.start()
@@ -293,7 +294,7 @@ class DataFrameManager(DataFrameManagerInterface):
 
     async def format_dataframe_for_display(
         self,
-        df_id: UUID,
+        df_id: str,
         max_size_bytes: int,
         format_type: str = "table",
     ) -> Optional[str]:

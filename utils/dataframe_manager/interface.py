@@ -4,7 +4,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Protocol, TypeVar, Union
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pandas as pd
 
@@ -16,7 +16,7 @@ class DataFrameMetadata:
 
     def __init__(
         self,
-        df_id: UUID,
+        df_id: str,
         created_at: datetime,
         size_bytes: int,
         shape: tuple[int, int],
@@ -76,7 +76,7 @@ class DataFrameStorageInterface(ABC):
     async def store(
         self,
         df: pd.DataFrame,
-        df_id: UUID,
+        df_id: str,
         ttl_seconds: Optional[int] = None,
         tags: Optional[Dict[str, Any]] = None,
     ) -> DataFrameMetadata:
@@ -84,17 +84,17 @@ class DataFrameStorageInterface(ABC):
         pass
 
     @abstractmethod
-    async def retrieve(self, df_id: UUID) -> Optional[pd.DataFrame]:
+    async def retrieve(self, df_id: str) -> Optional[pd.DataFrame]:
         """Retrieve a DataFrame by ID."""
         pass
 
     @abstractmethod
-    async def get_metadata(self, df_id: UUID) -> Optional[DataFrameMetadata]:
+    async def get_metadata(self, df_id: str) -> Optional[DataFrameMetadata]:
         """Get metadata for a DataFrame."""
         pass
 
     @abstractmethod
-    async def delete(self, df_id: UUID) -> bool:
+    async def delete(self, df_id: str) -> bool:
         """Delete a DataFrame. Returns True if deleted, False if not found."""
         pass
 
@@ -255,19 +255,19 @@ class DataFrameManagerInterface(ABC):
         df: pd.DataFrame,
         ttl_seconds: Optional[int] = None,
         tags: Optional[Dict[str, Any]] = None,
-    ) -> UUID:
+    ) -> str:
         """Store a DataFrame and return its ID."""
         pass
 
     @abstractmethod
-    async def get_dataframe(self, df_id: UUID) -> Optional[pd.DataFrame]:
+    async def get_dataframe(self, df_id: str) -> Optional[pd.DataFrame]:
         """Retrieve a stored DataFrame."""
         pass
 
     @abstractmethod
     async def query_dataframe(
         self,
-        df_id: UUID,
+        df_id: str,
         operation: str,
         parameters: Optional[Dict[str, Any]] = None,
     ) -> Optional[DataFrameQueryResult]:
@@ -277,7 +277,7 @@ class DataFrameManagerInterface(ABC):
     @abstractmethod
     async def summarize_dataframe(
         self,
-        df_id: UUID,
+        df_id: str,
         max_size_bytes: int,
         include_sample: bool = True,
     ) -> Optional[Dict[str, Any]]:
@@ -293,7 +293,7 @@ class DataFrameManagerInterface(ABC):
         pass
 
     @abstractmethod
-    async def delete_dataframe(self, df_id: UUID) -> bool:
+    async def delete_dataframe(self, df_id: str) -> bool:
         """Delete a stored DataFrame."""
         pass
 

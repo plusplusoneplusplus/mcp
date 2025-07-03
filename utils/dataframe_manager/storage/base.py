@@ -61,7 +61,7 @@ class BaseDataFrameStorage(DataFrameStorageInterface):
     def _create_metadata(
         self,
         df: pd.DataFrame,
-        df_id: UUID,
+        df_id: str,
         ttl_seconds: Optional[int] = None,
         tags: Optional[Dict[str, Any]] = None,
     ) -> DataFrameMetadata:

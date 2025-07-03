@@ -35,13 +35,13 @@ class InMemoryDataFrameStorage(BaseDataFrameStorage):
         self.max_dataframes = max_dataframes
 
         # Use OrderedDict for LRU behavior
-        self._dataframes: OrderedDict[UUID, pd.DataFrame] = OrderedDict()
-        self._metadata: Dict[UUID, DataFrameMetadata] = {}
+        self._dataframes: OrderedDict[str, pd.DataFrame] = OrderedDict()
+        self._metadata: Dict[str, DataFrameMetadata] = {}
 
     async def store(
         self,
         df: pd.DataFrame,
-        df_id: UUID,
+        df_id: str,
         ttl_seconds: Optional[int] = None,
         tags: Optional[Dict[str, Any]] = None,
     ) -> DataFrameMetadata:
@@ -96,7 +96,7 @@ class InMemoryDataFrameStorage(BaseDataFrameStorage):
 
             return metadata
 
-    async def retrieve(self, df_id: UUID) -> Optional[pd.DataFrame]:
+    async def retrieve(self, df_id: str) -> Optional[pd.DataFrame]:
         """Retrieve a DataFrame from memory."""
         async with self._lock:
             if df_id not in self._dataframes:
@@ -113,7 +113,7 @@ class InMemoryDataFrameStorage(BaseDataFrameStorage):
 
             return self._dataframes[df_id].copy()
 
-    async def get_metadata(self, df_id: UUID) -> Optional[DataFrameMetadata]:
+    async def get_metadata(self, df_id: str) -> Optional[DataFrameMetadata]:
         """Get metadata for a DataFrame."""
         async with self._lock:
             metadata = self._metadata.get(df_id)
@@ -122,7 +122,7 @@ class InMemoryDataFrameStorage(BaseDataFrameStorage):
                 return None
             return metadata
 
-    async def delete(self, df_id: UUID) -> bool:
+    async def delete(self, df_id: str) -> bool:
         """Delete a DataFrame from memory."""
         async with self._lock:
             return await self._remove_dataframe(df_id)
@@ -186,7 +186,7 @@ class InMemoryDataFrameStorage(BaseDataFrameStorage):
             self._logger.info(f"Cleared all {count} DataFrames from memory")
             return count
 
-    async def _remove_dataframe(self, df_id: UUID) -> bool:
+    async def _remove_dataframe(self, df_id: str) -> bool:
         """Remove a DataFrame and its metadata (internal, assumes lock held)."""
         if df_id in self._dataframes:
             del self._dataframes[df_id]
