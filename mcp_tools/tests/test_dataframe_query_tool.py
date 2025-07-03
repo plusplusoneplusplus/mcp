@@ -59,7 +59,7 @@ class TestDataFrameQueryTool:
 
         # Check operation enum values
         operations = schema["properties"]["operation"]["enum"]
-        expected_operations = ["head", "tail", "sample", "filter", "describe", "info"]
+        expected_operations = ["head", "tail", "sample", "query", "describe", "info"]
         for op in expected_operations:
             assert op in operations
 
@@ -164,8 +164,8 @@ class TestDataFrameQueryTool:
         """Test handling of empty results."""
         empty_result = Mock()
         empty_result.data = pd.DataFrame()  # Empty DataFrame
-        empty_result.operation = "filter"
-        empty_result.parameters = {"conditions": {"age": {"gt": 200}}}
+        empty_result.operation = "query"
+        empty_result.parameters = {"expr": "age > 200"}
         empty_result.execution_time_ms = 5.0
         empty_result.metadata = {"rows_returned": 0}
 
@@ -177,8 +177,8 @@ class TestDataFrameQueryTool:
         with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
-                "operation": "filter",
-                "parameters": {"conditions": {"age": {"gt": 200}}}
+                "operation": "query",
+                "parameters": {"expr": "age > 200"}
             })
 
         assert result["success"] is True
@@ -224,8 +224,8 @@ class TestDataFrameQueryTool:
         with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
-                "operation": "filter",
-                "parameters": {"conditions": {"invalid_column": "value"}}
+                "operation": "query",
+                "parameters": {"expr": "invalid_column > 30"}
             })
 
         assert result["success"] is False
@@ -273,7 +273,7 @@ class TestDataFrameQueryTool:
         """Test getting operation examples."""
         examples = tool.get_operation_examples()
 
-        expected_operations = ["head", "tail", "sample", "filter", "describe", "info"]
+        expected_operations = ["head", "tail", "sample", "query", "describe", "info"]
         for operation in expected_operations:
             assert operation in examples
             assert "description" in examples[operation]
@@ -286,14 +286,14 @@ class TestDataFrameQueryTool:
         head_example = examples["head"]["example"]
         assert head_example["parameters"]["n"] == 10
 
-    def test_filter_operation_example(self, tool):
-        """Test filter operation example structure."""
+    def test_query_operation_example(self, tool):
+        """Test query operation example structure."""
         examples = tool.get_operation_examples()
-        filter_example = examples["filter"]["example"]
-        assert "conditions" in filter_example["parameters"]
-        conditions = filter_example["parameters"]["conditions"]
-        assert "age" in conditions
-        assert "status" in conditions
+        query_example = examples["query"]["example"]
+        assert "expr" in query_example["parameters"]
+        expr = query_example["parameters"]["expr"]
+        assert isinstance(expr, str)
+        assert len(expr) > 0
 
     @pytest.mark.asyncio
     async def test_all_operations_coverage(self, tool):
@@ -309,7 +309,7 @@ class TestDataFrameQueryTool:
     @pytest.mark.asyncio
     async def test_different_operations(self, tool, sample_dataframe):
         """Test different operations with appropriate mock results."""
-        operations_to_test = ["head", "tail", "sample", "filter", "describe", "info"]
+        operations_to_test = ["head", "tail", "sample", "query", "describe", "info"]
 
         for operation in operations_to_test:
             # Create operation-specific mock result
