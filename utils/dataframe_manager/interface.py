@@ -173,6 +173,15 @@ class DataFrameQueryInterface(ABC):
         pass
 
     @abstractmethod
+    async def query(
+        self,
+        df: pd.DataFrame,
+        expr: str,
+    ) -> DataFrameQueryResult:
+        """Query DataFrame using pandas query syntax."""
+        pass
+
+    @abstractmethod
     async def filter(
         self,
         df: pd.DataFrame,
