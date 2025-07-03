@@ -32,12 +32,13 @@ def mock_kusto_response():
     return mock_response
 
 
-def test_format_results(kusto_client, mock_kusto_response):
+@pytest.mark.asyncio
+async def test_format_results(kusto_client, mock_kusto_response):
     """Test the format_results method with a KustoResponseDataSet."""
     # Mock DataFrame conversion to return None to force fallback to raw formatting
     with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
         # Format the response
-        formatted = kusto_client.format_results(mock_kusto_response)
+        formatted = await kusto_client.format_results(mock_kusto_response)
 
         # Check the structure
         assert formatted["success"] is True
@@ -47,7 +48,8 @@ def test_format_results(kusto_client, mock_kusto_response):
         assert formatted["result"] == "Table with 3 rows (id, name, value)"
 
 
-def test_format_results_with_complex_values(kusto_client):
+@pytest.mark.asyncio
+async def test_format_results_with_complex_values(kusto_client):
     """Test format_results with complex data types."""
     # Create a mock KustoResponseDataSet
     mock_response = MagicMock(spec=KustoResponseDataSet)
@@ -62,7 +64,7 @@ def test_format_results_with_complex_values(kusto_client):
     # Mock DataFrame conversion to return None to force fallback to raw formatting
     with patch.object(kusto_client, '_kusto_response_to_dataframe', return_value=None):
         # Format the results
-        formatted = kusto_client.format_results(mock_response)
+        formatted = await kusto_client.format_results(mock_response)
 
         # Check the content
         assert formatted["success"] is True
