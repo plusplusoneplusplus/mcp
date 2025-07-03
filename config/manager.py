@@ -24,6 +24,7 @@ class EnvironmentManager:
         "browser_profile_path",
         "image_dir",
         "vector_store_path",
+        "dataframe_persistent_storage_path",
     ]
 
     # Default settings with their types
@@ -52,6 +53,13 @@ class EnvironmentManager:
         "job_history_storage_path": (".job_history.json", str),
         "job_history_max_entries": (1000, int),
         "job_history_max_age_days": (30, int),
+        # DataFrame management settings
+        "dataframe_max_memory_mb": (1024, int),
+        "dataframe_default_ttl_seconds": (3600, int),
+        "dataframe_cleanup_interval_seconds": (300, int),
+        "dataframe_max_dataframes": (1000, int),
+        "dataframe_storage_backend": ("memory", str),
+        "dataframe_persistent_storage_path": (".dataframes", str),
     }
 
     # Default Azure repo settings with their types
