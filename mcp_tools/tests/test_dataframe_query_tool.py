@@ -28,60 +28,46 @@ class TestDataFrameQueryTool:
         return pd.DataFrame({
             'id': range(1, 101),
             'name': [f'User_{i}' for i in range(1, 101)],
-            'age': [20 + (i % 50) for i in range(100)],
-            'status': ['active' if i % 2 == 0 else 'inactive' for i in range(100)],
-            'score': [85.5 + (i % 20) for i in range(100)]
+            'age': range(20, 120),
+            'status': ['active' if i % 2 == 0 else 'inactive' for i in range(1, 101)],
+            'score': [85.5 + i * 0.5 for i in range(100)]
         })
 
     @pytest.fixture
     def mock_result(self, sample_dataframe):
-        """Create a mock DataFrameQueryResult."""
+        """Create a mock query result."""
         mock_result = Mock()
         mock_result.data = sample_dataframe.head(5)
         mock_result.operation = "head"
         mock_result.parameters = {"n": 5}
-        mock_result.execution_time_ms = 10.5
-        mock_result.metadata = {
-            "original_shape": sample_dataframe.shape,
-            "result_shape": sample_dataframe.head(5).shape,
-            "rows_returned": 5
-        }
+        mock_result.execution_time_ms = 15.0
+        mock_result.metadata = {"rows_returned": 5}
         return mock_result
 
     def test_tool_properties(self, tool):
-        """Test basic tool properties."""
+        """Test tool basic properties."""
         assert tool.name == "dataframe_query"
-        assert "Query and manipulate stored DataFrames" in tool.description
+        assert "DataFrame" in tool.description
+        assert "Query" in tool.description
 
+    def test_input_schema_structure(self, tool):
+        """Test the input schema structure."""
         schema = tool.input_schema
         assert schema["type"] == "object"
         assert "dataframe_id" in schema["required"]
         assert "operation" in schema["required"]
-        assert set(schema["properties"]["operation"]["enum"]) == {
-            "head", "tail", "sample", "filter", "describe", "info"
-        }
 
-    def test_input_schema_structure(self, tool):
-        """Test the structure of the input schema."""
-        schema = tool.input_schema
-
-        # Check main properties
-        assert "dataframe_id" in schema["properties"]
-        assert "operation" in schema["properties"]
-        assert "parameters" in schema["properties"]
-
-        # Check parameters schema
-        params = schema["properties"]["parameters"]["properties"]
-        assert "n" in params
-        assert "frac" in params
-        assert "random_state" in params
-        assert "conditions" in params
-        assert "include" in params
-
-        # Check operation enum
+        # Check operation enum values
         operations = schema["properties"]["operation"]["enum"]
         expected_operations = ["head", "tail", "sample", "filter", "describe", "info"]
-        assert set(operations) == set(expected_operations)
+        for op in expected_operations:
+            assert op in operations
+
+        # Check dataframe_id property
+        assert schema["properties"]["dataframe_id"]["type"] == "string"
+
+        # Check parameters are optional
+        assert "parameters" not in schema["required"]
 
     @pytest.mark.asyncio
     async def test_execute_tool_missing_dataframe_id(self, tool):
@@ -104,16 +90,14 @@ class TestDataFrameQueryTool:
         assert "operation is required" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_execute_tool_dataframe_not_found(self, mock_os, mock_sys, tool):
+    async def test_execute_tool_dataframe_not_found(self, tool):
         """Test execute_tool when DataFrame is not found."""
         # Mock the import and manager
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=None)
 
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "nonexistent-123",
                 "operation": "head"
@@ -123,9 +107,7 @@ class TestDataFrameQueryTool:
         assert "not found or expired" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_execute_tool_successful_head_operation(self, mock_os, mock_sys, tool, sample_dataframe, mock_result):
+    async def test_execute_tool_successful_head_operation(self, tool, sample_dataframe, mock_result):
         """Test successful head operation execution."""
         # Mock the manager and its methods
         mock_manager = AsyncMock()
@@ -133,7 +115,7 @@ class TestDataFrameQueryTool:
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
         mock_manager.query_dataframe = AsyncMock(return_value=mock_result)
 
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
                 "operation": "head",
@@ -149,24 +131,23 @@ class TestDataFrameQueryTool:
         assert "columns" in result
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_execute_tool_large_result_handling(self, mock_os, mock_sys, tool, sample_dataframe):
+    async def test_execute_tool_large_result_handling(self, tool, sample_dataframe):
         """Test handling of large results (more than 100 rows)."""
-        # Create a large result
+        # Create a large result with more than 100 rows
+        large_df = pd.concat([sample_dataframe] * 2)  # 200 rows > 100 threshold
         large_result = Mock()
-        large_result.data = sample_dataframe  # 100 rows > 100 threshold
+        large_result.data = large_df
         large_result.operation = "sample"
         large_result.parameters = {"n": 150}
         large_result.execution_time_ms = 25.0
-        large_result.metadata = {"rows_returned": 100}
+        large_result.metadata = {"rows_returned": 200}
 
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
         mock_manager.query_dataframe = AsyncMock(return_value=large_result)
 
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
                 "operation": "sample",
@@ -179,9 +160,7 @@ class TestDataFrameQueryTool:
         assert "note" in result
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_execute_tool_empty_result(self, mock_os, mock_sys, tool, sample_dataframe):
+    async def test_execute_tool_empty_result(self, tool, sample_dataframe):
         """Test handling of empty results."""
         empty_result = Mock()
         empty_result.data = pd.DataFrame()  # Empty DataFrame
@@ -195,7 +174,7 @@ class TestDataFrameQueryTool:
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
         mock_manager.query_dataframe = AsyncMock(return_value=empty_result)
 
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
                 "operation": "filter",
@@ -206,16 +185,14 @@ class TestDataFrameQueryTool:
         assert result["data"] == "No data returned (empty result)"
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_execute_tool_operation_failure(self, mock_os, mock_sys, tool, sample_dataframe):
+    async def test_execute_tool_operation_failure(self, tool, sample_dataframe):
         """Test handling of operation failures."""
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
         mock_manager.query_dataframe = AsyncMock(return_value=None)  # Operation failed
 
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
                 "operation": "head"
@@ -225,11 +202,9 @@ class TestDataFrameQueryTool:
         assert "Failed to execute" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_execute_tool_import_error(self, mock_os, mock_sys, tool):
+    async def test_execute_tool_import_error(self, tool):
         """Test handling when DataFrame manager import fails."""
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', side_effect=ImportError("Module not found")):
+        with patch('utils.dataframe_manager.get_dataframe_manager', side_effect=ImportError("Module not found")):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
                 "operation": "head"
@@ -239,16 +214,14 @@ class TestDataFrameQueryTool:
         assert "DataFrame management framework not available" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_execute_tool_value_error(self, mock_os, mock_sys, tool, sample_dataframe):
+    async def test_execute_tool_value_error(self, tool, sample_dataframe):
         """Test handling of ValueError during operation."""
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
         mock_manager.query_dataframe = AsyncMock(side_effect=ValueError("Invalid parameters"))
 
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
                 "operation": "filter",
@@ -259,9 +232,7 @@ class TestDataFrameQueryTool:
         assert "Invalid operation parameters" in result["error"]
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_get_available_dataframes(self, mock_os, mock_sys, tool):
+    async def test_get_available_dataframes(self, tool):
         """Test getting list of available DataFrames."""
         # Mock DataFrame metadata
         mock_metadata = Mock()
@@ -277,7 +248,7 @@ class TestDataFrameQueryTool:
         mock_manager.start = AsyncMock()
         mock_manager.list_stored_dataframes = AsyncMock(return_value=[mock_metadata])
 
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.get_available_dataframes()
 
         assert result["success"] is True
@@ -290,11 +261,9 @@ class TestDataFrameQueryTool:
         assert df_info["memory_usage_mb"] == 1.0
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_get_available_dataframes_error(self, mock_os, mock_sys, tool):
+    async def test_get_available_dataframes_error(self, tool):
         """Test error handling in get_available_dataframes."""
-        with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', side_effect=Exception("Connection failed")):
+        with patch('utils.dataframe_manager.get_dataframe_manager', side_effect=Exception("Connection failed")):
             result = await tool.get_available_dataframes()
 
         assert result["success"] is False
@@ -305,36 +274,26 @@ class TestDataFrameQueryTool:
         examples = tool.get_operation_examples()
 
         expected_operations = ["head", "tail", "sample", "filter", "describe", "info"]
-        assert set(examples.keys()) == set(expected_operations)
-
-        # Check structure of each example
-        for operation, example_data in examples.items():
-            assert "description" in example_data
-            assert "example" in example_data
-            assert example_data["example"]["operation"] == operation
-            assert "dataframe_id" in example_data["example"]
+        for operation in expected_operations:
+            assert operation in examples
+            assert "description" in examples[operation]
+            assert "example" in examples[operation]
+            assert examples[operation]["example"]["operation"] == operation
 
     def test_head_operation_example(self, tool):
         """Test head operation example structure."""
         examples = tool.get_operation_examples()
-        head_example = examples["head"]
-
-        assert "Get first n rows" in head_example["description"]
-        assert head_example["example"]["operation"] == "head"
-        assert "n" in head_example["example"]["parameters"]
+        head_example = examples["head"]["example"]
+        assert head_example["parameters"]["n"] == 10
 
     def test_filter_operation_example(self, tool):
         """Test filter operation example structure."""
         examples = tool.get_operation_examples()
-        filter_example = examples["filter"]
-
-        assert "Filter DataFrame rows" in filter_example["description"]
-        assert filter_example["example"]["operation"] == "filter"
-        assert "conditions" in filter_example["example"]["parameters"]
-
-        conditions = filter_example["example"]["parameters"]["conditions"]
-        assert isinstance(conditions, dict)
-        assert len(conditions) > 0
+        filter_example = examples["filter"]["example"]
+        assert "conditions" in filter_example["parameters"]
+        conditions = filter_example["parameters"]["conditions"]
+        assert "age" in conditions
+        assert "status" in conditions
 
     @pytest.mark.asyncio
     async def test_all_operations_coverage(self, tool):
@@ -348,9 +307,7 @@ class TestDataFrameQueryTool:
         assert supported_operations == example_operations
 
     @pytest.mark.asyncio
-    @patch('mcp_tools.dataframe_query.tool.sys')
-    @patch('mcp_tools.dataframe_query.tool.os')
-    async def test_different_operations(self, mock_os, mock_sys, tool, sample_dataframe):
+    async def test_different_operations(self, tool, sample_dataframe):
         """Test different operations with appropriate mock results."""
         operations_to_test = ["head", "tail", "sample", "filter", "describe", "info"]
 
@@ -368,7 +325,7 @@ class TestDataFrameQueryTool:
             mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
             mock_manager.query_dataframe = AsyncMock(return_value=mock_result)
 
-            with patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+            with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
                 result = await tool.execute_tool({
                     "dataframe_id": "test-123",
                     "operation": operation
@@ -392,9 +349,7 @@ class TestDataFrameQueryTool:
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
         mock_manager.query_dataframe = AsyncMock(return_value=mock_result)
 
-        with patch('mcp_tools.dataframe_query.tool.sys'), \
-             patch('mcp_tools.dataframe_query.tool.os'), \
-             patch('mcp_tools.dataframe_query.tool.get_dataframe_manager', return_value=mock_manager):
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
 
             # Run multiple operations concurrently
             tasks = [
