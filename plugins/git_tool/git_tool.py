@@ -17,6 +17,25 @@ from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
 
+def sanitize_git_output(text: str) -> str:
+    """Sanitize git output to remove invalid Unicode characters that can't be JSON serialized."""
+    if not isinstance(text, str):
+        text = str(text)
+
+    # Replace surrogate characters and other problematic Unicode
+    # Use 'replace' error handling to substitute invalid characters
+    try:
+        # First try to encode/decode to catch surrogate pairs
+        text = text.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+    except Exception:
+        # Fallback: remove non-printable characters except common whitespace
+        text = "".join(
+            char for char in text if char.isprintable() or char in "\n\r\t "
+        )
+
+    return text
+
+
 class GitOperationType(str, Enum):
     """Enumeration of supported Git operations."""
 
@@ -281,19 +300,23 @@ class GitTool(ToolInterface):
 
     def _git_status(self, repo: git.Repo) -> str:
         """Get repository status."""
-        return repo.git.status()
+        output = repo.git.status()
+        return sanitize_git_output(output)
 
     def _git_diff_unstaged(self, repo: git.Repo) -> str:
         """Get unstaged changes."""
-        return repo.git.diff()
+        output = repo.git.diff()
+        return sanitize_git_output(output)
 
     def _git_diff_staged(self, repo: git.Repo) -> str:
         """Get staged changes."""
-        return repo.git.diff("--cached")
+        output = repo.git.diff("--cached")
+        return sanitize_git_output(output)
 
     def _git_diff(self, repo: git.Repo, target: str) -> str:
         """Get diff with target branch or commit."""
-        return repo.git.diff(target)
+        output = repo.git.diff(target)
+        return sanitize_git_output(output)
 
     def _git_add(self, repo: git.Repo, files: List[str]) -> str:
         """Add files to staging area."""
@@ -314,7 +337,7 @@ class GitTool(ToolInterface):
                 f"Commit: {commit.hexsha}\n"
                 f"Author: {commit.author}\n"
                 f"Date: {commit.authored_datetime}\n"
-                f"Message: {commit.message}\n"
+                f"Message: {sanitize_git_output(commit.message)}\n"
             )
         return "\n".join(log_entries)
 
@@ -342,7 +365,7 @@ class GitTool(ToolInterface):
             f"Commit: {commit.hexsha}\n"
             f"Author: {commit.author}\n"
             f"Date: {commit.authored_datetime}\n"
-            f"Message: {commit.message}\n"
+            f"Message: {sanitize_git_output(commit.message)}\n"
         ]
 
         if commit.parents:
@@ -354,7 +377,12 @@ class GitTool(ToolInterface):
         for d in diff:
             output.append(f"\n--- {d.a_path}\n+++ {d.b_path}\n")
             if d.diff:
-                output.append(d.diff.decode("utf-8"))
+                try:
+                    # Handle potential encoding issues in diff content
+                    diff_text = d.diff.decode("utf-8", errors='replace')
+                    output.append(sanitize_git_output(diff_text))
+                except Exception:
+                    output.append(sanitize_git_output(str(d.diff)))
 
         return "".join(output)
 
@@ -412,7 +440,7 @@ class GitTool(ToolInterface):
                     f"Commit: {commit.hexsha[:8]}\n"
                     f"Author: {commit.author.name} <{commit.author.email}>\n"
                     f"Date: {commit.authored_datetime.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                    f"Message: {commit.message.strip()}\n"
+                    f"Message: {sanitize_git_output(commit.message.strip())}\n"
                     f"{'=' * 50}"
                 )
 
