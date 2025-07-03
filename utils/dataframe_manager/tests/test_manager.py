@@ -44,7 +44,8 @@ class TestDataFrameManager:
         """Test storing and retrieving a DataFrame."""
         # Store DataFrame
         df_id = await manager.store_dataframe(sample_dataframe)
-        assert isinstance(df_id, UUID)
+        assert isinstance(df_id, str)
+        assert df_id.startswith("dataframe-")
 
         # Retrieve DataFrame
         retrieved_df = await manager.get_dataframe(df_id)
