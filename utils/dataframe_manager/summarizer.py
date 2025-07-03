@@ -160,9 +160,19 @@ class DataFrameSummarizer(DataFrameSummarizerInterface):
             if len(categorical_cols) > 0 and len(df) > sample_size * 2:
                 # Use the first categorical column for stratification
                 strat_col = categorical_cols[0]
-                return df.groupby(strat_col, group_keys=False).apply(
-                    lambda x: x.sample(min(len(x), max(1, sample_size // df[strat_col].nunique())))
-                ).head(sample_size)
+                # Group by stratification column and sample from each group
+                groups = []
+                for group_name, group_df in df.groupby(strat_col):
+                    group_sample_size = max(1, sample_size // df[strat_col].nunique())
+                    if len(group_df) > 0:
+                        sample_size_for_group = min(len(group_df), group_sample_size)
+                        groups.append(group_df.sample(n=sample_size_for_group, random_state=42))
+
+                if groups:
+                    sampled = pd.concat(groups, ignore_index=True).head(sample_size)
+                    return sampled
+                else:
+                    return df.sample(n=min(sample_size, len(df)), random_state=42)
 
             # Otherwise, just random sample
             return df.sample(n=sample_size, random_state=42)
