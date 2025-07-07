@@ -66,7 +66,7 @@ class KustoClient(KustoClientInterface):
                 },
                 "database": {
                     "type": "string",
-                    "description": "The name of the database to query",
+                    "description": "The name of the database to query. When specified, 'cluster' must also be provided.",
                 },
                 "query": {
                     "type": "string",
@@ -74,8 +74,7 @@ class KustoClient(KustoClientInterface):
                 },
                 "cluster": {
                     "type": "string",
-                    "description": "The URL or name of the Kusto cluster",
-                    "nullable": True,
+                    "description": "The URL or name of the Kusto cluster. When specified, 'database' must also be provided. Can be a full URL (https://cluster.kusto.windows.net), partial URL (cluster.kusto.windows.net), or just the cluster name (cluster).",
                 },
                 "format_results": {
                     "type": "boolean",
@@ -127,6 +126,21 @@ class KustoClient(KustoClientInterface):
                 },
             },
             "required": ["operation", "query"],
+            "anyOf": [
+                {
+                    "description": "Use environment configuration for database and cluster",
+                    "not": {
+                        "anyOf": [
+                            {"required": ["database"]},
+                            {"required": ["cluster"]}
+                        ]
+                    }
+                },
+                {
+                    "description": "Specify both database and cluster explicitly",
+                    "required": ["database", "cluster"]
+                }
+            ]
         }
 
     def __init__(self, config_dict=None):
@@ -149,7 +163,7 @@ class KustoClient(KustoClientInterface):
             "preserve_raw": False  # Set to True if raw data access is needed
         }
 
-    def normalize_cluster_url(self, cluster: Optional[str]) -> str:
+    def normalize_cluster_url(self, cluster: Optional[str]) -> Optional[str]:
         """
         Normalize a cluster name or URL to a fully qualified Kusto cluster URL.
 
@@ -162,7 +176,7 @@ class KustoClient(KustoClientInterface):
             cluster (str, optional): Cluster name or URL to normalize
 
         Returns:
-            str: Fully qualified Kusto cluster URL
+            str or None: Fully qualified Kusto cluster URL or None if no cluster provided
         """
         if not cluster:
             # If no cluster provided, return None
@@ -560,7 +574,10 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
                 formatted_result = self._format_dataframe_smart(df)
 
                 # Check if output limiting is needed
-                if len(formatted_result) <= limits.get("max_total_length", 50 * 1024):
+                max_length = limits.get("max_total_length", 50 * 1024)
+                if isinstance(max_length, str):
+                    max_length = int(max_length)
+                if len(formatted_result) <= max_length:
                     # Result is within limits, return formatted DataFrame
                     return {
                         "success": True,
@@ -604,7 +621,10 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
                     raw_result = "No results found"
 
                 # Check if output limiting is needed
-                if len(raw_result) <= limits.get("max_total_length", 50 * 1024):
+                max_length = limits.get("max_total_length", 50 * 1024)
+                if isinstance(max_length, str):
+                    max_length = int(max_length)
+                if len(raw_result) <= max_length:
                     # Result is within limits, return as-is
                     return {"success": True, "result": raw_result}
 
@@ -753,10 +773,21 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
         operation = arguments.get("operation", "")
 
         if operation == "execute_query":
+            # Validate required arguments
+            database = arguments.get("database")
+            query = arguments.get("query")
+
+            if not query:
+                return {
+                    "success": False,
+                    "result": "Query parameter is required",
+                    "error_type": "ValueError",
+                }
+
             # Always format results for LLM when using execute_tool
             result = await self.execute_query(
-                database=arguments.get("database"),
-                query=arguments.get("query"),
+                database=database or "",
+                query=query,
                 cluster=arguments.get("cluster"),
                 format_results=arguments.get("format_results", True),
                 formatting_options=arguments.get("formatting_options"),
