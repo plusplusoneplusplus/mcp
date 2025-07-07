@@ -198,10 +198,16 @@ class PlaywrightBrowserClient(IBrowserClient):
         self, url: str, wait_time: int = 30, headless: bool = True, options: Any = None
     ) -> Optional[str]:
         try:
-            html = await self.wrapper.get_page_html(
-                url, wait_until="networkidle", wait_time=wait_time
-            )
-            return html
+            # Create a new wrapper instance with the specified headless mode
+            async with PlaywrightWrapper(
+                browser_type=self.browser,
+                user_data_dir=self.user_data_dir,
+                headless=headless,
+            ) as temp_wrapper:
+                html = await temp_wrapper.get_page_html(
+                    url, wait_until="networkidle", wait_time=wait_time
+                )
+                return html
         except Exception:
             return None
 

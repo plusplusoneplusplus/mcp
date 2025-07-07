@@ -123,6 +123,11 @@ class BrowserClient(BrowserClientInterface):
                     "description": "Whether to run the browser in headless mode.",
                     "default": False,
                 },
+                "redact_secrets": {
+                    "type": "boolean",
+                    "description": "Whether to scan for and redact potential secrets in the content",
+                    "default": False,
+                },
             },
             "required": ["operation", "url"],
         }
@@ -236,6 +241,7 @@ class BrowserClient(BrowserClientInterface):
         browser_options = arguments.get("browser_options", None)
         browser_type = arguments.get("browser_type", self.browser_type)
         client_type = arguments.get("client_type", self.client_type)
+        redact_secrets_enabled = arguments.get("redact_secrets", False)
 
         async with BrowserClientFactory.create_client(
             client_type, user_data_dir=None, browser_type=browser_type
@@ -245,12 +251,13 @@ class BrowserClient(BrowserClientInterface):
                     url, wait_time, headless, browser_options
                 )
                 if html:
-                    # Always apply secret redaction
-                    html, findings = redact_secrets(html)
+                    # Apply secret redaction only if enabled
+                    if redact_secrets_enabled:
+                        html, findings = redact_secrets(html)
 
-                    # Log warnings if secrets were detected
-                    if findings:
-                        self._log_detected_secrets(findings, url, "HTML")
+                        # Log warnings if secrets were detected
+                        if findings:
+                            self._log_detected_secrets(findings, url, "HTML")
 
                     return {
                         "success": True,
@@ -283,12 +290,15 @@ class BrowserClient(BrowserClientInterface):
                         "error": f"Failed to retrieve HTML from {url}",
                     }
 
-                # Always apply secret redaction to the HTML content
-                redacted_html, html_findings = redact_secrets(html)
+                # Apply secret redaction to HTML only if enabled
+                redacted_html = html
+                html_findings = []
+                if redact_secrets_enabled:
+                    redacted_html, html_findings = redact_secrets(html)
 
-                # Log warnings if secrets were detected in HTML
-                if html_findings:
-                    self._log_detected_secrets(html_findings, url, "HTML")
+                    # Log warnings if secrets were detected in HTML
+                    if html_findings:
+                        self._log_detected_secrets(html_findings, url, "HTML")
 
                 result = extract_and_format_html(
                     redacted_html,
@@ -296,9 +306,9 @@ class BrowserClient(BrowserClientInterface):
                     include_images=include_images,
                 )
 
-                # Always scan the resulting markdown for any missed secrets
+                # Scan the resulting markdown for any missed secrets only if enabled
                 markdown_findings = []
-                if "markdown" in result:
+                if redact_secrets_enabled and "markdown" in result:
                     redacted_markdown, md_findings = redact_secrets(result["markdown"])
                     result["markdown"] = redacted_markdown
 
@@ -311,7 +321,7 @@ class BrowserClient(BrowserClientInterface):
                 result["url"] = url
 
                 # Log a summary if secrets were detected in either HTML or markdown
-                if html_findings or markdown_findings:
+                if redact_secrets_enabled and (html_findings or markdown_findings):
                     total_secrets = len(html_findings) + len(markdown_findings)
                     logger.warning(
                         f"SECURITY SUMMARY: Total of {total_secrets} potential secrets detected and "
