@@ -817,3 +817,83 @@ async def test_execute_tool_with_formatting_options(kusto_client):
         )
 
         assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_dataframe_formatting_no_string_truncation(kusto_client):
+    """Test that DataFrame formatting displays full strings without truncation."""
+    import pandas as pd
+
+    # Create a DataFrame with very long strings
+    long_string = "This is a very long string that should not be truncated when displayed. " * 10
+    test_data = {
+        "id": [1, 2, 3],
+        "short_text": ["A", "B", "C"],
+        "long_text": [long_string, long_string + " Extra", long_string + " More extra content"]
+    }
+
+    df = pd.DataFrame(test_data)
+
+    # Test small DataFrame formatting (≤20 rows)
+    result = kusto_client._format_small_dataframe(df)
+
+    # Verify that the full long string is present in the output
+    assert long_string in result
+    assert "..." not in result  # Should not have truncation indicators
+
+    # Test medium DataFrame formatting (21-1000 rows)
+    # Create a larger DataFrame
+    large_data = {
+        "id": list(range(1, 31)),
+        "text": [f"Long text entry {i}: {long_string}" for i in range(1, 31)]
+    }
+    large_df = pd.DataFrame(large_data)
+
+    result = kusto_client._format_medium_dataframe(large_df)
+
+    # Verify that the full long string is present in the sample data
+    assert long_string in result
+
+    # Test large DataFrame formatting (>1000 rows)
+    # Create an even larger DataFrame
+    very_large_data = {
+        "id": list(range(1, 1001)),
+        "text": [f"Entry {i}: {long_string}" for i in range(1, 1001)]
+    }
+    very_large_df = pd.DataFrame(very_large_data)
+
+    result = kusto_client._format_large_dataframe(very_large_df)
+
+    # Verify that the full long string is present in head/tail sections
+    assert long_string in result
+
+
+@pytest.mark.asyncio
+async def test_dataframe_summarizer_no_string_truncation():
+    """Test that DataFrame summarizer displays full strings without truncation."""
+    import pandas as pd
+    from utils.dataframe_manager.summarizer import DataFrameSummarizer
+
+    # Create a DataFrame with very long strings
+    long_string = "This is an extremely long string that historically might have been truncated but should now be displayed in full. " * 5
+    test_data = {
+        "id": [1, 2, 3],
+        "description": [long_string, long_string + " Additional", long_string + " More content"]
+    }
+
+    df = pd.DataFrame(test_data)
+    summarizer = DataFrameSummarizer()
+
+    # Test table formatting with large size limit
+    result = await summarizer.format_for_display(df, max_size_bytes=50000, format_type="table")
+
+    # Verify that the full long string is present
+    assert long_string in result
+    assert "..." not in result.split('\n')[0]  # First line should not have truncation indicators
+
+    # Test with smaller DataFrame that should fit completely
+    small_df = pd.DataFrame({"text": [long_string]})
+    result = await summarizer.format_for_display(small_df, max_size_bytes=50000, format_type="table")
+
+    # Verify the full string is displayed
+    assert long_string in result

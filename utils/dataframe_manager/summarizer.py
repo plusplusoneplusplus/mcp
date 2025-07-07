@@ -206,6 +206,7 @@ class DataFrameSummarizer(DataFrameSummarizerInterface):
                         max_rows=None,
                         max_cols=None,
                         show_dimensions=True,
+                        max_colwidth=None,  # Display full strings without truncation
                     )
 
                     if len(formatted.encode('utf-8')) <= max_size_bytes:
@@ -220,6 +221,7 @@ class DataFrameSummarizer(DataFrameSummarizerInterface):
                     formatted = col_truncated.to_string(
                         index=False,
                         show_dimensions=True,
+                        max_colwidth=None,  # Display full strings without truncation
                     )
 
                     if len(formatted.encode('utf-8')) <= max_size_bytes:
