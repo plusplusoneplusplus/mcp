@@ -336,9 +336,8 @@ class KustoClient(KustoClientInterface):
         output.append(f"Query Results ({len(df)} rows, {len(df.columns)} columns)")
         output.append("=" * 50)
 
-        # Get max column width from formatting options
-        max_col_width = getattr(self, '_current_formatting_options', {}).get('max_column_width', 50)
-        output.append(df.to_string(index=False, max_colwidth=max_col_width))
+        # Display full strings without truncation
+        output.append(df.to_string(index=False))
         return "\n".join(output)
 
     def _format_medium_dataframe(self, df: pd.DataFrame) -> str:
@@ -361,15 +360,14 @@ class KustoClient(KustoClientInterface):
             output.append(f"• {col}: {dtype} ({unique_count} unique, {null_count} nulls)")
 
         # Sample data (first 10 rows)
-        max_col_width = getattr(self, '_current_formatting_options', {}).get('max_column_width', 40)
         output.append(f"\nSample Data (first 10 rows):")
-        output.append(df.head(10).to_string(index=False, max_colwidth=max_col_width))
+        output.append(df.head(10).to_string(index=False))
 
         # If more than 10 rows, show summary statistics for numeric columns
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) > 0:
             output.append(f"\nNumeric Summary:")
-            output.append(df[numeric_cols].describe().to_string(max_colwidth=20))
+            output.append(df[numeric_cols].describe().to_string())
 
         return "\n".join(output)
 
@@ -407,19 +405,18 @@ class KustoClient(KustoClientInterface):
             output.append(f"• {col}: {dtype} ({unique_count:,} unique, {null_count:,} nulls{range_info})")
 
         # First 5 rows
-        max_col_width = formatting_options.get('max_column_width', 30)
         output.append(f"\nFirst 5 rows:")
-        output.append(df.head(5).to_string(index=False, max_colwidth=max_col_width))
+        output.append(df.head(5).to_string(index=False))
 
         # Last 5 rows
         output.append(f"\nLast 5 rows:")
-        output.append(df.tail(5).to_string(index=False, max_colwidth=max_col_width))
+        output.append(df.tail(5).to_string(index=False))
 
         # Summary statistics for numeric columns
         numeric_cols = df.select_dtypes(include=[np.number]).columns
         if len(numeric_cols) > 0:
             output.append(f"\nNumeric Summary (top 5 columns):")
-            output.append(df[numeric_cols[:5]].describe().to_string(max_colwidth=15))
+            output.append(df[numeric_cols[:5]].describe().to_string())
 
         return "\n".join(output)
 
