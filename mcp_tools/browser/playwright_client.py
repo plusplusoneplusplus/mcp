@@ -4,7 +4,7 @@ This module provides a browser client implementation using Playwright.
 """
 
 import asyncio
-from typing import Optional, Any, Literal
+from typing import Optional, Any, Literal, List, Dict
 
 from mcp_tools.browser.interface import IBrowserClient
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
@@ -20,9 +20,6 @@ class PlaywrightBrowserClient(IBrowserClient):
         """
         self.browser = browser
         self.user_data_dir = user_data_dir
-        self.wrapper: Optional[PlaywrightWrapper] = PlaywrightWrapper(
-            browser_type=browser, user_data_dir=user_data_dir
-        )
         self.retry_capture_panels_keywords = ["LOADING"]
         self.max_retry_capture_panels = 3
 
@@ -96,7 +93,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                     }
 
                 semaphore = asyncio.Semaphore(max_parallelism)
-                panel_results = [None] * len(panels)
+                panel_results: List[Optional[Dict[str, Any]]] = [None for _ in range(len(panels))]
 
                 async def capture_panel(idx, el):
                     pid = None
@@ -165,7 +162,8 @@ class PlaywrightBrowserClient(IBrowserClient):
                 async def sem_task(idx, el):
                     async with semaphore:
                         result = await capture_panel(idx, el)
-                        panel_results[idx] = result
+                        if result is not None:
+                            panel_results[idx] = result
 
                 tasks = [
                     asyncio.create_task(sem_task(idx, el))
@@ -186,8 +184,6 @@ class PlaywrightBrowserClient(IBrowserClient):
 
     async def __aenter__(self):
         """Support for async context manager."""
-        if self.wrapper:
-            await self.wrapper.__aenter__()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -224,22 +220,25 @@ class PlaywrightBrowserClient(IBrowserClient):
         scroll_delay: float = 0.3,
     ) -> bool:
         try:
-            await self.wrapper.open_page(url, wait_time=wait_time)
-            if auto_scroll:
-                print("Auto-scrolling page to load all content...")
-                await self.wrapper.auto_scroll(
-                    timeout=scroll_timeout,
-                    scroll_step=scroll_step,
-                    scroll_delay=scroll_delay,
-                )
-            await self.wrapper.take_screenshot(output_path, full_page=True)
-            return True
+            async with PlaywrightWrapper(
+                browser_type=self.browser,
+                user_data_dir=self.user_data_dir,
+                headless=headless,
+            ) as wrapper:
+                await wrapper.open_page(url, wait_time=wait_time)
+                if auto_scroll:
+                    print("Auto-scrolling page to load all content...")
+                    await wrapper.auto_scroll(
+                        timeout=scroll_timeout,
+                        scroll_step=scroll_step,
+                        scroll_delay=scroll_delay,
+                    )
+                await wrapper.take_screenshot(output_path, full_page=True)
+                return True
         except Exception as e:
             print(f"Error taking screenshot: {e}")
             return False
 
     async def close(self):
         """Close the browser and clean up resources."""
-        if self.wrapper:
-            await self.wrapper.close()
-            self.wrapper = None
+        pass
