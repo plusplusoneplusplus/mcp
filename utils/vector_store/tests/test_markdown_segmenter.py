@@ -362,6 +362,116 @@ Concluding remarks.
             self.segmenter.chunk_size = original_chunk_size
             self.segmenter.chunk_overlap = original_overlap
 
+    def test_small_file_no_chunking(self):
+        """Test that files with less than 500 lines are not chunked."""
+        # Create markdown content with less than 500 lines
+        small_markdown = """# Small Document
+
+## Introduction
+
+This is a small document with fewer than 500 lines.
+It should not be chunked but returned as a single segment.
+
+### Section 1
+
+Some content here.
+
+### Section 2
+
+More content here.
+
+| Column 1 | Column 2 |
+|----------|----------|
+| Value 1  | Value 2  |
+| Value 3  | Value 4  |
+
+Final content.
+"""
+
+        # Verify the markdown has less than 500 lines
+        line_count = len(small_markdown.splitlines())
+        self.assertLess(line_count, 500, f"Test markdown should have less than 500 lines, but has {line_count}")
+
+        segments = self.segmenter.segment_markdown(small_markdown)
+
+        # Should have exactly 2 segments: 1 text segment (whole file) + 1 table segment
+        self.assertEqual(len(segments), 2)
+
+        # Find text and table segments
+        text_segments = [s for s in segments if s["type"] == "text"]
+        table_segments = [s for s in segments if s["type"] == "table"]
+
+        # Should have exactly 1 text segment and 1 table segment
+        self.assertEqual(len(text_segments), 1)
+        self.assertEqual(len(table_segments), 1)
+
+        # The text segment should contain most of the content (excluding the table)
+        text_segment = text_segments[0]
+        self.assertIn("Small Document", text_segment["content"])
+        self.assertIn("This is a small document", text_segment["content"])
+        self.assertIn("Final content", text_segment["content"])
+
+        # The text segment should NOT contain the table content
+        self.assertNotIn("| Column 1 | Column 2 |", text_segment["content"])
+
+        # The table segment should contain the table
+        table_segment = table_segments[0]
+        self.assertIn("| Column 1 | Column 2 |", table_segment["content"])
+        self.assertIn("| Value 1  | Value 2  |", table_segment["content"])
+
+    def test_large_file_with_chunking(self):
+        """Test that files with 500+ lines are chunked normally."""
+        # Create markdown content with 500+ lines
+        lines = ["# Large Document", ""]
+        for i in range(1, 501):  # Create 500+ lines
+            lines.append(f"This is line {i} of content in the large document.")
+            if i % 50 == 0:  # Add some headers
+                lines.append(f"## Section {i//50}")
+                lines.append("")
+
+        large_markdown = "\n".join(lines)
+
+        # Verify the markdown has 500+ lines
+        line_count = len(large_markdown.splitlines())
+        self.assertGreaterEqual(line_count, 500, f"Test markdown should have 500+ lines, but has {line_count}")
+
+        segments = self.segmenter.segment_markdown(large_markdown)
+
+        # Should have multiple segments due to chunking
+        text_segments = [s for s in segments if s["type"] == "text"]
+        self.assertGreater(len(text_segments), 1, "Large file should be chunked into multiple segments")
+
+    def test_configurable_line_threshold(self):
+        """Test that the line count threshold can be configured."""
+        # Create content with 100 lines
+        lines = ["# Document with 100 lines", ""]
+        for i in range(1, 99):  # Create ~100 lines total
+            lines.append(f"This is line {i} of content.")
+
+        content_100_lines = "\n".join(lines)
+        line_count = len(content_100_lines.splitlines())
+
+        # Test with default threshold (500) - should NOT chunk
+        default_segmenter = MarkdownSegmenter(
+            vector_store=self.vector_store,
+            chunk_size=200,
+            chunk_overlap=50
+        )
+        segments_default = default_segmenter.segment_markdown(content_100_lines)
+        text_segments_default = [s for s in segments_default if s["type"] == "text"]
+        self.assertEqual(len(text_segments_default), 1, "With default threshold (500), should have 1 segment")
+
+        # Test with custom threshold (50) - should chunk
+        custom_segmenter = MarkdownSegmenter(
+            vector_store=self.vector_store,
+            chunk_size=200,
+            chunk_overlap=50,
+            line_count_threshold=50
+        )
+        segments_custom = custom_segmenter.segment_markdown(content_100_lines)
+        text_segments_custom = [s for s in segments_custom if s["type"] == "text"]
+        self.assertGreater(len(text_segments_custom), 1, f"With threshold 50, should chunk {line_count}-line content")
+
 
 if __name__ == "__main__":
     unittest.main()

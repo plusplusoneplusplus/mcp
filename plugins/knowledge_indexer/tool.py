@@ -29,7 +29,7 @@ class KnowledgeIndexerTool(ToolInterface):
 
     @property
     def description(self) -> str:
-        return "Upload and index new knowledge from files (markdown format) into a vector store. This tool is intended for users to add new documents and knowledge bases that can later be searched and retrieved. Supports multiple file uploads and organizes content into searchable collections."
+        return "Upload and index new knowledge from files (markdown format) into a vector store. This tool is intended for users to add new documents and knowledge bases that can later be searched and retrieved. Supports multiple file uploads and organizes content into searchable collections. Files with fewer than the configured line count threshold (default: 500 lines) are stored as single segments without chunking."
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -70,6 +70,12 @@ class KnowledgeIndexerTool(ToolInterface):
                     "type": "string",
                     "description": "Optional custom path for vector store persistence. If not provided, uses default server directory",
                 },
+                "line_count_threshold": {
+                    "type": "integer",
+                    "default": 500,
+                    "minimum": 1,
+                    "description": "Minimum number of lines before chunking is applied. Files with fewer lines are kept as single segments",
+                },
             },
             "required": ["files"],
         }
@@ -81,6 +87,7 @@ class KnowledgeIndexerTool(ToolInterface):
             collection = arguments.get("collection", "default")
             overwrite = arguments.get("overwrite", False)
             persist_directory = arguments.get("persist_directory", self.persist_dir)
+            line_count_threshold = arguments.get("line_count_threshold", 500)
 
             if not files:
                 return {"success": False, "error": "No files provided for indexing"}
@@ -138,7 +145,7 @@ class KnowledgeIndexerTool(ToolInterface):
                 vector_store = ChromaVectorStore(
                     collection_name=collection, persist_directory=persist_directory
                 )
-                segmenter = MarkdownSegmenter(vector_store)
+                segmenter = MarkdownSegmenter(vector_store, line_count_threshold=line_count_threshold)
 
                 # Process each markdown file
                 total_segments = 0
@@ -272,15 +279,21 @@ class KnowledgeQueryTool(ToolInterface):
                 query_embeddings=query_vec, n_results=limit
             )
 
+            # Handle potential None results with safe defaults
+            result_ids = results.get("ids") or [[]]
+            result_documents = results.get("documents") or [[]]
+            result_metadatas = results.get("metadatas") or [[]]
+            result_distances = results.get("distances") or [[]]
+
             return {
                 "success": True,
                 "query": query_text,
                 "collection": collection,
                 "results": {
-                    "ids": results.get("ids", [[]])[0],
-                    "documents": results.get("documents", [[]])[0],
-                    "metadatas": results.get("metadatas", [[]])[0],
-                    "distances": results.get("distances", [[]])[0],
+                    "ids": result_ids[0] if result_ids else [],
+                    "documents": result_documents[0] if result_documents else [],
+                    "metadatas": result_metadatas[0] if result_metadatas else [],
+                    "distances": result_distances[0] if result_distances else [],
                 },
             }
 
@@ -375,21 +388,25 @@ class KnowledgeCollectionManagerTool(ToolInterface):
                     )
 
                     # Use a zero-vector to get all documents (hack for ChromaDB)
-                    dummy_vec = [[0.0] * 384]
+                    # Fix: Use proper embedding dimension and format
+                    dummy_vec = [0.0] * 384
                     results = collection_store.collection.query(
                         query_embeddings=dummy_vec, n_results=1000
                     )
 
-                    document_count = len(results.get("ids", [[]])[0])
+                    # Handle potential None results with safe defaults
+                    result_ids = results.get("ids") or [[]]
+                    result_documents = results.get("documents") or [[]]
+
+                    document_count = len(result_ids[0]) if result_ids else 0
+                    sample_documents = result_documents[0][:5] if result_documents else []
 
                     return {
                         "success": True,
                         "action": "info",
                         "collection": collection,
                         "document_count": document_count,
-                        "sample_documents": results.get("documents", [[]])[0][
-                            :5
-                        ],  # First 5 docs as sample
+                        "sample_documents": sample_documents,
                     }
 
                 except Exception as e:

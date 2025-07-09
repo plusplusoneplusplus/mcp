@@ -457,11 +457,12 @@ This tests the system's ability to handle larger documents efficiently.
 
         tool = KnowledgeIndexerTool()
 
-        # Index large document
+        # Index large document with a low line count threshold to force chunking
         result = await tool.execute_tool({
             "files": large_files_data,
             "collection": unique_collection_name,
             "persist_directory": unique_temp_dir,
+            "line_count_threshold": 50,  # Force chunking with low threshold
         })
 
         assert result["success"] is True
