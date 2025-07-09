@@ -42,6 +42,9 @@ try:
         PullRequestThread,
         PullRequestCommentsResponse,
         PullRequestCommentResponse,
+        PullRequestChangeItem,
+        PullRequestChanges,
+        PullRequestChangesResponse,
     )
 except ImportError:
     # Fallback for when module is loaded directly by plugin system
@@ -72,6 +75,9 @@ except ImportError:
     PullRequestThread = types_module.PullRequestThread
     PullRequestCommentsResponse = types_module.PullRequestCommentsResponse
     PullRequestCommentResponse = types_module.PullRequestCommentResponse
+    PullRequestChangeItem = types_module.PullRequestChangeItem
+    PullRequestChanges = types_module.PullRequestChanges
+    PullRequestChangesResponse = types_module.PullRequestChangesResponse
 
 
 @register_tool(ecosystem="microsoft", os_type="all")
@@ -148,6 +154,7 @@ class AzurePullRequestTool(ToolInterface):
                         "resolve_comment",
                         "add_comment",
                         "update_comment",
+                        "get_changes",
                     ],
                 },
                 "pull_request_id": {
@@ -290,6 +297,16 @@ class AzurePullRequestTool(ToolInterface):
                 "parent_comment_id": {
                     "type": ["string", "integer"],
                     "description": "ID of parent comment when replying to existing comment",
+                    "nullable": True,
+                },
+                "iteration_id": {
+                    "type": "integer",
+                    "description": "PR iteration to get changes for (default: 1 for complete PR)",
+                    "nullable": True,
+                },
+                "compare_to": {
+                    "type": "integer",
+                    "description": "Compare against specific iteration (default: 0 for base comparison)",
                     "nullable": True,
                 },
             },
@@ -1287,6 +1304,123 @@ class AzurePullRequestTool(ToolInterface):
         except Exception as e:
             return {"success": False, "error": str(e)}
 
+    async def get_changes(
+        self,
+        pull_request_id: Union[int, str],
+        organization: Optional[str] = None,
+        project: Optional[str] = None,
+        repository: Optional[str] = None,
+        iteration_id: Optional[int] = None,
+        compare_to: Optional[int] = None,
+        top: Optional[int] = None,
+        skip: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Get file changes for a pull request using Azure DevOps REST API.
+
+        This method retrieves per-file diffs between source and target branches
+        for the specified pull request, showing what files were added, modified,
+        deleted, or renamed.
+
+        Args:
+            pull_request_id: ID of the pull request
+            organization: Azure DevOps organization URL (optional, uses default)
+            project: Project name/ID (optional, uses default)
+            repository: Repository name/ID (optional, uses default)
+            iteration_id: PR iteration to get changes for (default: 1 for complete PR)
+            compare_to: Compare against specific iteration (default: 0 for base comparison)
+            top: Maximum number of changes to return
+            skip: Number of changes to skip for pagination
+
+        Returns:
+            Dict containing success status and change data or error information
+
+        Example:
+            # Get all changes for PR 123
+            result = await pr_tool.get_changes(123)
+
+            # Get changes for specific iteration
+            result = await pr_tool.get_changes(123, iteration_id=2, compare_to=1)
+        """
+        try:
+            if not pull_request_id:
+                return {"success": False, "error": "Pull request ID is required"}
+
+            # Use configured defaults for core parameters
+            org = self._get_param_with_default(organization, self.default_organization)
+            proj = self._get_param_with_default(project, self.default_project)
+            repo = self._get_param_with_default(repository, self.default_repository)
+
+            if not org or not proj or not repo:
+                return {"success": False, "error": "Organization, project, and repository are required"}
+
+            # Default to iteration 1 (complete PR) if not specified
+            if iteration_id is None:
+                iteration_id = 1
+
+            # Default to compare against base (iteration 0) if not specified
+            if compare_to is None:
+                compare_to = 0
+
+            # Build URL for pull request iteration changes
+            endpoint = f"git/repositories/{repo}/pullrequests/{pull_request_id}/iterations/{iteration_id}/changes"
+            url = build_api_url(org, proj, endpoint)
+
+            # Build query parameters
+            params = {"api-version": "7.0"}
+
+            if compare_to is not None:
+                params["$compareTo"] = compare_to
+
+            if top is not None:
+                params["$top"] = top
+
+            if skip is not None:
+                params["$skip"] = skip
+
+            headers = get_auth_headers()
+
+            self.logger.debug(f"Getting changes for PR {pull_request_id}, iteration {iteration_id}")
+
+            # Make REST API call
+            async with AzureHttpClient() as http_client:
+                result = await http_client.request('GET', url, headers=headers, params=params)
+
+                if result["success"]:
+                    data = result.get("data", {})
+
+                    # Parse the changes data into our structured format
+                    try:
+                        changes = PullRequestChanges(changeEntries=data.get("changeEntries", []))
+                        response = PullRequestChangesResponse(
+                            success=True,
+                            data=changes,
+                            count=len(changes.changeEntries),
+                            raw_output=result.get("raw_response")
+                        )
+                        # Convert to dict and remove None values for cleaner response
+                        response_dict = response.model_dump()
+                        return {k: v for k, v in response_dict.items() if v is not None}
+
+                    except Exception as parse_error:
+                        self.logger.warning(f"Failed to parse changes data: {parse_error}")
+                        # Return raw data if parsing fails
+                        return {
+                            "success": True,
+                            "data": data,
+                            "count": len(data.get("changeEntries", [])),
+                            "raw_output": result.get("raw_response")
+                        }
+
+                elif result.get("status_code") == 404:
+                    return {"success": False, "error": f"Pull request {pull_request_id} or iteration {iteration_id} not found"}
+                else:
+                    return {"success": False, "error": result.get("error", "Unknown error")}
+
+        except Exception as e:
+            self.logger.error(f"Error getting PR changes: {e}")
+            return {"success": False, "error": str(e)}
+
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments."""
         operation = arguments.get("operation", "")
@@ -1389,6 +1523,17 @@ class AzurePullRequestTool(ToolInterface):
                 organization=arguments.get("organization"),
                 project=arguments.get("project"),
                 repository=arguments.get("repository"),
+            )
+        elif operation == "get_changes":
+            return await self.get_changes(
+                pull_request_id=arguments.get("pull_request_id"),
+                organization=arguments.get("organization"),
+                project=arguments.get("project"),
+                repository=arguments.get("repository"),
+                iteration_id=arguments.get("iteration_id"),
+                compare_to=arguments.get("compare_to"),
+                top=arguments.get("top"),
+                skip=arguments.get("skip"),
             )
         else:
             return {"success": False, "error": f"Unknown operation: {operation}"}

@@ -222,3 +222,77 @@ class WorkItemUpdateResponse(BaseModel):
     data: Optional[WorkItem] = None
     error: Optional[str] = None
     raw_output: Optional[str] = None
+
+
+class PullRequestChangeItem(BaseModel):
+    """Individual file change in a pull request"""
+
+    changeId: int
+    changeType: str  # add, edit, delete, rename, etc.
+    item: Dict[str, Any]  # Contains path, gitObjectType, originalObjectId, objectId, etc.
+    sourceItem: Optional[Dict[str, Any]] = None  # For renames/moves
+
+    # Computed properties for easier access
+    @property
+    def file_path(self) -> str:
+        """Get the file path from the item"""
+        return self.item.get("path", "")
+
+    @property
+    def change_type(self) -> str:
+        """Get the change type"""
+        return self.changeType
+
+    @property
+    def is_file(self) -> bool:
+        """Check if this is a file change (not folder)"""
+        return self.item.get("gitObjectType") == "blob"
+
+    @property
+    def original_path(self) -> Optional[str]:
+        """Get original path for renamed/moved files"""
+        if self.sourceItem:
+            return self.sourceItem.get("path")
+        return None
+
+
+class PullRequestChanges(BaseModel):
+    """Pull request changes information"""
+
+    changeEntries: List[PullRequestChangeItem]
+
+    # Helper methods for filtering changes
+    @property
+    def file_changes(self) -> List[PullRequestChangeItem]:
+        """Get only file changes (excluding folder changes)"""
+        return [change for change in self.changeEntries if change.is_file]
+
+    @property
+    def added_files(self) -> List[PullRequestChangeItem]:
+        """Get added files"""
+        return [change for change in self.file_changes if change.change_type == "add"]
+
+    @property
+    def modified_files(self) -> List[PullRequestChangeItem]:
+        """Get modified files"""
+        return [change for change in self.file_changes if change.change_type == "edit"]
+
+    @property
+    def deleted_files(self) -> List[PullRequestChangeItem]:
+        """Get deleted files"""
+        return [change for change in self.file_changes if change.change_type == "delete"]
+
+    @property
+    def renamed_files(self) -> List[PullRequestChangeItem]:
+        """Get renamed/moved files"""
+        return [change for change in self.file_changes if change.change_type in ["rename", "rename2"]]
+
+
+class PullRequestChangesResponse(BaseModel):
+    """Response from get pull request changes operation"""
+
+    success: bool
+    data: Optional[PullRequestChanges] = None
+    count: Optional[int] = None  # Total number of changes
+    error: Optional[str] = None
+    raw_output: Optional[str] = None
