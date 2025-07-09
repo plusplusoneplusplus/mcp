@@ -309,11 +309,6 @@ def format_result_as_text(result: dict) -> str:
         return result.get("output", "")
     elif "html" in result:
         return f"HTML content (length: {result.get('html_length', 0)}):\n{result.get('html', '')}"
-    elif "parameters" in result:
-        params = result.get("parameters", {})
-        return "Environment parameters:\n" + "\n".join(
-            f"{k}: {v}" for k, v in params.items()
-        )
     else:
         # Generic formatting
         return "\n".join(f"{k}: {v}" for k, v in result.items() if k != "success")
