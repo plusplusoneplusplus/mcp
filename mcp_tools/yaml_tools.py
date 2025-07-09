@@ -20,7 +20,7 @@ from utils.concurrency import get_concurrency_manager, parse_concurrency_config
 
 # Configuration
 DEFAULT_WAIT_FOR_QUERY = True  # Default wait for task
-DEFAULT_STATUS_QUERY_TIMEOUT = 120  # Default timeout in seconds for status queries
+DEFAULT_STATUS_QUERY_TIMEOUT = 300  # Default timeout in seconds for status queries (5 minutes)
 
 logger = logging.getLogger(__name__)
 
