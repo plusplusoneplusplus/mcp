@@ -388,8 +388,8 @@ class KnowledgeCollectionManagerTool(ToolInterface):
                     )
 
                     # Use a zero-vector to get all documents (hack for ChromaDB)
-                    # Fix: Use proper embedding dimension and format as List[List[float]]
-                    dummy_vec = [[0.0] * 384]
+                    # Fix: Use proper embedding dimension and format
+                    dummy_vec = [0.0] * 384
                     results = collection_store.collection.query(
                         query_embeddings=dummy_vec, n_results=1000
                     )

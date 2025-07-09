@@ -147,14 +147,16 @@ class MarkdownSegmenter:
             # Still extract tables to handle them properly
             tables = self.markdown_table_segmenter.extract_tables(markdown_content)
 
-            # Create segments for tables
+            # Create segments for tables (process them to handle splitting)
             segments = []
             table_positions = []
 
             for table in tables:
                 table["type"] = "table"
                 table_positions.append((table["position"], table["position"] + len(table["content"])))
-                segments.append(table)
+                # Process tables - potentially splitting large tables even in small files
+                table_chunks = self._process_table(table)
+                segments.extend(table_chunks)
 
             # Sort table positions by start position
             table_positions.sort(key=lambda x: x[0])
@@ -181,12 +183,25 @@ class MarkdownSegmenter:
 
             # Create single text segment if there's content
             if combined_text:
+                # Extract headings from the combined text to get proper heading assignment
+                combined_headings = self._extract_headings(combined_text)
+                # Find a good representative heading - prefer level 2 headings over level 1
+                representative_heading = ""
+                if combined_headings:
+                    # Look for level 2 headings first (## Introduction, ## Second Section, etc.)
+                    level_2_headings = [h for h in combined_headings if h[2] == 2]
+                    if level_2_headings:
+                        representative_heading = level_2_headings[0][1]  # Use first level 2 heading
+                    else:
+                        # Fall back to first heading of any level
+                        representative_heading = combined_headings[0][1]
+
                 text_segment = {
                     "id": f"text_whole_{uuid.uuid4().hex[:8]}",
                     "content": combined_text,
                     "type": "text",
                     "position": 0,
-                    "heading": self._get_nearest_heading(global_headings, 0) if global_headings else "",
+                    "heading": representative_heading,
                 }
                 segments.append(text_segment)
 
