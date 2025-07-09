@@ -25,6 +25,7 @@ class MarkdownSegmenter:
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         table_max_rows: int = 500,
+        line_count_threshold: int = 500,
         embedding_service: Optional[EmbeddingInterface] = None,
     ):
         """
@@ -36,6 +37,7 @@ class MarkdownSegmenter:
             chunk_size: Maximum size of text chunks in characters
             chunk_overlap: Overlap between text chunks in characters
             table_max_rows: Maximum number of rows in a table before splitting
+            line_count_threshold: Minimum number of lines before chunking is applied (files with fewer lines are kept as single segments)
             embedding_service: Optional embedding service. If not provided, creates SentenceTransformerEmbedding with model_name
         """
         from utils.vector_store.markdown_table_segmenter import MarkdownTableSegmenter
@@ -62,6 +64,7 @@ class MarkdownSegmenter:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.table_max_rows = table_max_rows
+        self.line_count_threshold = line_count_threshold
 
         # Create a table segmenter for handling tables, reusing the same embedding service
         self.markdown_table_segmenter = MarkdownTableSegmenter(
@@ -135,6 +138,62 @@ class MarkdownSegmenter:
         Returns:
             List of dictionaries containing segment information
         """
+        # Check line count - skip chunking for files with less than the configured threshold
+        line_count = len(markdown_content.splitlines())
+        if line_count < self.line_count_threshold:
+            # Return entire content as a single segment without chunking
+            global_headings = self._extract_headings(markdown_content)
+
+            # Still extract tables to handle them properly
+            tables = self.markdown_table_segmenter.extract_tables(markdown_content)
+
+            # Create segments for tables
+            segments = []
+            table_positions = []
+
+            for table in tables:
+                table["type"] = "table"
+                table_positions.append((table["position"], table["position"] + len(table["content"])))
+                segments.append(table)
+
+            # Sort table positions by start position
+            table_positions.sort(key=lambda x: x[0])
+
+            # Create a single text segment excluding tables
+            if table_positions:
+                # Extract text excluding table areas
+                text_parts = []
+                last_end = 0
+
+                for start, end in table_positions:
+                    if start > last_end:
+                        text_parts.append(markdown_content[last_end:start])
+                    last_end = end
+
+                # Add text after the last table
+                if last_end < len(markdown_content):
+                    text_parts.append(markdown_content[last_end:])
+
+                combined_text = "".join(text_parts).strip()
+            else:
+                # No tables, use entire content
+                combined_text = markdown_content.strip()
+
+            # Create single text segment if there's content
+            if combined_text:
+                text_segment = {
+                    "id": f"text_whole_{uuid.uuid4().hex[:8]}",
+                    "content": combined_text,
+                    "type": "text",
+                    "position": 0,
+                    "heading": self._get_nearest_heading(global_headings, 0) if global_headings else "",
+                }
+                segments.append(text_segment)
+
+            # Sort all segments by position
+            segments.sort(key=lambda x: x["position"])
+            return segments
+
         # Extract all headings from the full markdown
         global_headings = self._extract_headings(markdown_content)
 
