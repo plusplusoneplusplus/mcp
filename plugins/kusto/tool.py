@@ -653,7 +653,7 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
             self.logger.error(f"Error formatting results: {str(e)}")
             return {
                 "success": False,
-                "result": f"Error formatting results: {str(e)}",
+                "error": f"Error formatting results: {str(e)}",
                 "error_type": type(e).__name__,
                 "traceback": traceback.format_exc(),
             }
@@ -701,7 +701,7 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
                 self.logger.error(error_msg)
                 return {
                     "success": False,
-                    "result": error_msg,
+                    "error": error_msg,
                     "error_type": "ValueError",
                     "traceback": traceback.format_exc(),
                 }
@@ -714,7 +714,7 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
             self.logger.error(error_msg)
             return {
                 "success": False,
-                "result": error_msg,
+                "error": error_msg,
                 "error_type": type(e).__name__,
                 "traceback": traceback.format_exc(),
             }
@@ -742,7 +742,7 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
             self.logger.error(error_msg)
             return {
                 "success": False,
-                "result": error_msg,
+                "error": error_msg,
                 "error_type": "KustoServiceError",
                 "error_code": getattr(e, "error_code", None),
                 "error_category": getattr(e, "error_category", None),
@@ -753,7 +753,7 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
             self.logger.error(error_msg)
             return {
                 "success": False,
-                "result": error_msg,
+                "error": error_msg,
                 "error_type": type(e).__name__,
                 "traceback": traceback.format_exc(),
             }
@@ -777,7 +777,7 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
             if not query:
                 return {
                     "success": False,
-                    "result": "Query parameter is required",
+                    "error": "Query parameter is required",
                     "error_type": "ValueError",
                 }
 
@@ -794,6 +794,6 @@ Available Operations: {', '.join(storage_result['available_operations'])}""",
         else:
             return {
                 "success": False,
-                "result": f"Unknown operation: {operation}",
+                "error": f"Unknown operation: {operation}",
                 "error_type": "InvalidOperation",
             }

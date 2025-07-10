@@ -102,8 +102,8 @@ async def test_format_results_error_handling(kusto_client):
 
     # Check that error was handled
     assert formatted["success"] is False
-    assert "Error formatting results" in formatted["result"]
-    assert "Test formatting error" in formatted["result"]
+    assert "Error formatting results" in formatted["error"]
+    assert "Test formatting error" in formatted["error"]
 
 
 @pytest.mark.asyncio
@@ -190,8 +190,8 @@ async def test_execute_query_client_error(kusto_client):
 
         # Verify error is handled and formatted properly
         assert result["success"] is False
-        assert "Failed to create Kusto client" in result["result"]
-        assert "Test client error" in result["result"]
+        assert "Failed to create Kusto client" in result["error"]
+        assert "Test client error" in result["error"]
 
 
 @pytest.mark.asyncio
@@ -214,8 +214,8 @@ async def test_execute_query_execution_error(kusto_client):
 
             # Verify error is handled and formatted properly
             assert result["success"] is False
-            assert "Error during query execution" in result["result"]
-            assert "Test execution error" in result["result"]
+            assert "Error during query execution" in result["error"]
+            assert "Test execution error" in result["error"]
 
 
 @pytest.mark.asyncio
@@ -262,7 +262,7 @@ async def test_execute_tool_invalid_operation(kusto_client):
 
     # Verify error is handled properly
     assert result["success"] is False
-    assert "Unknown operation" in result["result"]
+    assert "Unknown operation" in result["error"]
 
 
 @pytest.mark.asyncio
