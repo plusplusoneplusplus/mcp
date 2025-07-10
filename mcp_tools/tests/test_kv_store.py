@@ -70,6 +70,48 @@ class TestKVStore:
         assert "expired" not in keys
         assert len(keys) == 2
 
+    def test_list_keys(self):
+        """Test list_keys operation with prefix filtering."""
+        # Test empty store
+        assert self.kv.list_keys() == []
+        assert self.kv.list_keys("prefix") == []
+
+        # Add hierarchical keys
+        self.kv.set("a/b/c", "value1")
+        self.kv.set("a/b/d", "value2")
+        self.kv.set("a/x/y", "value3")
+        self.kv.set("b/c/d", "value4")
+        self.kv.set("simple", "value5")
+
+        # Test listing with no prefix (should return all keys)
+        all_keys = self.kv.list_keys()
+        assert sorted(all_keys) == ["a/b/c", "a/b/d", "a/x/y", "b/c/d", "simple"]
+
+        # Test listing with prefix "a/b" (should return "c" and "d")
+        ab_keys = self.kv.list_keys("a/b")
+        assert sorted(ab_keys) == ["c", "d"]
+
+        # Test listing with prefix "a" (should return first segments: "b", "x")
+        a_keys = self.kv.list_keys("a")
+        assert sorted(a_keys) == ["b", "x"]
+
+        # Test listing with prefix "b" (should return "c")
+        b_keys = self.kv.list_keys("b")
+        assert sorted(b_keys) == ["c"]
+
+        # Test listing with non-existent prefix
+        empty_keys = self.kv.list_keys("nonexistent")
+        assert empty_keys == []
+
+        # Test expired keys are filtered out
+        self.kv.set("expired/key", "value", ttl_seconds=1)
+        expired_keys = self.kv.list_keys("expired")
+        assert "key" in expired_keys
+
+        time.sleep(1.1)
+        expired_keys = self.kv.list_keys("expired")
+        assert expired_keys == []
+
     def test_clear(self):
         """Test clear operation."""
         self.kv.set("key1", "value1")
@@ -276,6 +318,50 @@ class TestKVStoreTool:
         assert "key1" in result["keys"]
         assert "key2" in result["keys"]
         assert result["count"] == 2
+
+    def test_list_operation(self):
+        """Test list operation with prefix filtering."""
+        # Test empty store
+        result = self.tool.execute("list")
+        assert result["success"] is True
+        assert result["keys"] == []
+        assert result["count"] == 0
+        assert result["prefix"] == ""
+
+        # Add hierarchical keys
+        self.tool.execute("set", "a/b/c", "value1")
+        self.tool.execute("set", "a/b/d", "value2")
+        self.tool.execute("set", "a/x/y", "value3")
+        self.tool.execute("set", "b/c/d", "value4")
+        self.tool.execute("set", "simple", "value5")
+
+        # Test listing with no prefix
+        result = self.tool.execute("list")
+        assert result["success"] is True
+        assert sorted(result["keys"]) == ["a/b/c", "a/b/d", "a/x/y", "b/c/d", "simple"]
+        assert result["count"] == 5
+        assert result["prefix"] == ""
+
+        # Test listing with prefix "a/b"
+        result = self.tool.execute("list", prefix="a/b")
+        assert result["success"] is True
+        assert sorted(result["keys"]) == ["c", "d"]
+        assert result["count"] == 2
+        assert result["prefix"] == "a/b"
+
+        # Test listing with prefix "a"
+        result = self.tool.execute("list", prefix="a")
+        assert result["success"] is True
+        assert sorted(result["keys"]) == ["b", "x"]
+        assert result["count"] == 2
+        assert result["prefix"] == "a"
+
+        # Test listing with non-existent prefix
+        result = self.tool.execute("list", prefix="nonexistent")
+        assert result["success"] is True
+        assert result["keys"] == []
+        assert result["count"] == 0
+        assert result["prefix"] == "nonexistent"
 
     def test_clear_operation(self):
         """Test clear operation."""

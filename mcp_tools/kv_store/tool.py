@@ -82,6 +82,44 @@ class KVStore:
 
             return valid_keys
 
+    def list_keys(self, prefix: str = "") -> list[str]:
+        """List keys with optional prefix filtering."""
+        with self._lock:
+            current_time = time.time()
+            valid_keys = []
+            expired_keys = []
+
+            for key, entry in self._store.items():
+                if entry['expiry'] is not None and current_time > entry['expiry']:
+                    expired_keys.append(key)
+                else:
+                    if not prefix:
+                        # If no prefix, return full key
+                        valid_keys.append(key)
+                    elif key.startswith(prefix):
+                        # Return the part after the prefix
+                        remaining = key[len(prefix):]
+                        if remaining.startswith('/'):
+                            # For hierarchical keys like a/b/c, when prefix is a/b, return c
+                            remaining = remaining[1:]  # Remove leading slash
+                            # Only return the first segment after the prefix
+                            next_segment = remaining.split('/')[0]
+                            if next_segment not in valid_keys:
+                                valid_keys.append(next_segment)
+                        elif remaining == "":
+                            # Exact match with prefix
+                            valid_keys.append("")
+                        elif prefix and not remaining.startswith('/'):
+                            # Handle case where prefix is "a" and key is "a/b/c"
+                            # This shouldn't happen if prefix logic is correct
+                            pass
+
+            # Clean up expired keys
+            for key in expired_keys:
+                del self._store[key]
+
+            return sorted(valid_keys)
+
     def clear(self) -> int:
         """Clear all keys, returns number of keys cleared."""
         with self._lock:
@@ -124,7 +162,7 @@ class KVStoreTool(ToolInterface):
     def description(self) -> str:
         return (
             "In-memory key-value store with TTL support. "
-            "Supports operations: set, get, delete, exists, keys, clear, ttl. "
+            "Supports operations: set, get, delete, exists, keys, list, clear, ttl. "
             "Default TTL is 1 day (86400 seconds)."
         )
 
@@ -136,11 +174,16 @@ class KVStoreTool(ToolInterface):
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform",
-                    "enum": ["set", "get", "delete", "exists", "keys", "clear", "ttl"]
+                    "enum": ["set", "get", "delete", "exists", "keys", "list", "clear", "ttl"]
                 },
                 "key": {
                     "type": "string",
-                    "description": "The key for the operation (required for all operations except 'keys' and 'clear')"
+                    "description": "The key for the operation (required for all operations except 'keys', 'list', and 'clear')"
+                },
+                "prefix": {
+                    "type": "string",
+                    "description": "The prefix to filter keys by (optional, only used for 'list' operation)",
+                    "default": ""
                 },
                 "value": {
                     "description": "The value to store (required for 'set' operation)",
@@ -167,6 +210,7 @@ class KVStoreTool(ToolInterface):
         key = arguments.get("key")
         value = arguments.get("value")
         ttl = arguments.get("ttl", 86400)
+        prefix = arguments.get("prefix", "")
         try:
             if operation == "set":
                 if key is None:
@@ -212,6 +256,10 @@ class KVStoreTool(ToolInterface):
                 keys = _kv_store.keys()
                 return {"success": True, "keys": keys, "count": len(keys)}
 
+            elif operation == "list":
+                keys = _kv_store.list_keys(prefix)
+                return {"success": True, "keys": keys, "count": len(keys), "prefix": prefix}
+
             elif operation == "clear":
                 count = _kv_store.clear()
                 return {"success": True, "message": f"Cleared {count} keys"}
@@ -234,13 +282,14 @@ class KVStoreTool(ToolInterface):
         except Exception as e:
             return {"success": False, "error": f"Operation failed: {str(e)}"}
 
-    def execute(self, operation: str, key: Optional[str] = None, value: Any = None, ttl: int = 86400) -> Dict[str, Any]:
+    def execute(self, operation: str, key: Optional[str] = None, value: Any = None, ttl: int = 86400, prefix: str = "") -> Dict[str, Any]:
         """Synchronous wrapper for execute_tool for backwards compatibility and testing."""
         import asyncio
         arguments = {
             "operation": operation,
             "key": key,
             "value": value,
-            "ttl": ttl
+            "ttl": ttl,
+            "prefix": prefix
         }
         return asyncio.run(self.execute_tool(arguments))
