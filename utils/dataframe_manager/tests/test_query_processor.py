@@ -443,6 +443,150 @@ class TestDataFrameQueryProcessor:
             assert result.execution_time_ms >= 0
             assert isinstance(result.execution_time_ms, float)
 
+    @pytest.mark.asyncio
+    async def test_query_operation_python_expression_basic(self, processor, sample_dataframe):
+        """Test query operation with Python expression that falls back from pandas query."""
+        # This expression should fail with pandas query and succeed with eval
+        expr = "df[df['age'] > 30]"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert isinstance(result, DataFrameQueryResult)
+        assert result.operation == "query"
+        assert result.parameters == {"expr": expr}
+        assert result.metadata["query_expression"] == expr
+        assert result.metadata["query_method"] == "python_eval"
+        assert result.metadata["original_shape"] == (100, 6)
+        assert result.metadata["rows_filtered"] > 0
+        assert result.metadata["filter_ratio"] < 1.0
+
+        # All results should have age > 30
+        if len(result.data) > 0:
+            assert (result.data["age"] > 30).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_python_expression_with_column_selection(self, processor, sample_dataframe):
+        """Test query operation with Python expression that includes column selection."""
+        expr = "df[df['age'] > 30][['name', 'age', 'category']]"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        assert result.metadata["query_method"] == "python_eval"
+        assert result.data.shape[1] == 3  # Should have only 3 columns
+        assert list(result.data.columns) == ['name', 'age', 'category']
+
+        # All results should have age > 30
+        if len(result.data) > 0:
+            assert (result.data["age"] > 30).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_python_expression_with_head(self, processor, sample_dataframe):
+        """Test query operation with Python expression that includes head()."""
+        expr = "df[df['age'] > 30].head(5)"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        assert result.metadata["query_method"] == "python_eval"
+        assert len(result.data) <= 5  # Should have at most 5 rows
+
+        # All results should have age > 30
+        if len(result.data) > 0:
+            assert (result.data["age"] > 30).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_python_expression_string_length(self, processor, sample_dataframe):
+        """Test query operation with Python expression using string length."""
+        expr = "df[df['name'].str.len() > 6]"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        assert result.metadata["query_method"] == "python_eval"
+
+        # All results should have name length > 6
+        if len(result.data) > 0:
+            assert (result.data["name"].str.len() > 6).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_python_expression_complex_chaining(self, processor, sample_dataframe):
+        """Test query operation with complex Python expression chaining."""
+        expr = "df[df['category'] == 'A'][['name', 'age']].sort_values('age').head(3)"
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        assert result.metadata["query_method"] == "python_eval"
+        assert result.data.shape[1] == 2  # Should have only 2 columns
+        assert list(result.data.columns) == ['name', 'age']
+        assert len(result.data) <= 3  # Should have at most 3 rows
+
+        # All results should have category == 'A' (but category column is not in result)
+        # We can't check this directly since category column was filtered out
+
+    @pytest.mark.asyncio
+    async def test_query_operation_pandas_query_method_tracking(self, processor, sample_dataframe):
+        """Test that pandas query method is correctly tracked in metadata."""
+        expr = "age > 30"  # This should work with pandas query
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.metadata["query_method"] == "pandas_query"
+        assert result.parameters == {"expr": expr}
+
+        # All results should have age > 30
+        if len(result.data) > 0:
+            assert (result.data["age"] > 30).all()
+
+    @pytest.mark.asyncio
+    async def test_query_operation_fallback_behavior(self, processor, sample_dataframe):
+        """Test that the fallback from pandas query to Python eval works correctly."""
+        # Test cases that should use pandas query
+        pandas_expressions = [
+            "age > 30",
+            "category == 'A'",
+            "name.str.contains('user_1')",
+            "age.between(25, 35)"
+        ]
+
+        for expr in pandas_expressions:
+            result = await processor.query(sample_dataframe, expr)
+            assert result.metadata["query_method"] == "pandas_query"
+
+        # Test cases that should fallback to Python eval
+        python_expressions = [
+            "df[df['age'] > 30]",
+            "df.head(10)",
+            "df[df['category'] == 'A'][['name', 'age']]",
+            "df.sort_values('age').head(5)"
+        ]
+
+        for expr in python_expressions:
+            result = await processor.query(sample_dataframe, expr)
+            assert result.metadata["query_method"] == "python_eval"
+
+    @pytest.mark.asyncio
+    async def test_query_operation_python_expression_error_handling(self, processor, sample_dataframe):
+        """Test error handling for invalid Python expressions."""
+        # This should fail both pandas query and Python eval
+        invalid_expr = "df[df['nonexistent_column'] > 30]"
+
+        with pytest.raises(Exception):
+            await processor.query(sample_dataframe, invalid_expr)
+
+        # Test syntax error
+        syntax_error_expr = "df[df['age'] > 30"  # Missing closing bracket
+
+        with pytest.raises(Exception):
+            await processor.query(sample_dataframe, syntax_error_expr)
+
+    @pytest.mark.asyncio
+    async def test_query_operation_python_expression_empty_result(self, processor, sample_dataframe):
+        """Test Python expression that returns empty result."""
+        expr = "df[df['age'] > 1000]"  # Should return no results
+        result = await processor.query(sample_dataframe, expr)
+
+        assert result.parameters == {"expr": expr}
+        assert result.metadata["query_method"] == "python_eval"
+        assert result.data.empty
+        assert result.metadata["rows_filtered"] == len(sample_dataframe)
+        assert result.metadata["filter_ratio"] == 0.0
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
