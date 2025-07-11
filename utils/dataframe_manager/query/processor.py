@@ -172,28 +172,37 @@ class DataFrameQueryProcessor(DataFrameQueryInterface):
         df: pd.DataFrame,
         expr: str,
     ) -> DataFrameQueryResult:
-        """Query DataFrame using pandas query syntax."""
+        """Query DataFrame using pandas query syntax or Python expressions."""
         start_time = time.time()
         try:
+            # Try pandas query syntax first
             result_df = df.query(expr)
-            execution_time = (time.time() - start_time) * 1000
+            query_method = "pandas_query"
+        except Exception:
+            # Fall back to Python expression evaluation
+            try:
+                result_df = eval(expr)
+                query_method = "python_eval"
+            except Exception as e:
+                self._logger.error(f"Error in query operation: {e}")
+                raise
 
-            return DataFrameQueryResult(
-                data=result_df,
-                operation="query",
-                parameters={"expr": expr},
-                metadata={
-                    "original_shape": df.shape,
-                    "result_shape": result_df.shape,
-                    "rows_filtered": len(df) - len(result_df),
-                    "filter_ratio": len(result_df) / len(df) if len(df) > 0 else 0,
-                    "query_expression": expr,
-                },
-                execution_time_ms=execution_time,
-            )
-        except Exception as e:
-            self._logger.error(f"Error in query operation: {e}")
-            raise
+        execution_time = (time.time() - start_time) * 1000
+
+        return DataFrameQueryResult(
+            data=result_df,
+            operation="query",
+            parameters={"expr": expr},
+            metadata={
+                "original_shape": df.shape,
+                "result_shape": result_df.shape,
+                "rows_filtered": len(df) - len(result_df),
+                "filter_ratio": len(result_df) / len(df) if len(df) > 0 else 0,
+                "query_expression": expr,
+                "query_method": query_method,
+            },
+            execution_time_ms=execution_time,
+        )
 
     async def filter(
         self,

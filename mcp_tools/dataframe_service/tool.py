@@ -105,7 +105,7 @@ class DataFrameServiceTool(ToolInterface):
                         # For query operation
                         "expr": {
                             "type": "string",
-                            "description": "Query expression using pandas query syntax (e.g., 'age > 30 and status == \"active\"')"
+                            "description": "Query expression using pandas query syntax (e.g., 'age > 30 and status == \"active\"') or Python expressions (e.g., 'df[df[\"Ex\"].str.len()>0][[\"TimeStamp\",\"Msg\",\"Ex\"]].head(10)')"
                         },
                         # For describe operation
                         "include": {
