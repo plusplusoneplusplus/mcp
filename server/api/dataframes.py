@@ -500,20 +500,47 @@ async def api_delete_dataframe(request: Request) -> JSONResponse:
     try:
         df_id = request.path_params["df_id"]
 
+        # Check for confirmation parameter
+        confirm = request.query_params.get("confirm", "false").lower() == "true"
+
         # Get DataFrame manager
         manager = get_dataframe_manager()
         await manager.start()
+
+        # Get metadata before deletion for response
+        metadata = await manager.storage.get_metadata(df_id)
+        if not metadata:
+            return create_error_response(
+                APIError("DATAFRAME_NOT_FOUND", f"DataFrame with ID '{df_id}' not found"),
+                status_code=404
+            )
+
+        # If confirmation is required but not provided, return confirmation request
+        if not confirm:
+            return create_success_response({
+                "confirmation_required": True,
+                "df_id": df_id,
+                "metadata": format_metadata_for_api(metadata),
+                "message": f"Confirm deletion of DataFrame '{df_id}' with shape {metadata.shape}",
+                "confirm_url": f"/api/dataframes/{df_id}?confirm=true"
+            })
 
         # Delete DataFrame
         deleted = await manager.delete_dataframe(df_id)
 
         if not deleted:
             return create_error_response(
-                APIError("DATAFRAME_NOT_FOUND", f"DataFrame with ID '{df_id}' not found"),
-                status_code=404
+                APIError("DELETION_FAILED", f"Failed to delete DataFrame '{df_id}'"),
+                status_code=500
             )
 
-        return create_success_response({"deleted": True, "df_id": df_id})
+        return create_success_response({
+            "deleted": True,
+            "df_id": df_id,
+            "freed_memory_bytes": metadata.memory_usage,
+            "shape": metadata.shape,
+            "message": f"Successfully deleted DataFrame '{df_id}'"
+        })
 
     except Exception as e:
         logger.error(f"Error deleting DataFrame: {e}")
@@ -526,16 +553,86 @@ async def api_delete_dataframe(request: Request) -> JSONResponse:
 async def api_cleanup_expired_dataframes(request: Request) -> JSONResponse:
     """POST /api/dataframes/cleanup - Clean up expired DataFrames."""
     try:
+        # Parse request body for options
+        body = {}
+        try:
+            if request.headers.get("content-type", "").startswith("application/json"):
+                body = await request.json()
+        except Exception:
+            # If no body or invalid JSON, use defaults
+            pass
+
+        # Get options
+        dry_run = body.get("dry_run", False)
+        confirm = body.get("confirm", False)
+
         # Get DataFrame manager
         manager = get_dataframe_manager()
         await manager.start()
 
-        # Cleanup expired DataFrames
+        # Get current storage stats before cleanup
+        stats_before = await manager.get_storage_stats()
+
+        # Get list of expired DataFrames for reporting
+        all_dataframes = await manager.list_stored_dataframes()
+        expired_dataframes = [df for df in all_dataframes if df.is_expired]
+
+        # Calculate memory that would be freed
+        total_memory_to_free = sum(df.memory_usage for df in expired_dataframes)
+
+        # If dry run, just return what would be cleaned up
+        if dry_run:
+            return create_success_response({
+                "dry_run": True,
+                "expired_count": len(expired_dataframes),
+                "total_memory_to_free_bytes": total_memory_to_free,
+                "total_memory_to_free_mb": round(total_memory_to_free / (1024 * 1024), 2),
+                "expired_dataframes": [
+                    {
+                        "df_id": df.df_id,
+                        "shape": df.shape,
+                        "memory_usage": df.memory_usage,
+                        "expired_since": (datetime.now() - df.expires_at).total_seconds() if df.expires_at else 0
+                    }
+                    for df in expired_dataframes
+                ],
+                "message": f"Would clean up {len(expired_dataframes)} expired DataFrames, freeing {round(total_memory_to_free / (1024 * 1024), 2)} MB"
+            })
+
+        # If confirmation required but not provided
+        if len(expired_dataframes) > 0 and not confirm:
+            return create_success_response({
+                "confirmation_required": True,
+                "expired_count": len(expired_dataframes),
+                "total_memory_to_free_bytes": total_memory_to_free,
+                "total_memory_to_free_mb": round(total_memory_to_free / (1024 * 1024), 2),
+                "message": f"Confirm cleanup of {len(expired_dataframes)} expired DataFrames",
+                "confirm_body": {"confirm": True}
+            })
+
+        # Perform actual cleanup
         removed_count = await manager.cleanup_expired()
+
+        # Get storage stats after cleanup
+        stats_after = await manager.get_storage_stats()
+
+        # Calculate freed memory
+        memory_freed = stats_before.get("total_memory_bytes", 0) - stats_after.get("total_memory_bytes", 0)
 
         return create_success_response({
             "cleaned_up": True,
-            "removed_count": removed_count
+            "removed_count": removed_count,
+            "memory_freed_bytes": memory_freed,
+            "memory_freed_mb": round(memory_freed / (1024 * 1024), 2),
+            "stats_before": {
+                "total_dataframes": stats_before.get("total_dataframes", 0),
+                "total_memory_mb": round(stats_before.get("total_memory_bytes", 0) / (1024 * 1024), 2)
+            },
+            "stats_after": {
+                "total_dataframes": stats_after.get("total_dataframes", 0),
+                "total_memory_mb": round(stats_after.get("total_memory_bytes", 0) / (1024 * 1024), 2)
+            },
+            "message": f"Successfully cleaned up {removed_count} expired DataFrames, freed {round(memory_freed / (1024 * 1024), 2)} MB"
         })
 
     except Exception as e:
@@ -550,26 +647,557 @@ async def api_cleanup_expired_dataframes(request: Request) -> JSONResponse:
 
 async def api_upload_dataframe(request: Request) -> JSONResponse:
     """POST /api/dataframes/upload - Upload file and create DataFrame."""
-    # TODO: Implement in task 2.1
-    return create_error_response(
-        APIError("NOT_IMPLEMENTED", "File upload functionality not yet implemented"),
-        status_code=501
-    )
+    try:
+        # Parse multipart form data
+        form = await request.form()
+
+        # Get uploaded file
+        upload_file = form.get("file")
+        if not upload_file or not hasattr(upload_file, 'filename'):
+            return create_error_response(
+                APIError("MISSING_FILE", "No file uploaded or invalid file format")
+            )
+
+        # Get optional parameters
+        ttl_seconds = form.get("ttl_seconds")
+        if ttl_seconds:
+            try:
+                ttl_seconds = int(ttl_seconds)
+            except ValueError:
+                return create_error_response(
+                    APIError("INVALID_TTL", "ttl_seconds must be a valid integer")
+                )
+
+        # Get file format options
+        csv_separator = form.get("csv_separator", ",")
+        csv_encoding = form.get("csv_encoding", "utf-8")
+        excel_sheet = form.get("excel_sheet", 0)
+        if excel_sheet != 0:
+            try:
+                excel_sheet = int(excel_sheet)
+            except ValueError:
+                excel_sheet = str(excel_sheet)  # Sheet name
+
+        # Read file content
+        file_content = await upload_file.read()
+        filename = upload_file.filename
+
+        if not filename:
+            return create_error_response(
+                APIError("INVALID_FILENAME", "Uploaded file must have a filename")
+            )
+
+        # Determine file format from extension
+        file_ext = filename.lower().split('.')[-1] if '.' in filename else ''
+
+        try:
+            # Load DataFrame based on file format
+            if file_ext == 'csv':
+                import io
+                df = pd.read_csv(
+                    io.BytesIO(file_content),
+                    sep=csv_separator,
+                    encoding=csv_encoding
+                )
+            elif file_ext in ['xlsx', 'xls']:
+                import io
+                df = pd.read_excel(
+                    io.BytesIO(file_content),
+                    sheet_name=excel_sheet
+                )
+            elif file_ext == 'json':
+                import io
+                df = pd.read_json(io.BytesIO(file_content))
+            elif file_ext == 'parquet':
+                import io
+                df = pd.read_parquet(io.BytesIO(file_content))
+            else:
+                return create_error_response(
+                    APIError("UNSUPPORTED_FORMAT", f"Unsupported file format: {file_ext}. Supported formats: csv, xlsx, xls, json, parquet")
+                )
+
+            # Validate DataFrame
+            if df.empty:
+                return create_error_response(
+                    APIError("EMPTY_DATAFRAME", "Uploaded file resulted in empty DataFrame")
+                )
+
+            # Get DataFrame manager and store the DataFrame
+            manager = get_dataframe_manager()
+            await manager.start()
+
+            # Create tags with source information
+            tags = {
+                "source": f"upload:{filename}",
+                "original_filename": filename,
+                "file_format": file_ext,
+                "upload_timestamp": datetime.now().isoformat()
+            }
+
+            # Store DataFrame
+            df_id = await manager.store_dataframe(
+                df=df,
+                ttl_seconds=ttl_seconds,
+                tags=tags
+            )
+
+            # Get metadata for response
+            metadata = await manager.storage.get_metadata(df_id)
+
+            return create_success_response({
+                "success": True,
+                "df_id": df_id,
+                "filename": filename,
+                "shape": df.shape,
+                "memory_usage": metadata.memory_usage if metadata else None,
+                "message": f"Successfully uploaded and stored DataFrame from {filename}"
+            }, status_code=201)
+
+        except pd.errors.EmptyDataError:
+            return create_error_response(
+                APIError("EMPTY_FILE", "Uploaded file is empty or contains no data")
+            )
+        except pd.errors.ParserError as e:
+            return create_error_response(
+                APIError("PARSE_ERROR", f"Error parsing file: {str(e)}")
+            )
+        except Exception as e:
+            logger.error(f"Error processing uploaded file {filename}: {e}")
+            return create_error_response(
+                APIError("PROCESSING_ERROR", f"Error processing uploaded file: {str(e)}")
+            )
+
+    except Exception as e:
+        logger.error(f"Error in file upload endpoint: {e}")
+        return create_error_response(
+            APIError("INTERNAL_ERROR", f"Failed to process file upload: {str(e)}"),
+            status_code=500
+        )
 
 
 async def api_load_dataframe_from_url(request: Request) -> JSONResponse:
     """POST /api/dataframes/load-url - Load data from URL."""
-    # TODO: Implement in task 2.1
-    return create_error_response(
-        APIError("NOT_IMPLEMENTED", "URL loading functionality not yet implemented"),
-        status_code=501
-    )
+    try:
+        # Parse request body
+        try:
+            body = await request.json()
+        except Exception:
+            return create_error_response(
+                APIError("INVALID_REQUEST_BODY", "Invalid JSON in request body")
+            )
+
+        # Get required URL parameter
+        url = body.get("url")
+        if not url:
+            return create_error_response(
+                APIError("MISSING_URL", "URL is required")
+            )
+
+        # Validate URL format
+        if not url.startswith(('http://', 'https://')):
+            return create_error_response(
+                APIError("INVALID_URL", "URL must start with http:// or https://")
+            )
+
+        # Get optional parameters
+        ttl_seconds = body.get("ttl_seconds")
+        if ttl_seconds is not None:
+            try:
+                ttl_seconds = int(ttl_seconds)
+            except ValueError:
+                return create_error_response(
+                    APIError("INVALID_TTL", "ttl_seconds must be a valid integer")
+                )
+
+        # Get file format options
+        file_format = body.get("format", "auto")  # auto-detect by default
+        csv_separator = body.get("csv_separator", ",")
+        csv_encoding = body.get("csv_encoding", "utf-8")
+        excel_sheet = body.get("excel_sheet", 0)
+        if excel_sheet != 0:
+            try:
+                excel_sheet = int(excel_sheet)
+            except ValueError:
+                excel_sheet = str(excel_sheet)  # Sheet name
+
+        try:
+            # Import aiohttp for async HTTP requests
+            import aiohttp
+            import asyncio
+
+            # Download data from URL
+            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        return create_error_response(
+                            APIError("URL_ERROR", f"Failed to fetch URL: HTTP {response.status}")
+                        )
+
+                    # Get content type and file extension from URL
+                    content_type = response.headers.get('content-type', '').lower()
+                    url_path = url.split('?')[0]  # Remove query parameters
+                    file_ext = url_path.split('.')[-1].lower() if '.' in url_path else ''
+
+                    # Auto-detect format if not specified
+                    if file_format == "auto":
+                        if 'csv' in content_type or file_ext == 'csv':
+                            file_format = 'csv'
+                        elif 'json' in content_type or file_ext == 'json':
+                            file_format = 'json'
+                        elif file_ext in ['xlsx', 'xls']:
+                            file_format = 'excel'
+                        elif file_ext == 'parquet':
+                            file_format = 'parquet'
+                        else:
+                            # Default to CSV for unknown formats
+                            file_format = 'csv'
+
+                    # Read response content
+                    content = await response.read()
+
+            # Load DataFrame based on format
+            import io
+            try:
+                if file_format == 'csv':
+                    df = pd.read_csv(
+                        io.BytesIO(content),
+                        sep=csv_separator,
+                        encoding=csv_encoding
+                    )
+                elif file_format == 'json':
+                    df = pd.read_json(io.BytesIO(content))
+                elif file_format == 'excel':
+                    df = pd.read_excel(
+                        io.BytesIO(content),
+                        sheet_name=excel_sheet
+                    )
+                elif file_format == 'parquet':
+                    df = pd.read_parquet(io.BytesIO(content))
+                else:
+                    return create_error_response(
+                        APIError("UNSUPPORTED_FORMAT", f"Unsupported format: {file_format}. Supported formats: csv, json, excel, parquet")
+                    )
+
+                # Validate DataFrame
+                if df.empty:
+                    return create_error_response(
+                        APIError("EMPTY_DATAFRAME", "URL data resulted in empty DataFrame")
+                    )
+
+                # Get DataFrame manager and store the DataFrame
+                manager = get_dataframe_manager()
+                await manager.start()
+
+                # Create tags with source information
+                tags = {
+                    "source": f"url:{url}",
+                    "original_url": url,
+                    "file_format": file_format,
+                    "load_timestamp": datetime.now().isoformat(),
+                    "content_type": content_type
+                }
+
+                # Store DataFrame
+                df_id = await manager.store_dataframe(
+                    df=df,
+                    ttl_seconds=ttl_seconds,
+                    tags=tags
+                )
+
+                # Get metadata for response
+                metadata = await manager.storage.get_metadata(df_id)
+
+                return create_success_response({
+                    "success": True,
+                    "df_id": df_id,
+                    "url": url,
+                    "format": file_format,
+                    "shape": df.shape,
+                    "memory_usage": metadata.memory_usage if metadata else None,
+                    "message": f"Successfully loaded DataFrame from URL"
+                }, status_code=201)
+
+            except pd.errors.EmptyDataError:
+                return create_error_response(
+                    APIError("EMPTY_DATA", "URL contains no data or empty file")
+                )
+            except pd.errors.ParserError as e:
+                return create_error_response(
+                    APIError("PARSE_ERROR", f"Error parsing data from URL: {str(e)}")
+                )
+            except Exception as e:
+                logger.error(f"Error processing data from URL {url}: {e}")
+                return create_error_response(
+                    APIError("PROCESSING_ERROR", f"Error processing data from URL: {str(e)}")
+                )
+
+        except aiohttp.ClientError as e:
+            return create_error_response(
+                APIError("NETWORK_ERROR", f"Network error accessing URL: {str(e)}")
+            )
+        except asyncio.TimeoutError:
+            return create_error_response(
+                APIError("TIMEOUT_ERROR", "Timeout while fetching data from URL")
+            )
+        except ImportError:
+            return create_error_response(
+                APIError("DEPENDENCY_ERROR", "aiohttp library not available for URL loading"),
+                status_code=500
+            )
+        except Exception as e:
+            logger.error(f"Error loading data from URL {url}: {e}")
+            return create_error_response(
+                APIError("URL_LOAD_ERROR", f"Failed to load data from URL: {str(e)}")
+            )
+
+    except Exception as e:
+        logger.error(f"Error in URL loading endpoint: {e}")
+        return create_error_response(
+            APIError("INTERNAL_ERROR", f"Failed to process URL loading: {str(e)}"),
+            status_code=500
+        )
+
+
+async def api_batch_delete_dataframes(request: Request) -> JSONResponse:
+    """POST /api/dataframes/batch-delete - Delete multiple DataFrames."""
+    try:
+        # Parse request body
+        try:
+            body = await request.json()
+        except Exception:
+            return create_error_response(
+                APIError("INVALID_REQUEST_BODY", "Invalid JSON in request body")
+            )
+
+        # Get DataFrame IDs to delete
+        df_ids = body.get("df_ids", [])
+        if not df_ids or not isinstance(df_ids, list):
+            return create_error_response(
+                APIError("MISSING_DF_IDS", "df_ids array is required")
+            )
+
+        # Check for confirmation parameter
+        confirm = body.get("confirm", False)
+
+        # Get DataFrame manager
+        manager = get_dataframe_manager()
+        await manager.start()
+
+        # Get metadata for all DataFrames before deletion
+        dataframes_info = []
+        total_memory_to_free = 0
+        not_found_ids = []
+
+        for df_id in df_ids:
+            metadata = await manager.storage.get_metadata(df_id)
+            if metadata:
+                dataframes_info.append({
+                    "df_id": df_id,
+                    "shape": metadata.shape,
+                    "memory_usage": metadata.memory_usage,
+                    "created_at": metadata.created_at.isoformat()
+                })
+                total_memory_to_free += metadata.memory_usage
+            else:
+                not_found_ids.append(df_id)
+
+        # If some DataFrames not found, include in response
+        if not_found_ids:
+            return create_error_response(
+                APIError("DATAFRAMES_NOT_FOUND", f"DataFrames not found: {not_found_ids}"),
+                status_code=404
+            )
+
+        # If confirmation is required but not provided, return confirmation request
+        if not confirm:
+            return create_success_response({
+                "confirmation_required": True,
+                "df_count": len(dataframes_info),
+                "total_memory_to_free_bytes": total_memory_to_free,
+                "total_memory_to_free_mb": round(total_memory_to_free / (1024 * 1024), 2),
+                "dataframes": dataframes_info,
+                "message": f"Confirm deletion of {len(dataframes_info)} DataFrames",
+                "confirm_body": {"df_ids": df_ids, "confirm": True}
+            })
+
+        # Perform batch deletion
+        deleted_count = 0
+        failed_deletions = []
+
+        for df_id in df_ids:
+            try:
+                deleted = await manager.delete_dataframe(df_id)
+                if deleted:
+                    deleted_count += 1
+                else:
+                    failed_deletions.append(df_id)
+            except Exception as e:
+                logger.error(f"Error deleting DataFrame {df_id}: {e}")
+                failed_deletions.append(df_id)
+
+        # Create response
+        response_data = {
+            "batch_deleted": True,
+            "requested_count": len(df_ids),
+            "deleted_count": deleted_count,
+            "failed_count": len(failed_deletions),
+            "freed_memory_bytes": total_memory_to_free,
+            "freed_memory_mb": round(total_memory_to_free / (1024 * 1024), 2),
+            "message": f"Successfully deleted {deleted_count} of {len(df_ids)} DataFrames"
+        }
+
+        if failed_deletions:
+            response_data["failed_deletions"] = failed_deletions
+            response_data["message"] += f", {len(failed_deletions)} failed"
+
+        return create_success_response(response_data)
+
+    except Exception as e:
+        logger.error(f"Error in batch delete endpoint: {e}")
+        return create_error_response(
+            APIError("INTERNAL_ERROR", f"Failed to process batch deletion: {str(e)}"),
+            status_code=500
+        )
 
 
 async def api_export_dataframe(request: Request) -> JSONResponse:
     """POST /api/dataframes/{df_id}/export - Export DataFrame to file."""
-    # TODO: Implement in task 2.3
-    return create_error_response(
-        APIError("NOT_IMPLEMENTED", "Export functionality not yet implemented"),
-        status_code=501
-    )
+    try:
+        df_id = request.path_params["df_id"]
+
+        # Parse request body
+        try:
+            body = await request.json()
+        except Exception:
+            return create_error_response(
+                APIError("INVALID_REQUEST_BODY", "Invalid JSON in request body")
+            )
+
+        # Get export parameters
+        export_format = body.get("format", "csv").lower()
+        filename = body.get("filename")
+
+        # Validate export format
+        supported_formats = ["csv", "json", "excel", "parquet"]
+        if export_format not in supported_formats:
+            return create_error_response(
+                APIError("UNSUPPORTED_FORMAT", f"Unsupported export format: {export_format}. Supported formats: {supported_formats}")
+            )
+
+        # Get optional parameters
+        limit_rows = body.get("limit_rows")
+        if limit_rows is not None:
+            try:
+                limit_rows = int(limit_rows)
+                if limit_rows <= 0:
+                    return create_error_response(
+                        APIError("INVALID_LIMIT", "limit_rows must be a positive integer")
+                    )
+            except ValueError:
+                return create_error_response(
+                    APIError("INVALID_LIMIT", "limit_rows must be a valid integer")
+                )
+
+        # Format-specific options
+        csv_separator = body.get("csv_separator", ",")
+        csv_index = body.get("csv_index", False)
+        json_orient = body.get("json_orient", "records")
+        excel_sheet_name = body.get("excel_sheet_name", "Sheet1")
+
+        # Get DataFrame manager
+        manager = get_dataframe_manager()
+        await manager.start()
+
+        # Get DataFrame
+        df = await manager.get_dataframe(df_id)
+        if df is None:
+            return create_error_response(
+                APIError("DATAFRAME_NOT_FOUND", f"DataFrame with ID '{df_id}' not found or expired"),
+                status_code=404
+            )
+
+        # Apply row limit if specified
+        original_shape = df.shape
+        if limit_rows and len(df) > limit_rows:
+            df = df.head(limit_rows)
+
+        # Generate filename if not provided
+        if not filename:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"dataframe_{df_id}_{timestamp}.{export_format}"
+        elif not filename.endswith(f".{export_format}"):
+            filename = f"{filename}.{export_format}"
+
+        try:
+            # Export DataFrame based on format
+            import io
+            import tempfile
+            import os
+
+            # Create temporary file for export
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{export_format}") as temp_file:
+                temp_path = temp_file.name
+
+                if export_format == "csv":
+                    df.to_csv(temp_path, sep=csv_separator, index=csv_index)
+                elif export_format == "json":
+                    df.to_json(temp_path, orient=json_orient, indent=2)
+                elif export_format == "excel":
+                    df.to_excel(temp_path, sheet_name=excel_sheet_name, index=False)
+                elif export_format == "parquet":
+                    df.to_parquet(temp_path, index=False)
+
+                # Get file size
+                file_size = os.path.getsize(temp_path)
+
+                # Read file content for response
+                with open(temp_path, 'rb') as f:
+                    file_content = f.read()
+
+                # Clean up temporary file
+                os.unlink(temp_path)
+
+            # Prepare response with file content
+            import base64
+            file_content_b64 = base64.b64encode(file_content).decode('utf-8')
+
+            # Determine MIME type
+            mime_types = {
+                "csv": "text/csv",
+                "json": "application/json",
+                "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "parquet": "application/octet-stream"
+            }
+
+            return create_success_response({
+                "exported": True,
+                "df_id": df_id,
+                "filename": filename,
+                "format": export_format,
+                "file_size_bytes": file_size,
+                "file_size_mb": round(file_size / (1024 * 1024), 2),
+                "original_shape": original_shape,
+                "exported_shape": df.shape,
+                "mime_type": mime_types[export_format],
+                "file_content": file_content_b64,
+                "download_info": {
+                    "filename": filename,
+                    "content_type": mime_types[export_format],
+                    "size": file_size
+                },
+                "message": f"Successfully exported DataFrame to {export_format.upper()} format"
+            })
+
+        except Exception as e:
+            logger.error(f"Error exporting DataFrame {df_id} to {export_format}: {e}")
+            return create_error_response(
+                APIError("EXPORT_ERROR", f"Failed to export DataFrame: {str(e)}")
+            )
+
+    except Exception as e:
+        logger.error(f"Error in export endpoint: {e}")
+        return create_error_response(
+            APIError("INTERNAL_ERROR", f"Failed to process export request: {str(e)}"),
+            status_code=500
+        )
