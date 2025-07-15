@@ -23,6 +23,7 @@ from starlette.routing import Route, Mount
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
 from starlette.templating import Jinja2Templates
+from starlette.staticfiles import StaticFiles
 from server.api import api_routes
 
 import uvicorn
@@ -379,6 +380,17 @@ async def visualizations_page(request: Request):
         "task_visualization.html", {"request": request, "current_page": "visualizations"}
     )
 
+async def dataframes_page(request: Request):
+    return templates.TemplateResponse(
+        "dataframes.html", {"request": request, "current_page": "dataframes"}
+    )
+
+async def dataframe_detail_page(request: Request):
+    df_id = request.path_params["df_id"]
+    return templates.TemplateResponse(
+        "dataframe_detail.html", {"request": request, "current_page": "dataframes", "df_id": df_id}
+    )
+
 
 # --- Add routes ---
 routes = [
@@ -388,9 +400,12 @@ routes = [
     Route("/tools", endpoint=tools_page, methods=["GET"]),
     Route("/tool-history", endpoint=tool_history_page, methods=["GET"]),
     Route("/visualizations", endpoint=visualizations_page, methods=["GET"]),
+    Route("/dataframes", endpoint=dataframes_page, methods=["GET"]),
+    Route("/dataframes/{df_id}", endpoint=dataframe_detail_page, methods=["GET"]),
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
+    Mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static"),
 ] + api_routes
 
 # Create Starlette app
