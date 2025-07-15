@@ -36,10 +36,10 @@ class DataFrameServiceTool(ToolInterface):
     @property
     def description(self) -> str:
         return (
-            "Data Frame Service - Load data from files/URLs and query DataFrames. "
-            "Supports loading from local files or URLs, storing with IDs for later queries. "
-            "Operations: load_data, head, tail, sample, query, describe, info. "
-            "Use this tool to load data once and perform multiple operations efficiently."
+            "Data Frame Service - Load data from files/URLs and execute pandas operations. "
+            "Supports loading from local files or URLs, storing with IDs for later operations. "
+            "Operations: load_data, execute. Use execute with any pandas expression like df.head(), df.query('age > 30'), etc. "
+            "Use this tool to load data once and perform multiple pandas operations efficiently."
         )
 
     @property
@@ -50,15 +50,15 @@ class DataFrameServiceTool(ToolInterface):
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform",
-                    "enum": ["load_data", "head", "tail", "sample", "query", "describe", "info"]
+                    "enum": ["load_data", "execute"]
                 },
                 "dataframe_id": {
                     "type": "string",
-                    "description": "The ID of the stored DataFrame to query (not required for load_data)"
+                    "description": "The ID of the stored DataFrame to operate on (not required for load_data)"
                 },
                 "parameters": {
                     "type": "object",
-                    "description": "Parameters for the operation (varies by operation)",
+                    "description": "Parameters for the operation",
                     "properties": {
                         # For load_data operation
                         "source": {
@@ -84,39 +84,10 @@ class DataFrameServiceTool(ToolInterface):
                                 "encoding": {"type": "string", "description": "File encoding"}
                             }
                         },
-                        # For head and tail operations
-                        "n": {
-                            "type": "integer",
-                            "description": "Number of rows to return (for head, tail)",
-                            "minimum": 1,
-                            "default": 5
-                        },
-                        # For sample operation
-                        "frac": {
-                            "type": "number",
-                            "description": "Fraction of rows to sample (for sample)",
-                            "minimum": 0,
-                            "maximum": 1
-                        },
-                        "random_state": {
-                            "type": "integer",
-                            "description": "Random seed for sampling (for sample)"
-                        },
-                        # For query operation
-                        "expr": {
+                        # For execute operation
+                        "pandas_expression": {
                             "type": "string",
-                            "description": "Query expression using pandas query syntax (e.g., 'age > 30 and status == \"active\"') or Python expressions (e.g., 'df[df[\"Ex\"].str.len()>0][[\"TimeStamp\",\"Msg\",\"Ex\"]].head(10)')"
-                        },
-                        # For describe operation
-                        "include": {
-                            "anyOf": [
-                                {"type": "string"},
-                                {
-                                    "type": "array",
-                                    "items": {"type": "string"}
-                                }
-                            ],
-                            "description": "Data types to include in describe (e.g., 'all', ['number'], etc.)"
+                            "description": "Any pandas expression to execute on the DataFrame. Examples: 'df.head(10)', 'df.query(\"age > 30\")', 'df[df.column > 0].describe()', 'df.groupby(\"category\").sum()'"
                         }
                     }
                 }
@@ -142,91 +113,14 @@ class DataFrameServiceTool(ToolInterface):
             if operation == "load_data":
                 return await self._load_data(parameters)
 
-            # For other operations, dataframe_id is required
-            if not dataframe_id:
+            # Handle execute operation
+            elif operation == "execute":
+                return await self._execute_pandas_expression(dataframe_id, parameters)
+
+            else:
                 return {
                     "success": False,
-                    "error": "dataframe_id is required for non-load operations"
-                }
-
-            # Get DataFrame manager
-            try:
-                # Add project root directory to path to access utils
-                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                if project_root not in sys.path:
-                    sys.path.insert(0, project_root)
-
-                from utils.dataframe_manager import get_dataframe_manager
-                manager = get_dataframe_manager()
-            except ImportError as e:
-                return {
-                    "success": False,
-                    "error": f"DataFrame management framework not available: {e}"
-                }
-
-            # Ensure manager is started
-            await manager.start()
-
-            # Check if DataFrame exists
-            df = await manager.get_dataframe(dataframe_id)
-            if df is None:
-                return {
-                    "success": False,
-                    "error": f"DataFrame with ID '{dataframe_id}' not found or expired"
-                }
-
-            # Execute the requested operation
-            try:
-                result = await manager.query_dataframe(
-                    df_id=dataframe_id,
-                    operation=operation,
-                    parameters=parameters
-                )
-
-                if result is None:
-                    return {
-                        "success": False,
-                        "error": f"Failed to execute {operation} operation on DataFrame {dataframe_id}"
-                    }
-
-                # Format the response
-                response = {
-                    "success": True,
-                    "dataframe_id": dataframe_id,
-                    "operation": result.operation,
-                    "parameters": result.parameters,
-                    "result_shape": result.data.shape,
-                    "execution_time_ms": result.execution_time_ms,
-                    "metadata": result.metadata
-                }
-
-                # Convert result DataFrame to appropriate format
-                if result.data.empty:
-                    response["data"] = "No data returned (empty result)"
-                else:
-                    # For small results, include the actual data
-                    if len(result.data) <= 100:  # Arbitrary limit for direct display
-                        response["data"] = result.data.to_dict('records')
-                        response["columns"] = list(result.data.columns)
-                    else:
-                        # For large results, provide summary and suggest chunking
-                        response["data"] = f"Large result with {len(result.data)} rows and {len(result.data.columns)} columns"
-                        response["columns"] = list(result.data.columns)
-                        response["sample_data"] = result.data.head(5).to_dict('records')
-                        response["note"] = "Use smaller parameters or 'head'/'tail' operations for large results"
-
-                return response
-
-            except ValueError as e:
-                return {
-                    "success": False,
-                    "error": f"Invalid operation parameters: {e}"
-                }
-            except Exception as e:
-                logger.error(f"Error executing {operation} on DataFrame {dataframe_id}: {e}")
-                return {
-                    "success": False,
-                    "error": f"Operation failed: {e}"
+                    "error": f"Unknown operation: {operation}"
                 }
 
         except Exception as e:
@@ -384,3 +278,113 @@ class DataFrameServiceTool(ToolInterface):
 
         except Exception as e:
             raise Exception(f"Failed to load {file_type} file: {e}")
+
+    async def _execute_pandas_expression(self, dataframe_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a pandas expression on a stored DataFrame."""
+        try:
+            if not dataframe_id:
+                return {
+                    "success": False,
+                    "error": "dataframe_id is required for execute operation"
+                }
+
+            pandas_expression = parameters.get("pandas_expression")
+            if not pandas_expression:
+                return {
+                    "success": False,
+                    "error": "pandas_expression parameter is required for execute operation"
+                }
+
+            # Get DataFrame manager
+            try:
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                if project_root not in sys.path:
+                    sys.path.insert(0, project_root)
+
+                from utils.dataframe_manager import get_dataframe_manager
+                manager = get_dataframe_manager()
+            except ImportError as e:
+                return {
+                    "success": False,
+                    "error": f"DataFrame management framework not available: {e}"
+                }
+
+            # Ensure manager is started
+            await manager.start()
+
+            # Get the DataFrame
+            df = await manager.get_dataframe(dataframe_id)
+            if df is None:
+                return {
+                    "success": False,
+                    "error": f"DataFrame with ID '{dataframe_id}' not found or expired"
+                }
+
+            # Execute the pandas expression
+            try:
+                import time
+                start_time = time.time()
+                
+                # Create execution environment with the DataFrame
+                safe_globals = {
+                    'df': df,
+                    'pd': pd
+                }
+                
+                # Execute the expression
+                result = eval(pandas_expression, safe_globals)
+                
+                execution_time_ms = (time.time() - start_time) * 1000
+
+                # Handle different result types
+                if isinstance(result, pd.DataFrame):
+                    result_df = result
+                elif isinstance(result, pd.Series):
+                    result_df = result.to_frame()
+                else:
+                    # For scalar results, create a simple DataFrame
+                    result_df = pd.DataFrame({'result': [result]})
+
+                # Format the response
+                response = {
+                    "success": True,
+                    "dataframe_id": dataframe_id,
+                    "expression": pandas_expression,
+                    "result_shape": result_df.shape,
+                    "execution_time_ms": round(execution_time_ms, 2)
+                }
+
+                # Convert result to appropriate format
+                if result_df.empty:
+                    response["data"] = "No data returned (empty result)"
+                else:
+                    # For small results, include the actual data
+                    if len(result_df) <= 100:
+                        response["data"] = result_df.to_dict('records')
+                        response["columns"] = list(result_df.columns)
+                    else:
+                        # For large results, provide summary
+                        response["data"] = f"Large result with {len(result_df)} rows and {len(result_df.columns)} columns"
+                        response["columns"] = list(result_df.columns)
+                        response["sample_data"] = result_df.head(5).to_dict('records')
+                        response["note"] = "Use .head() or .tail() in your expression to limit large results"
+
+                return response
+
+            except SyntaxError as e:
+                return {
+                    "success": False,
+                    "error": f"Invalid pandas expression syntax: {e}"
+                }
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Error executing pandas expression: {e}"
+                }
+
+        except Exception as e:
+            logger.error(f"Error in execute_pandas_expression: {e}")
+            return {
+                "success": False,
+                "error": f"Execute operation failed: {e}"
+            }
