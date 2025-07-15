@@ -61,18 +61,20 @@
   - Create export progress tracking and file download handling
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [x] 3. Create web interface templates and frontend components
-  - Build main DataFrame dashboard template
-  - Create detailed DataFrame viewer template
-  - Implement interactive controls and modals
+- [x] 3. Create comprehensive web interface templates and frontend components
+  - Build main DataFrame dashboard template with full functionality
+  - Create detailed DataFrame viewer template with all interactive features
+  - Implement complete interactive controls and modals
   - _Requirements: 1.1, 1.2, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [x] 3.1 Create DataFrame dashboard template
-  - Create `server/templates/dataframes.html` extending base template
-  - Implement DataFrame list table with sortable columns
+- [x] 3.1 Create comprehensive DataFrame dashboard template
+  - Replace basic `server/templates/dataframes.html` with full dashboard implementation
+  - Implement DataFrame list table with sortable columns and metadata display
   - Add storage statistics display and visual indicators for expired DataFrames
-  - Create action buttons for refresh, cleanup, and new data loading
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 7.1, 7.2, 7.3_
+  - Create action buttons for refresh, cleanup, new data loading, and batch operations
+  - Add file upload modal with drag-and-drop functionality
+  - Implement URL loading modal with format options
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 5.4, 5.5, 5.6, 7.1, 7.2, 7.3_
 
 - [x] 3.2 Create DataFrame detail viewer template
   - Create `server/templates/dataframe_detail.html` for individual DataFrame view
@@ -88,10 +90,11 @@
   - Create export buttons with format selection
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 6.1, 6.2_
 
-- [x] 4. Add JavaScript functionality for dynamic interactions
-  - Implement AJAX calls for all API endpoints
-  - Create dynamic table updates and pagination
-  - Add file upload with progress indication
+- [ ] 4. Complete JavaScript functionality for dynamic interactions
+  - Integrate JavaScript API client with dashboard template
+  - Implement complete dynamic table updates and pagination
+  - Add comprehensive file upload with progress indication
+  - Connect all frontend components with backend APIs
   - _Requirements: 2.3, 3.6, 4.4, 4.5, 5.4, 5.5_
 
 - [x] 4.1 Implement core JavaScript API client
@@ -101,12 +104,14 @@
   - Create utility functions for data formatting and display
   - _Requirements: 3.6, 5.3, 7.5_
 
-- [x] 4.2 Implement dynamic table functionality
-  - Create JavaScript for DataFrame list table updates
-  - Implement client-side sorting and filtering
-  - Add pagination controls with AJAX loading
-  - Create auto-refresh functionality for real-time updates
-  - _Requirements: 1.4, 2.3, 4.5, 4.6_
+- [ ] 4.2 Implement complete dashboard JavaScript functionality
+  - Create JavaScript for DataFrame list table updates and interactions
+  - Implement client-side sorting, filtering, and pagination
+  - Add auto-refresh functionality for real-time updates
+  - Connect file upload and URL loading modals with API
+  - Implement batch operations and cleanup functionality
+  - Add storage statistics updates and visual indicators
+  - _Requirements: 1.4, 2.3, 4.5, 4.6, 5.4, 5.5, 5.6, 7.1, 7.2, 7.4, 7.5_
 
 - [x] 4.3 Implement pandas expression executor interface
   - Create JavaScript for expression input and execution
@@ -115,20 +120,21 @@
   - Create execution history and common expression shortcuts
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [x] 4.4 Implement file upload and data loading interface
-  - Create drag-and-drop file upload functionality
+- [ ] 4.4 Implement complete file upload and data loading interface
+  - Integrate drag-and-drop file upload functionality with dashboard
   - Implement upload progress tracking and cancellation
-  - Add URL input form with validation
+  - Add URL input form with validation and format detection
   - Create format selection and options configuration
+  - Connect upload/loading functionality with dashboard refresh
   - _Requirements: 5.4, 5.5, 5.6_
 
-- [ ] 5. Integrate DataFrame interface with existing server infrastructure
+- [x] 5. Integrate DataFrame interface with existing server infrastructure
   - Add DataFrame navigation link to existing navbar
   - Create DataFrame page route handler
   - Integrate with existing template and styling system
   - _Requirements: 1.1, 1.2_
 
-- [ ] 5.1 Add DataFrame routes to main server
+- [x] 5.1 Add DataFrame routes to main server
   - Add DataFrame page route to `server/main.py`
   - Create route handler function for DataFrame dashboard
   - Add DataFrame detail page route with ID parameter
@@ -142,27 +148,33 @@
   - Test integration with existing server middleware
   - _Requirements: 1.1, 5.1, 5.2, 5.3_
 
-- [ ] 6. Create comprehensive test suite for DataFrame web interface
+- [ ] 6. Update navigation template to include DataFrame link
+  - Add DataFrame link to the main navigation in `server/templates/base.html`
+  - Ensure proper active state highlighting for DataFrame pages
+  - Test navigation integration across all pages
+  - _Requirements: 1.1, 1.2_
+
+- [ ] 7. Create comprehensive test suite for DataFrame web interface
   - Write unit tests for all API endpoints
   - Create integration tests for complete workflows
   - Add performance tests for large DataFrame handling
   - _Requirements: All requirements for validation_
 
-- [x] 6.1 Implement API endpoint unit tests
+- [x] 7.1 Implement API endpoint unit tests
   - Create `test_dataframes_api.py` with tests for all endpoints
   - Test CRUD operations, error handling, and edge cases
   - Add tests for file upload and data loading functionality
   - Create tests for pandas expression execution and validation
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 3.1, 5.1, 5.4_
 
-- [ ] 6.2 Implement integration tests for complete workflows
+- [ ] 7.2 Implement integration tests for complete workflows
   - Create end-to-end tests for data upload to visualization workflow
   - Test DataFrame lifecycle from creation to deletion
   - Add tests for concurrent access and data consistency
   - Create tests for export functionality and file generation
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 5.6, 6.1, 6.2, 6.3_
 
-- [ ] 6.3 Implement performance and load tests
+- [ ] 7.3 Implement performance and load tests
   - Create tests for large DataFrame handling and memory usage
   - Add tests for pagination performance with large datasets
   - Test concurrent user access and operation execution

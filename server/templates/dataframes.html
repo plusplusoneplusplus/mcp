@@ -2,27 +2,1078 @@
 
 {% block title %}DataFrames - MCP Knowledge Server{% endblock %}
 
+{% block extra_styles %}
+<style>
+    /* Dashboard-specific styles */
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2em;
+        flex-wrap: wrap;
+        gap: 1em;
+    }
+
+    .dashboard-title {
+        margin: 0;
+        color: #333;
+    }
+
+    .dashboard-actions {
+        display: flex;
+        gap: 0.5em;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 0.5em 1em;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5em;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #0077cc;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #005fa3;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #1e7e34;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+    }
+
+    .btn-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+
+    .btn-warning:hover {
+        background: #e0a800;
+    }
+
+    .btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    /* Storage statistics */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1em;
+        margin-bottom: 2em;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 2em;
+        font-weight: bold;
+        color: #0077cc;
+        margin-bottom: 0.25em;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .stat-card.warning .stat-value {
+        color: #ffc107;
+    }
+
+    .stat-card.danger .stat-value {
+        color: #dc3545;
+    }
+
+    /* DataFrame table */
+    .dataframes-table-container {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .table-header {
+        background: #f8f9fa;
+        padding: 1em;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1em;
+    }
+
+    .table-title {
+        margin: 0;
+        font-size: 1.2em;
+        color: #333;
+    }
+
+    .table-controls {
+        display: flex;
+        gap: 0.5em;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        padding: 0.5em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.9em;
+        min-width: 200px;
+    }
+
+    .dataframes-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+
+    .dataframes-table th,
+    .dataframes-table td {
+        padding: 1em;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+    }
+
+    .dataframes-table th {
+        background: #f8f9fa;
+        font-weight: bold;
+        color: #333;
+        cursor: pointer;
+        user-select: none;
+        position: relative;
+    }
+
+    .dataframes-table th:hover {
+        background: #e9ecef;
+    }
+
+    .dataframes-table th.sortable::after {
+        content: '↕';
+        position: absolute;
+        right: 0.5em;
+        opacity: 0.5;
+    }
+
+    .dataframes-table th.sort-asc::after {
+        content: '↑';
+        opacity: 1;
+    }
+
+    .dataframes-table th.sort-desc::after {
+        content: '↓';
+        opacity: 1;
+    }
+
+    .dataframes-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .dataframes-table .actions {
+        display: flex;
+        gap: 0.5em;
+        align-items: center;
+    }
+
+    .dataframes-table .btn {
+        padding: 0.25em 0.5em;
+        font-size: 0.8em;
+    }
+
+    /* Status badges */
+    .status-badge {
+        padding: 0.25em 0.5em;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .status-badge.active {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.expired {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .status-badge.warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    /* Drag and drop upload area */
+    .upload-area {
+        border: 2px dashed #ddd;
+        border-radius: 8px;
+        padding: 2em;
+        text-align: center;
+        background: #fafafa;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 1em;
+    }
+
+    .upload-area:hover,
+    .upload-area.dragover {
+        border-color: #0077cc;
+        background: #f0f8ff;
+    }
+
+    .upload-area.dragover {
+        border-style: solid;
+    }
+
+    .upload-icon {
+        font-size: 3em;
+        color: #ccc;
+        margin-bottom: 0.5em;
+    }
+
+    .upload-text {
+        color: #666;
+        margin-bottom: 1em;
+    }
+
+    .upload-hint {
+        font-size: 0.8em;
+        color: #999;
+    }
+
+    /* Progress indicators */
+    .progress-container {
+        margin: 1em 0;
+    }
+
+    .progress-bar-container {
+        width: 100%;
+        background: #f0f0f0;
+        border-radius: 4px;
+        overflow: hidden;
+        height: 8px;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #0077cc, #28a745);
+        transition: width 0.3s ease;
+        width: 0%;
+    }
+
+    .progress-text {
+        font-size: 0.8em;
+        color: #666;
+        margin-top: 0.25em;
+    }
+
+    /* Modal styles */
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1em;
+        padding-bottom: 1em;
+        border-bottom: 1px solid #eee;
+    }
+
+    .modal-title {
+        margin: 0;
+        color: #333;
+    }
+
+    .modal-body {
+        margin-bottom: 2em;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.5em;
+        padding-top: 1em;
+        border-top: 1px solid #eee;
+    }
+
+    .form-group {
+        margin-bottom: 1em;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5em;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 1em;
+        box-sizing: border-box;
+    }
+
+    .form-group .form-help {
+        font-size: 0.8em;
+        color: #666;
+        margin-top: 0.25em;
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+        width: auto;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 3em;
+        color: #666;
+    }
+
+    .empty-state-icon {
+        font-size: 4em;
+        margin-bottom: 0.5em;
+        opacity: 0.3;
+    }
+
+    .empty-state-title {
+        font-size: 1.2em;
+        margin-bottom: 0.5em;
+        color: #333;
+    }
+
+    .empty-state-text {
+        margin-bottom: 1.5em;
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .dashboard-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .dashboard-actions {
+            justify-content: center;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .table-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .table-controls {
+            justify-content: center;
+        }
+
+        .dataframes-table {
+            font-size: 0.8em;
+        }
+
+        .dataframes-table th,
+        .dataframes-table td {
+            padding: 0.5em;
+        }
+
+        .search-box {
+            min-width: auto;
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card">
-    <h2>DataFrames Dashboard</h2>
-    <p>DataFrame interface is working!</p>
-    <div id="test-api-button">
-        <button onclick="testAPI()">Test API Connection</button>
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <h2 class="dashboard-title">DataFrames Dashboard</h2>
+        <div class="dashboard-actions">
+            <button class="btn btn-primary" onclick="showUploadModal()">
+                📁 Upload File
+            </button>
+            <button class="btn btn-secondary" onclick="showUrlModal()">
+                🌐 Load from URL
+            </button>
+            <button class="btn btn-warning" onclick="cleanupExpired()">
+                🧹 Cleanup Expired
+            </button>
+            <button class="btn btn-success" onclick="refreshDashboard()">
+                🔄 Refresh
+            </button>
+        </div>
     </div>
-    <div id="api-result"></div>
+
+    <!-- Storage Statistics -->
+    <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="total-dataframes">-</div>
+            <div class="stat-label">Total DataFrames</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-memory">-</div>
+            <div class="stat-label">Memory Usage</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="expired-count">-</div>
+            <div class="stat-label">Expired DataFrames</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="active-count">-</div>
+            <div class="stat-label">Active DataFrames</div>
+        </div>
+    </div>
+
+    <!-- DataFrames Table -->
+    <div class="dataframes-table-container">
+        <div class="table-header">
+            <h3 class="table-title">DataFrames</h3>
+            <div class="table-controls">
+                <input type="text" class="search-box" id="search-box" placeholder="Search DataFrames..."
+                    onkeyup="filterDataFrames()">
+                <button class="btn btn-secondary" onclick="toggleBatchMode()">
+                    <span id="batch-mode-text">Select Multiple</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="dataframes-table-content">
+            <!-- Table content will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Status Messages -->
+    <div id="status-message" style="display: none; margin-top: 1em;"></div>
+</div>
+
+<!-- File Upload Modal -->
+<div id="upload-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Upload Data File</h3>
+            <span class="close" onclick="hideModal('upload-modal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">
+                    <strong>Click to select files</strong> or drag and drop here
+                </div>
+                <div class="upload-hint">
+                    Supported formats: CSV, JSON, Excel (.xlsx), Parquet
+                </div>
+            </div>
+            <input type="file" id="file-input" style="display: none" accept=".csv,.json,.xlsx,.parquet" multiple>
+
+            <div class="form-group">
+                <label for="upload-display-name">Display Name (optional)</label>
+                <input type="text" id="upload-display-name" placeholder="Custom name for the DataFrame">
+                <div class="form-help">Leave empty to use filename</div>
+            </div>
+
+            <div class="form-group">
+                <label for="upload-format">Format</label>
+                <select id="upload-format">
+                    <option value="auto">Auto-detect</option>
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                    <option value="excel">Excel</option>
+                    <option value="parquet">Parquet</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="upload-has-header" checked>
+                    <label for="upload-has-header">File has header row</label>
+                </div>
+            </div>
+
+            <div id="upload-progress" class="progress-container" style="display: none;">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="upload-progress-bar"></div>
+                </div>
+                <div class="progress-text" id="upload-progress-text">Preparing upload...</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="hideModal('upload-modal')">Cancel</button>
+            <button class="btn btn-primary" id="upload-btn" onclick="uploadFiles()">Upload</button>
+        </div>
+    </div>
+</div>
+
+<!-- URL Loading Modal -->
+<div id="url-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Load Data from URL</h3>
+            <span class="close" onclick="hideModal('url-modal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="url-input">Data URL</label>
+                <input type="url" id="url-input" placeholder="https://example.com/data.csv" required>
+                <div class="form-help">Enter the URL of a CSV, JSON, Excel, or Parquet file</div>
+            </div>
+
+            <div class="form-group">
+                <label for="url-display-name">Display Name (optional)</label>
+                <input type="text" id="url-display-name" placeholder="Custom name for the DataFrame">
+            </div>
+
+            <div class="form-group">
+                <label for="url-format">Format</label>
+                <select id="url-format">
+                    <option value="auto">Auto-detect</option>
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                    <option value="excel">Excel</option>
+                    <option value="parquet">Parquet</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="url-has-header" checked>
+                    <label for="url-has-header">Data has header row</label>
+                </div>
+            </div>
+
+            <div id="url-progress" class="progress-container" style="display: none;">
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="url-progress-bar"></div>
+                </div>
+                <div class="progress-text" id="url-progress-text">Loading data...</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="hideModal('url-modal')">Cancel</button>
+            <button class="btn btn-primary" id="url-load-btn" onclick="loadFromUrl()">Load Data</button>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Operations Modal -->
+<div id="batch-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Batch Operations</h3>
+            <span class="close" onclick="hideModal('batch-modal')">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Selected DataFrames: <span id="selected-count">0</span></p>
+            <div id="selected-list"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="hideModal('batch-modal')">Cancel</button>
+            <button class="btn btn-danger" onclick="batchDelete()">Delete Selected</button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    async function testAPI() {
+    // Dashboard state
+    let dataframes = [];
+    let filteredDataframes = [];
+    let sortColumn = 'created_at';
+    let sortDirection = 'desc';
+    let batchMode = false;
+    let selectedDataframes = new Set();
+
+    // Initialize dashboard
+    document.addEventListener('DOMContentLoaded', function () {
+        setupEventListeners();
+        refreshDashboard();
+    });
+
+    function setupEventListeners() {
+        // File upload drag and drop
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            fileInput.files = e.dataTransfer.files;
+            updateUploadPreview();
+        });
+
+        fileInput.addEventListener('change', updateUploadPreview);
+
+        // Auto-detect format based on URL
+        document.getElementById('url-input').addEventListener('input', function () {
+            const url = this.value.toLowerCase();
+            const formatSelect = document.getElementById('url-format');
+
+            if (url.includes('.csv')) {
+                formatSelect.value = 'csv';
+            } else if (url.includes('.json')) {
+                formatSelect.value = 'json';
+            } else if (url.includes('.xlsx') || url.includes('.xls')) {
+                formatSelect.value = 'excel';
+            } else if (url.includes('.parquet')) {
+                formatSelect.value = 'parquet';
+            }
+        });
+    }
+
+    async function refreshDashboard() {
         try {
-            const response = await fetch('/api/dataframes');
-            const data = await response.json();
-            document.getElementById('api-result').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            DataFrameUI.showLoading('dataframes-table-content', 'Loading DataFrames...');
+
+            // Load DataFrames and statistics
+            const [dataframesResponse, statsResponse] = await Promise.all([
+                dataframeAPI.getDataFrames(),
+                dataframeAPI.getStorageStats()
+            ]);
+
+            dataframes = dataframesResponse.dataframes || [];
+            updateStatistics(statsResponse.storage_stats || {});
+            updateDataFramesTable();
+
+            DataFrameUI.showToast('Dashboard refreshed successfully', 'success');
         } catch (error) {
-            document.getElementById('api-result').innerHTML = 'Error: ' + error.message;
+            console.error('Error refreshing dashboard:', error);
+            document.getElementById('dataframes-table-content').innerHTML =
+                '<div class="empty-state">Error loading DataFrames. Please try again.</div>';
+            DataFrameUI.showToast('Failed to refresh dashboard', 'error');
         }
     }
+
+    function updateStatistics(stats) {
+        document.getElementById('total-dataframes').textContent = stats.total_dataframes || 0;
+        document.getElementById('total-memory').textContent = DataFrameFormatter.formatMemorySize(stats.total_memory_mb * 1024 * 1024 || 0);
+        document.getElementById('expired-count').textContent = stats.expired_count || 0;
+        document.getElementById('active-count').textContent = (stats.total_dataframes || 0) - (stats.expired_count || 0);
+
+        // Update stat card styling based on values
+        const expiredCard = document.getElementById('expired-count').closest('.stat-card');
+        if (stats.expired_count > 0) {
+            expiredCard.classList.add('warning');
+        } else {
+            expiredCard.classList.remove('warning');
+        }
+    }
+
+    function updateDataFramesTable() {
+        const container = document.getElementById('dataframes-table-content');
+
+        if (!dataframes || dataframes.length === 0) {
+            container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <div class="empty-state-title">No DataFrames Found</div>
+                <div class="empty-state-text">Upload a file or load data from a URL to get started.</div>
+                <button class="btn btn-primary" onclick="showUploadModal()">Upload Your First File</button>
+            </div>
+        `;
+            return;
+        }
+
+        // Apply current filter and sort
+        filteredDataframes = filterAndSortDataframes();
+
+        let html = `
+        <table class="dataframes-table">
+            <thead>
+                <tr>
+                    ${batchMode ? '<th><input type="checkbox" onchange="toggleSelectAll(this)"></th>' : ''}
+                    <th class="sortable" onclick="sortBy('df_id')">ID ${getSortIcon('df_id')}</th>
+                    <th class="sortable" onclick="sortBy('display_name')">Name ${getSortIcon('display_name')}</th>
+                    <th class="sortable" onclick="sortBy('shape')">Shape ${getSortIcon('shape')}</th>
+                    <th class="sortable" onclick="sortBy('memory_usage')">Memory ${getSortIcon('memory_usage')}</th>
+                    <th class="sortable" onclick="sortBy('created_at')">Created ${getSortIcon('created_at')}</th>
+                    <th class="sortable" onclick="sortBy('expires_at')">Status ${getSortIcon('expires_at')}</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+        filteredDataframes.forEach(df => {
+            const statusBadge = DataFrameFormatter.getStatusBadge(df);
+            const displayName = df.tags?.display_name || df.df_id;
+
+            html += `
+            <tr>
+                ${batchMode ? `<td><input type="checkbox" onchange="toggleSelect('${df.df_id}')" ${selectedDataframes.has(df.df_id) ? 'checked' : ''}></td>` : ''}
+                <td><code>${DataFrameFormatter.truncateText(df.df_id, 12)}</code></td>
+                <td><strong>${DataFrameFormatter.truncateText(displayName, 20)}</strong></td>
+                <td>${DataFrameFormatter.formatShape(df.shape)}</td>
+                <td>${DataFrameFormatter.formatMemorySize(df.memory_usage)}</td>
+                <td>${DataFrameFormatter.formatDate(df.created_at)}</td>
+                <td><span class="status-badge ${statusBadge.class}">${statusBadge.text}</span></td>
+                <td class="actions">
+                    <a href="/dataframes/${df.df_id}" class="btn btn-primary">View</a>
+                    <button class="btn btn-danger" onclick="deleteDataFrame('${df.df_id}')">Delete</button>
+                </td>
+            </tr>
+        `;
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function filterAndSortDataframes() {
+        let filtered = [...dataframes];
+
+        // Apply search filter
+        const searchTerm = document.getElementById('search-box').value.toLowerCase();
+        if (searchTerm) {
+            filtered = filtered.filter(df => {
+                const displayName = df.tags?.display_name || df.df_id;
+                return displayName.toLowerCase().includes(searchTerm) ||
+                    df.df_id.toLowerCase().includes(searchTerm) ||
+                    (df.tags?.source || '').toLowerCase().includes(searchTerm);
+            });
+        }
+
+        // Apply sorting
+        filtered.sort((a, b) => {
+            let aVal = a[sortColumn];
+            let bVal = b[sortColumn];
+
+            // Special handling for different column types
+            if (sortColumn === 'display_name') {
+                aVal = a.tags?.display_name || a.df_id;
+                bVal = b.tags?.display_name || b.df_id;
+            } else if (sortColumn === 'shape') {
+                aVal = a.shape ? a.shape[0] * a.shape[1] : 0;
+                bVal = b.shape ? b.shape[0] * b.shape[1] : 0;
+            } else if (sortColumn === 'created_at' || sortColumn === 'expires_at') {
+                aVal = new Date(aVal || 0);
+                bVal = new Date(bVal || 0);
+            }
+
+            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    }
+
+    function sortBy(column) {
+        if (sortColumn === column) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortColumn = column;
+            sortDirection = 'asc';
+        }
+        updateDataFramesTable();
+    }
+
+    function getSortIcon(column) {
+        if (sortColumn !== column) return '';
+        return sortDirection === 'asc' ? '↑' : '↓';
+    }
+
+    function filterDataFrames() {
+        updateDataFramesTable();
+    }
+
+    function toggleBatchMode() {
+        batchMode = !batchMode;
+        selectedDataframes.clear();
+        document.getElementById('batch-mode-text').textContent = batchMode ? 'Exit Selection' : 'Select Multiple';
+        updateDataFramesTable();
+    }
+
+    function toggleSelect(dfId) {
+        if (selectedDataframes.has(dfId)) {
+            selectedDataframes.delete(dfId);
+        } else {
+            selectedDataframes.add(dfId);
+        }
+        updateBatchControls();
+    }
+
+    function toggleSelectAll(checkbox) {
+        if (checkbox.checked) {
+            filteredDataframes.forEach(df => selectedDataframes.add(df.df_id));
+        } else {
+            selectedDataframes.clear();
+        }
+        updateDataFramesTable();
+        updateBatchControls();
+    }
+
+    function updateBatchControls() {
+        if (selectedDataframes.size > 0) {
+            // Show batch operations button or modal
+            document.getElementById('selected-count').textContent = selectedDataframes.size;
+        }
+    }
+
+    // Modal functions
+    function showUploadModal() {
+        DataFrameUI.showModal('upload-modal');
+        resetUploadForm();
+    }
+
+    function showUrlModal() {
+        DataFrameUI.showModal('url-modal');
+        resetUrlForm();
+    }
+
+    function resetUploadForm() {
+        document.getElementById('file-input').value = '';
+        document.getElementById('upload-display-name').value = '';
+        document.getElementById('upload-format').value = 'auto';
+        document.getElementById('upload-has-header').checked = true;
+        document.getElementById('upload-progress').style.display = 'none';
+        updateUploadPreview();
+    }
+
+    function resetUrlForm() {
+        document.getElementById('url-input').value = '';
+        document.getElementById('url-display-name').value = '';
+        document.getElementById('url-format').value = 'auto';
+        document.getElementById('url-has-header').checked = true;
+        document.getElementById('url-progress').style.display = 'none';
+    }
+
+    function updateUploadPreview() {
+        const files = document.getElementById('file-input').files;
+        const uploadArea = document.getElementById('upload-area');
+
+        if (files.length > 0) {
+            const fileNames = Array.from(files).map(f => f.name).join(', ');
+            uploadArea.innerHTML = `
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">
+                <strong>${files.length} file(s) selected:</strong><br>
+                ${DataFrameFormatter.truncateText(fileNames, 50)}
+            </div>
+            <div class="upload-hint">Click to select different files</div>
+        `;
+        } else {
+            uploadArea.innerHTML = `
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">
+                <strong>Click to select files</strong> or drag and drop here
+            </div>
+            <div class="upload-hint">
+                Supported formats: CSV, JSON, Excel (.xlsx), Parquet
+            </div>
+        `;
+        }
+    }
+
+    async function uploadFiles() {
+        const files = document.getElementById('file-input').files;
+        if (files.length === 0) {
+            DataFrameUI.showToast('Please select at least one file', 'error');
+            return;
+        }
+
+        const displayName = document.getElementById('upload-display-name').value;
+        const format = document.getElementById('upload-format').value;
+        const hasHeader = document.getElementById('upload-has-header').checked;
+
+        document.getElementById('upload-progress').style.display = 'block';
+        document.getElementById('upload-btn').disabled = true;
+
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const options = {
+                    format: format === 'auto' ? null : format,
+                    displayName: displayName || null,
+                    hasHeader
+                };
+
+                await dataframeAPI.uploadFile(file, options);
+            }
+
+            DataFrameUI.showToast(`Successfully uploaded ${files.length} file(s)`, 'success');
+            DataFrameUI.hideModal('upload-modal');
+            refreshDashboard();
+        } catch (error) {
+            DataFrameUI.showToast(`Upload failed: ${error.message}`, 'error');
+        } finally {
+            document.getElementById('upload-btn').disabled = false;
+            document.getElementById('upload-progress').style.display = 'none';
+        }
+    }
+
+    async function loadFromUrl() {
+        const url = document.getElementById('url-input').value;
+        if (!url) {
+            DataFrameUI.showToast('Please enter a URL', 'error');
+            return;
+        }
+
+        const displayName = document.getElementById('url-display-name').value;
+        const format = document.getElementById('url-format').value;
+        const hasHeader = document.getElementById('url-has-header').checked;
+
+        document.getElementById('url-progress').style.display = 'block';
+        document.getElementById('url-load-btn').disabled = true;
+
+        try {
+            const options = {
+                format: format === 'auto' ? null : format,
+                displayName: displayName || null,
+                hasHeader
+            };
+
+            await dataframeAPI.loadFromUrl(url, options);
+
+            DataFrameUI.showToast('Successfully loaded data from URL', 'success');
+            DataFrameUI.hideModal('url-modal');
+            refreshDashboard();
+        } catch (error) {
+            DataFrameUI.showToast(`Failed to load from URL: ${error.message}`, 'error');
+        } finally {
+            document.getElementById('url-load-btn').disabled = false;
+            document.getElementById('url-progress').style.display = 'none';
+        }
+    }
+
+    async function deleteDataFrame(dfId) {
+        const df = dataframes.find(d => d.df_id === dfId);
+        const displayName = df?.tags?.display_name || dfId;
+
+        DataFrameUI.confirm(
+            'Delete DataFrame',
+            `Are you sure you want to delete "${displayName}"? This action cannot be undone.`,
+            async () => {
+                try {
+                    await dataframeAPI.deleteDataFrame(dfId);
+                    DataFrameUI.showToast('DataFrame deleted successfully', 'success');
+                    refreshDashboard();
+                } catch (error) {
+                    DataFrameUI.showToast(`Failed to delete DataFrame: ${error.message}`, 'error');
+                }
+            }
+        );
+    }
+
+    async function batchDelete() {
+        if (selectedDataframes.size === 0) {
+            DataFrameUI.showToast('No DataFrames selected', 'error');
+            return;
+        }
+
+        DataFrameUI.confirm(
+            'Delete Multiple DataFrames',
+            `Are you sure you want to delete ${selectedDataframes.size} DataFrame(s)? This action cannot be undone.`,
+            async () => {
+                try {
+                    await dataframeAPI.batchDelete(Array.from(selectedDataframes));
+                    DataFrameUI.showToast(`Successfully deleted ${selectedDataframes.size} DataFrame(s)`, 'success');
+                    selectedDataframes.clear();
+                    batchMode = false;
+                    document.getElementById('batch-mode-text').textContent = 'Select Multiple';
+                    refreshDashboard();
+                } catch (error) {
+                    DataFrameUI.showToast(`Batch delete failed: ${error.message}`, 'error');
+                }
+            }
+        );
+    }
+
+    async function cleanupExpired() {
+        DataFrameUI.confirm(
+            'Cleanup Expired DataFrames',
+            'This will permanently delete all expired DataFrames. Continue?',
+            async () => {
+                try {
+                    const result = await dataframeAPI.cleanupExpired();
+                    const count = result.deleted_count || 0;
+                    const freedMemory = DataFrameFormatter.formatMemorySize(result.freed_memory_mb * 1024 * 1024 || 0);
+
+                    DataFrameUI.showToast(`Cleaned up ${count} DataFrame(s), freed ${freedMemory}`, 'success');
+                    refreshDashboard();
+                } catch (error) {
+                    DataFrameUI.showToast(`Cleanup failed: ${error.message}`, 'error');
+                }
+            }
+        );
+    }
+
+    // Progress tracking for uploads
+    document.addEventListener('dataframe-progress', (event) => {
+        const { requestId, progress, message } = event.detail;
+
+        if (requestId.startsWith('upload_')) {
+            const progressBar = document.getElementById('upload-progress-bar');
+            const progressText = document.getElementById('upload-progress-text');
+
+            if (progressBar) progressBar.style.width = `${progress}%`;
+            if (progressText) progressText.textContent = `${Math.round(progress)}% - ${message}`;
+        }
+    });
 </script>
 {% endblock %}
