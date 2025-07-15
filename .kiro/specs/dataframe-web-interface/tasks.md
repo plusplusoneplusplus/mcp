@@ -33,30 +33,31 @@
   - Create error handling for invalid expressions and operations
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [ ] 2. Create DataFrame management and file upload functionality
+- [x] 2. Create DataFrame management and file upload functionality
   - Implement file upload handling with multiple format support
   - Create DataFrame deletion and cleanup operations
   - Add data loading from URLs and local files
   - _Requirements: 5.4, 5.5, 5.6, 7.4, 7.5_
 
-- [ ] 2.1 Implement file upload and data loading endpoints
+- [x] 2.1 Implement file upload and data loading endpoints
   - Code POST `/api/dataframes/upload` endpoint for file uploads
   - Code POST `/api/dataframes/load-url` endpoint for URL-based data loading
   - Implement multipart file handling and temporary file management
   - Add support for CSV, JSON, Excel, and Parquet formats with options
   - _Requirements: 5.4, 5.5, 5.6_
 
-- [ ] 2.2 Implement DataFrame deletion and cleanup endpoints
+- [x] 2.2 Implement DataFrame deletion and cleanup endpoints
   - Code DELETE `/api/dataframes/{df_id}` endpoint for individual DataFrame deletion
   - Code POST `/api/dataframes/cleanup` endpoint for expired DataFrame cleanup
+  - Code POST `/api/dataframes/batch-delete` endpoint for batch deletion operations
   - Implement confirmation mechanisms and batch operations
   - Add cleanup statistics and reporting
   - _Requirements: 5.1, 5.2, 5.3, 7.4, 7.5_
 
-- [ ] 2.3 Implement data export functionality
+- [x] 2.3 Implement data export functionality
   - Code POST `/api/dataframes/{df_id}/export` endpoint for data export
-  - Add support for CSV and JSON export formats
-  - Implement streaming for large dataset exports
+  - Add support for CSV, JSON, Excel, and Parquet export formats
+  - Implement file generation and base64 encoding for download
   - Create export progress tracking and file download handling
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
@@ -134,7 +135,7 @@
   - Update navigation template to include DataFrame link
   - _Requirements: 1.1, 1.2_
 
-- [ ] 5.2 Integrate DataFrame API with existing API structure
+- [x] 5.2 Integrate DataFrame API with existing API structure
   - Import DataFrame API routes in `server/api/__init__.py`
   - Add DataFrame endpoints to the main API routes list
   - Ensure consistent error handling with existing APIs
@@ -147,7 +148,7 @@
   - Add performance tests for large DataFrame handling
   - _Requirements: All requirements for validation_
 
-- [ ] 6.1 Implement API endpoint unit tests
+- [x] 6.1 Implement API endpoint unit tests
   - Create `test_dataframes_api.py` with tests for all endpoints
   - Test CRUD operations, error handling, and edge cases
   - Add tests for file upload and data loading functionality
