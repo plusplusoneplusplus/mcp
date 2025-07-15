@@ -1126,11 +1126,16 @@
         }
     }
 
-    // Execute pandas expression
+    // Enhanced pandas expression executor with history and validation
+    let expressionHistory = [];
+    let historyIndex = -1;
+    let currentExpression = '';
+
+    // Execute pandas expression using new API client
     async function executeExpression() {
         const expression = document.getElementById('pandas-expression').value.trim();
         if (!expression) {
-            alert('Please enter a pandas expression');
+            DataFrameUI.showToast('Please enter a pandas expression', 'warning');
             return;
         }
 
@@ -1143,26 +1148,71 @@
         executionInfo.textContent = '';
 
         try {
-            const startTime = Date.now();
-            const response = await fetch(`/api/dataframes/${dfId}/execute`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ expression: expression })
-            });
-            const data = await response.json();
-            const executionTime = Date.now() - startTime;
+            const data = await dataframeAPI.executeExpression(dfId, expression);
+            const result = data.result;
 
-            if (data.success) {
-                executionInfo.textContent = `Executed in ${executionTime}ms`;
-                renderExecutionResult(data.result);
-            } else {
-                resultsContent.innerHTML = `<div class="error-result">${data.error || 'Unknown error'}</div>`;
-                executionInfo.textContent = `Failed after ${executionTime}ms`;
-            }
+            // Add to history
+            addToHistory(expression);
+
+            // Update execution info
+            executionInfo.innerHTML = `
+                <span>Executed in ${result.execution_time_ms}ms</span>
+                <span style="margin-left: 1em;">Result type: ${result.result_type}</span>
+                ${result.shape ? `<span style="margin-left: 1em;">Shape: ${DataFrameFormatter.formatShape(result.shape)}</span>` : ''}
+            `;
+
+            renderExecutionResult(result);
+            DataFrameUI.showToast('Expression executed successfully', 'success', 2000);
+
         } catch (error) {
             console.error('Error executing expression:', error);
-            resultsContent.innerHTML = `<div class="error-result">Network error: ${error.message}</div>`;
-            executionInfo.textContent = 'Execution failed';
+            resultsContent.innerHTML = `<div class="error-result">Error: ${error.message}</div>`;
+            DataFrameUI.showToast('Error executing expression: ' + error.message, 'error');
+        }
+    }
+
+    // Expression history management
+    function addToHistory(expression) {
+        // Remove duplicates and add to beginning
+        expressionHistory = expressionHistory.filter(expr => expr !== expression);
+        expressionHistory.unshift(expression);
+
+        // Limit history size
+        if (expressionHistory.length > 50) {
+            expressionHistory = expressionHistory.slice(0, 50);
+        }
+
+        historyIndex = -1;
+        updateHistoryUI();
+    }
+
+    function updateHistoryUI() {
+        // Add history dropdown if it doesn't exist
+        let historyDropdown = document.getElementById('expression-history');
+        if (!historyDropdown && expressionHistory.length > 0) {
+            const container = document.querySelector('#pandas-expression').parentNode;
+            historyDropdown = document.createElement('select');
+            historyDropdown.id = 'expression-history';
+            historyDropdown.className = 'control-input';
+            historyDropdown.style.marginTop = '0.5em';
+            historyDropdown.innerHTML = '<option value="">Recent expressions...</option>';
+            historyDropdown.onchange = function () {
+                if (this.value) {
+                    document.getElementById('pandas-expression').value = this.value;
+                    this.selectedIndex = 0;
+                }
+            };
+            container.appendChild(historyDropdown);
+        }
+
+        if (historyDropdown) {
+            historyDropdown.innerHTML = '<option value="">Recent expressions...</option>';
+            expressionHistory.forEach((expr, index) => {
+                const option = document.createElement('option');
+                option.value = expr;
+                option.textContent = expr.length > 60 ? expr.substring(0, 57) + '...' : expr;
+                historyDropdown.appendChild(option);
+            });
         }
     }
 
@@ -1235,13 +1285,158 @@
         document.getElementById('pandas-expression').value = expression;
     }
 
-    // Handle keyboard shortcuts
+    // Enhanced expression input with syntax validation and shortcuts
     function handleExpressionKeydown(event) {
-        if (event.ctrlKey && event.key === 'Enter') {
+        const textarea = event.target;
+
+        // Ctrl/Cmd + Enter: Execute
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
             executeExpression();
+            return;
+        }
+
+        // Arrow up/down: Navigate history
+        if (event.key === 'ArrowUp' && event.ctrlKey) {
+            event.preventDefault();
+            navigateHistory(1);
+            return;
+        }
+
+        if (event.key === 'ArrowDown' && event.ctrlKey) {
+            event.preventDefault();
+            navigateHistory(-1);
+            return;
+        }
+
+        // Tab: Auto-complete common patterns
+        if (event.key === 'Tab') {
+            const cursorPos = textarea.selectionStart;
+            const textBefore = textarea.value.substring(0, cursorPos);
+            const textAfter = textarea.value.substring(cursorPos);
+
+            // Simple auto-completion
+            const completions = {
+                'df.': ['head()', 'tail()', 'describe()', 'info()', 'shape', 'dtypes', 'columns'],
+                'df.head': ['()'],
+                'df.tail': ['()'],
+                'df.describe': ['()'],
+                'df.info': ['()'],
+                'df.groupby': ['()'],
+                'df.sort_values': ['()'],
+                'df.drop_duplicates': ['()']
+            };
+
+            for (const [prefix, suggestions] of Object.entries(completions)) {
+                if (textBefore.endsWith(prefix)) {
+                    event.preventDefault();
+                    // Show suggestions (simplified implementation)
+                    if (suggestions.length === 1) {
+                        textarea.value = textBefore + suggestions[0] + textAfter;
+                        textarea.selectionStart = textarea.selectionEnd = cursorPos + suggestions[0].length;
+                    }
+                    break;
+                }
+            }
         }
     }
+
+    function navigateHistory(direction) {
+        if (expressionHistory.length === 0) return;
+
+        const textarea = document.getElementById('pandas-expression');
+
+        if (historyIndex === -1) {
+            currentExpression = textarea.value;
+        }
+
+        historyIndex += direction;
+
+        if (historyIndex < -1) {
+            historyIndex = -1;
+            textarea.value = currentExpression;
+        } else if (historyIndex >= expressionHistory.length) {
+            historyIndex = expressionHistory.length - 1;
+            textarea.value = expressionHistory[historyIndex];
+        } else if (historyIndex === -1) {
+            textarea.value = currentExpression;
+        } else {
+            textarea.value = expressionHistory[historyIndex];
+        }
+    }
+
+    // Expression validation (basic syntax checking)
+    function validateExpression(expression) {
+        const warnings = [];
+        const errors = [];
+
+        // Check for common issues
+        if (!expression.includes('df')) {
+            warnings.push('Expression does not reference "df" - make sure to use the DataFrame variable');
+        }
+
+        // Check for potentially dangerous operations
+        const dangerousPatterns = ['exec', 'eval', 'import', '__', 'open(', 'file('];
+        dangerousPatterns.forEach(pattern => {
+            if (expression.toLowerCase().includes(pattern)) {
+                errors.push(`Potentially unsafe operation detected: ${pattern}`);
+            }
+        });
+
+        // Check for unbalanced parentheses
+        const openParens = (expression.match(/\(/g) || []).length;
+        const closeParens = (expression.match(/\)/g) || []).length;
+        if (openParens !== closeParens) {
+            errors.push('Unbalanced parentheses');
+        }
+
+        return { warnings, errors };
+    }
+
+    // Show expression validation feedback
+    function showExpressionFeedback() {
+        const expression = document.getElementById('pandas-expression').value.trim();
+        if (!expression) return;
+
+        const validation = validateExpression(expression);
+        let feedbackElement = document.getElementById('expression-feedback');
+
+        if (!feedbackElement) {
+            feedbackElement = document.createElement('div');
+            feedbackElement.id = 'expression-feedback';
+            feedbackElement.style.cssText = 'margin-top: 0.5em; font-size: 0.8em;';
+            document.getElementById('pandas-expression').parentNode.appendChild(feedbackElement);
+        }
+
+        let feedback = '';
+
+        if (validation.errors.length > 0) {
+            feedback += `<div style="color: #dc3545;">⚠️ Errors: ${validation.errors.join(', ')}</div>`;
+        }
+
+        if (validation.warnings.length > 0) {
+            feedback += `<div style="color: #ffc107;">⚠️ Warnings: ${validation.warnings.join(', ')}</div>`;
+        }
+
+        if (validation.errors.length === 0 && validation.warnings.length === 0) {
+            feedback = '<div style="color: #28a745;">✓ Expression looks good</div>';
+        }
+
+        feedbackElement.innerHTML = feedback;
+    }
+
+    // Add expression input event listeners
+    document.addEventListener('DOMContentLoaded', function () {
+        const expressionInput = document.getElementById('pandas-expression');
+        if (expressionInput) {
+            // Debounced validation feedback
+            let validationTimeout;
+            expressionInput.addEventListener('input', function () {
+                clearTimeout(validationTimeout);
+                validationTimeout = setTimeout(showExpressionFeedback, 500);
+            });
+        }
+    });
 
     // Load summary
     async function loadSummary() {
@@ -1293,7 +1488,7 @@
         summaryContent.innerHTML = html;
     }
 
-    // Export functions
+    // Export functions using new API client
     function showExportModal() {
         showModal('export-modal');
     }
@@ -1306,64 +1501,39 @@
         clearStatus('export-status');
 
         try {
-            const response = await fetch(`/api/dataframes/${dfId}/export`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    format: format,
-                    include_index: includeIndex,
-                    include_header: includeHeader
-                })
+            await dataframeAPI.exportDataFrame(dfId, {
+                format,
+                includeIndex,
+                includeHeader
             });
 
-            const data = await response.json();
-
-            if (data.success) {
-                // Create download link
-                const blob = new Blob([atob(data.file_content)], { type: data.content_type });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = data.filename;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
-
-                showStatus('export-status', 'Export completed successfully!', false);
-                setTimeout(() => hideModal('export-modal'), 1500);
-            } else {
-                showStatus('export-status', 'Error: ' + (data.error || 'Unknown error'), true);
-            }
+            showStatus('export-status', 'Export completed successfully!', false);
+            DataFrameUI.showToast('DataFrame exported successfully', 'success');
+            setTimeout(() => hideModal('export-modal'), 1500);
         } catch (error) {
             console.error('Error exporting DataFrame:', error);
             showStatus('export-status', 'Error: ' + error.message, true);
+            DataFrameUI.showToast('Error exporting DataFrame: ' + error.message, 'error');
         }
     }
 
-    // Delete DataFrame
+    // Delete DataFrame using new API client
     function deleteDataFrame() {
-        if (confirm(`Are you sure you want to delete DataFrame "${dfId}"? This action cannot be undone.`)) {
-            performDelete();
-        }
+        DataFrameUI.confirm(
+            'Delete DataFrame',
+            `Are you sure you want to delete DataFrame "${dfId}"? This action cannot be undone.`,
+            performDelete
+        );
     }
 
     async function performDelete() {
         try {
-            const response = await fetch(`/api/dataframes/${dfId}`, {
-                method: 'DELETE'
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                alert('DataFrame deleted successfully');
-                window.location.href = '/dataframes';
-            } else {
-                alert('Error deleting DataFrame: ' + (data.error || 'Unknown error'));
-            }
+            await dataframeAPI.deleteDataFrame(dfId);
+            DataFrameUI.showToast('DataFrame deleted successfully', 'success');
+            window.location.href = '/dataframes';
         } catch (error) {
             console.error('Error deleting DataFrame:', error);
-            alert('Error deleting DataFrame: ' + error.message);
+            DataFrameUI.showToast('Error deleting DataFrame: ' + error.message, 'error');
         }
     }
 

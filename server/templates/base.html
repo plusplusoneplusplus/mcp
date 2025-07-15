@@ -134,6 +134,175 @@
             font-size: 1em;
         }
 
+        /* Toast notifications */
+        .toast {
+            padding: 12px 16px;
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+            max-width: 300px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .toast-info {
+            background: #0077cc;
+        }
+
+        .toast-success {
+            background: #28a745;
+        }
+
+        .toast-error {
+            background: #dc3545;
+        }
+
+        .toast-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        /* Progress indicators */
+        .progress-container {
+            width: 100%;
+            background: #f0f0f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 0.5em 0;
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: linear-gradient(90deg, #0077cc, #28a745);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 0.25em;
+        }
+
+        /* Loading states */
+        .loading {
+            text-align: center;
+            padding: 2em;
+            color: #666;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0077cc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5em;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Global loading indicator */
+        #global-loading-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #0077cc, #28a745, #0077cc);
+            background-size: 200% 100%;
+            animation: loading-bar 2s linear infinite;
+            z-index: 9999;
+            display: none;
+        }
+
+        @keyframes loading-bar {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Enhanced table styles */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+            background: white;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75em;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+            border-right: 1px solid #eee;
+        }
+
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .data-table .null-value {
+            color: #999;
+            font-style: italic;
+        }
+
+        .data-table .number {
+            text-align: right;
+            font-family: 'Courier New', monospace;
+        }
+
+        .data-table .truncated {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .data-table .index-cell {
+            background: #f0f0f0;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3em;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 0.5em;
+            opacity: 0.5;
+        }
+
         /* Responsive design */
         @media (max-width: 768px) {
             .navbar {
@@ -149,6 +318,10 @@
             .card {
                 margin: 1em;
                 padding: 1em;
+            }
+
+            .toast {
+                max-width: calc(100vw - 40px);
             }
         }
     </style>
@@ -173,6 +346,9 @@
 </head>
 
 <body>
+    <!-- Global Loading Indicator -->
+    <div id="global-loading-indicator"></div>
+
     <!-- Navigation Bar -->
     <nav class="navbar">
         <h1>MCP Knowledge Server</h1>
@@ -194,39 +370,27 @@
         {% block content %}{% endblock %}
     </div>
 
+    <!-- DataFrame API Client -->
+    <script src="/static/js/dataframes.js"></script>
+
     <!-- Shared JavaScript -->
     <script>
-        // Shared utility functions
+        // Shared utility functions (legacy support)
         function showStatus(elementId, message, isError = false) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.textContent = message;
-                element.style.color = isError ? '#d9534f' : '#5cb85c';
-                element.style.display = 'block';
-            }
+            DataFrameUI.showStatus(elementId, message, isError);
         }
 
         function clearStatus(elementId) {
-            const element = document.getElementById(elementId);
-            if (element) {
-                element.textContent = '';
-                element.style.display = 'none';
-            }
+            DataFrameUI.clearStatus(elementId);
         }
 
-        // Modal utilities
+        // Modal utilities (legacy support)
         function showModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.style.display = 'block';
-            }
+            DataFrameUI.showModal(modalId);
         }
 
         function hideModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.style.display = 'none';
-            }
+            DataFrameUI.hideModal(modalId);
         }
 
         // Setup modal close handlers

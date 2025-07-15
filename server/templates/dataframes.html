@@ -467,10 +467,41 @@
 
         <!-- File Upload Section -->
         <div id="file-upload-section">
-            <div style="margin-bottom: 1em;">
-                <label for="file-input">Select File:</label>
-                <input type="file" id="file-input" accept=".csv,.json,.xlsx,.xls,.parquet"
-                    style="width: 100%; margin-top: 0.5em;">
+            <!-- Drag and Drop Area -->
+            <div id="drop-zone" style="
+                border: 2px dashed #ddd;
+                border-radius: 8px;
+                padding: 2em;
+                text-align: center;
+                margin-bottom: 1em;
+                background: #f8f9fa;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            " onclick="document.getElementById('file-input').click()">
+                <div style="font-size: 2em; margin-bottom: 0.5em; opacity: 0.5;">📁</div>
+                <div style="font-weight: bold; margin-bottom: 0.5em;">Drop files here or click to browse</div>
+                <div style="font-size: 0.9em; color: #666;">
+                    Supported formats: CSV, JSON, Excel (.xlsx, .xls), Parquet
+                </div>
+                <div style="font-size: 0.8em; color: #999; margin-top: 0.5em;">
+                    Maximum file size: 100MB
+                </div>
+            </div>
+
+            <input type="file" id="file-input" accept=".csv,.json,.xlsx,.xls,.parquet" style="display: none;" multiple>
+
+            <!-- Selected Files Display -->
+            <div id="selected-files" style="margin-bottom: 1em; display: none;">
+                <label>Selected Files:</label>
+                <div id="file-list" style="margin-top: 0.5em;"></div>
+            </div>
+
+            <!-- Upload Progress -->
+            <div id="upload-progress" style="margin-bottom: 1em; display: none;">
+                <div class="progress-container">
+                    <div class="progress-bar" id="upload-progress-bar"></div>
+                </div>
+                <div class="progress-text" id="upload-progress-text">Preparing upload...</div>
             </div>
 
             <div style="margin-bottom: 1em;">
@@ -483,6 +514,37 @@
                     <option value="parquet">Parquet</option>
                 </select>
             </div>
+
+            <!-- Advanced Options -->
+            <details style="margin-bottom: 1em;">
+                <summary style="cursor: pointer; font-weight: bold;">Advanced Options</summary>
+                <div style="margin-top: 1em; padding: 1em; background: #f8f9fa; border-radius: 4px;">
+                    <div style="margin-bottom: 0.5em;">
+                        <label>
+                            <input type="checkbox" id="has-header" checked>
+                            First row contains headers
+                        </label>
+                    </div>
+                    <div style="margin-bottom: 0.5em;">
+                        <label for="encoding">Text Encoding:</label>
+                        <select id="encoding" style="width: 100%; margin-top: 0.25em;">
+                            <option value="utf-8">UTF-8</option>
+                            <option value="latin-1">Latin-1</option>
+                            <option value="cp1252">Windows-1252</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 0.5em;">
+                        <label for="separator">CSV Separator:</label>
+                        <select id="separator" style="width: 100%; margin-top: 0.25em;">
+                            <option value="auto">Auto-detect</option>
+                            <option value=",">Comma (,)</option>
+                            <option value=";">Semicolon (;)</option>
+                            <option value="\t">Tab</option>
+                            <option value="|">Pipe (|)</option>
+                        </select>
+                    </div>
+                </div>
+            </details>
         </div>
 
         <!-- URL Loading Section -->
@@ -549,45 +611,103 @@
     let sortColumn = 'created_at';
     let sortDirection = 'desc';
     let pendingAction = null;
+    let autoRefreshInterval = null;
+    let autoRefreshEnabled = false;
 
     // Initialize dashboard
     document.addEventListener('DOMContentLoaded', function () {
         loadDataFrames();
+        setupAutoRefresh();
     });
 
-    // Load DataFrames from API
+    // Load DataFrames from API using the new API client
     async function loadDataFrames() {
         showLoading(true);
         try {
-            const response = await fetch('/api/dataframes');
-            const data = await response.json();
+            const data = await dataframeAPI.getDataFrames();
 
-            if (data.success) {
-                dataframes = data.dataframes || [];
-                updateStatistics(data.storage_stats || {});
-                filteredDataframes = [...dataframes];
-                sortDataFrames();
-                renderDataFrames();
-            } else {
-                showStatus('Error loading DataFrames: ' + (data.error || 'Unknown error'), true);
-            }
+            dataframes = data.dataframes || [];
+            updateStatistics(data.storage_stats || {});
+            filteredDataframes = [...dataframes];
+            sortDataFrames();
+            renderDataFrames();
+
+            DataFrameUI.showToast('DataFrames loaded successfully', 'success', 2000);
         } catch (error) {
             console.error('Error loading DataFrames:', error);
-            showStatus('Error loading DataFrames: ' + error.message, true);
+            DataFrameUI.showToast('Error loading DataFrames: ' + error.message, 'error');
         } finally {
             showLoading(false);
         }
     }
 
-    // Update statistics display
+    // Setup auto-refresh functionality
+    function setupAutoRefresh() {
+        // Add auto-refresh toggle to dashboard actions
+        const dashboardActions = document.querySelector('.dashboard-actions');
+        const autoRefreshBtn = document.createElement('button');
+        autoRefreshBtn.className = 'btn btn-secondary';
+        autoRefreshBtn.id = 'auto-refresh-btn';
+        autoRefreshBtn.innerHTML = '⏸️ Auto-refresh: OFF';
+        autoRefreshBtn.onclick = toggleAutoRefresh;
+        dashboardActions.appendChild(autoRefreshBtn);
+    }
+
+    function toggleAutoRefresh() {
+        autoRefreshEnabled = !autoRefreshEnabled;
+        const btn = document.getElementById('auto-refresh-btn');
+
+        if (autoRefreshEnabled) {
+            btn.innerHTML = '⏸️ Auto-refresh: ON';
+            btn.classList.remove('btn-secondary');
+            btn.classList.add('btn-success');
+            startAutoRefresh();
+        } else {
+            btn.innerHTML = '▶️ Auto-refresh: OFF';
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-secondary');
+            stopAutoRefresh();
+        }
+    }
+
+    function startAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+        }
+
+        autoRefreshInterval = setInterval(() => {
+            if (autoRefreshEnabled && !dataframeAPI.isLoading()) {
+                loadDataFrames();
+            }
+        }, 30000); // Refresh every 30 seconds
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+
+    // Update statistics display with enhanced formatting
     function updateStatistics(stats) {
-        document.getElementById('total-dataframes').textContent = stats.total_dataframes || 0;
+        document.getElementById('total-dataframes').textContent = DataFrameFormatter.formatNumber(stats.total_dataframes || 0);
         document.getElementById('total-memory').textContent = (stats.total_memory_mb || 0).toFixed(1);
-        document.getElementById('expired-count').textContent = stats.expired_count || 0;
+        document.getElementById('expired-count').textContent = DataFrameFormatter.formatNumber(stats.expired_count || 0);
 
         const avgSize = stats.total_dataframes > 0 ?
             (stats.total_memory_mb / stats.total_dataframes) : 0;
         document.getElementById('avg-size').textContent = avgSize.toFixed(1);
+
+        // Update stat card styling based on values
+        const expiredCard = document.querySelector('.stat-card.warning');
+        if (stats.expired_count > 0) {
+            expiredCard.classList.add('danger');
+            expiredCard.classList.remove('warning');
+        } else {
+            expiredCard.classList.add('warning');
+            expiredCard.classList.remove('danger');
+        }
     }
 
     // Show/hide loading indicator
@@ -769,12 +889,340 @@
     // Load data modal functions
     function showLoadDataModal() {
         showModal('load-data-modal');
+        setupDragAndDrop();
     }
 
     function toggleLoadMethod() {
         const method = document.querySelector('input[name="load-method"]:checked').value;
         document.getElementById('file-upload-section').style.display = method === 'file' ? 'block' : 'none';
         document.getElementById('url-load-section').style.display = method === 'url' ? 'block' : 'none';
+    }
+
+    // Enhanced drag-and-drop functionality
+    function setupDragAndDrop() {
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        if (!dropZone || !fileInput) return;
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        // Handle dropped files
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        // Handle file input change
+        fileInput.addEventListener('change', handleFileSelect, false);
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight(e) {
+            dropZone.style.borderColor = '#0077cc';
+            dropZone.style.backgroundColor = '#f0f8ff';
+            dropZone.style.transform = 'scale(1.02)';
+        }
+
+        function unhighlight(e) {
+            dropZone.style.borderColor = '#ddd';
+            dropZone.style.backgroundColor = '#f8f9fa';
+            dropZone.style.transform = 'scale(1)';
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+
+            // Validate files
+            const validFiles = [];
+            const errors = [];
+
+            Array.from(files).forEach(file => {
+                const validation = validateFile(file);
+                if (validation.valid) {
+                    validFiles.push(file);
+                } else {
+                    errors.push(`${file.name}: ${validation.error}`);
+                }
+            });
+
+            if (errors.length > 0) {
+                DataFrameUI.showToast('File validation errors:\n' + errors.join('\n'), 'error', 5000);
+            }
+
+            if (validFiles.length > 0) {
+                displaySelectedFiles(validFiles);
+                // Auto-detect format from first file
+                autoDetectFormat(validFiles[0]);
+            }
+        }
+    }
+
+    // File validation
+    function validateFile(file) {
+        const maxSize = 100 * 1024 * 1024; // 100MB
+        const allowedTypes = [
+            'text/csv',
+            'application/json',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/octet-stream' // For parquet files
+        ];
+        const allowedExtensions = ['.csv', '.json', '.xlsx', '.xls', '.parquet'];
+
+        // Check file size
+        if (file.size > maxSize) {
+            return {
+                valid: false,
+                error: `File too large (${DataFrameFormatter.formatMemorySize(file.size)}). Maximum size is 100MB.`
+            };
+        }
+
+        // Check file extension
+        const extension = '.' + file.name.split('.').pop().toLowerCase();
+        if (!allowedExtensions.includes(extension)) {
+            return {
+                valid: false,
+                error: `Unsupported file type. Allowed types: ${allowedExtensions.join(', ')}`
+            };
+        }
+
+        return { valid: true };
+    }
+
+    // Display selected files
+    function displaySelectedFiles(files) {
+        const selectedFilesDiv = document.getElementById('selected-files');
+        const fileListDiv = document.getElementById('file-list');
+
+        if (files.length === 0) {
+            selectedFilesDiv.style.display = 'none';
+            return;
+        }
+
+        selectedFilesDiv.style.display = 'block';
+        fileListDiv.innerHTML = '';
+
+        Array.from(files).forEach((file, index) => {
+            const fileItem = document.createElement('div');
+            fileItem.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.5em;
+                background: #f8f9fa;
+                border-radius: 4px;
+                margin-bottom: 0.5em;
+            `;
+
+            fileItem.innerHTML = `
+                <div>
+                    <strong>${file.name}</strong>
+                    <span style="color: #666; margin-left: 1em;">
+                        ${DataFrameFormatter.formatMemorySize(file.size)}
+                    </span>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="removeFile(${index})" type="button">
+                    Remove
+                </button>
+            `;
+
+            fileListDiv.appendChild(fileItem);
+        });
+    }
+
+    // Remove file from selection
+    function removeFile(index) {
+        const fileInput = document.getElementById('file-input');
+        const dt = new DataTransfer();
+
+        Array.from(fileInput.files).forEach((file, i) => {
+            if (i !== index) {
+                dt.items.add(file);
+            }
+        });
+
+        fileInput.files = dt.files;
+        displaySelectedFiles(fileInput.files);
+    }
+
+    // Auto-detect file format
+    function autoDetectFormat(file) {
+        const extension = '.' + file.name.split('.').pop().toLowerCase();
+        const formatSelect = document.getElementById('file-format');
+
+        const formatMap = {
+            '.csv': 'csv',
+            '.json': 'json',
+            '.xlsx': 'excel',
+            '.xls': 'excel',
+            '.parquet': 'parquet'
+        };
+
+        if (formatMap[extension]) {
+            formatSelect.value = formatMap[extension];
+        }
+    }
+
+    // Enhanced URL validation
+    function validateUrl(url) {
+        try {
+            const urlObj = new URL(url);
+
+            // Check protocol
+            if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                return { valid: false, error: 'Only HTTP and HTTPS URLs are supported' };
+            }
+
+            // Check for common data file extensions
+            const pathname = urlObj.pathname.toLowerCase();
+            const supportedExtensions = ['.csv', '.json', '.xlsx', '.xls', '.parquet'];
+            const hasValidExtension = supportedExtensions.some(ext => pathname.endsWith(ext));
+
+            if (!hasValidExtension) {
+                return {
+                    valid: true,
+                    warning: 'URL does not end with a recognized data file extension. Auto-detection may not work correctly.'
+                };
+            }
+
+            return { valid: true };
+        } catch (error) {
+            return { valid: false, error: 'Invalid URL format' };
+        }
+    }
+
+    // Enhanced load data function with progress tracking
+    async function loadData() {
+        const method = document.querySelector('input[name="load-method"]:checked').value;
+        const displayName = document.getElementById('display-name').value;
+        const hasHeader = document.getElementById('has-header').checked;
+
+        clearStatus('load-status');
+
+        try {
+            let data;
+
+            if (method === 'file') {
+                const fileInput = document.getElementById('file-input');
+                const format = document.getElementById('file-format').value;
+
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    showStatus('load-status', 'Please select a file', true);
+                    return;
+                }
+
+                // Show upload progress
+                showUploadProgress(true);
+
+                // Get advanced options
+                const encoding = document.getElementById('encoding').value;
+                const separator = document.getElementById('separator').value;
+
+                // Process each file (for now, just the first one)
+                const file = fileInput.files[0];
+
+                data = await dataframeAPI.uploadFile(file, {
+                    format: format === 'auto' ? null : format,
+                    displayName: displayName || file.name.split('.')[0],
+                    hasHeader,
+                    encoding: encoding !== 'utf-8' ? encoding : undefined,
+                    separator: separator !== 'auto' ? separator : undefined
+                });
+
+            } else {
+                const url = document.getElementById('data-url').value.trim();
+                const format = document.getElementById('url-format').value;
+
+                if (!url) {
+                    showStatus('load-status', 'Please enter a URL', true);
+                    return;
+                }
+
+                // Validate URL
+                const urlValidation = validateUrl(url);
+                if (!urlValidation.valid) {
+                    showStatus('load-status', urlValidation.error, true);
+                    return;
+                }
+
+                if (urlValidation.warning) {
+                    DataFrameUI.showToast(urlValidation.warning, 'warning', 4000);
+                }
+
+                data = await dataframeAPI.loadFromUrl(url, {
+                    format: format === 'auto' ? null : format,
+                    displayName: displayName || 'URL Dataset',
+                    hasHeader
+                });
+            }
+
+            showStatus('load-status', 'Data loaded successfully!', false);
+            DataFrameUI.showToast('Data loaded successfully!', 'success');
+
+            setTimeout(() => {
+                hideModal('load-data-modal');
+                resetLoadDataForm();
+                loadDataFrames();
+            }, 1500);
+
+        } catch (error) {
+            console.error('Error loading data:', error);
+            showStatus('load-status', 'Error: ' + error.message, true);
+            DataFrameUI.showToast('Error loading data: ' + error.message, 'error');
+        } finally {
+            showUploadProgress(false);
+        }
+    }
+
+    // Show/hide upload progress
+    function showUploadProgress(show) {
+        const progressDiv = document.getElementById('upload-progress');
+        if (progressDiv) {
+            progressDiv.style.display = show ? 'block' : 'none';
+        }
+    }
+
+    // Reset load data form
+    function resetLoadDataForm() {
+        document.getElementById('file-input').value = '';
+        document.getElementById('data-url').value = '';
+        document.getElementById('display-name').value = '';
+        document.getElementById('has-header').checked = true;
+        document.getElementById('file-format').value = 'auto';
+        document.getElementById('url-format').value = 'auto';
+        document.getElementById('encoding').value = 'utf-8';
+        document.getElementById('separator').value = 'auto';
+        document.getElementById('selected-files').style.display = 'none';
+        document.getElementById('upload-progress').style.display = 'none';
+
+        // Reset load method to file
+        document.querySelector('input[name="load-method"][value="file"]').checked = true;
+        toggleLoadMethod();
     }
 
     async function loadData() {
@@ -785,7 +1233,7 @@
         clearStatus('load-status');
 
         try {
-            let response;
+            let data;
 
             if (method === 'file') {
                 const fileInput = document.getElementById('file-input');
@@ -796,15 +1244,21 @@
                     return;
                 }
 
-                const formData = new FormData();
-                formData.append('file', fileInput.files[0]);
-                formData.append('format', format);
-                formData.append('has_header', hasHeader);
-                if (displayName) formData.append('display_name', displayName);
+                // Show progress indicator
+                const progressContainer = document.createElement('div');
+                progressContainer.innerHTML = `
+                    <div class="progress-container" data-progress-id="upload_${fileInput.files[0].name}">
+                        <div class="progress-bar"></div>
+                        <div class="progress-text">Preparing upload...</div>
+                    </div>
+                `;
+                document.getElementById('load-status').appendChild(progressContainer);
+                document.getElementById('load-status').style.display = 'block';
 
-                response = await fetch('/api/dataframes/upload', {
-                    method: 'POST',
-                    body: formData
+                data = await dataframeAPI.uploadFile(fileInput.files[0], {
+                    format: format === 'auto' ? null : format,
+                    displayName,
+                    hasHeader
                 });
             } else {
                 const url = document.getElementById('data-url').value;
@@ -815,89 +1269,75 @@
                     return;
                 }
 
-                response = await fetch('/api/dataframes/load-url', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        url: url,
-                        format: format,
-                        has_header: hasHeader,
-                        display_name: displayName
-                    })
+                data = await dataframeAPI.loadFromUrl(url, {
+                    format: format === 'auto' ? null : format,
+                    displayName,
+                    hasHeader
                 });
             }
 
-            const data = await response.json();
+            showStatus('load-status', 'Data loaded successfully!', false);
+            DataFrameUI.showToast('Data loaded successfully!', 'success');
 
-            if (data.success) {
-                showStatus('load-status', 'Data loaded successfully!', false);
-                setTimeout(() => {
-                    hideModal('load-data-modal');
-                    loadDataFrames();
-                }, 1500);
-            } else {
-                showStatus('load-status', 'Error: ' + (data.error || 'Unknown error'), true);
-            }
+            setTimeout(() => {
+                hideModal('load-data-modal');
+                loadDataFrames();
+                // Reset form
+                document.getElementById('file-input').value = '';
+                document.getElementById('data-url').value = '';
+                document.getElementById('display-name').value = '';
+                document.getElementById('has-header').checked = true;
+            }, 1500);
+
         } catch (error) {
             console.error('Error loading data:', error);
             showStatus('load-status', 'Error: ' + error.message, true);
+            DataFrameUI.showToast('Error loading data: ' + error.message, 'error');
         }
     }
 
-    // Delete DataFrame
+    // Delete DataFrame using new API client
     function deleteDataFrame(dfId) {
-        pendingAction = () => performDelete(dfId);
-        document.getElementById('confirm-title').textContent = 'Delete DataFrame';
-        document.getElementById('confirm-message').textContent = `Are you sure you want to delete DataFrame "${dfId}"? This action cannot be undone.`;
-        showModal('confirm-modal');
+        DataFrameUI.confirm(
+            'Delete DataFrame',
+            `Are you sure you want to delete DataFrame "${dfId}"? This action cannot be undone.`,
+            () => performDelete(dfId)
+        );
     }
 
     async function performDelete(dfId) {
         try {
-            const response = await fetch(`/api/dataframes/${dfId}`, {
-                method: 'DELETE'
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                loadDataFrames();
-            } else {
-                alert('Error deleting DataFrame: ' + (data.error || 'Unknown error'));
-            }
+            await dataframeAPI.deleteDataFrame(dfId);
+            DataFrameUI.showToast('DataFrame deleted successfully', 'success');
+            loadDataFrames();
         } catch (error) {
             console.error('Error deleting DataFrame:', error);
-            alert('Error deleting DataFrame: ' + error.message);
+            DataFrameUI.showToast('Error deleting DataFrame: ' + error.message, 'error');
         }
     }
 
-    // Cleanup expired DataFrames
+    // Cleanup expired DataFrames using new API client
     function cleanupExpired() {
-        pendingAction = performCleanup;
-        document.getElementById('confirm-title').textContent = 'Cleanup Expired DataFrames';
-        document.getElementById('confirm-message').textContent = 'Are you sure you want to delete all expired DataFrames? This action cannot be undone.';
-        showModal('confirm-modal');
+        DataFrameUI.confirm(
+            'Cleanup Expired DataFrames',
+            'Are you sure you want to delete all expired DataFrames? This action cannot be undone.',
+            performCleanup
+        );
     }
 
     async function performCleanup() {
         try {
-            const response = await fetch('/api/dataframes/cleanup', {
-                method: 'POST'
-            });
-            const data = await response.json();
-
-            if (data.success) {
-                alert(`Cleanup completed. Removed ${data.removed_count} DataFrames, freed ${data.memory_freed_mb.toFixed(1)} MB.`);
-                loadDataFrames();
-            } else {
-                alert('Error during cleanup: ' + (data.error || 'Unknown error'));
-            }
+            const data = await dataframeAPI.cleanupExpired();
+            const message = `Cleanup completed. Removed ${data.removed_count} DataFrames, freed ${data.memory_freed_mb.toFixed(1)} MB.`;
+            DataFrameUI.showToast(message, 'success', 5000);
+            loadDataFrames();
         } catch (error) {
             console.error('Error during cleanup:', error);
-            alert('Error during cleanup: ' + error.message);
+            DataFrameUI.showToast('Error during cleanup: ' + error.message, 'error');
         }
     }
 
-    // Confirmation modal
+    // Confirmation modal (legacy support)
     function confirmAction() {
         if (pendingAction) {
             pendingAction();
@@ -906,22 +1346,406 @@
         hideModal('confirm-modal');
     }
 
-    // Utility functions
-    function showStatus(elementId, message, isError = false) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            element.textContent = message;
-            element.style.color = isError ? '#dc3545' : '#28a745';
-            element.style.display = 'block';
+    // Enhanced client-side filtering with debouncing
+    let filterTimeout;
+    function filterDataFrames() {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(() => {
+            performFiltering();
+        }, 300); // Debounce for 300ms
+    }
+
+    function performFiltering() {
+        const searchTerm = document.getElementById('search-input').value.toLowerCase();
+        const statusFilter = document.getElementById('status-filter').value;
+
+        filteredDataframes = dataframes.filter(df => {
+            // Enhanced text search - search in multiple fields
+            const searchFields = [
+                df.df_id,
+                df.source || '',
+                (df.tags && df.tags.display_name) || '',
+                DataFrameFormatter.formatShape(df.shape),
+                DataFrameFormatter.formatMemorySize(df.memory_usage)
+            ].join(' ').toLowerCase();
+
+            const matchesSearch = !searchTerm || searchFields.includes(searchTerm);
+
+            // Status filter
+            const status = DataFrameFormatter.getStatusBadge(df);
+            const matchesStatus = !statusFilter || status.class === statusFilter;
+
+            return matchesSearch && matchesStatus;
+        });
+
+        sortDataFrames();
+        renderDataFrames();
+
+        // Update search results count
+        updateSearchResultsCount();
+    }
+
+    function updateSearchResultsCount() {
+        const tableTitle = document.querySelector('.table-title');
+        const totalCount = dataframes.length;
+        const filteredCount = filteredDataframes.length;
+
+        if (filteredCount === totalCount) {
+            tableTitle.textContent = `DataFrames (${totalCount})`;
+        } else {
+            tableTitle.textContent = `DataFrames (${filteredCount} of ${totalCount})`;
         }
     }
 
-    function clearStatus(elementId) {
-        const element = document.getElementById(elementId);
-        if (element) {
-            element.textContent = '';
-            element.style.display = 'none';
+    // Enhanced rendering with better performance for large datasets
+    function renderDataFrames() {
+        const tbody = document.getElementById('dataframes-table-body');
+
+        if (filteredDataframes.length === 0) {
+            document.getElementById('dataframes-table').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'block';
+            return;
         }
+
+        document.getElementById('dataframes-table').style.display = 'table';
+        document.getElementById('empty-state').style.display = 'none';
+
+        // Use document fragment for better performance
+        const fragment = document.createDocumentFragment();
+
+        filteredDataframes.forEach(df => {
+            const row = document.createElement('tr');
+            row.className = 'dataframe-row';
+            row.onclick = () => viewDataFrame(df.df_id);
+
+            const status = DataFrameFormatter.getStatusBadge(df);
+            const memoryFormatted = DataFrameFormatter.formatMemorySize(df.memory_usage);
+            const createdDate = DataFrameFormatter.formatDate(df.created_at);
+            const source = DataFrameFormatter.truncateText(df.source || 'Unknown', 30);
+            const shape = DataFrameFormatter.formatShape(df.shape);
+
+            // Calculate memory bar percentage (max 100MB = 100%)
+            const memoryPercentage = Math.min(100, (df.memory_usage / (100 * 1024 * 1024)) * 100);
+
+            row.innerHTML = `
+                <td><strong>${df.df_id}</strong></td>
+                <td>${createdDate}</td>
+                <td>${shape}</td>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 0.5em;">
+                        ${memoryFormatted}
+                        <div class="memory-bar">
+                            <div class="memory-fill" style="width: ${memoryPercentage}%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td><span class="status-badge status-${status.class}">${status.text}</span></td>
+                <td title="${df.source || 'Unknown'}">${source}</td>
+                <td onclick="event.stopPropagation()">
+                    <div class="action-buttons">
+                        <button class="btn btn-primary btn-sm" onclick="viewDataFrame('${df.df_id}')">View</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteDataFrame('${df.df_id}')">Delete</button>
+                    </div>
+                </td>
+            `;
+
+            fragment.appendChild(row);
+        });
+
+        // Clear and append all at once for better performance
+        tbody.innerHTML = '';
+        tbody.appendChild(fragment);
+
+        updateSearchResultsCount();
     }
+
+    // Enhanced sorting with better data type handling
+    function sortDataFrames() {
+        filteredDataframes.sort((a, b) => {
+            let aVal, bVal;
+
+            switch (sortColumn) {
+                case 'df_id':
+                    aVal = a.df_id.toLowerCase();
+                    bVal = b.df_id.toLowerCase();
+                    break;
+                case 'created_at':
+                    aVal = new Date(a.created_at);
+                    bVal = new Date(b.created_at);
+                    break;
+                case 'shape':
+                    aVal = a.shape[0] * a.shape[1];
+                    bVal = b.shape[0] * b.shape[1];
+                    break;
+                case 'memory_usage':
+                    aVal = a.memory_usage;
+                    bVal = b.memory_usage;
+                    break;
+                case 'status':
+                    // Sort by status priority: active < warning < expired
+                    const statusPriority = { 'active': 0, 'warning': 1, 'expired': 2 };
+                    aVal = statusPriority[DataFrameFormatter.getStatusBadge(a).class] || 0;
+                    bVal = statusPriority[DataFrameFormatter.getStatusBadge(b).class] || 0;
+                    break;
+                case 'source':
+                    aVal = (a.source || '').toLowerCase();
+                    bVal = (b.source || '').toLowerCase();
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function (event) {
+        // Ctrl/Cmd + R: Refresh
+        if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+            event.preventDefault();
+            refreshDashboard();
+        }
+
+        // Ctrl/Cmd + L: Load data
+        if ((event.ctrlKey || event.metaKey) && event.key === 'l') {
+            event.preventDefault();
+            showLoadDataModal();
+        }
+
+        // Escape: Close modals
+        if (event.key === 'Escape') {
+            document.querySelectorAll('.modal').forEach(modal => {
+                if (modal.style.display === 'block') {
+                    hideModal(modal.id);
+                }
+            });
+        }
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function () {
+        stopAutoRefresh();
+    });
 </script>
-{% endblock %}
+{% endblock %}e, 'error');
+}
+}
+
+// Confirmation modal (legacy support)
+function confirmAction() {
+if (pendingAction) {
+pendingAction();
+pendingAction = null;
+}
+hideModal('confirm-modal');
+}
+
+// Enhanced client-side filtering with debouncing
+let filterTimeout;
+function filterDataFrames() {
+clearTimeout(filterTimeout);
+filterTimeout = setTimeout(() => {
+performFiltering();
+}, 300); // Debounce for 300ms
+}
+
+function performFiltering() {
+const searchTerm = document.getElementById('search-input').value.toLowerCase();
+const statusFilter = document.getElementById('status-filter').value;
+
+filteredDataframes = dataframes.filter(df => {
+// Enhanced text search - search in multiple fields
+const searchFields = [
+df.df_id,
+df.source || '',
+(df.tags && df.tags.display_name) || '',
+DataFrameFormatter.formatShape(df.shape),
+DataFrameFormatter.formatMemorySize(df.memory_usage)
+].join(' ').toLowerCase();
+
+const matchesSearch = !searchTerm || searchFields.includes(searchTerm);
+
+// Status filter
+const status = DataFrameFormatter.getStatusBadge(df);
+const matchesStatus = !statusFilter || status.class === statusFilter;
+
+return matchesSearch && matchesStatus;
+});
+
+sortDataFrames();
+renderDataFrames();
+
+// Update search results count
+updateSearchResultsCount();
+}
+
+function updateSearchResultsCount() {
+const tableTitle = document.querySelector('.table-title');
+const totalCount = dataframes.length;
+const filteredCount = filteredDataframes.length;
+
+if (filteredCount === totalCount) {
+tableTitle.textContent = `DataFrames (${totalCount})`;
+} else {
+tableTitle.textContent = `DataFrames (${filteredCount} of ${totalCount})`;
+}
+}
+
+// Enhanced rendering with better performance for large datasets
+function renderDataFrames() {
+const tbody = document.getElementById('dataframes-table-body');
+
+if (filteredDataframes.length === 0) {
+document.getElementById('dataframes-table').style.display = 'none';
+document.getElementById('empty-state').style.display = 'block';
+return;
+}
+
+document.getElementById('dataframes-table').style.display = 'table';
+document.getElementById('empty-state').style.display = 'none';
+
+// Use document fragment for better performance
+const fragment = document.createDocumentFragment();
+
+filteredDataframes.forEach(df => {
+const row = document.createElement('tr');
+row.className = 'dataframe-row';
+row.onclick = () => viewDataFrame(df.df_id);
+
+const status = DataFrameFormatter.getStatusBadge(df);
+const memoryFormatted = DataFrameFormatter.formatMemorySize(df.memory_usage);
+const createdDate = DataFrameFormatter.formatDate(df.created_at);
+const source = DataFrameFormatter.truncateText(df.source || 'Unknown', 30);
+const shape = DataFrameFormatter.formatShape(df.shape);
+
+// Calculate memory bar percentage (max 100MB = 100%)
+const memoryPercentage = Math.min(100, (df.memory_usage / (100 * 1024 * 1024)) * 100);
+
+row.innerHTML = `
+<td><strong>${df.df_id}</strong></td>
+<td>${createdDate}</td>
+<td>${shape}</td>
+<td>
+    <div style="display: flex; align-items: center; gap: 0.5em;">
+        ${memoryFormatted}
+        <div class="memory-bar">
+            <div class="memory-fill" style="width: ${memoryPercentage}%"></div>
+        </div>
+    </div>
+</td>
+<td><span class="status-badge status-${status.class}">${status.text}</span></td>
+<td title="${df.source || 'Unknown'}">${source}</td>
+<td onclick="event.stopPropagation()">
+    <div class="action-buttons">
+        <button class="btn btn-primary btn-sm" onclick="viewDataFrame('${df.df_id}')">View</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteDataFrame('${df.df_id}')">Delete</button>
+    </div>
+</td>
+`;
+
+fragment.appendChild(row);
+});
+
+// Clear and append all at once for better performance
+tbody.innerHTML = '';
+tbody.appendChild(fragment);
+
+updateSearchResultsCount();
+}
+
+// Enhanced sorting with better data type handling
+function sortDataFrames() {
+filteredDataframes.sort((a, b) => {
+let aVal, bVal;
+
+switch (sortColumn) {
+case 'df_id':
+aVal = a.df_id.toLowerCase();
+bVal = b.df_id.toLowerCase();
+break;
+case 'created_at':
+aVal = new Date(a.created_at);
+bVal = new Date(b.created_at);
+break;
+case 'shape':
+aVal = a.shape[0] * a.shape[1];
+bVal = b.shape[0] * b.shape[1];
+break;
+case 'memory_usage':
+aVal = a.memory_usage;
+bVal = b.memory_usage;
+break;
+case 'status':
+// Sort by status priority: active < warning < expired const statusPriority={ 'active' : 0, 'warning' : 1, 'expired' : 2
+    }; aVal=statusPriority[DataFrameFormatter.getStatusBadge(a).class] || 0;
+    bVal=statusPriority[DataFrameFormatter.getStatusBadge(b).class] || 0; break; case 'source' : aVal=(a.source || ''
+    ).toLowerCase(); bVal=(b.source || '' ).toLowerCase(); break; default: return 0; } if (aVal < bVal) return
+    sortDirection==='asc' ? -1 : 1; if (aVal> bVal) return sortDirection === 'asc' ? 1 : -1;
+    return 0;
+    });
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function (event) {
+    // Ctrl/Cmd + R: Refresh
+    if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+    event.preventDefault();
+    refreshDashboard();
+    }
+
+    // Ctrl/Cmd + L: Load data
+    if ((event.ctrlKey || event.metaKey) && event.key === 'l') {
+    event.preventDefault();
+    showLoadDataModal();
+    }
+
+    // Escape: Close modals
+    if (event.key === 'Escape') {
+    document.querySelectorAll('.modal').forEach(modal => {
+    if (modal.style.display === 'block') {
+    hideModal(modal.id);
+    }
+    });
+    }
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', function () {
+    stopAutoRefresh();
+    });
+    </script>
+    {% endblock %}e, 'error');
+    }
+    }
+
+    // Confirmation modal
+    function confirmAction() {
+    if (pendingAction) {
+    pendingAction();
+    pendingAction = null;
+    }
+    hideModal('confirm-modal');
+    }
+
+    // Utility functions
+    function showStatus(elementId, message, isError = false) {
+    const element = document.getElementById(elementId);
+    if (element) {
+    element.textContent = message;
+    element.style.color = isError ? '#dc3545' : '#28a745';
+    element.style.display = 'block';
+    }
+    }
+
+    function clearStatus(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+    element.textContent = '';
+    element.style.display = 'none';
+    }
+    }
+    </script>
+    {% endblock %}
