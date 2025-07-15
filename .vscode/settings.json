@@ -1,13 +1,13 @@
 {
-    "files.exclude": {
-      "**/*.egg-info/": true,
-      "**/.pytest_cache/": true,
-      "**/__pycache__/": true
-    },
-    "python.formatting.provider": "black",
-    "python.formatting.blackPath": "uv run black",
-    "editor.formatOnSave": true,
-    "[python]": {
-      "editor.defaultFormatter": "ms-python.python"
-    }
+  "files.exclude": {
+    "**/*.egg-info/": true,
+    "**/.pytest_cache/": true,
+    "**/__pycache__/": true
+  },
+  "python.formatting.provider": "black",
+  "python.formatting.blackPath": "uv run black",
+  "editor.formatOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python"
+  }
 }
