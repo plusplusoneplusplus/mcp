@@ -52,6 +52,20 @@ from .tools import (
 
 from .visualizations import visualization_api
 
+from .dataframes import (
+    api_list_dataframes,
+    api_get_dataframe_detail,
+    api_get_storage_stats,
+    api_get_dataframe_data,
+    api_get_dataframe_summary,
+    api_execute_dataframe_operation,
+    api_delete_dataframe,
+    api_cleanup_expired_dataframes,
+    api_upload_dataframe,
+    api_load_dataframe_from_url,
+    api_export_dataframe,
+)
+
 # Aggregate all routes into a single list
 api_routes = [
     # Knowledge management endpoints
@@ -98,4 +112,17 @@ api_routes = [
     Route("/api/visualizations/execution-timeline", endpoint=visualization_api.get_execution_timeline, methods=["GET"]),
     Route("/api/visualizations/critical-path", endpoint=visualization_api.get_critical_path, methods=["GET"]),
     Route("/api/visualizations/status-overview", endpoint=visualization_api.get_status_overview, methods=["GET"]),
+
+    # DataFrame management endpoints - specific routes first, then generic ones
+    Route("/api/dataframes", endpoint=api_list_dataframes, methods=["GET"]),
+    Route("/api/dataframes/stats", endpoint=api_get_storage_stats, methods=["GET"]),
+    Route("/api/dataframes/cleanup", endpoint=api_cleanup_expired_dataframes, methods=["POST"]),
+    Route("/api/dataframes/upload", endpoint=api_upload_dataframe, methods=["POST"]),
+    Route("/api/dataframes/load-url", endpoint=api_load_dataframe_from_url, methods=["POST"]),
+    Route("/api/dataframes/{df_id}", endpoint=api_get_dataframe_detail, methods=["GET"]),
+    Route("/api/dataframes/{df_id}", endpoint=api_delete_dataframe, methods=["DELETE"]),
+    Route("/api/dataframes/{df_id}/data", endpoint=api_get_dataframe_data, methods=["GET"]),
+    Route("/api/dataframes/{df_id}/summary", endpoint=api_get_dataframe_summary, methods=["GET"]),
+    Route("/api/dataframes/{df_id}/execute", endpoint=api_execute_dataframe_operation, methods=["POST"]),
+    Route("/api/dataframes/{df_id}/export", endpoint=api_export_dataframe, methods=["POST"]),
 ]
