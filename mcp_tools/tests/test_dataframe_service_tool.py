@@ -71,9 +71,8 @@ class TestDataFrameServiceTool:
 
         # Check operation enum values
         operations = schema["properties"]["operation"]["enum"]
-        expected_operations = ["load_data", "head", "tail", "sample", "query", "describe", "info"]
-        for op in expected_operations:
-            assert op in operations
+        expected_operations = ["load_data", "execute"]
+        assert operations == expected_operations
 
         # Check load_data specific parameters
         params = schema["properties"]["parameters"]["properties"]
@@ -81,6 +80,9 @@ class TestDataFrameServiceTool:
         assert "file_type" in params
         assert "custom_id" in params
         assert "csv_options" in params
+        
+        # Check execute specific parameters
+        assert "pandas_expression" in params
 
     # Tests for load_data operation
     @pytest.mark.asyncio
@@ -389,7 +391,7 @@ class TestDataFrameServiceTool:
         finally:
             os.unlink(temp_file_path)
 
-    # Tests for non-load_data operations
+    # Tests for execute operation
     @pytest.mark.asyncio
     async def test_execute_tool_missing_operation(self, tool):
         """Test execute_tool with missing operation."""
@@ -399,18 +401,29 @@ class TestDataFrameServiceTool:
         assert "operation is required" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_tool_non_load_missing_dataframe_id(self, tool):
-        """Test execute_tool with non-load operation missing dataframe_id."""
+    async def test_execute_missing_dataframe_id(self, tool):
+        """Test execute operation with missing dataframe_id."""
         result = await tool.execute_tool({
-            "operation": "head"
+            "operation": "execute"
         })
 
         assert result["success"] is False
-        assert "dataframe_id is required for non-load operations" in result["error"]
+        assert "dataframe_id is required for execute operation" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_tool_dataframe_not_found(self, tool):
-        """Test execute_tool when DataFrame is not found."""
+    async def test_execute_missing_pandas_expression(self, tool):
+        """Test execute operation with missing pandas_expression."""
+        result = await tool.execute_tool({
+            "operation": "execute",
+            "dataframe_id": "test-123"
+        })
+
+        assert result["success"] is False
+        assert "pandas_expression parameter is required" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_execute_dataframe_not_found(self, tool):
+        """Test execute operation when DataFrame is not found."""
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=None)
@@ -418,131 +431,213 @@ class TestDataFrameServiceTool:
         with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "nonexistent-123",
-                "operation": "head"
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df.head()"}
             })
 
         assert result["success"] is False
         assert "not found or expired" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_tool_successful_head_operation(self, tool, sample_dataframe, mock_query_result):
-        """Test successful head operation execution."""
+    async def test_execute_successful_head_operation(self, tool, sample_dataframe):
+        """Test successful head operation using pandas expression."""
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
-        mock_manager.query_dataframe = AsyncMock(return_value=mock_query_result)
 
         with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
-                "operation": "head",
-                "parameters": {"n": 5}
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df.head(5)"}
             })
 
         assert result["success"] is True
         assert result["dataframe_id"] == "test-123"
-        assert result["operation"] == "head"
-        assert result["parameters"] == {"n": 5}
+        assert result["expression"] == "df.head(5)"
         assert result["result_shape"] == (5, 5)
+        assert "execution_time_ms" in result
 
     @pytest.mark.asyncio
-    async def test_execute_tool_large_result_handling(self, tool, sample_dataframe):
-        """Test handling of large results."""
-        large_df = pd.concat([sample_dataframe] * 2)  # 200 rows > 100 threshold
-        large_result = Mock()
-        large_result.data = large_df
-        large_result.operation = "sample"
-        large_result.parameters = {"n": 150}
-        large_result.execution_time_ms = 25.0
-        large_result.metadata = {"rows_returned": 200}
-
+    async def test_execute_query_operation(self, tool, sample_dataframe):
+        """Test query operation using pandas expression."""
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
-        mock_manager.query_dataframe = AsyncMock(return_value=large_result)
 
         with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
-                "operation": "sample",
-                "parameters": {"n": 150}
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df.query('age > 50')"}
+            })
+
+        assert result["success"] is True
+        assert result["dataframe_id"] == "test-123"
+        assert result["expression"] == "df.query('age > 50')"
+        # Should return rows where age > 50 (ages 51-119, so 69 rows)
+        assert result["result_shape"] == (69, 5)
+
+    @pytest.mark.asyncio
+    async def test_execute_describe_operation(self, tool, sample_dataframe):
+        """Test describe operation using pandas expression."""
+        mock_manager = AsyncMock()
+        mock_manager.start = AsyncMock()
+        mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
+
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
+            result = await tool.execute_tool({
+                "dataframe_id": "test-123",
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df.describe()"}
+            })
+
+        assert result["success"] is True
+        assert result["dataframe_id"] == "test-123"
+        assert result["expression"] == "df.describe()"
+        # describe() returns 8 rows (count, mean, std, min, 25%, 50%, 75%, max) for numeric columns
+        assert result["result_shape"][0] == 8
+
+    @pytest.mark.asyncio
+    async def test_execute_series_result(self, tool, sample_dataframe):
+        """Test handling of Series results."""
+        mock_manager = AsyncMock()
+        mock_manager.start = AsyncMock()
+        mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
+
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
+            result = await tool.execute_tool({
+                "dataframe_id": "test-123",
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df['age']"}
+            })
+
+        assert result["success"] is True
+        assert result["dataframe_id"] == "test-123"
+        assert result["expression"] == "df['age']"
+        # Series converted to DataFrame should have 100 rows, 1 column
+        assert result["result_shape"] == (100, 1)
+
+    @pytest.mark.asyncio
+    async def test_execute_scalar_result(self, tool, sample_dataframe):
+        """Test handling of scalar results."""
+        mock_manager = AsyncMock()
+        mock_manager.start = AsyncMock()
+        mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
+
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
+            result = await tool.execute_tool({
+                "dataframe_id": "test-123",
+                "operation": "execute",
+                "parameters": {"pandas_expression": "len(df)"}
+            })
+
+        # Debug: print the result if it fails
+        if not result["success"]:
+            print(f"Error: {result.get('error', 'Unknown error')}")
+        
+        assert result["success"] is True
+        assert result["dataframe_id"] == "test-123"
+        assert result["expression"] == "len(df)"
+        # Scalar result converted to DataFrame should have 1 row, 1 column
+        assert result["result_shape"] == (1, 1)
+        assert result["data"] == [{"result": 100}]
+
+    @pytest.mark.asyncio
+    async def test_execute_large_result_handling(self, tool, sample_dataframe):
+        """Test handling of large results."""
+        # Create a larger DataFrame for testing
+        large_df = pd.concat([sample_dataframe] * 2)  # 200 rows > 100 threshold
+        
+        mock_manager = AsyncMock()
+        mock_manager.start = AsyncMock()
+        mock_manager.get_dataframe = AsyncMock(return_value=large_df)
+
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
+            result = await tool.execute_tool({
+                "dataframe_id": "test-123",
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df"}
             })
 
         assert result["success"] is True
         assert "Large result with" in result["data"]
         assert "sample_data" in result
+        assert result["result_shape"] == (200, 5)
 
     @pytest.mark.asyncio
-    async def test_execute_tool_empty_result(self, tool, sample_dataframe):
+    async def test_execute_empty_result(self, tool, sample_dataframe):
         """Test handling of empty results."""
-        empty_result = Mock()
-        empty_result.data = pd.DataFrame()
-        empty_result.operation = "query"
-        empty_result.parameters = {"expr": "age > 200"}
-        empty_result.execution_time_ms = 5.0
-        empty_result.metadata = {"rows_returned": 0}
-
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
-        mock_manager.query_dataframe = AsyncMock(return_value=empty_result)
 
         with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
-                "operation": "query",
-                "parameters": {"expr": "age > 200"}
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df.query('age > 200')"}
             })
 
         assert result["success"] is True
         assert result["data"] == "No data returned (empty result)"
 
     @pytest.mark.asyncio
-    async def test_execute_tool_operation_failure(self, tool, sample_dataframe):
-        """Test handling of operation failures."""
+    async def test_execute_syntax_error(self, tool, sample_dataframe):
+        """Test handling of syntax errors in pandas expressions."""
         mock_manager = AsyncMock()
         mock_manager.start = AsyncMock()
         mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
-        mock_manager.query_dataframe = AsyncMock(return_value=None)
 
         with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
-                "operation": "head"
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df.head("}  # Invalid syntax
             })
 
         assert result["success"] is False
-        assert "Failed to execute" in result["error"]
+        assert "Invalid pandas expression syntax" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_tool_import_error(self, tool):
+    async def test_execute_runtime_error(self, tool, sample_dataframe):
+        """Test handling of runtime errors in pandas expressions."""
+        mock_manager = AsyncMock()
+        mock_manager.start = AsyncMock()
+        mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
+
+        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
+            result = await tool.execute_tool({
+                "dataframe_id": "test-123",
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df['nonexistent_column']"}
+            })
+
+        assert result["success"] is False
+        assert "Error executing pandas expression" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_execute_import_error(self, tool):
         """Test handling when DataFrame manager import fails."""
         with patch('utils.dataframe_manager.get_dataframe_manager', side_effect=ImportError("Module not found")):
             result = await tool.execute_tool({
                 "dataframe_id": "test-123",
-                "operation": "head"
+                "operation": "execute",
+                "parameters": {"pandas_expression": "df.head()"}
             })
 
         assert result["success"] is False
         assert "DataFrame management framework not available" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_execute_tool_value_error(self, tool, sample_dataframe):
-        """Test handling of ValueError during operation."""
-        mock_manager = AsyncMock()
-        mock_manager.start = AsyncMock()
-        mock_manager.get_dataframe = AsyncMock(return_value=sample_dataframe)
-        mock_manager.query_dataframe = AsyncMock(side_effect=ValueError("Invalid parameters"))
-
-        with patch('utils.dataframe_manager.get_dataframe_manager', return_value=mock_manager):
-            result = await tool.execute_tool({
-                "dataframe_id": "test-123",
-                "operation": "query",
-                "parameters": {"expr": "invalid_column > 30"}
-            })
+    async def test_execute_unknown_operation(self, tool):
+        """Test handling of unknown operations."""
+        result = await tool.execute_tool({
+            "operation": "unknown_operation"
+        })
 
         assert result["success"] is False
-        assert "Invalid operation parameters" in result["error"]
+        assert "Unknown operation: unknown_operation" in result["error"]
 
     def test_tool_registration(self):
         """Test that the tool is properly registered."""
