@@ -1,0 +1,1400 @@
+{% extends "base.html" %}
+
+{% block title %}DataFrame {{ df_id }} - MCP Knowledge Server{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2em;
+        flex-wrap: wrap;
+        gap: 1em;
+    }
+
+    .detail-title {
+        margin: 0;
+        color: #333;
+        flex: 1;
+    }
+
+    .detail-actions {
+        display: flex;
+        gap: 0.5em;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 0.5em 1em;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5em;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+        background: #0077cc;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #005fa3;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #545b62;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #218838;
+    }
+
+    .btn-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+
+    .btn-warning:hover {
+        background: #e0a800;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+    }
+
+    .metadata-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1em;
+        margin-bottom: 2em;
+    }
+
+    .metadata-card {
+        background: #fff;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #0077cc;
+    }
+
+    .metadata-card h4 {
+        margin: 0 0 1em 0;
+        color: #333;
+        font-size: 1.1em;
+    }
+
+    .metadata-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5em;
+        padding-bottom: 0.5em;
+        border-bottom: 1px solid #eee;
+    }
+
+    .metadata-item:last-child {
+        margin-bottom: 0;
+        border-bottom: none;
+    }
+
+    .metadata-label {
+        font-weight: bold;
+        color: #666;
+    }
+
+    .metadata-value {
+        color: #333;
+        text-align: right;
+    }
+
+    .status-badge {
+        padding: 0.25em 0.5em;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .status-active {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-expired {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .status-warning {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .tabs {
+        display: flex;
+        border-bottom: 2px solid #eee;
+        margin-bottom: 2em;
+        flex-wrap: wrap;
+    }
+
+    .tab {
+        padding: 1em 1.5em;
+        cursor: pointer;
+        border: none;
+        background: none;
+        font-size: 1em;
+        color: #666;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+    .tab:hover {
+        color: #0077cc;
+        background: #f8f9fa;
+    }
+
+    .tab.active {
+        color: #0077cc;
+        border-bottom-color: #0077cc;
+        font-weight: bold;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .panel {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        margin-bottom: 2em;
+    }
+
+    .panel-header {
+        background: #f8f9fa;
+        padding: 1em;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1em;
+    }
+
+    .panel-title {
+        margin: 0;
+        color: #333;
+        font-size: 1.1em;
+    }
+
+    .panel-content {
+        padding: 1.5em;
+    }
+
+    .controls-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1em;
+        margin-bottom: 1em;
+    }
+
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+    }
+
+    .control-label {
+        font-weight: bold;
+        color: #333;
+        font-size: 0.9em;
+    }
+
+    .control-input {
+        padding: 0.4em 0.8em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .quick-ops {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 0.5em;
+        margin-bottom: 2em;
+    }
+
+    .quick-op-btn {
+        padding: 0.75em;
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s ease;
+        font-size: 0.9em;
+    }
+
+    .quick-op-btn:hover {
+        background: #0077cc;
+        color: white;
+        border-color: #0077cc;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 0.75em;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+        border-right: 1px solid #eee;
+        white-space: nowrap;
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .data-table th {
+        background: #f8f9fa;
+        font-weight: bold;
+        color: #333;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .data-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .data-table td.null-value {
+        color: #999;
+        font-style: italic;
+    }
+
+    .data-table td.number {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5em;
+        padding: 1em;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .pagination button {
+        padding: 0.5em 1em;
+        border: 1px solid #ddd;
+        background: #fff;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+
+    .pagination button:hover:not(:disabled) {
+        background: #0077cc;
+        color: white;
+        border-color: #0077cc;
+    }
+
+    .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .pagination .page-info {
+        margin: 0 1em;
+        color: #666;
+        font-size: 0.9em;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 2em;
+        color: #666;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #0077cc;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5em;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .expression-input {
+        width: 100%;
+        min-height: 100px;
+        padding: 1em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        resize: vertical;
+    }
+
+    .examples-box {
+        margin-top: 1em;
+        padding: 1em;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border-left: 4px solid #0077cc;
+    }
+
+    .example-item {
+        margin-bottom: 0.5em;
+        font-family: 'Courier New', monospace;
+        font-size: 0.8em;
+        cursor: pointer;
+        color: #0077cc;
+    }
+
+    .example-item:hover {
+        text-decoration: underline;
+    }
+
+    .results-container {
+        margin-top: 2em;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        display: none;
+    }
+
+    .error-result {
+        color: #dc3545;
+        background: #f8d7da;
+        padding: 1em;
+        border-radius: 4px;
+        border-left: 4px solid #dc3545;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        white-space: pre-wrap;
+    }
+
+    .scalar-result {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #333;
+        text-align: center;
+        padding: 2em;
+    }
+
+    @media (max-width: 768px) {
+        .detail-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .detail-actions {
+            justify-content: center;
+        }
+
+        .metadata-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .controls-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .quick-ops {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <!-- Detail Header -->
+    <div class="detail-header">
+        <div>
+            <h2 class="detail-title">DataFrame: <span id="df-id">{{ df_id }}</span></h2>
+            <p style="margin: 0.5em 0 0 0; color: #666;">
+                <a href="/dataframes" style="color: #0077cc; text-decoration: none;">← Back to DataFrames</a>
+            </p>
+        </div>
+        <div class="detail-actions">
+            <button class="btn btn-success" onclick="showExportModal()">
+                📥 Export
+            </button>
+            <button class="btn btn-warning" onclick="refreshDataFrame()">
+                🔄 Refresh
+            </button>
+            <button class="btn btn-danger" onclick="deleteDataFrame()">
+                🗑️ Delete
+            </button>
+        </div>
+    </div>
+
+    <!-- Metadata Grid -->
+    <div class="metadata-grid">
+        <div class="metadata-card">
+            <h4>Basic Information</h4>
+            <div class="metadata-item">
+                <span class="metadata-label">ID:</span>
+                <span class="metadata-value" id="meta-id">-</span>
+            </div>
+            <div class="metadata-item">
+                <span class="metadata-label">Shape:</span>
+                <span class="metadata-value" id="meta-shape">-</span>
+            </div>
+            <div class="metadata-item">
+                <span class="metadata-label">Memory Usage:</span>
+                <span class="metadata-value" id="meta-memory">-</span>
+            </div>
+            <div class="metadata-item">
+                <span class="metadata-label">Status:</span>
+                <span class="metadata-value" id="meta-status">-</span>
+            </div>
+        </div>
+
+        <div class="metadata-card">
+            <h4>Timestamps</h4>
+            <div class="metadata-item">
+                <span class="metadata-label">Created:</span>
+                <span class="metadata-value" id="meta-created">-</span>
+            </div>
+            <div class="metadata-item">
+                <span class="metadata-label">Last Accessed:</span>
+                <span class="metadata-value" id="meta-accessed">-</span>
+            </div>
+            <div class="metadata-item">
+                <span class="metadata-label">Expires:</span>
+                <span class="metadata-value" id="meta-expires">-</span>
+            </div>
+        </div>
+
+        <div class="metadata-card">
+            <h4>Source Information</h4>
+            <div class="metadata-item">
+                <span class="metadata-label">Source:</span>
+                <span class="metadata-value" id="meta-source">-</span>
+            </div>
+            <div class="metadata-item">
+                <span class="metadata-label">Display Name:</span>
+                <span class="metadata-value" id="meta-display-name">-</span>
+            </div>
+            <div class="metadata-item">
+                <span class="metadata-label">Tags:</span>
+                <span class="metadata-value" id="meta-tags">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('preview')">Data Preview</button>
+        <button class="tab" onclick="showTab('operations')">Operations</button>
+        <button class="tab" onclick="showTab('summary')">Summary</button>
+    </div>
+
+    <!-- Data Preview Tab -->
+    <div id="tab-preview" class="tab-content active">
+        <div class="panel">
+            <div class="panel-header">
+                <h3 class="panel-title">Data Preview & Controls</h3>
+                <div style="display: flex; gap: 0.5em; align-items: center;">
+                    <label for="rows-selector">Rows:</label>
+                    <select id="rows-selector" class="control-input" onchange="loadPreviewData()">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Interactive Controls -->
+            <div class="panel-content">
+                <h4>Interactive Controls</h4>
+
+                <!-- Common Operations -->
+                <div style="margin-bottom: 2em;">
+                    <h5>Common Operations</h5>
+                    <div class="quick-ops">
+                        <button class="quick-op-btn" onclick="executeQuickOp('head()')">Head</button>
+                        <button class="quick-op-btn" onclick="executeQuickOp('tail()')">Tail</button>
+                        <button class="quick-op-btn" onclick="executeQuickOp('describe()')">Describe</button>
+                        <button class="quick-op-btn" onclick="executeQuickOp('info()')">Info</button>
+                        <button class="quick-op-btn" onclick="executeQuickOp('shape')">Shape</button>
+                        <button class="quick-op-btn" onclick="executeQuickOp('dtypes')">Data Types</button>
+                        <button class="quick-op-btn" onclick="executeQuickOp('isnull().sum()')">Null Count</button>
+                        <button class="quick-op-btn" onclick="executeQuickOp('nunique()')">Unique Count</button>
+                    </div>
+                </div>
+
+                <!-- Filtering and Sorting Controls -->
+                <div style="margin-bottom: 2em;">
+                    <h5>Filtering & Sorting</h5>
+                    <div class="controls-grid">
+                        <div class="control-group">
+                            <label class="control-label" for="column-filter">Filter by Column:</label>
+                            <select id="column-filter" class="control-input" onchange="updateFilterValue()">
+                                <option value="">Select column...</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="filter-value">Filter Value:</label>
+                            <input type="text" id="filter-value" class="control-input"
+                                placeholder="Enter filter value..." onkeyup="handleFilterKeyup(event)" disabled>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="sort-column">Sort by Column:</label>
+                            <select id="sort-column" class="control-input" onchange="applySorting()">
+                                <option value="">No sorting</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label class="control-label" for="sort-direction">Sort Direction:</label>
+                            <select id="sort-direction" class="control-input" onchange="applySorting()">
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Control Buttons -->
+                    <div style="display: flex; gap: 0.5em; flex-wrap: wrap;">
+                        <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                        <button class="btn btn-secondary" onclick="clearFilters()">Clear Filters</button>
+                        <button class="btn btn-success" onclick="exportCurrentView()">Export Current View</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Display -->
+            <div id="preview-loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                Loading data preview...
+            </div>
+
+            <div style="overflow-x: auto; max-height: 600px; overflow-y: auto;" id="preview-table-container">
+                <table class="data-table" id="preview-table">
+                    <thead id="preview-thead"></thead>
+                    <tbody id="preview-tbody"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="preview-pagination">
+                <button onclick="changePage(-1)" id="prev-btn">← Previous</button>
+                <span class="page-info" id="page-info">Page 1 of 1</span>
+                <button onclick="changePage(1)" id="next-btn">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Operations Tab -->
+    <div id="tab-operations" class="tab-content">
+        <div class="panel">
+            <div class="panel-header">
+                <h3 class="panel-title">DataFrame Operations</h3>
+            </div>
+            <div class="panel-content">
+                <!-- Pandas Expression Input -->
+                <div style="margin-bottom: 2em;">
+                    <label class="control-label" for="pandas-expression">
+                        Pandas Expression:
+                    </label>
+                    <textarea id="pandas-expression" class="expression-input"
+                        placeholder="Enter pandas expression (e.g., df.head(), df.describe(), df['column'].value_counts())"
+                        onkeydown="handleExpressionKeydown(event)"></textarea>
+
+                    <div style="margin-top: 0.5em; font-size: 0.8em; color: #666;">
+                        Use 'df' to reference the DataFrame. Press Ctrl+Enter to execute.
+                    </div>
+
+                    <div class="examples-box">
+                        <h5 style="margin: 0 0 0.5em 0; color: #333;">Example Expressions:</h5>
+                        <div class="example-item" onclick="setExpression('df.head(10)')">df.head(10)</div>
+                        <div class="example-item" onclick="setExpression('df.describe()')">df.describe()</div>
+                        <div class="example-item" onclick="setExpression('df.groupby(\'column\').mean()')">
+                            df.groupby('column').mean()</div>
+                        <div class="example-item" onclick="setExpression('df[df[\'column\'] > 0]')">df[df['column'] > 0]
+                        </div>
+                        <div class="example-item"
+                            onclick="setExpression('df.sort_values(\'column\', ascending=False)')">
+                            df.sort_values('column', ascending=False)</div>
+                    </div>
+
+                    <div style="text-align: right; margin-top: 1em;">
+                        <button class="btn btn-primary" onclick="executeExpression()">
+                            ▶️ Execute
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Container -->
+        <div class="results-container" id="results-container">
+            <div class="panel-header">
+                <h3 class="panel-title">Execution Results</h3>
+                <div style="font-size: 0.8em; color: #666;" id="execution-info"></div>
+            </div>
+            <div class="panel-content" id="results-content"></div>
+        </div>
+    </div>
+
+    <!-- Summary Tab -->
+    <div id="tab-summary" class="tab-content">
+        <div class="panel">
+            <div class="panel-header">
+                <h3 class="panel-title">DataFrame Summary</h3>
+            </div>
+            <div class="panel-content" id="summary-content">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading summary...
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Modal -->
+<div id="export-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Export DataFrame</h3>
+
+        <div style="margin-bottom: 1em;">
+            <label for="export-format">Format:</label>
+            <select id="export-format" style="width: 100%; margin-top: 0.5em; padding: 0.4em;">
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+                <option value="excel">Excel</option>
+                <option value="parquet">Parquet</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom: 1em;">
+            <label>
+                <input type="checkbox" id="export-index" checked>
+                Include index
+            </label>
+        </div>
+
+        <div style="margin-bottom: 2em;">
+            <label>
+                <input type="checkbox" id="export-header" checked>
+                Include header
+            </label>
+        </div>
+
+        <div style="text-align: right;">
+            <button class="btn btn-secondary" onclick="hideModal('export-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="performExport()" style="margin-left: 0.5em;">Export</button>
+        </div>
+
+        <div id="export-status" style="margin-top: 1em; display: none;"></div>
+    </div>
+</div>
+{% endblock %}{
+% block extra_scripts %}
+<script>
+    // Global variables
+    const dfId = '{{ df_id }}';
+    let dataframeMetadata = null;
+    let currentPage = 1;
+    let totalPages = 1;
+    let currentColumns = [];
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function () {
+        loadDataFrameMetadata();
+        loadPreviewData();
+    });
+
+    // Load DataFrame metadata
+    async function loadDataFrameMetadata() {
+        try {
+            const response = await fetch(`/api/dataframes/${dfId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                dataframeMetadata = data.dataframe;
+                updateMetadataDisplay();
+            } else {
+                alert('Error loading DataFrame: ' + (data.error || 'Unknown error'));
+                window.location.href = '/dataframes';
+            }
+        } catch (error) {
+            console.error('Error loading DataFrame metadata:', error);
+            alert('Error loading DataFrame: ' + error.message);
+            window.location.href = '/dataframes';
+        }
+    }
+
+    // Update metadata display
+    function updateMetadataDisplay() {
+        if (!dataframeMetadata) return;
+
+        const df = dataframeMetadata;
+
+        document.getElementById('meta-id').textContent = df.df_id;
+        document.getElementById('meta-shape').textContent = `${df.shape[0].toLocaleString()} × ${df.shape[1]}`;
+        document.getElementById('meta-memory').textContent = `${(df.memory_usage / (1024 * 1024)).toFixed(1)} MB`;
+
+        const status = getDataFrameStatus(df);
+        document.getElementById('meta-status').innerHTML = `<span class="status-badge status-${status.class}">${status.text}</span>`;
+
+        document.getElementById('meta-created').textContent = new Date(df.created_at).toLocaleString();
+        document.getElementById('meta-accessed').textContent = df.last_accessed ? new Date(df.last_accessed).toLocaleString() : 'Never';
+        document.getElementById('meta-expires').textContent = df.expires_at ? new Date(df.expires_at).toLocaleString() : 'Never';
+
+        document.getElementById('meta-source').textContent = df.source || 'Unknown';
+        document.getElementById('meta-display-name').textContent = (df.tags && df.tags.display_name) || df.df_id;
+
+        const tags = df.tags ? Object.entries(df.tags).filter(([k, v]) => k !== 'display_name').map(([k, v]) => `${k}: ${v}`).join(', ') : 'None';
+        document.getElementById('meta-tags').textContent = tags || 'None';
+    }
+
+    // Get DataFrame status
+    function getDataFrameStatus(df) {
+        if (df.is_expired) {
+            return { class: 'expired', text: 'Expired' };
+        }
+
+        if (df.expires_at) {
+            const expiresAt = new Date(df.expires_at);
+            const now = new Date();
+            const hoursUntilExpiry = (expiresAt - now) / (1000 * 60 * 60);
+
+            if (hoursUntilExpiry < 24) {
+                return { class: 'warning', text: 'Expiring Soon' };
+            }
+        }
+
+        return { class: 'active', text: 'Active' };
+    }
+
+    // Tab management
+    function showTab(tabName) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // Show selected tab
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        event.target.classList.add('active');
+
+        // Load tab-specific content
+        if (tabName === 'summary') {
+            loadSummary();
+        }
+    }
+
+    // Load data preview
+    async function loadPreviewData() {
+        const rowCount = document.getElementById('rows-selector').value;
+        document.getElementById('preview-loading').style.display = 'block';
+        document.getElementById('preview-table-container').style.display = 'none';
+
+        try {
+            const response = await fetch(`/api/dataframes/${dfId}/data?page=${currentPage}&page_size=${rowCount}`);
+            const data = await response.json();
+
+            if (data.success) {
+                currentColumns = data.columns;
+                renderPreviewTable(data.data, data.columns, data.dtypes);
+                updatePagination(data.page, Math.ceil(data.total_rows / parseInt(rowCount)), data.total_rows);
+                populateColumnSelectors(data.columns);
+            } else {
+                alert('Error loading data: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error loading preview data:', error);
+            alert('Error loading data: ' + error.message);
+        } finally {
+            document.getElementById('preview-loading').style.display = 'none';
+            document.getElementById('preview-table-container').style.display = 'block';
+        }
+    }
+
+    // Populate column selectors for filtering and sorting
+    function populateColumnSelectors(columns) {
+        const columnFilter = document.getElementById('column-filter');
+        const sortColumn = document.getElementById('sort-column');
+
+        // Clear existing options
+        columnFilter.innerHTML = '<option value="">Select column...</option>';
+        sortColumn.innerHTML = '<option value="">No sorting</option>';
+
+        // Add column options
+        columns.forEach(col => {
+            const filterOption = document.createElement('option');
+            filterOption.value = col;
+            filterOption.textContent = col;
+            columnFilter.appendChild(filterOption);
+
+            const sortOption = document.createElement('option');
+            sortOption.value = col;
+            sortOption.textContent = col;
+            sortColumn.appendChild(sortOption);
+        });
+    }
+
+    // Update filter value input based on selected column
+    function updateFilterValue() {
+        const selectedColumn = document.getElementById('column-filter').value;
+        const filterValue = document.getElementById('filter-value');
+
+        if (selectedColumn) {
+            filterValue.disabled = false;
+            filterValue.placeholder = `Filter ${selectedColumn}...`;
+        } else {
+            filterValue.disabled = true;
+            filterValue.placeholder = 'Select a column first';
+            filterValue.value = '';
+        }
+    }
+
+    // Handle filter input keyup
+    function handleFilterKeyup(event) {
+        if (event.key === 'Enter') {
+            applyFilters();
+        }
+    }
+
+    // Apply filters
+    async function applyFilters() {
+        const column = document.getElementById('column-filter').value;
+        const value = document.getElementById('filter-value').value;
+
+        if (!column || !value) {
+            alert('Please select a column and enter a filter value');
+            return;
+        }
+
+        const rowCount = document.getElementById('rows-selector').value;
+        document.getElementById('preview-loading').style.display = 'block';
+        document.getElementById('preview-table-container').style.display = 'none';
+
+        try {
+            const params = new URLSearchParams({
+                page: 1,
+                page_size: rowCount,
+                filter_column: column,
+                filter_value: value
+            });
+
+            const response = await fetch(`/api/dataframes/${dfId}/data?${params}`);
+            const data = await response.json();
+
+            if (data.success) {
+                renderPreviewTable(data.data, data.columns, data.dtypes);
+                updatePagination(data.page, Math.ceil(data.total_rows / parseInt(rowCount)), data.total_rows);
+                currentPage = 1;
+            } else {
+                alert('Error applying filters: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error applying filters:', error);
+            alert('Error applying filters: ' + error.message);
+        } finally {
+            document.getElementById('preview-loading').style.display = 'none';
+            document.getElementById('preview-table-container').style.display = 'block';
+        }
+    }
+
+    // Clear filters
+    function clearFilters() {
+        document.getElementById('column-filter').value = '';
+        document.getElementById('filter-value').value = '';
+        document.getElementById('sort-column').value = '';
+        updateFilterValue();
+        currentPage = 1;
+        loadPreviewData();
+    }
+
+    // Apply sorting
+    async function applySorting() {
+        const column = document.getElementById('sort-column').value;
+        const direction = document.getElementById('sort-direction').value;
+
+        if (!column) {
+            loadPreviewData();
+            return;
+        }
+
+        const rowCount = document.getElementById('rows-selector').value;
+        document.getElementById('preview-loading').style.display = 'block';
+        document.getElementById('preview-table-container').style.display = 'none';
+
+        try {
+            const params = new URLSearchParams({
+                page: currentPage,
+                page_size: rowCount,
+                sort_column: column,
+                sort_direction: direction
+            });
+
+            const response = await fetch(`/api/dataframes/${dfId}/data?${params}`);
+            const data = await response.json();
+
+            if (data.success) {
+                renderPreviewTable(data.data, data.columns, data.dtypes);
+                updatePagination(data.page, Math.ceil(data.total_rows / parseInt(rowCount)), data.total_rows);
+            } else {
+                alert('Error applying sorting: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error applying sorting:', error);
+            alert('Error applying sorting: ' + error.message);
+        } finally {
+            document.getElementById('preview-loading').style.display = 'none';
+            document.getElementById('preview-table-container').style.display = 'block';
+        }
+    }
+
+    // Export current view
+    async function exportCurrentView() {
+        const format = prompt('Export format (csv, json, excel, parquet):', 'csv');
+        if (!format) return;
+
+        const column = document.getElementById('column-filter').value;
+        const filterValue = document.getElementById('filter-value').value;
+        const sortColumn = document.getElementById('sort-column').value;
+        const sortDirection = document.getElementById('sort-direction').value;
+
+        try {
+            const exportData = {
+                format: format,
+                include_index: true,
+                include_header: true
+            };
+
+            // Add filtering and sorting parameters if they exist
+            if (column && filterValue) {
+                exportData.filter_column = column;
+                exportData.filter_value = filterValue;
+            }
+            if (sortColumn) {
+                exportData.sort_column = sortColumn;
+                exportData.sort_direction = sortDirection;
+            }
+
+            const response = await fetch(`/api/dataframes/${dfId}/export`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(exportData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Create download link
+                const blob = new Blob([atob(data.file_content)], { type: data.content_type });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                alert('Export completed successfully!');
+            } else {
+                alert('Error exporting data: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error exporting data:', error);
+            alert('Error exporting data: ' + error.message);
+        }
+    }
+
+    // Render preview table
+    function renderPreviewTable(data, columns, dtypes) {
+        const thead = document.getElementById('preview-thead');
+        const tbody = document.getElementById('preview-tbody');
+
+        // Clear existing content
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="100%" style="text-align: center; padding: 2em; color: #666;">No data available</td></tr>';
+            return;
+        }
+
+        // Create header
+        const headerRow = document.createElement('tr');
+        columns.forEach(col => {
+            const th = document.createElement('th');
+            th.textContent = col;
+            th.title = `${col} (${dtypes[col] || 'unknown'})`;
+            headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+
+        // Create data rows
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            columns.forEach(col => {
+                const td = document.createElement('td');
+                const value = row[col];
+
+                if (value === null || value === undefined) {
+                    td.textContent = 'null';
+                    td.classList.add('null-value');
+                } else if (typeof value === 'number') {
+                    td.textContent = value.toLocaleString();
+                    td.classList.add('number');
+                } else {
+                    td.textContent = String(value);
+                }
+
+                td.title = String(value);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Update pagination
+    function updatePagination(page, totalPgs, totalRows) {
+        currentPage = page;
+        totalPages = totalPgs;
+
+        document.getElementById('page-info').textContent = `Page ${page} of ${totalPgs} (${totalRows.toLocaleString()} rows)`;
+        document.getElementById('prev-btn').disabled = page <= 1;
+        document.getElementById('next-btn').disabled = page >= totalPgs;
+    }
+
+    // Change page
+    function changePage(direction) {
+        const newPage = currentPage + direction;
+        if (newPage >= 1 && newPage <= totalPages) {
+            currentPage = newPage;
+            loadPreviewData();
+        }
+    }
+
+    // Execute pandas expression
+    async function executeExpression() {
+        const expression = document.getElementById('pandas-expression').value.trim();
+        if (!expression) {
+            alert('Please enter a pandas expression');
+            return;
+        }
+
+        const resultsContainer = document.getElementById('results-container');
+        const resultsContent = document.getElementById('results-content');
+        const executionInfo = document.getElementById('execution-info');
+
+        resultsContainer.style.display = 'block';
+        resultsContent.innerHTML = '<div class="loading"><div class="spinner"></div>Executing expression...</div>';
+        executionInfo.textContent = '';
+
+        try {
+            const startTime = Date.now();
+            const response = await fetch(`/api/dataframes/${dfId}/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ expression: expression })
+            });
+            const data = await response.json();
+            const executionTime = Date.now() - startTime;
+
+            if (data.success) {
+                executionInfo.textContent = `Executed in ${executionTime}ms`;
+                renderExecutionResult(data.result);
+            } else {
+                resultsContent.innerHTML = `<div class="error-result">${data.error || 'Unknown error'}</div>`;
+                executionInfo.textContent = `Failed after ${executionTime}ms`;
+            }
+        } catch (error) {
+            console.error('Error executing expression:', error);
+            resultsContent.innerHTML = `<div class="error-result">Network error: ${error.message}</div>`;
+            executionInfo.textContent = 'Execution failed';
+        }
+    }
+
+    // Render execution result
+    function renderExecutionResult(result) {
+        const resultsContent = document.getElementById('results-content');
+
+        if (result.result_type === 'dataframe') {
+            // Render as table
+            const table = document.createElement('table');
+            table.className = 'data-table';
+
+            if (result.data && result.data.length > 0) {
+                const columns = Object.keys(result.data[0]);
+
+                // Header
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                columns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.textContent = col;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                // Body
+                const tbody = document.createElement('tbody');
+                result.data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    columns.forEach(col => {
+                        const td = document.createElement('td');
+                        const value = row[col];
+
+                        if (value === null || value === undefined) {
+                            td.textContent = 'null';
+                            td.classList.add('null-value');
+                        } else if (typeof value === 'number') {
+                            td.textContent = value.toLocaleString();
+                            td.classList.add('number');
+                        } else {
+                            td.textContent = String(value);
+                        }
+
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+            }
+
+            resultsContent.innerHTML = '';
+            resultsContent.appendChild(table);
+        } else if (result.result_type === 'scalar') {
+            resultsContent.innerHTML = `<div class="scalar-result">${result.data}</div>`;
+        } else {
+            // Series or other types
+            resultsContent.innerHTML = `<pre style="white-space: pre-wrap; font-family: 'Courier New', monospace;">${JSON.stringify(result.data, null, 2)}</pre>`;
+        }
+    }
+
+    // Quick operations
+    function executeQuickOp(expression) {
+        document.getElementById('pandas-expression').value = `df.${expression}`;
+        executeExpression();
+    }
+
+    // Set expression from examples
+    function setExpression(expression) {
+        document.getElementById('pandas-expression').value = expression;
+    }
+
+    // Handle keyboard shortcuts
+    function handleExpressionKeydown(event) {
+        if (event.ctrlKey && event.key === 'Enter') {
+            event.preventDefault();
+            executeExpression();
+        }
+    }
+
+    // Load summary
+    async function loadSummary() {
+        const summaryContent = document.getElementById('summary-content');
+        summaryContent.innerHTML = '<div class="loading"><div class="spinner"></div>Loading summary...</div>';
+
+        try {
+            const response = await fetch(`/api/dataframes/${dfId}/summary`);
+            const data = await response.json();
+
+            if (data.success) {
+                renderSummary(data.summary);
+            } else {
+                summaryContent.innerHTML = `<div class="error-result">Error loading summary: ${data.error}</div>`;
+            }
+        } catch (error) {
+            console.error('Error loading summary:', error);
+            summaryContent.innerHTML = `<div class="error-result">Error loading summary: ${error.message}</div>`;
+        }
+    }
+
+    // Render summary
+    function renderSummary(summary) {
+        const summaryContent = document.getElementById('summary-content');
+
+        let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1em;">';
+
+        // Basic stats
+        html += '<div style="background: #f8f9fa; padding: 1em; border-radius: 4px;">';
+        html += '<h4>Basic Statistics</h4>';
+        html += `<p><strong>Shape:</strong> ${summary.shape[0].toLocaleString()} rows × ${summary.shape[1]} columns</p>`;
+        html += `<p><strong>Memory Usage:</strong> ${(summary.memory_usage / (1024 * 1024)).toFixed(1)} MB</p>`;
+        html += `<p><strong>Non-null Values:</strong> ${summary.non_null_count.toLocaleString()}</p>`;
+        html += `<p><strong>Null Values:</strong> ${summary.null_count.toLocaleString()}</p>`;
+        html += '</div>';
+
+        // Data types
+        if (summary.dtypes) {
+            html += '<div style="background: #f8f9fa; padding: 1em; border-radius: 4px;">';
+            html += '<h4>Data Types</h4>';
+            Object.entries(summary.dtypes).forEach(([dtype, count]) => {
+                html += `<p><strong>${dtype}:</strong> ${count} columns</p>`;
+            });
+            html += '</div>';
+        }
+
+        html += '</div>';
+
+        summaryContent.innerHTML = html;
+    }
+
+    // Export functions
+    function showExportModal() {
+        showModal('export-modal');
+    }
+
+    async function performExport() {
+        const format = document.getElementById('export-format').value;
+        const includeIndex = document.getElementById('export-index').checked;
+        const includeHeader = document.getElementById('export-header').checked;
+
+        clearStatus('export-status');
+
+        try {
+            const response = await fetch(`/api/dataframes/${dfId}/export`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    format: format,
+                    include_index: includeIndex,
+                    include_header: includeHeader
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Create download link
+                const blob = new Blob([atob(data.file_content)], { type: data.content_type });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = data.filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showStatus('export-status', 'Export completed successfully!', false);
+                setTimeout(() => hideModal('export-modal'), 1500);
+            } else {
+                showStatus('export-status', 'Error: ' + (data.error || 'Unknown error'), true);
+            }
+        } catch (error) {
+            console.error('Error exporting DataFrame:', error);
+            showStatus('export-status', 'Error: ' + error.message, true);
+        }
+    }
+
+    // Delete DataFrame
+    function deleteDataFrame() {
+        if (confirm(`Are you sure you want to delete DataFrame "${dfId}"? This action cannot be undone.`)) {
+            performDelete();
+        }
+    }
+
+    async function performDelete() {
+        try {
+            const response = await fetch(`/api/dataframes/${dfId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                alert('DataFrame deleted successfully');
+                window.location.href = '/dataframes';
+            } else {
+                alert('Error deleting DataFrame: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting DataFrame:', error);
+            alert('Error deleting DataFrame: ' + error.message);
+        }
+    }
+
+    // Refresh DataFrame
+    function refreshDataFrame() {
+        loadDataFrameMetadata();
+        loadPreviewData();
+
+        // Refresh active tab content
+        const activeTab = document.querySelector('.tab.active').textContent.toLowerCase();
+        if (activeTab === 'summary') {
+            loadSummary();
+        }
+    }
+
+    // Utility functions
+    function showStatus(elementId, message, isError = false) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = message;
+            element.style.color = isError ? '#dc3545' : '#28a745';
+            element.style.display = 'block';
+        }
+    }
+
+    function clearStatus(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.textContent = '';
+            element.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

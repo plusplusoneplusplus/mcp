@@ -61,27 +61,27 @@
   - Create export progress tracking and file download handling
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 3. Create web interface templates and frontend components
+- [x] 3. Create web interface templates and frontend components
   - Build main DataFrame dashboard template
   - Create detailed DataFrame viewer template
   - Implement interactive controls and modals
   - _Requirements: 1.1, 1.2, 1.4, 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 3.1 Create DataFrame dashboard template
+- [x] 3.1 Create DataFrame dashboard template
   - Create `server/templates/dataframes.html` extending base template
   - Implement DataFrame list table with sortable columns
   - Add storage statistics display and visual indicators for expired DataFrames
   - Create action buttons for refresh, cleanup, and new data loading
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 7.1, 7.2, 7.3_
 
-- [ ] 3.2 Create DataFrame detail viewer template
+- [x] 3.2 Create DataFrame detail viewer template
   - Create `server/templates/dataframe_detail.html` for individual DataFrame view
   - Implement data preview table with pagination controls
   - Add pandas expression input form with syntax highlighting
   - Create operation result display area with formatting
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
-- [ ] 3.3 Implement interactive operation controls
+- [x] 3.3 Implement interactive operation controls
   - Create common operation buttons (head, tail, describe, info)
   - Implement filtering controls with column-based filters
   - Add sorting controls for data display
