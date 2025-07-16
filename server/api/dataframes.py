@@ -93,7 +93,7 @@ class ExecuteOperationResponse:
         self.error = error
 
     def to_dict(self) -> Dict[str, Any]:
-        response = {"success": self.success}
+        response: Dict[str, Any] = {"success": self.success}
         if self.result:
             response["result"] = self.result
         if self.error:
@@ -653,17 +653,18 @@ async def api_upload_dataframe(request: Request) -> JSONResponse:
 
         # Get uploaded file
         upload_file = form.get("file")
-        if not upload_file or not hasattr(upload_file, 'filename'):
+        if not isinstance(upload_file, UploadFile) or not upload_file.filename:
             return create_error_response(
                 APIError("MISSING_FILE", "No file uploaded or invalid file format")
             )
 
         # Get optional parameters
-        ttl_seconds = form.get("ttl_seconds")
-        if ttl_seconds:
+        ttl_seconds_str = form.get("ttl_seconds")
+        ttl_seconds: Optional[int] = None
+        if ttl_seconds_str and isinstance(ttl_seconds_str, str):
             try:
-                ttl_seconds = int(ttl_seconds)
-            except ValueError:
+                ttl_seconds = int(ttl_seconds_str)
+            except (ValueError, TypeError):
                 return create_error_response(
                     APIError("INVALID_TTL", "ttl_seconds must be a valid integer")
                 )
@@ -674,12 +675,13 @@ async def api_upload_dataframe(request: Request) -> JSONResponse:
         # Get file format options
         csv_separator = form.get("csv_separator", ",")
         csv_encoding = form.get("csv_encoding", "utf-8")
-        excel_sheet = form.get("excel_sheet", 0)
-        if excel_sheet != 0:
+        excel_sheet_str = form.get("excel_sheet", "0")
+        excel_sheet: Union[int, str] = 0
+        if excel_sheet_str != "0" and isinstance(excel_sheet_str, str):
             try:
-                excel_sheet = int(excel_sheet)
-            except ValueError:
-                excel_sheet = str(excel_sheet)  # Sheet name
+                excel_sheet = int(excel_sheet_str)
+            except (ValueError, TypeError):
+                excel_sheet = excel_sheet_str  # Sheet name
 
         # Read file content
         file_content = await upload_file.read()
@@ -738,7 +740,7 @@ async def api_upload_dataframe(request: Request) -> JSONResponse:
             }
 
             # Add display name if provided
-            if display_name:
+            if display_name and isinstance(display_name, str):
                 tags["display_name"] = display_name
 
             # Store DataFrame
@@ -1051,7 +1053,7 @@ async def api_batch_delete_dataframes(request: Request) -> JSONResponse:
                 failed_deletions.append(df_id)
 
         # Create response
-        response_data = {
+        response_data: Dict[str, Any] = {
             "batch_deleted": True,
             "requested_count": len(df_ids),
             "deleted_count": deleted_count,
@@ -1063,7 +1065,7 @@ async def api_batch_delete_dataframes(request: Request) -> JSONResponse:
 
         if failed_deletions:
             response_data["failed_deletions"] = failed_deletions
-            response_data["message"] += f", {len(failed_deletions)} failed"
+            response_data["message"] = response_data["message"] + f", {len(failed_deletions)} failed"
 
         return create_success_response(response_data)
 
