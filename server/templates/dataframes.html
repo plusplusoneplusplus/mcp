@@ -948,17 +948,198 @@
             return;
         }
 
-        showToast('File upload functionality coming soon!', 'info');
+        const displayName = document.getElementById('upload-display-name').value.trim();
+        const format = document.getElementById('upload-format').value;
+        const hasHeader = document.getElementById('upload-has-header').checked;
+        const uploadBtn = document.getElementById('upload-btn');
+        const progressContainer = document.getElementById('upload-progress');
+        const progressBar = document.getElementById('upload-progress-bar');
+        const progressText = document.getElementById('upload-progress-text');
+
+        // Disable upload button and show progress
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Uploading...';
+        progressContainer.style.display = 'block';
+
+        // Upload files one by one
+        let successCount = 0;
+        let errorCount = 0;
+        const totalFiles = files.length;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const currentProgress = ((i + 1) / totalFiles) * 100;
+
+            try {
+                progressText.textContent = `Uploading ${file.name} (${i + 1}/${totalFiles})...`;
+                progressBar.style.width = `${currentProgress}%`;
+
+                // Validate file size (100MB limit)
+                if (file.size > 100 * 1024 * 1024) {
+                    throw new Error(`File ${file.name} is too large (max 100MB)`);
+                }
+
+                // Create form data
+                const formData = new FormData();
+                formData.append('file', file);
+
+                if (displayName && totalFiles === 1) {
+                    formData.append('display_name', displayName);
+                }
+
+                if (format !== 'auto') {
+                    formData.append('format', format);
+                }
+
+                formData.append('has_header', hasHeader);
+
+                // Upload file
+                const response = await fetch('/api/dataframes/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    successCount++;
+                    showToast(`Successfully uploaded ${file.name}`, 'success');
+                } else {
+                    errorCount++;
+                    showToast(`Failed to upload ${file.name}: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                errorCount++;
+                console.error(`Error uploading ${file.name}:`, error);
+                showToast(`Failed to upload ${file.name}: ${error.message}`, 'error');
+            }
+        }
+
+        // Show final status
+        progressBar.style.width = '100%';
+        if (successCount > 0) {
+            progressText.textContent = `Completed: ${successCount} successful, ${errorCount} failed`;
+
+            // Refresh dashboard after successful uploads
+            setTimeout(() => {
+                refreshDashboard();
+                hideModal('upload-modal');
+            }, 2000);
+        } else {
+            progressText.textContent = `Upload failed for all files`;
+
+            // Hide modal after delay
+            setTimeout(() => {
+                hideModal('upload-modal');
+            }, 3000);
+        }
+
+        // Re-enable upload button
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload';
     }
 
     async function loadFromUrl() {
-        const url = document.getElementById('url-input').value;
+        const url = document.getElementById('url-input').value.trim();
         if (!url) {
             showToast('Please enter a URL', 'error');
             return;
         }
 
-        showToast('URL loading functionality coming soon!', 'info');
+        // Basic URL validation
+        try {
+            new URL(url);
+        } catch (error) {
+            showToast('Please enter a valid URL', 'error');
+            return;
+        }
+
+        const displayName = document.getElementById('url-display-name').value.trim();
+        const format = document.getElementById('url-format').value;
+        const hasHeader = document.getElementById('url-has-header').checked;
+        const loadBtn = document.getElementById('url-load-btn');
+        const progressContainer = document.getElementById('url-progress');
+        const progressBar = document.getElementById('url-progress-bar');
+        const progressText = document.getElementById('url-progress-text');
+
+        // Disable load button and show progress
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Loading...';
+        progressContainer.style.display = 'block';
+        progressText.textContent = 'Connecting to URL...';
+        progressBar.style.width = '10%';
+
+        try {
+            // Prepare request data
+            const requestData = {
+                url: url,
+                format: format,
+                has_header: hasHeader
+            };
+
+            if (displayName) {
+                requestData.display_name = displayName;
+            }
+
+            // Update progress
+            progressText.textContent = 'Downloading data...';
+            progressBar.style.width = '50%';
+
+            // Make API request
+            const response = await fetch('/api/dataframes/load-url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            // Update progress
+            progressText.textContent = 'Processing data...';
+            progressBar.style.width = '80%';
+
+            const result = await response.json();
+
+            if (result.success) {
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Data loaded successfully!';
+
+                showToast(`Successfully loaded data from URL into DataFrame ${result.df_id}`, 'success');
+
+                // Refresh dashboard and close modal after short delay
+                setTimeout(() => {
+                    refreshDashboard();
+                    hideModal('url-modal');
+                }, 1500);
+
+            } else {
+                throw new Error(result.error || 'Failed to load data from URL');
+            }
+
+        } catch (error) {
+            console.error('Error loading from URL:', error);
+            progressText.textContent = 'Load failed';
+            progressBar.style.width = '0%';
+
+            let errorMessage = error.message;
+            if (error.message.includes('fetch')) {
+                errorMessage = 'Network error: Could not connect to the URL';
+            } else if (error.message.includes('JSON')) {
+                errorMessage = 'Invalid server response';
+            }
+
+            showToast(`Failed to load data: ${errorMessage}`, 'error');
+
+            // Hide modal after delay
+            setTimeout(() => {
+                hideModal('url-modal');
+            }, 3000);
+        } finally {
+            // Re-enable load button
+            loadBtn.disabled = false;
+            loadBtn.textContent = 'Load Data';
+        }
     }
 
     async function deleteDataFrame(dfId) {

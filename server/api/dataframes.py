@@ -668,6 +668,9 @@ async def api_upload_dataframe(request: Request) -> JSONResponse:
                     APIError("INVALID_TTL", "ttl_seconds must be a valid integer")
                 )
 
+        # Get optional display name
+        display_name = form.get("display_name")
+
         # Get file format options
         csv_separator = form.get("csv_separator", ",")
         csv_encoding = form.get("csv_encoding", "utf-8")
@@ -733,6 +736,10 @@ async def api_upload_dataframe(request: Request) -> JSONResponse:
                 "file_format": file_ext,
                 "upload_timestamp": datetime.now().isoformat()
             }
+
+            # Add display name if provided
+            if display_name:
+                tags["display_name"] = display_name
 
             # Store DataFrame
             df_id = await manager.store_dataframe(
@@ -808,6 +815,9 @@ async def api_load_dataframe_from_url(request: Request) -> JSONResponse:
                 return create_error_response(
                     APIError("INVALID_TTL", "ttl_seconds must be a valid integer")
                 )
+
+        # Get optional display name
+        display_name = body.get("display_name")
 
         # Get file format options
         file_format = body.get("format", "auto")  # auto-detect by default
@@ -897,6 +907,10 @@ async def api_load_dataframe_from_url(request: Request) -> JSONResponse:
                     "load_timestamp": datetime.now().isoformat(),
                     "content_type": content_type
                 }
+
+                # Add display name if provided
+                if display_name:
+                    tags["display_name"] = display_name
 
                 # Store DataFrame
                 df_id = await manager.store_dataframe(
