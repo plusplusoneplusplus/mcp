@@ -51,6 +51,7 @@ class DataFrameDetailResponse:
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
+            "success": True,
             "df_id": self.df_id,
             "metadata": self.metadata
         }
@@ -74,6 +75,7 @@ class DataFrameDataResponse:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "success": True,
             "data": self.data,
             "columns": self.columns,
             "dtypes": self.dtypes,
@@ -93,7 +95,7 @@ class ExecuteOperationResponse:
         self.error = error
 
     def to_dict(self) -> Dict[str, Any]:
-        response = {"success": self.success}
+        response: Dict[str, Any] = {"success": self.success}
         if self.result:
             response["result"] = self.result
         if self.error:
@@ -393,7 +395,10 @@ async def api_get_dataframe_summary(request: Request) -> JSONResponse:
                 status_code=404
             )
 
-        return create_success_response(summary)
+        return create_success_response({
+            "success": True,
+            "summary": summary
+        })
 
     except Exception as e:
         logger.error(f"Error getting DataFrame summary: {e}")
@@ -416,10 +421,11 @@ async def api_execute_dataframe_operation(request: Request) -> JSONResponse:
                 APIError("INVALID_REQUEST_BODY", "Invalid JSON in request body")
             )
 
-        pandas_expression = body.get("pandas_expression")
+        # Support both 'pandas_expression' and 'expression' field names for backward compatibility
+        pandas_expression = body.get("pandas_expression") or body.get("expression")
         if not pandas_expression:
             return create_error_response(
-                APIError("MISSING_EXPRESSION", "pandas_expression is required")
+                APIError("MISSING_EXPRESSION", "pandas_expression (or expression) is required")
             )
 
         # Get DataFrame manager
@@ -653,30 +659,35 @@ async def api_upload_dataframe(request: Request) -> JSONResponse:
 
         # Get uploaded file
         upload_file = form.get("file")
-        if not upload_file or not hasattr(upload_file, 'filename'):
+        if not isinstance(upload_file, UploadFile) or not upload_file.filename:
             return create_error_response(
                 APIError("MISSING_FILE", "No file uploaded or invalid file format")
             )
 
         # Get optional parameters
-        ttl_seconds = form.get("ttl_seconds")
-        if ttl_seconds:
+        ttl_seconds_str = form.get("ttl_seconds")
+        ttl_seconds: Optional[int] = None
+        if ttl_seconds_str and isinstance(ttl_seconds_str, str):
             try:
-                ttl_seconds = int(ttl_seconds)
-            except ValueError:
+                ttl_seconds = int(ttl_seconds_str)
+            except (ValueError, TypeError):
                 return create_error_response(
                     APIError("INVALID_TTL", "ttl_seconds must be a valid integer")
                 )
 
+        # Get optional display name
+        display_name = form.get("display_name")
+
         # Get file format options
         csv_separator = form.get("csv_separator", ",")
         csv_encoding = form.get("csv_encoding", "utf-8")
-        excel_sheet = form.get("excel_sheet", 0)
-        if excel_sheet != 0:
+        excel_sheet_str = form.get("excel_sheet", "0")
+        excel_sheet: Union[int, str] = 0
+        if excel_sheet_str != "0" and isinstance(excel_sheet_str, str):
             try:
-                excel_sheet = int(excel_sheet)
-            except ValueError:
-                excel_sheet = str(excel_sheet)  # Sheet name
+                excel_sheet = int(excel_sheet_str)
+            except (ValueError, TypeError):
+                excel_sheet = excel_sheet_str  # Sheet name
 
         # Read file content
         file_content = await upload_file.read()
@@ -733,6 +744,10 @@ async def api_upload_dataframe(request: Request) -> JSONResponse:
                 "file_format": file_ext,
                 "upload_timestamp": datetime.now().isoformat()
             }
+
+            # Add display name if provided
+            if display_name and isinstance(display_name, str):
+                tags["display_name"] = display_name
 
             # Store DataFrame
             df_id = await manager.store_dataframe(
@@ -808,6 +823,9 @@ async def api_load_dataframe_from_url(request: Request) -> JSONResponse:
                 return create_error_response(
                     APIError("INVALID_TTL", "ttl_seconds must be a valid integer")
                 )
+
+        # Get optional display name
+        display_name = body.get("display_name")
 
         # Get file format options
         file_format = body.get("format", "auto")  # auto-detect by default
@@ -897,6 +915,10 @@ async def api_load_dataframe_from_url(request: Request) -> JSONResponse:
                     "load_timestamp": datetime.now().isoformat(),
                     "content_type": content_type
                 }
+
+                # Add display name if provided
+                if display_name:
+                    tags["display_name"] = display_name
 
                 # Store DataFrame
                 df_id = await manager.store_dataframe(
@@ -1037,7 +1059,7 @@ async def api_batch_delete_dataframes(request: Request) -> JSONResponse:
                 failed_deletions.append(df_id)
 
         # Create response
-        response_data = {
+        response_data: Dict[str, Any] = {
             "batch_deleted": True,
             "requested_count": len(df_ids),
             "deleted_count": deleted_count,
@@ -1049,7 +1071,7 @@ async def api_batch_delete_dataframes(request: Request) -> JSONResponse:
 
         if failed_deletions:
             response_data["failed_deletions"] = failed_deletions
-            response_data["message"] += f", {len(failed_deletions)} failed"
+            response_data["message"] = response_data["message"] + f", {len(failed_deletions)} failed"
 
         return create_success_response(response_data)
 

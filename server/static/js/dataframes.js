@@ -35,7 +35,7 @@ class DataFrameAPI {
             const data = await response.json();
 
             if (!data.success) {
-                throw new Error(data.error || 'Unknown API error');
+                throw new Error(data.error?.message || data.error || 'Unknown API error');
             }
 
             return data;
@@ -130,7 +130,7 @@ class DataFrameAPI {
         return await this.request(`/${dfId}/execute`, {
             method: 'POST',
             body: JSON.stringify({
-                expression,
+                pandas_expression: expression,
                 return_type: options.returnType || 'auto',
                 timeout: options.timeout || 30
             })
@@ -138,7 +138,7 @@ class DataFrameAPI {
     }
 
     /**
-     * Upload file and create DataFrame
+     * Upload file and create DataFrame with enhanced progress tracking and cancellation
      */
     async uploadFile(file, options = {}) {
         const formData = new FormData();
@@ -150,29 +150,47 @@ class DataFrameAPI {
         if (options.hasHeader !== undefined) formData.append('has_header', options.hasHeader);
 
         // Handle progress tracking
-        const requestId = `upload_${file.name}`;
+        const requestId = `upload_${file.name}_${Date.now()}`;
 
         return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
 
-            // Progress tracking
+            // Store xhr for potential cancellation
+            this.activeUploads = this.activeUploads || new Map();
+            this.activeUploads.set(requestId, xhr);
+
+            // Progress tracking with detailed stages
             xhr.upload.addEventListener('progress', (event) => {
                 if (event.lengthComputable) {
                     const progress = (event.loaded / event.total) * 100;
-                    this.notifyProgress(requestId, progress, 'Uploading file...');
+                    let message = 'Uploading file...';
+
+                    if (progress < 10) {
+                        message = 'Starting upload...';
+                    } else if (progress < 50) {
+                        message = 'Uploading file...';
+                    } else if (progress < 90) {
+                        message = 'Almost done...';
+                    } else {
+                        message = 'Processing file...';
+                    }
+
+                    this.notifyProgress(requestId, progress, message);
                 }
             });
 
             xhr.addEventListener('load', () => {
                 this.setLoading(requestId, false);
+                this.activeUploads.delete(requestId);
 
                 if (xhr.status >= 200 && xhr.status < 300) {
                     try {
                         const data = JSON.parse(xhr.responseText);
                         if (data.success) {
+                            this.notifyProgress(requestId, 100, 'Upload completed successfully');
                             resolve(data);
                         } else {
-                            reject(new Error(data.error || 'Upload failed'));
+                            reject(new Error(data.error?.message || data.error || 'Upload failed'));
                         }
                     } catch (error) {
                         reject(new Error('Invalid response format'));
@@ -184,33 +202,126 @@ class DataFrameAPI {
 
             xhr.addEventListener('error', () => {
                 this.setLoading(requestId, false);
+                this.activeUploads.delete(requestId);
                 reject(new Error('Network error during upload'));
             });
 
             xhr.addEventListener('abort', () => {
                 this.setLoading(requestId, false);
+                this.activeUploads.delete(requestId);
                 reject(new Error('Upload cancelled'));
             });
 
             this.setLoading(requestId, true);
+            this.notifyProgress(requestId, 0, 'Preparing upload...');
+
             xhr.open('POST', `${this.baseUrl}/upload`);
             xhr.send(formData);
         });
     }
 
     /**
-     * Load DataFrame from URL
+     * Cancel active upload
+     */
+    cancelUpload(requestId) {
+        if (this.activeUploads && this.activeUploads.has(requestId)) {
+            const xhr = this.activeUploads.get(requestId);
+            xhr.abort();
+            this.activeUploads.delete(requestId);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get active uploads
+     */
+    getActiveUploads() {
+        return this.activeUploads ? Array.from(this.activeUploads.keys()) : [];
+    }
+
+    /**
+     * Detect file format from filename
+     */
+    static detectFileFormat(filename) {
+        const extension = filename.toLowerCase().split('.').pop();
+        const formatMap = {
+            'csv': 'csv',
+            'json': 'json',
+            'xlsx': 'excel',
+            'xls': 'excel',
+            'parquet': 'parquet',
+            'pq': 'parquet'
+        };
+        return formatMap[extension] || 'auto';
+    }
+
+    /**
+     * Validate file before upload
+     */
+    static validateFile(file, options = {}) {
+        const errors = [];
+        const maxSize = options.maxSize || 100 * 1024 * 1024; // 100MB default
+        const allowedTypes = options.allowedTypes || [
+            'text/csv',
+            'application/json',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/octet-stream' // For parquet files
+        ];
+
+        // Check file size
+        if (file.size > maxSize) {
+            errors.push(`File size (${DataFrameFormatter.formatMemorySize(file.size)}) exceeds maximum allowed size (${DataFrameFormatter.formatMemorySize(maxSize)})`);
+        }
+
+        // Check file type (basic check)
+        const detectedFormat = this.detectFileFormat(file.name);
+        if (detectedFormat === 'auto' && !allowedTypes.includes(file.type)) {
+            errors.push(`File type "${file.type}" is not supported. Please use CSV, JSON, Excel, or Parquet files.`);
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors,
+            detectedFormat
+        };
+    }
+
+    /**
+     * Load DataFrame from URL with progress tracking
      */
     async loadFromUrl(url, options = {}) {
-        return await this.request('/load-url', {
-            method: 'POST',
-            body: JSON.stringify({
-                url,
-                format: options.format || 'auto',
-                display_name: options.displayName,
-                has_header: options.hasHeader !== undefined ? options.hasHeader : true
-            })
-        });
+        const requestId = `load-url_${Date.now()}`;
+
+        // Start progress tracking
+        this.notifyProgress(requestId, 0, 'Initiating URL load...');
+
+        try {
+            // Simulate progress updates for URL loading
+            const progressInterval = setInterval(() => {
+                const currentProgress = Math.min(90, Math.random() * 80 + 10);
+                this.notifyProgress(requestId, currentProgress, 'Loading data from URL...');
+            }, 500);
+
+            const result = await this.request('/load-url', {
+                method: 'POST',
+                body: JSON.stringify({
+                    url,
+                    format: options.format || 'auto',
+                    display_name: options.displayName,
+                    has_header: options.hasHeader !== undefined ? options.hasHeader : true
+                })
+            });
+
+            clearInterval(progressInterval);
+            this.notifyProgress(requestId, 100, 'Data loaded successfully');
+
+            return result;
+        } catch (error) {
+            this.notifyProgress(requestId, 0, 'Load failed');
+            throw error;
+        }
     }
 
     /**
@@ -406,7 +517,7 @@ class DataFrameFormatter {
             const hoursUntilExpiry = (expiresAt - now) / (1000 * 60 * 60);
 
             if (hoursUntilExpiry < 24) {
-                return { class: 'warning', text: 'Expiring Soon' };
+                return { class: 'warning', text: `Expires ${expiresAt.toLocaleString()}` };
             }
         }
 

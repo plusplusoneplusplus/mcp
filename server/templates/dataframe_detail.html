@@ -258,6 +258,7 @@
         text-align: center;
         transition: all 0.2s ease;
         font-size: 0.9em;
+        color: #333;
     }
 
     .quick-op-btn:hover {
@@ -324,6 +325,7 @@
         cursor: pointer;
         border-radius: 4px;
         transition: all 0.2s ease;
+        color: #333;
     }
 
     .pagination button:hover:not(:disabled) {
@@ -740,8 +742,9 @@
         <div id="export-status" style="margin-top: 1em; display: none;"></div>
     </div>
 </div>
-{% endblock %}{
-% block extra_scripts %}
+{% endblock %}
+
+{% block extra_scripts %}
 <script>
     // Global variables
     const dfId = '{{ df_id }}';
@@ -749,6 +752,9 @@
     let currentPage = 1;
     let totalPages = 1;
     let currentColumns = [];
+
+    // Initialize API client
+    const dataframeAPI = new DataFrameAPI();
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', function () {
@@ -760,17 +766,33 @@
     async function loadDataFrameMetadata() {
         try {
             const response = await fetch(`/api/dataframes/${dfId}`);
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.error('DataFrame metadata loading error: 404 Not Found');
+                    alert('DataFrame not found. It may have been deleted or expired.');
+                } else {
+                    console.error(`DataFrame metadata loading error: HTTP ${response.status}`);
+                    alert(`Error loading DataFrame: HTTP ${response.status}`);
+                }
+                window.location.href = '/dataframes';
+                return;
+            }
+
             const data = await response.json();
 
-            if (data.success) {
-                dataframeMetadata = data.dataframe;
+            if (data.success !== false && data.metadata) {
+                dataframeMetadata = data.metadata;
                 updateMetadataDisplay();
             } else {
-                alert('Error loading DataFrame: ' + (data.error || 'Unknown error'));
+                const errorMessage = data.error?.message || data.error || 'Unknown error';
+                console.error('DataFrame metadata loading error:', data);
+                alert('Error loading DataFrame: ' + errorMessage);
                 window.location.href = '/dataframes';
             }
         } catch (error) {
             console.error('Error loading DataFrame metadata:', error);
+            console.error('DataFrame metadata catch error details:', { dfId, error: error.message, stack: error.stack });
             alert('Error loading DataFrame: ' + error.message);
             window.location.href = '/dataframes';
         }
@@ -812,7 +834,7 @@
             const hoursUntilExpiry = (expiresAt - now) / (1000 * 60 * 60);
 
             if (hoursUntilExpiry < 24) {
-                return { class: 'warning', text: 'Expiring Soon' };
+                return { class: 'warning', text: `Expires ${expiresAt.toLocaleString()}` };
             }
         }
 
@@ -855,10 +877,12 @@
                 updatePagination(data.page, Math.ceil(data.total_rows / parseInt(rowCount)), data.total_rows);
                 populateColumnSelectors(data.columns);
             } else {
-                alert('Error loading data: ' + (data.error || 'Unknown error'));
+                console.error('Data preview loading error:', { dfId, currentPage, rowCount, response: data });
+                alert('Error loading data: ' + (data.error?.message || data.error || 'Unknown error'));
             }
         } catch (error) {
             console.error('Error loading preview data:', error);
+            console.error('Data preview catch error details:', { dfId, currentPage, rowCount, error: error.message, stack: error.stack });
             alert('Error loading data: ' + error.message);
         } finally {
             document.getElementById('preview-loading').style.display = 'none';
@@ -917,6 +941,7 @@
         const value = document.getElementById('filter-value').value;
 
         if (!column || !value) {
+            console.warn('Filter validation failed:', { column, value });
             alert('Please select a column and enter a filter value');
             return;
         }
@@ -941,10 +966,12 @@
                 updatePagination(data.page, Math.ceil(data.total_rows / parseInt(rowCount)), data.total_rows);
                 currentPage = 1;
             } else {
-                alert('Error applying filters: ' + (data.error || 'Unknown error'));
+                console.error('Filter application error:', { dfId, column, value, rowCount, response: data });
+                alert('Error applying filters: ' + (data.error?.message || data.error || 'Unknown error'));
             }
         } catch (error) {
             console.error('Error applying filters:', error);
+            console.error('Filter catch error details:', { dfId, column, value, rowCount, error: error.message, stack: error.stack });
             alert('Error applying filters: ' + error.message);
         } finally {
             document.getElementById('preview-loading').style.display = 'none';
@@ -991,10 +1018,12 @@
                 renderPreviewTable(data.data, data.columns, data.dtypes);
                 updatePagination(data.page, Math.ceil(data.total_rows / parseInt(rowCount)), data.total_rows);
             } else {
-                alert('Error applying sorting: ' + (data.error || 'Unknown error'));
+                console.error('Sorting application error:', { dfId, column, direction, rowCount, response: data });
+                alert('Error applying sorting: ' + (data.error?.message || data.error || 'Unknown error'));
             }
         } catch (error) {
             console.error('Error applying sorting:', error);
+            console.error('Sorting catch error details:', { dfId, column, direction, rowCount, error: error.message, stack: error.stack });
             alert('Error applying sorting: ' + error.message);
         } finally {
             document.getElementById('preview-loading').style.display = 'none';
@@ -1049,12 +1078,15 @@
                 window.URL.revokeObjectURL(url);
                 document.body.removeChild(a);
 
+                console.log('Export completed successfully:', { dfId, filename: data.filename, format });
                 alert('Export completed successfully!');
             } else {
-                alert('Error exporting data: ' + (data.error || 'Unknown error'));
+                console.error('Export error:', { dfId, format, exportData, response: data });
+                alert('Error exporting data: ' + (data.error?.message || data.error || 'Unknown error'));
             }
         } catch (error) {
             console.error('Error exporting data:', error);
+            console.error('Export catch error details:', { dfId, format, error: error.message, stack: error.stack });
             alert('Error exporting data: ' + error.message);
         }
     }
@@ -1450,7 +1482,8 @@
             if (data.success) {
                 renderSummary(data.summary);
             } else {
-                summaryContent.innerHTML = `<div class="error-result">Error loading summary: ${data.error}</div>`;
+                console.error('Summary loading error:', { dfId, response: data });
+                summaryContent.innerHTML = `<div class="error-result">Error loading summary: ${data.error?.message || data.error || 'Unknown error'}</div>`;
             }
         } catch (error) {
             console.error('Error loading summary:', error);

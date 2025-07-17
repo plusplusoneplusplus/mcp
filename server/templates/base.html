@@ -8,6 +8,8 @@
             font-family: Arial, sans-serif;
             margin: 0;
             background: #fafbfc;
+            padding-top: 80px;
+            /* Account for fixed navbar height */
         }
 
         /* Navigation Styles */
@@ -19,6 +21,11 @@
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
         }
 
         .navbar h1 {
@@ -71,6 +78,8 @@
 
         /* Shared component styles */
         .modal {
+            display: none;
+            /* Hidden by default */
             position: fixed;
             z-index: 1000;
             left: 0;
@@ -305,6 +314,11 @@
 
         /* Responsive design */
         @media (max-width: 768px) {
+            body {
+                padding-top: 140px;
+                /* More space for mobile navbar */
+            }
+
             .navbar {
                 flex-direction: column;
                 gap: 1em;

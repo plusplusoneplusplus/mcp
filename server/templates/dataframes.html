@@ -688,32 +688,43 @@
 
     async function refreshDashboard() {
         try {
-            DataFrameUI.showLoading('dataframes-table-content', 'Loading DataFrames...');
+            showLoading('dataframes-table-content', 'Loading DataFrames...');
 
             // Load DataFrames and statistics
             const [dataframesResponse, statsResponse] = await Promise.all([
-                dataframeAPI.getDataFrames(),
-                dataframeAPI.getStorageStats()
+                fetch('/api/dataframes').then(r => r.json()),
+                fetch('/api/dataframes/stats').then(r => r.json())
             ]);
 
-            dataframes = dataframesResponse.dataframes || [];
-            updateStatistics(statsResponse.storage_stats || {});
-            updateDataFramesTable();
+            // Handle dataframes response
+            if (dataframesResponse.dataframes !== undefined) {
+                dataframes = dataframesResponse.dataframes || [];
+            } else {
+                throw new Error('Invalid response format for DataFrames');
+            }
 
-            DataFrameUI.showToast('Dashboard refreshed successfully', 'success');
+            // Handle stats response - stats are returned directly, not nested under 'data'
+            if (statsResponse.dataframe_count !== undefined) {
+                updateStatistics(statsResponse);
+            } else {
+                throw new Error('Invalid response format for stats');
+            }
+
+            updateDataFramesTable();
+            showToast('Dashboard refreshed successfully', 'success');
         } catch (error) {
             console.error('Error refreshing dashboard:', error);
             document.getElementById('dataframes-table-content').innerHTML =
                 '<div class="empty-state">Error loading DataFrames. Please try again.</div>';
-            DataFrameUI.showToast('Failed to refresh dashboard', 'error');
+            showToast('Failed to refresh dashboard', 'error');
         }
     }
 
     function updateStatistics(stats) {
-        document.getElementById('total-dataframes').textContent = stats.total_dataframes || 0;
-        document.getElementById('total-memory').textContent = DataFrameFormatter.formatMemorySize(stats.total_memory_mb * 1024 * 1024 || 0);
+        document.getElementById('total-dataframes').textContent = stats.dataframe_count || 0;
+        document.getElementById('total-memory').textContent = formatMemorySize(stats.total_memory_mb * 1024 * 1024 || 0);
         document.getElementById('expired-count').textContent = stats.expired_count || 0;
-        document.getElementById('active-count').textContent = (stats.total_dataframes || 0) - (stats.expired_count || 0);
+        document.getElementById('active-count').textContent = (stats.dataframe_count || 0) - (stats.expired_count || 0);
 
         // Update stat card styling based on values
         const expiredCard = document.getElementById('expired-count').closest('.stat-card');
@@ -760,17 +771,17 @@
     `;
 
         filteredDataframes.forEach(df => {
-            const statusBadge = DataFrameFormatter.getStatusBadge(df);
+            const statusBadge = getStatusBadge(df);
             const displayName = df.tags?.display_name || df.df_id;
 
             html += `
             <tr>
                 ${batchMode ? `<td><input type="checkbox" onchange="toggleSelect('${df.df_id}')" ${selectedDataframes.has(df.df_id) ? 'checked' : ''}></td>` : ''}
-                <td><code>${DataFrameFormatter.truncateText(df.df_id, 12)}</code></td>
-                <td><strong>${DataFrameFormatter.truncateText(displayName, 20)}</strong></td>
-                <td>${DataFrameFormatter.formatShape(df.shape)}</td>
-                <td>${DataFrameFormatter.formatMemorySize(df.memory_usage)}</td>
-                <td>${DataFrameFormatter.formatDate(df.created_at)}</td>
+                <td><code>${truncateText(df.df_id, 12)}</code></td>
+                <td><strong>${truncateText(displayName, 20)}</strong></td>
+                <td>${formatShape(df.shape)}</td>
+                <td>${formatMemorySize(df.memory_usage)}</td>
+                <td>${formatDate(df.created_at)}</td>
                 <td><span class="status-badge ${statusBadge.class}">${statusBadge.text}</span></td>
                 <td class="actions">
                     <a href="/dataframes/${df.df_id}" class="btn btn-primary">View</a>
@@ -877,12 +888,12 @@
 
     // Modal functions
     function showUploadModal() {
-        DataFrameUI.showModal('upload-modal');
+        showModal('upload-modal');
         resetUploadForm();
     }
 
     function showUrlModal() {
-        DataFrameUI.showModal('url-modal');
+        showModal('url-modal');
         resetUrlForm();
     }
 
@@ -913,7 +924,7 @@
             <div class="upload-icon">📁</div>
             <div class="upload-text">
                 <strong>${files.length} file(s) selected:</strong><br>
-                ${DataFrameFormatter.truncateText(fileNames, 50)}
+                ${truncateText(fileNames, 50)}
             </div>
             <div class="upload-hint">Click to select different files</div>
         `;
@@ -933,71 +944,201 @@
     async function uploadFiles() {
         const files = document.getElementById('file-input').files;
         if (files.length === 0) {
-            DataFrameUI.showToast('Please select at least one file', 'error');
+            showToast('Please select at least one file', 'error');
             return;
         }
 
-        const displayName = document.getElementById('upload-display-name').value;
+        const displayName = document.getElementById('upload-display-name').value.trim();
         const format = document.getElementById('upload-format').value;
         const hasHeader = document.getElementById('upload-has-header').checked;
+        const uploadBtn = document.getElementById('upload-btn');
+        const progressContainer = document.getElementById('upload-progress');
+        const progressBar = document.getElementById('upload-progress-bar');
+        const progressText = document.getElementById('upload-progress-text');
 
-        document.getElementById('upload-progress').style.display = 'block';
-        document.getElementById('upload-btn').disabled = true;
+        // Disable upload button and show progress
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Uploading...';
+        progressContainer.style.display = 'block';
 
-        try {
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const options = {
-                    format: format === 'auto' ? null : format,
-                    displayName: displayName || null,
-                    hasHeader
-                };
+        // Upload files one by one
+        let successCount = 0;
+        let errorCount = 0;
+        const totalFiles = files.length;
 
-                await dataframeAPI.uploadFile(file, options);
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const currentProgress = ((i + 1) / totalFiles) * 100;
+
+            try {
+                progressText.textContent = `Uploading ${file.name} (${i + 1}/${totalFiles})...`;
+                progressBar.style.width = `${currentProgress}%`;
+
+                // Validate file size (100MB limit)
+                if (file.size > 100 * 1024 * 1024) {
+                    throw new Error(`File ${file.name} is too large (max 100MB)`);
+                }
+
+                // Create form data
+                const formData = new FormData();
+                formData.append('file', file);
+
+                if (displayName && totalFiles === 1) {
+                    formData.append('display_name', displayName);
+                }
+
+                if (format !== 'auto') {
+                    formData.append('format', format);
+                }
+
+                formData.append('has_header', hasHeader);
+
+                // Upload file
+                const response = await fetch('/api/dataframes/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    successCount++;
+                    showToast(`Successfully uploaded ${file.name}`, 'success');
+                } else {
+                    errorCount++;
+                    showToast(`Failed to upload ${file.name}: ${result.error}`, 'error');
+                }
+
+            } catch (error) {
+                errorCount++;
+                console.error(`Error uploading ${file.name}:`, error);
+                showToast(`Failed to upload ${file.name}: ${error.message}`, 'error');
             }
-
-            DataFrameUI.showToast(`Successfully uploaded ${files.length} file(s)`, 'success');
-            DataFrameUI.hideModal('upload-modal');
-            refreshDashboard();
-        } catch (error) {
-            DataFrameUI.showToast(`Upload failed: ${error.message}`, 'error');
-        } finally {
-            document.getElementById('upload-btn').disabled = false;
-            document.getElementById('upload-progress').style.display = 'none';
         }
+
+        // Show final status
+        progressBar.style.width = '100%';
+        if (successCount > 0) {
+            progressText.textContent = `Completed: ${successCount} successful, ${errorCount} failed`;
+
+            // Refresh dashboard after successful uploads
+            setTimeout(() => {
+                refreshDashboard();
+                hideModal('upload-modal');
+            }, 2000);
+        } else {
+            progressText.textContent = `Upload failed for all files`;
+
+            // Hide modal after delay
+            setTimeout(() => {
+                hideModal('upload-modal');
+            }, 3000);
+        }
+
+        // Re-enable upload button
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload';
     }
 
     async function loadFromUrl() {
-        const url = document.getElementById('url-input').value;
+        const url = document.getElementById('url-input').value.trim();
         if (!url) {
-            DataFrameUI.showToast('Please enter a URL', 'error');
+            showToast('Please enter a URL', 'error');
             return;
         }
 
-        const displayName = document.getElementById('url-display-name').value;
+        // Basic URL validation
+        try {
+            new URL(url);
+        } catch (error) {
+            showToast('Please enter a valid URL', 'error');
+            return;
+        }
+
+        const displayName = document.getElementById('url-display-name').value.trim();
         const format = document.getElementById('url-format').value;
         const hasHeader = document.getElementById('url-has-header').checked;
+        const loadBtn = document.getElementById('url-load-btn');
+        const progressContainer = document.getElementById('url-progress');
+        const progressBar = document.getElementById('url-progress-bar');
+        const progressText = document.getElementById('url-progress-text');
 
-        document.getElementById('url-progress').style.display = 'block';
-        document.getElementById('url-load-btn').disabled = true;
+        // Disable load button and show progress
+        loadBtn.disabled = true;
+        loadBtn.textContent = 'Loading...';
+        progressContainer.style.display = 'block';
+        progressText.textContent = 'Connecting to URL...';
+        progressBar.style.width = '10%';
 
         try {
-            const options = {
-                format: format === 'auto' ? null : format,
-                displayName: displayName || null,
-                hasHeader
+            // Prepare request data
+            const requestData = {
+                url: url,
+                format: format,
+                has_header: hasHeader
             };
 
-            await dataframeAPI.loadFromUrl(url, options);
+            if (displayName) {
+                requestData.display_name = displayName;
+            }
 
-            DataFrameUI.showToast('Successfully loaded data from URL', 'success');
-            DataFrameUI.hideModal('url-modal');
-            refreshDashboard();
+            // Update progress
+            progressText.textContent = 'Downloading data...';
+            progressBar.style.width = '50%';
+
+            // Make API request
+            const response = await fetch('/api/dataframes/load-url', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            // Update progress
+            progressText.textContent = 'Processing data...';
+            progressBar.style.width = '80%';
+
+            const result = await response.json();
+
+            if (result.success) {
+                progressBar.style.width = '100%';
+                progressText.textContent = 'Data loaded successfully!';
+
+                showToast(`Successfully loaded data from URL into DataFrame ${result.df_id}`, 'success');
+
+                // Refresh dashboard and close modal after short delay
+                setTimeout(() => {
+                    refreshDashboard();
+                    hideModal('url-modal');
+                }, 1500);
+
+            } else {
+                throw new Error(result.error || 'Failed to load data from URL');
+            }
+
         } catch (error) {
-            DataFrameUI.showToast(`Failed to load from URL: ${error.message}`, 'error');
+            console.error('Error loading from URL:', error);
+            progressText.textContent = 'Load failed';
+            progressBar.style.width = '0%';
+
+            let errorMessage = error.message;
+            if (error.message.includes('fetch')) {
+                errorMessage = 'Network error: Could not connect to the URL';
+            } else if (error.message.includes('JSON')) {
+                errorMessage = 'Invalid server response';
+            }
+
+            showToast(`Failed to load data: ${errorMessage}`, 'error');
+
+            // Hide modal after delay
+            setTimeout(() => {
+                hideModal('url-modal');
+            }, 3000);
         } finally {
-            document.getElementById('url-load-btn').disabled = false;
-            document.getElementById('url-progress').style.display = 'none';
+            // Re-enable load button
+            loadBtn.disabled = false;
+            loadBtn.textContent = 'Load Data';
         }
     }
 
@@ -1005,75 +1146,148 @@
         const df = dataframes.find(d => d.df_id === dfId);
         const displayName = df?.tags?.display_name || dfId;
 
-        DataFrameUI.confirm(
-            'Delete DataFrame',
-            `Are you sure you want to delete "${displayName}"? This action cannot be undone.`,
-            async () => {
-                try {
-                    await dataframeAPI.deleteDataFrame(dfId);
-                    DataFrameUI.showToast('DataFrame deleted successfully', 'success');
-                    refreshDashboard();
-                } catch (error) {
-                    DataFrameUI.showToast(`Failed to delete DataFrame: ${error.message}`, 'error');
-                }
-            }
-        );
-    }
-
-    async function batchDelete() {
-        if (selectedDataframes.size === 0) {
-            DataFrameUI.showToast('No DataFrames selected', 'error');
+        if (!confirm(`Are you sure you want to delete "${displayName}"? This action cannot be undone.`)) {
             return;
         }
 
-        DataFrameUI.confirm(
-            'Delete Multiple DataFrames',
-            `Are you sure you want to delete ${selectedDataframes.size} DataFrame(s)? This action cannot be undone.`,
-            async () => {
-                try {
-                    await dataframeAPI.batchDelete(Array.from(selectedDataframes));
-                    DataFrameUI.showToast(`Successfully deleted ${selectedDataframes.size} DataFrame(s)`, 'success');
-                    selectedDataframes.clear();
-                    batchMode = false;
-                    document.getElementById('batch-mode-text').textContent = 'Select Multiple';
-                    refreshDashboard();
-                } catch (error) {
-                    DataFrameUI.showToast(`Batch delete failed: ${error.message}`, 'error');
-                }
+        try {
+            const response = await fetch(`/api/dataframes/${dfId}`, { method: 'DELETE' });
+            const result = await response.json();
+
+            if (result.success) {
+                showToast('DataFrame deleted successfully', 'success');
+                refreshDashboard();
+            } else {
+                throw new Error(result.error || 'Failed to delete DataFrame');
             }
-        );
+        } catch (error) {
+            showToast(`Failed to delete DataFrame: ${error.message}`, 'error');
+        }
     }
 
     async function cleanupExpired() {
-        DataFrameUI.confirm(
-            'Cleanup Expired DataFrames',
-            'This will permanently delete all expired DataFrames. Continue?',
-            async () => {
-                try {
-                    const result = await dataframeAPI.cleanupExpired();
-                    const count = result.deleted_count || 0;
-                    const freedMemory = DataFrameFormatter.formatMemorySize(result.freed_memory_mb * 1024 * 1024 || 0);
+        if (!confirm('This will permanently delete all expired DataFrames. Continue?')) {
+            return;
+        }
 
-                    DataFrameUI.showToast(`Cleaned up ${count} DataFrame(s), freed ${freedMemory}`, 'success');
-                    refreshDashboard();
-                } catch (error) {
-                    DataFrameUI.showToast(`Cleanup failed: ${error.message}`, 'error');
-                }
+        try {
+            const response = await fetch('/api/dataframes/cleanup', { method: 'POST' });
+            const result = await response.json();
+
+            if (result.success) {
+                const count = result.deleted_count || 0;
+                const freedMemory = formatMemorySize(result.freed_memory_mb * 1024 * 1024 || 0);
+                showToast(`Cleaned up ${count} DataFrame(s), freed ${freedMemory}`, 'success');
+                refreshDashboard();
+            } else {
+                throw new Error(result.error || 'Cleanup failed');
             }
-        );
+        } catch (error) {
+            showToast(`Cleanup failed: ${error.message}`, 'error');
+        }
     }
 
-    // Progress tracking for uploads
-    document.addEventListener('dataframe-progress', (event) => {
-        const { requestId, progress, message } = event.detail;
+    // Utility functions
+    function formatMemorySize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
 
-        if (requestId.startsWith('upload_')) {
-            const progressBar = document.getElementById('upload-progress-bar');
-            const progressText = document.getElementById('upload-progress-text');
+    function formatShape(shape) {
+        if (!shape || !Array.isArray(shape)) return 'Unknown';
+        return `${shape[0]} × ${shape[1]}`;
+    }
 
-            if (progressBar) progressBar.style.width = `${progress}%`;
-            if (progressText) progressText.textContent = `${Math.round(progress)}% - ${message}`;
+    function formatDate(dateString) {
+        if (!dateString) return 'Unknown';
+        return new Date(dateString).toLocaleDateString();
+    }
+
+    function truncateText(text, maxLength) {
+        if (!text) return '';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+
+    function getStatusBadge(df) {
+        if (!df.expires_at) {
+            return { class: 'active', text: 'Active' };
         }
-    });
+
+        const now = new Date();
+        const expiresAt = new Date(df.expires_at);
+
+        if (expiresAt <= now) {
+            return { class: 'expired', text: 'Expired' };
+        }
+
+        const hoursUntilExpiry = (expiresAt - now) / (1000 * 60 * 60);
+        if (hoursUntilExpiry < 24) {
+            return { class: 'warning', text: `Expires ${expiresAt.toLocaleString()}` };
+        }
+
+        return { class: 'active', text: 'Active' };
+    }
+
+    function showLoading(elementId, message) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.innerHTML = `<div style="text-align: center; padding: 2em; color: #666;">${message}</div>`;
+        }
+    }
+
+    function showToast(message, type = 'info') {
+        // Simple toast implementation
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1em;
+            border-radius: 4px;
+            color: white;
+            z-index: 10000;
+            max-width: 300px;
+        `;
+
+        switch (type) {
+            case 'success':
+                toast.style.backgroundColor = '#28a745';
+                break;
+            case 'error':
+                toast.style.backgroundColor = '#dc3545';
+                break;
+            case 'warning':
+                toast.style.backgroundColor = '#ffc107';
+                toast.style.color = '#212529';
+                break;
+            default:
+                toast.style.backgroundColor = '#0077cc';
+        }
+
+        toast.textContent = message;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+
+    function showModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'block';
+        }
+    }
+
+    function hideModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
 </script>
 {% endblock %}
