@@ -35,7 +35,7 @@ class DataFrameAPI {
             const data = await response.json();
 
             if (!data.success) {
-                throw new Error(data.error || 'Unknown API error');
+                throw new Error(data.error?.message || data.error || 'Unknown API error');
             }
 
             return data;
@@ -130,7 +130,7 @@ class DataFrameAPI {
         return await this.request(`/${dfId}/execute`, {
             method: 'POST',
             body: JSON.stringify({
-                expression,
+                pandas_expression: expression,
                 return_type: options.returnType || 'auto',
                 timeout: options.timeout || 30
             })
@@ -190,7 +190,7 @@ class DataFrameAPI {
                             this.notifyProgress(requestId, 100, 'Upload completed successfully');
                             resolve(data);
                         } else {
-                            reject(new Error(data.error || 'Upload failed'));
+                            reject(new Error(data.error?.message || data.error || 'Upload failed'));
                         }
                     } catch (error) {
                         reject(new Error('Invalid response format'));

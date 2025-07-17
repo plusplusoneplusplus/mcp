@@ -51,6 +51,7 @@ class DataFrameDetailResponse:
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
+            "success": True,
             "df_id": self.df_id,
             "metadata": self.metadata
         }
@@ -74,6 +75,7 @@ class DataFrameDataResponse:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "success": True,
             "data": self.data,
             "columns": self.columns,
             "dtypes": self.dtypes,
@@ -393,7 +395,10 @@ async def api_get_dataframe_summary(request: Request) -> JSONResponse:
                 status_code=404
             )
 
-        return create_success_response(summary)
+        return create_success_response({
+            "success": True,
+            "summary": summary
+        })
 
     except Exception as e:
         logger.error(f"Error getting DataFrame summary: {e}")
