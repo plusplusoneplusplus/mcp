@@ -517,7 +517,7 @@ class DataFrameFormatter {
             const hoursUntilExpiry = (expiresAt - now) / (1000 * 60 * 60);
 
             if (hoursUntilExpiry < 24) {
-                return { class: 'warning', text: 'Expiring Soon' };
+                return { class: 'warning', text: `Expires ${expiresAt.toLocaleString()}` };
             }
         }
 

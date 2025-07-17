@@ -421,10 +421,11 @@ async def api_execute_dataframe_operation(request: Request) -> JSONResponse:
                 APIError("INVALID_REQUEST_BODY", "Invalid JSON in request body")
             )
 
-        pandas_expression = body.get("pandas_expression")
+        # Support both 'pandas_expression' and 'expression' field names for backward compatibility
+        pandas_expression = body.get("pandas_expression") or body.get("expression")
         if not pandas_expression:
             return create_error_response(
-                APIError("MISSING_EXPRESSION", "pandas_expression is required")
+                APIError("MISSING_EXPRESSION", "pandas_expression (or expression) is required")
             )
 
         # Get DataFrame manager
