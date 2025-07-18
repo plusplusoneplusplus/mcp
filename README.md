@@ -82,6 +82,23 @@ Tools are modular plugins registered through `mcp_tools`. Built-in utilities inc
 
 The web interface offers a Tools dashboard at `/tools` for browsing all registered tools and viewing their details.
 
+## Plugin Management
+
+External plugins can be installed by declaring them in `plugin_config.yaml`. Each
+entry should specify a `plugin_repo` in the form `owner/repository` and an optional
+`sub_dir` if the plugin lives in a subfolder. Example:
+
+```yaml
+plugins:
+  # - plugin_repo: "github_owner/repo"
+  #   sub_dir: "path/to/plugin"
+  #   type: "python"
+```
+
+Run the `mcp_admin` tool with the `refresh_plugins` operation to clone or update
+plugins based on this configuration. Pass `force=true` to remove all installed
+plugins before reinstalling.
+
 ## Running Tests
 
 Execute all test suites with:

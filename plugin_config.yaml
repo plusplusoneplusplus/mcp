@@ -1,0 +1,7 @@
+# Example plugin configuration. Uncomment and edit entries to install plugins.
+plugins:
+  # - plugin_repo: "plusplusoneplusplus/mcp"
+  #   sub_dir: "plugin/logcli"
+  #   type: "python"
+  # - plugin_repo: "tcauth/boltx_deploy"
+  #   type: "python"
