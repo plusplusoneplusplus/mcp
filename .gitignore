@@ -168,3 +168,5 @@ utils/secret_scanner/**/__pycache__/
 .claude/**/history/
 .claude/**/cache/
 .claude/**/node_modules/
+# External plugin clones
+plugins_external/
