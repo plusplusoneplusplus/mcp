@@ -90,9 +90,9 @@ entry should specify a `plugin_repo` in the form `owner/repository` and an optio
 
 ```yaml
 plugins:
-  # - plugin_repo: "github_owner/repo"
-  #   sub_dir: "path/to/plugin"
-  #   type: "python"
+   - plugin_repo: "github_owner/repo"
+     sub_dir: "path/to/plugin"
+     type: "python"
 ```
 
 Run the `mcp_admin` tool with the `refresh_plugins` operation to clone or update
