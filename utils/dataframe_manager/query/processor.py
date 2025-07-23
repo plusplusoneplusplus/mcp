@@ -6,6 +6,7 @@ import time
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
+from utils.pyeval import RestrictedPythonEvaluator
 
 from ..interface import DataFrameQueryInterface, DataFrameQueryResult
 
@@ -179,10 +180,16 @@ class DataFrameQueryProcessor(DataFrameQueryInterface):
             result_df = df.query(expr)
             query_method = "pandas_query"
         except Exception:
-            # Fall back to Python expression evaluation
+            # Fall back to restricted Python expression evaluation
             try:
-                result_df = eval(expr)
-                query_method = "python_eval"
+                evaluator = RestrictedPythonEvaluator()
+                eval_result = evaluator.evaluate_dataframe_expression(expr, df)
+
+                if not eval_result.success:
+                    raise ValueError(eval_result.error_message)
+
+                result_df = eval_result.result
+                query_method = "restricted_python_eval"
             except Exception as e:
                 self._logger.error(f"Error in query operation: {e}")
                 raise

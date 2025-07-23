@@ -2356,6 +2356,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "regex" },
     { name = "requests" },
+    { name = "restrictedpython" },
     { name = "selenium" },
     { name = "sentence-transformers" },
     { name = "starlette" },
@@ -2411,6 +2412,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "regex", specifier = ">=2024.11.6" },
     { name = "requests", specifier = ">=2.31.0" },
+    { name = "restrictedpython", specifier = ">=7.0.0" },
     { name = "selenium", specifier = "==4.18.1" },
     { name = "sentence-transformers", specifier = ">=4.0.0" },
     { name = "starlette", specifier = ">=0.37.0" },
@@ -4278,6 +4280,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/f2/05f29bc3913aea15eb670be136045bf5c5bbf4b99ecb839da9b422bb2c85/requests-oauthlib-2.0.0.tar.gz", hash = "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9", size = 55650, upload_time = "2024-03-22T20:32:29.939Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/5d/63d4ae3b9daea098d5d6f5da83984853c1bbacd5dc826764b249fe119d24/requests_oauthlib-2.0.0-py2.py3-none-any.whl", hash = "sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36", size = 24179, upload_time = "2024-03-22T20:32:28.055Z" },
+]
+
+[[package]]
+name = "restrictedpython"
+version = "8.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/f3/3cfd684abf456f536a842e4fabe1ca360a8e94d1fc329f261c34c1d98825/restrictedpython-8.0.tar.gz", hash = "sha256:3af2312bc67e5fced887fb85b006c89861da72488128b155beea81eb6a0a9b24", size = 448747, upload_time = "2025-01-23T07:15:53.14Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/31/b33804f873742ab20c8ed82a75652bf60a6205116dfec8bb092a6ebef084/RestrictedPython-8.0-py3-none-any.whl", hash = "sha256:ed3d894efd7d6cac0a5f13f75583b8458378d400d7dd4c083b59233eba85fe69", size = 27238, upload_time = "2025-01-23T07:15:50.428Z" },
 ]
 
 [[package]]

@@ -15,6 +15,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.datastructures import UploadFile
 import pandas as pd
+from utils.pyeval import RestrictedPythonEvaluator
 
 # Import DataFrame manager
 from utils.dataframe_manager import get_dataframe_manager
@@ -444,14 +445,14 @@ async def api_execute_dataframe_operation(request: Request) -> JSONResponse:
         try:
             start_time = time.time()
 
-            # Create safe execution environment
-            safe_globals = {
-                'df': df,
-                'pd': pd
-            }
+            # Use centralized restricted Python evaluator
+            evaluator = RestrictedPythonEvaluator()
+            eval_result = evaluator.evaluate_dataframe_expression(pandas_expression, df)
 
-            # Execute the expression
-            result = eval(pandas_expression, safe_globals)
+            if not eval_result.success:
+                raise ValueError(eval_result.error_message)
+
+            result = eval_result.result
             execution_time_ms = (time.time() - start_time) * 1000
 
             # Handle different result types
