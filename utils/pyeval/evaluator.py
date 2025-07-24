@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 from RestrictedPython import compile_restricted_exec, safe_globals, limited_builtins
-from RestrictedPython.Guards import safer_getattr, guarded_setattr
+from RestrictedPython.Guards import safer_getattr, guarded_setattr, guarded_iter_unpack_sequence
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +52,9 @@ class RestrictedPythonEvaluator:
         Returns:
             Dictionary containing safe built-in functions.
         """
+        import statistics
+        import math
+
         safe_builtins = limited_builtins.copy()
         safe_builtins.update({
             # Mathematical functions
@@ -61,12 +64,15 @@ class RestrictedPythonEvaluator:
             'sum': sum,
             'abs': abs,
             'round': round,
+            'pow': pow,
 
             # Collection functions
             'sorted': sorted,
             'enumerate': enumerate,
             'zip': zip,
             'range': range,
+            'filter': filter,
+            'map': map,
 
             # Type constructors
             'list': list,
@@ -77,8 +83,38 @@ class RestrictedPythonEvaluator:
             'int': int,
             'float': float,
             'bool': bool,
+
+            # Safe modules
+            'statistics': statistics,
+            'math': math,
         })
         return safe_builtins
+
+    def _create_safe_getiter(self) -> callable:
+        """Create a safe iterator function for safe iteration.
+
+        Returns:
+            Safe iterator function for use in restricted environment.
+        """
+        def safe_getiter(obj):
+            """Safe iterator access for various objects.
+
+            Args:
+                obj: Object to iterate over
+
+            Returns:
+                Iterator for the object
+
+            Raises:
+                TypeError: If object is not iterable
+            """
+            try:
+                return iter(obj)
+            except TypeError as e:
+                self._logger.warning(f"Safe getiter failed for object: {e}")
+                raise
+
+        return safe_getiter
 
     def _create_safe_getitem(self) -> callable:
         """Create a safe getitem function for accessing DataFrame columns and Series values.
@@ -124,6 +160,8 @@ class RestrictedPythonEvaluator:
             '_getattr_': safer_getattr,
             '_setattr_': guarded_setattr,
             '_getitem_': self._create_safe_getitem(),
+            '_getiter_': self._create_safe_getiter(),
+            '_iter_unpack_sequence_': guarded_iter_unpack_sequence,
         })
 
         # Add user-provided context

@@ -67,6 +67,8 @@ from .dataframes import (
     api_export_dataframe,
 )
 
+from .pyeval import pyeval_routes
+
 # Aggregate all routes into a single list
 api_routes = [
     # Knowledge management endpoints
@@ -127,4 +129,4 @@ api_routes = [
     Route("/api/dataframes/{df_id}/summary", endpoint=api_get_dataframe_summary, methods=["GET"]),
     Route("/api/dataframes/{df_id}/execute", endpoint=api_execute_dataframe_operation, methods=["POST"]),
     Route("/api/dataframes/{df_id}/export", endpoint=api_export_dataframe, methods=["POST"]),
-]
+] + pyeval_routes
