@@ -158,7 +158,7 @@ class RestrictedPythonEvaluator:
         if context is None:
             context = {}
 
-        start_time = time.time()
+        start_time = time.perf_counter()
 
         try:
             # Create restricted execution environment
@@ -191,7 +191,7 @@ class RestrictedPythonEvaluator:
                     error_message=error_msg
                 )
 
-            execution_time_ms = (time.time() - start_time) * 1000
+            execution_time_ms = (time.perf_counter() - start_time) * 1000
 
             self._logger.debug(
                 f"Successfully evaluated expression '{expression}' in {execution_time_ms:.2f}ms"
