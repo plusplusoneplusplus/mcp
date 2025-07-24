@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+
+{% block title %}PyEval - MCP Knowledge Server{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/default.min.css">
+<style>
+    .pyeval-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .evaluation-panel {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2em;
+        margin-bottom: 2em;
+    }
+
+    .code-input-section {
+        background: white;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .result-section {
+        background: white;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .CodeMirror {
+        height: 300px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    }
+
+    .context-section {
+        margin-bottom: 1em;
+    }
+
+    .context-input {
+        width: 100%;
+        height: 120px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 12px;
+        resize: vertical;
+    }
+
+    .evaluation-controls {
+        display: flex;
+        gap: 1em;
+        align-items: center;
+        margin-top: 1em;
+    }
+
+    .result-display {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 1em;
+        min-height: 200px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        overflow-x: auto;
+    }
+
+    .result-success {
+        background: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+    }
+
+    .result-error {
+        background: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+    }
+
+    .execution-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1em;
+        padding: 0.5em;
+        background: #f8f9fa;
+        border-radius: 4px;
+        font-size: 0.9em;
+    }
+
+    .execution-time {
+        color: #666;
+    }
+
+    .execution-status {
+        font-weight: bold;
+    }
+
+    .execution-status.success {
+        color: #28a745;
+    }
+
+    .execution-status.error {
+        color: #dc3545;
+    }
+
+    .examples-section {
+        background: white;
+        padding: 1.5em;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2em;
+    }
+
+    .example-tabs {
+        display: flex;
+        gap: 0.5em;
+        margin-bottom: 1em;
+    }
+
+    .example-tab {
+        padding: 0.5em 1em;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px 4px 0 0;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .example-tab:hover {
+        background: #e9ecef;
+    }
+
+    .example-tab.active {
+        background: #0077cc;
+        color: white;
+        border-color: #0077cc;
+    }
+
+    .example-content {
+        display: none;
+        padding: 1em;
+        border: 1px solid #dee2e6;
+        border-radius: 0 4px 4px 4px;
+        background: #f8f9fa;
+    }
+
+    .example-content.active {
+        display: block;
+    }
+
+    .example-code {
+        background: #2d3748;
+        color: #e2e8f0;
+        padding: 1em;
+        border-radius: 4px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 12px;
+        margin: 0.5em 0;
+        overflow-x: auto;
+    }
+
+    .load-example-btn {
+        background: #28a745;
+        margin-top: 0.5em;
+    }
+
+    .load-example-btn:hover {
+        background: #218838;
+    }
+
+    @media (max-width: 768px) {
+        .evaluation-panel {
+            grid-template-columns: 1fr;
+        }
+
+        .pyeval-container {
+            margin: 0 1em;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pyeval-container">
+    <div class="card">
+        <h2>Python Expression Evaluator</h2>
+        <p>Safely evaluate Python expressions using RestrictedPython. Perfect for DataFrame operations and data analysis.</p>
+    </div>
+
+    <div class="examples-section">
+        <h3>Examples</h3>
+        <div class="example-tabs">
+            <div class="example-tab active" onclick="switchExample('basic')">Basic Operations</div>
+            <div class="example-tab" onclick="switchExample('dataframe')">DataFrame Operations</div>
+            <div class="example-tab" onclick="switchExample('math')">Mathematical</div>
+        </div>
+
+        <div id="basic-example" class="example-content active">
+            <h4>Basic Python Operations</h4>
+            <p>Simple arithmetic and list operations:</p>
+            <div class="example-code"># Basic arithmetic
+sum([1, 2, 3, 4, 5])
+
+# List comprehension
+[x**2 for x in range(5)]
+
+# String operations
+"hello world".title()</div>
+            <button class="load-example-btn" onclick="loadExample('basic')">Load Example</button>
+        </div>
+
+        <div id="dataframe-example" class="example-content">
+            <h4>DataFrame Operations</h4>
+            <p>Working with pandas DataFrames:</p>
+            <div class="example-code"># DataFrame operations (requires DataFrame in context)
+df.head(10)
+
+# Column statistics
+df['column_name'].describe()
+
+# Filtering
+df[df['age'] > 25]</div>
+            <p><strong>Context needed:</strong></p>
+            <div class="example-code">{"df": "your_dataframe_variable", "pd": "pandas"}</div>
+            <button class="load-example-btn" onclick="loadExample('dataframe')">Load Example</button>
+        </div>
+
+        <div id="math-example" class="example-content">
+            <h4>Mathematical Operations</h4>
+            <p>Advanced mathematical computations:</p>
+            <div class="example-code"># Statistical operations (statistics module is available)
+statistics.mean([1, 2, 3, 4, 5])
+
+# Math operations
+math.sqrt(16) + math.sin(math.pi / 2)
+
+# Complex calculations with generators
+sum(x**2 for x in range(10) if x % 2 == 0)</div>
+            <button class="load-example-btn" onclick="loadExample('math')">Load Example</button>
+        </div>
+    </div>
+
+    <div class="evaluation-panel">
+        <div class="code-input-section">
+            <h3>Python Expression</h3>
+            <textarea id="code-input" placeholder="Enter your Python expression here...">sum([1, 2, 3, 4, 5])</textarea>
+
+            <div class="context-section">
+                <h4>Context Variables (JSON)</h4>
+                <textarea id="context-input" class="context-input" placeholder='{"df": "your_dataframe", "pd": "pandas"}'>{}</textarea>
+            </div>
+
+            <div class="evaluation-controls">
+                <button id="evaluate-btn" onclick="evaluateExpression()">Evaluate Expression</button>
+                <button onclick="clearInputs()">Clear</button>
+                <div id="evaluation-status"></div>
+            </div>
+        </div>
+
+        <div class="result-section">
+            <h3>Result</h3>
+            <div id="execution-info" class="execution-info" style="display: none;">
+                <div class="execution-status" id="execution-status">Ready</div>
+                <div class="execution-time" id="execution-time"></div>
+            </div>
+            <div id="result-display" class="result-display">Ready to evaluate your Python expression...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+<script>
+    let codeEditor;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize CodeMirror
+        const codeInput = document.getElementById('code-input');
+        codeEditor = CodeMirror.fromTextArea(codeInput, {
+            mode: 'python',
+            theme: 'default',
+            lineNumbers: true,
+            matchBrackets: true,
+            indentUnit: 4,
+            indentWithTabs: false,
+            extraKeys: {
+                "Ctrl-Enter": evaluateExpression,
+                "Cmd-Enter": evaluateExpression
+            }
+        });
+    });
+
+    function switchExample(exampleType) {
+        // Update tab states
+        document.querySelectorAll('.example-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelector(`[onclick="switchExample('${exampleType}')"]`).classList.add('active');
+
+        // Update content visibility
+        document.querySelectorAll('.example-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(`${exampleType}-example`).classList.add('active');
+    }
+
+    function loadExample(exampleType) {
+        const examples = {
+            'basic': {
+                code: 'sum([1, 2, 3, 4, 5])',
+                context: '{}'
+            },
+            'dataframe': {
+                code: 'df.head(10)',
+                context: '{"df": "your_dataframe_variable", "pd": "pandas"}'
+            },
+            'math': {
+                code: 'statistics.mean([1, 2, 3, 4, 5])',
+                context: '{}'
+            }
+        };
+
+        const example = examples[exampleType];
+        if (example) {
+            codeEditor.setValue(example.code);
+            document.getElementById('context-input').value = example.context;
+        }
+    }
+
+    async function evaluateExpression() {
+        const expression = codeEditor.getValue().trim();
+        const contextInput = document.getElementById('context-input').value.trim();
+        const evaluateBtn = document.getElementById('evaluate-btn');
+        const resultDisplay = document.getElementById('result-display');
+        const executionInfo = document.getElementById('execution-info');
+        const executionStatus = document.getElementById('execution-status');
+        const executionTime = document.getElementById('execution-time');
+
+        if (!expression) {
+            showStatus('evaluation-status', 'Please enter a Python expression', true);
+            return;
+        }
+
+        // Parse context JSON
+        let context = {};
+        if (contextInput) {
+            try {
+                context = JSON.parse(contextInput);
+            } catch (e) {
+                showStatus('evaluation-status', 'Invalid JSON in context variables', true);
+                return;
+            }
+        }
+
+        // Update UI for evaluation
+        evaluateBtn.disabled = true;
+        evaluateBtn.textContent = 'Evaluating...';
+        clearStatus('evaluation-status');
+
+        resultDisplay.className = 'result-display';
+        resultDisplay.textContent = 'Evaluating expression...';
+        executionInfo.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/pyeval/evaluate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    expression: expression,
+                    context: context
+                })
+            });
+
+            const data = await response.json();
+
+            // Show execution info
+            executionInfo.style.display = 'flex';
+            executionTime.textContent = `${data.execution_time_ms?.toFixed(2) || 0}ms`;
+
+            if (data.success) {
+                // Success
+                executionStatus.textContent = 'Success';
+                executionStatus.className = 'execution-status success';
+                resultDisplay.className = 'result-display result-success';
+                resultDisplay.textContent = data.result || 'No result returned';
+            } else {
+                // Error
+                executionStatus.textContent = 'Error';
+                executionStatus.className = 'execution-status error';
+                resultDisplay.className = 'result-display result-error';
+                resultDisplay.textContent = data.error_message || 'Unknown error occurred';
+            }
+
+        } catch (error) {
+            console.error('Evaluation error:', error);
+            executionInfo.style.display = 'flex';
+            executionStatus.textContent = 'Network Error';
+            executionStatus.className = 'execution-status error';
+            executionTime.textContent = '';
+            resultDisplay.className = 'result-display result-error';
+            resultDisplay.textContent = `Network error: ${error.message}`;
+        } finally {
+            evaluateBtn.disabled = false;
+            evaluateBtn.textContent = 'Evaluate Expression';
+        }
+    }
+
+    function clearInputs() {
+        codeEditor.setValue('');
+        document.getElementById('context-input').value = '{}';
+        document.getElementById('result-display').className = 'result-display';
+        document.getElementById('result-display').textContent = 'Ready to evaluate your Python expression...';
+        document.getElementById('execution-info').style.display = 'none';
+        clearStatus('evaluation-status');
+    }
+
+    // Add keyboard shortcut hint
+    document.addEventListener('DOMContentLoaded', function() {
+        const evaluateBtn = document.getElementById('evaluate-btn');
+        evaluateBtn.title = 'Keyboard shortcut: Ctrl+Enter (Cmd+Enter on Mac)';
+    });
+</script>
+{% endblock %}

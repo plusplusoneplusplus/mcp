@@ -391,6 +391,11 @@ async def dataframe_detail_page(request: Request):
         "dataframe_detail.html", {"request": request, "current_page": "dataframes", "df_id": df_id}
     )
 
+async def pyeval_page(request: Request):
+    return templates.TemplateResponse(
+        "pyeval.html", {"request": request, "current_page": "pyeval"}
+    )
+
 
 # --- Add routes ---
 routes = [
@@ -402,6 +407,7 @@ routes = [
     Route("/visualizations", endpoint=visualizations_page, methods=["GET"]),
     Route("/dataframes", endpoint=dataframes_page, methods=["GET"]),
     Route("/dataframes/{df_id}", endpoint=dataframe_detail_page, methods=["GET"]),
+    Route("/pyeval", endpoint=pyeval_page, methods=["GET"]),
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
