@@ -77,6 +77,7 @@ dependencies = [
     # Neo4j graph database
     "neo4j>=5.15.0", # Neo4j Python driver
     "typing-extensions>=4.8.0", # Enhanced typing support
+    "restrictedpython>=7.0.0", # Secure Python expression evaluation
 ]
 
 [tool.setuptools]

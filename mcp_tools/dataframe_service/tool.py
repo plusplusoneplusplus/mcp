@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 import pandas as pd
 import requests
+from utils.pyeval import RestrictedPythonEvaluator
 
 from ..interfaces import ToolInterface
 from ..plugin import register_tool
@@ -324,16 +325,19 @@ class DataFrameServiceTool(ToolInterface):
             try:
                 import time
                 start_time = time.time()
-                
-                # Create execution environment with the DataFrame
-                safe_globals = {
-                    'df': df,
-                    'pd': pd
-                }
-                
-                # Execute the expression
-                result = eval(pandas_expression, safe_globals)
-                
+
+                # Use centralized restricted Python evaluator
+                evaluator = RestrictedPythonEvaluator()
+                eval_result = evaluator.evaluate_dataframe_expression(pandas_expression, df)
+
+                if not eval_result.success:
+                    if "Invalid expression syntax" in eval_result.error_message:
+                        raise SyntaxError(eval_result.error_message)
+                    else:
+                        raise RuntimeError(eval_result.error_message)
+
+                result = eval_result.result
+
                 execution_time_ms = (time.time() - start_time) * 1000
 
                 # Handle different result types

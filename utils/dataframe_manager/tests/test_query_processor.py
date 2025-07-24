@@ -454,7 +454,7 @@ class TestDataFrameQueryProcessor:
         assert result.operation == "query"
         assert result.parameters == {"expr": expr}
         assert result.metadata["query_expression"] == expr
-        assert result.metadata["query_method"] == "python_eval"
+        assert result.metadata["query_method"] == "restricted_python_eval"
         assert result.metadata["original_shape"] == (100, 6)
         assert result.metadata["rows_filtered"] > 0
         assert result.metadata["filter_ratio"] < 1.0
@@ -470,7 +470,7 @@ class TestDataFrameQueryProcessor:
         result = await processor.query(sample_dataframe, expr)
 
         assert result.parameters == {"expr": expr}
-        assert result.metadata["query_method"] == "python_eval"
+        assert result.metadata["query_method"] == "restricted_python_eval"
         assert result.data.shape[1] == 3  # Should have only 3 columns
         assert list(result.data.columns) == ['name', 'age', 'category']
 
@@ -485,7 +485,7 @@ class TestDataFrameQueryProcessor:
         result = await processor.query(sample_dataframe, expr)
 
         assert result.parameters == {"expr": expr}
-        assert result.metadata["query_method"] == "python_eval"
+        assert result.metadata["query_method"] == "restricted_python_eval"
         assert len(result.data) <= 5  # Should have at most 5 rows
 
         # All results should have age > 30
@@ -499,7 +499,7 @@ class TestDataFrameQueryProcessor:
         result = await processor.query(sample_dataframe, expr)
 
         assert result.parameters == {"expr": expr}
-        assert result.metadata["query_method"] == "python_eval"
+        assert result.metadata["query_method"] == "restricted_python_eval"
 
         # All results should have name length > 6
         if len(result.data) > 0:
@@ -512,7 +512,7 @@ class TestDataFrameQueryProcessor:
         result = await processor.query(sample_dataframe, expr)
 
         assert result.parameters == {"expr": expr}
-        assert result.metadata["query_method"] == "python_eval"
+        assert result.metadata["query_method"] == "restricted_python_eval"
         assert result.data.shape[1] == 2  # Should have only 2 columns
         assert list(result.data.columns) == ['name', 'age']
         assert len(result.data) <= 3  # Should have at most 3 rows
@@ -558,7 +558,7 @@ class TestDataFrameQueryProcessor:
 
         for expr in python_expressions:
             result = await processor.query(sample_dataframe, expr)
-            assert result.metadata["query_method"] == "python_eval"
+            assert result.metadata["query_method"] == "restricted_python_eval"
 
     @pytest.mark.asyncio
     async def test_query_operation_python_expression_error_handling(self, processor, sample_dataframe):
@@ -582,7 +582,7 @@ class TestDataFrameQueryProcessor:
         result = await processor.query(sample_dataframe, expr)
 
         assert result.parameters == {"expr": expr}
-        assert result.metadata["query_method"] == "python_eval"
+        assert result.metadata["query_method"] == "restricted_python_eval"
         assert result.data.empty
         assert result.metadata["rows_filtered"] == len(sample_dataframe)
         assert result.metadata["filter_ratio"] == 0.0
