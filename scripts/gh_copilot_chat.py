@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """
-GitHub API Token Access Script
-
-This script provides functionality to access GitHub API tokens,
-including support for GitHub Copilot internal APIs and chat capabilities.
+GitHub Chat API Script
 """
 
 import os
