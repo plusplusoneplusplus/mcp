@@ -39,6 +39,11 @@ tools:
         echo 'Process complete';
         echo 'Error: Something went wrong' >&2"
 
+    # Run to completion option (default: false)
+    # When true, the tool will wait indefinitely for the script to finish
+    # and return the final result instead of just starting it asynchronously
+    run_to_completion: false
+
     # Post-processing configuration demonstrating all features
     post_processing:
       # Standard output attachment options (existing features)
@@ -98,6 +103,55 @@ tools:
           default: 60
       required: []
 
+  # Example tool that waits for completion
+  long_running_sync_tool:
+    enabled: true
+    name: long_running_sync_tool
+    description: |
+      Example tool that demonstrates run_to_completion feature.
+      This tool will wait indefinitely for the script to finish
+      and return the final result directly.
+    type: script
+
+    # Enable run to completion - tool will wait indefinitely
+    run_to_completion: true
+
+    script: >
+      bash -c "echo 'Starting long process...';
+      sleep 30;
+      echo 'Process completed successfully';
+      echo 'Final result: SUCCESS'"
+
+    scripts:
+      windows: >
+        powershell -command "Write-Host 'Starting long process...';
+        Start-Sleep -Seconds 30;
+        Write-Host 'Process completed successfully';
+        Write-Host 'Final result: SUCCESS'"
+      darwin: >
+        bash -c "echo 'Starting long process...';
+        sleep 30;
+        echo 'Process completed successfully';
+        echo 'Final result: SUCCESS'"
+      linux: >
+        bash -c "echo 'Starting long process...';
+        sleep 30;
+        echo 'Process completed successfully';
+        echo 'Final result: SUCCESS'"
+
+    post_processing:
+      attach_stdout: true
+      attach_stderr: true
+
+    inputSchema:
+      type: object
+      properties:
+        duration:
+          type: number
+          description: Duration to sleep in seconds
+          default: 30
+      required: []
+
 # Usage examples for different scenarios:
 #
 # 1. For final results/errors (default behavior):
@@ -120,3 +174,7 @@ tools:
 # 5. For data processing with backup:
 #    truncate_strategy: "start"
 #    preserve_raw: true
+#
+# 6. For synchronous execution (run_to_completion):
+#    run_to_completion: true
+#    # Tool waits for script completion and returns final result
