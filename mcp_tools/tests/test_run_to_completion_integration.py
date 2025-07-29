@@ -70,8 +70,8 @@ class TestRunToCompletionIntegration:
             "type": "script",
             "run_to_completion": True,
             "scripts": {
-                "linux": "for i in {1..20}; do echo 'Line $i of output'; done",
-                "darwin": "for i in {1..20}; do echo \"Line $i of output\"; done",
+                "linux": "for i in {{1..20}}; do echo 'Line '$i' of output'; done",
+                "darwin": "for i in {{1..20}}; do echo \"Line \"$i\" of output\"; done",
                 "windows": "for /l %i in (1,1,20) do echo Line %i of output"
             },
             "post_processing": {
@@ -117,9 +117,9 @@ class TestRunToCompletionIntegration:
             "type": "script",
             "run_to_completion": False,
             "scripts": {
-                "linux": "echo 'Async test' && sleep 1",
-                "darwin": "echo 'Async test' && sleep 1",
-                "windows": "echo Async test && timeout /t 1 /nobreak"
+                "linux": "{{ echo 'Async test' && sleep 1; }}",
+                "darwin": "{{ echo 'Async test' && sleep 1; }}",
+                "windows": "{{ echo Async test; timeout /t 1 /nobreak; }}"
             },
             "inputSchema": {"type": "object", "properties": {}, "required": []}
         }
@@ -144,9 +144,9 @@ class TestRunToCompletionIntegration:
             "type": "script",
             "run_to_completion": True,
             "scripts": {
-                "linux": "echo 'Sync test' && sleep 1",
-                "darwin": "echo 'Sync test' && sleep 1",
-                "windows": "echo Sync test && timeout /t 1 /nobreak"
+                "linux": "{{ echo 'Sync test' && sleep 1; }}",
+                "darwin": "{{ echo 'Sync test' && sleep 1; }}",
+                "windows": "{{ echo Sync test; timeout /t 1 /nobreak; }}"
             },
             "inputSchema": {"type": "object", "properties": {}, "required": []}
         }
@@ -174,9 +174,9 @@ class TestRunToCompletionIntegration:
             "type": "script",
             "run_to_completion": True,
             "scripts": {
-                "linux": "echo 'Before failure' && exit 1",
-                "darwin": "echo 'Before failure' && exit 1",
-                "windows": "echo Before failure && exit /b 1"
+                "linux": "{{ echo 'Before failure' && exit 1; }}",
+                "darwin": "{{ echo 'Before failure' && exit 1; }}",
+                "windows": "{{ echo Before failure; exit /b 1; }}"
             },
             "inputSchema": {"type": "object", "properties": {}, "required": []}
         }
