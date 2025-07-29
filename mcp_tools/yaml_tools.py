@@ -249,16 +249,67 @@ class YamlToolBase(ToolInterface):
                     }
                 ]
 
-            # Execute the script
-            logger.info(f"Executing script: {formatted_script}")
-            result = await self._command_executor.execute_async(formatted_script)
+            # Check if run_to_completion is enabled
+            run_to_completion = self._tool_data.get("run_to_completion", False)
 
-            return [
-                {
-                    "type": "text",
-                    "text": f"Script started with token: {result.get('token')}\nStatus: {result.get('status')}\nPID: {result.get('pid')}",
-                }
-            ]
+            if run_to_completion:
+                # Execute synchronously and wait indefinitely for completion
+                logger.info(f"Executing script with run_to_completion: {formatted_script}")
+                result = await self._command_executor.execute_async(formatted_script)
+                token = result.get('token')
+
+                if token and result.get('status') == 'running':
+                    # Wait for completion without timeout
+                    final_result = await self._command_executor.wait_for_process(token, timeout=None)
+
+                    # Apply post-processing configuration
+                    post_config = self._tool_data.get("post_processing", {})
+
+                    # Apply security filtering if enabled
+                    security_config = post_config.get("security_filtering", {})
+                    if security_config.get("enabled", False):
+                        stdout_content = final_result.get("output", "")
+                        stderr_content = final_result.get("error", "")
+
+                        filtered_stdout, filtered_stderr = self._apply_security_filtering(
+                            stdout_content, stderr_content, security_config
+                        )
+
+                        final_result = final_result.copy()
+                        final_result["output"] = filtered_stdout
+                        final_result["error"] = filtered_stderr
+
+                    # Apply output length limits if configured
+                    output_limits = post_config.get("output_limits", {})
+                    if output_limits:
+                        final_result = self._output_limiter.apply_output_limits(final_result, output_limits)
+
+                    processed_result = self._apply_output_attachment_config(final_result, post_config)
+
+                    return [
+                        {
+                            "type": "text",
+                            "text": self._format_result(processed_result, token),
+                        }
+                    ]
+                else:
+                    return [
+                        {
+                            "type": "text",
+                            "text": f"Script execution failed: {result.get('error', 'Unknown error')}"
+                        }
+                    ]
+            else:
+                # Execute asynchronously (original behavior)
+                logger.info(f"Executing script: {formatted_script}")
+                result = await self._command_executor.execute_async(formatted_script)
+
+                return [
+                    {
+                        "type": "text",
+                        "text": f"Script started with token: {result.get('token')}\nStatus: {result.get('status')}\nPID: {result.get('pid')}",
+                    }
+                ]
         except Exception as e:
             logger.exception(f"Error executing script for tool '{self._name}'")
             return [{"type": "text", "text": f"Error executing script: {str(e)}"}]
@@ -566,9 +617,15 @@ class YamlToolBase(ToolInterface):
             return [{"type": "text", "text": "Error: Token is required"}]
 
         wait = arguments.get("wait", DEFAULT_WAIT_FOR_QUERY)
-        timeout = arguments.get(
-            "timeout", DEFAULT_STATUS_QUERY_TIMEOUT
-        )  # Use default timeout from config
+
+        # Check if this tool has run_to_completion enabled
+        run_to_completion = self._tool_data.get("run_to_completion", False)
+
+        # If run_to_completion is enabled, ignore timeout and wait indefinitely
+        if run_to_completion:
+            timeout = None
+        else:
+            timeout = arguments.get("timeout", DEFAULT_STATUS_QUERY_TIMEOUT)
 
         try:
             import asyncio
