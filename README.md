@@ -1,20 +1,30 @@
 # MCP Server
 
-The **MCP Server** provides a framework for AI-powered command execution and a plugin-based tool system. It can be run as a standalone service or embedded in other projects to expose a consistent API for invoking tools and managing tasks.
+The **MCP Server** provides a comprehensive framework for AI-powered command execution, plugin-based tools, and advanced features including synchronous script execution, secure Python evaluation, and knowledge management. It can be run as a standalone service or embedded in other projects to expose a consistent API for invoking tools and managing tasks.
 
 ## Project Structure
 
-- **mcp_core/** – Lightweight data models and adapters used across the project
-- **mcp_tools/** – Plugin framework and built-in tools
-- **server/** – Starlette server implementation exposing HTTP/SSE endpoints
-- **plugins/** – Optional plugins (e.g., Azure DevOps, text summarization)
+- **mcp_tools/** – Plugin framework and built-in tools with enhanced concurrency management
+- **server/** – Starlette server implementation with HTTP/SSE endpoints and DataFrame UI
+- **plugins/** – Extensible plugins (Azure DevOps, Git tools, knowledge indexing, Kusto, CircleCI)
 - **config/** – Environment manager and configuration helpers
-- **scripts/** – Installation and utility scripts
-- **assets/** – Images used in documentation
+- **utils/** – Core utilities (async jobs, graph interface, memory management, vector store, PyEval)
+- **scripts/** – Installation, utility scripts, and automated submission workflows
+- **assets/** – Images and documentation resources
 
 ## Installation
 
-No installation required.
+The project uses `uv` for dependency management. Install dependencies with:
+
+```bash
+uv sync
+```
+
+Or install in development mode using pip:
+
+```bash
+pip install -e .
+```
 
 ## Environment Setup
 
@@ -78,9 +88,21 @@ Private overrides can be placed in `server/.private/` or in a folder pointed to 
 
 ## Tool System
 
-Tools are modular plugins registered through `mcp_tools`. Built-in utilities include a command executor, browser automation, time helpers, and a YAML-defined tool loader. Additional examples live in the `plugins/` directory. See `mcp_tools/docs/creating_tools.md` for details on building custom tools.
+Tools are modular plugins registered through `mcp_tools`. Built-in utilities include:
+- **Command Executor** – Synchronous and asynchronous command execution with run-to-completion support
+- **Browser Automation** – Selenium and Playwright integration for web interaction
+- **PyEval** – Secure Python expression evaluation using RestrictedPython
+- **DataFrame Service** – Data analysis and visualization with web interface
+- **Time Helpers** – Time-based utilities and scheduling
+- **YAML Tool Loader** – Dynamic tool definitions from YAML files
 
-The web interface offers a Tools dashboard at `/tools` for browsing all registered tools and viewing their details.
+Additional plugins in the `plugins/` directory include Azure DevOps integration, Git operations, knowledge indexing, Kusto queries, and CircleCI workflows. See `mcp_tools/docs/creating_tools.md` for details on building custom tools.
+
+The web interface offers comprehensive dashboards:
+- `/tools` – Browse all registered tools and view their details
+- `/dataframes` – Interactive DataFrame management and visualization
+- `/knowledge` – Knowledge graph exploration and management
+- `/pyeval` – Secure Python evaluation interface
 
 ## Plugin Management
 
@@ -109,11 +131,19 @@ scripts/run_tests.sh
 
 Or run `pytest` directly on `mcp_core/tests`, `mcp_tools/tests`, or `server/tests`.
 
+## Key Features (v0.2.0)
+
+- **Run-to-Completion Execution** – Synchronous script execution with comprehensive output capture
+- **PyEval Security** – Safe Python expression evaluation using RestrictedPython
+- **Enhanced DataFrame UI** – Responsive web interface for data analysis and visualization
+
 ## Where to Go Next
 
-1. Browse the documentation under `mcp_tools/docs/` to learn about tool creation and dependency injection.
+1. Browse the documentation under `mcp_tools/docs/` and `docs/` to learn about tool creation, dependency injection, and advanced features.
 2. Review the sample configuration files in `server/` and try adding your own tools.
 3. Explore plugins in the `plugins/` directory for concrete implementations.
+4. Check the `utils/` directory for advanced utilities like vector stores, graph interfaces, and memory management.
+5. See the `CHANGELOG.md` for detailed release notes and recent updates.
 
 ## Editor Integration
 
