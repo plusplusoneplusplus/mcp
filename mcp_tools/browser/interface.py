@@ -102,16 +102,19 @@ class IBrowserClient(ABC):
         wait_url: str,
         headless: bool = False,
         timeout: int = 60,
-    ) -> List[Dict[str, Any]]:
-        """Open a login page and return cookies after URL match.
+        store_key: Optional[str] = None,
+    ) -> str:
+        """Open a login page, store cookies and return the storage key.
 
         Args:
             url: Initial URL to open for login.
             wait_url: URL substring or pattern indicating login success.
             headless: Whether to run browser in headless mode.
             timeout: Seconds to wait for URL to match before returning.
+            store_key: Key under which cookies will be stored in the persisted KV store.
+                       Defaults to "browser.cookies/<domain>" when not provided.
 
         Returns:
-            List of cookies dictionaries.
+            The key where cookies were stored.
         """
         pass

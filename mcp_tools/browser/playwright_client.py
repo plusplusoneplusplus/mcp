@@ -4,12 +4,14 @@ This module provides a browser client implementation using Playwright.
 """
 
 import asyncio
-from typing import Optional, Any, Literal, List, Dict
 import re
+import urllib.parse
+from typing import Optional, Any, Literal, List, Dict
 
 from mcp_tools.browser.interface import IBrowserClient
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
 from config import env
+from mcp_tools.kv_store.tool import _kv_store as kv_store
 
 
 class PlaywrightBrowserClient(IBrowserClient):
@@ -250,8 +252,9 @@ class PlaywrightBrowserClient(IBrowserClient):
         wait_url: str,
         headless: bool = False,
         timeout: int = 60,
-    ) -> List[Dict[str, Any]]:
-        """Open a page for manual login and return cookies after URL match."""
+        store_key: Optional[str] = None,
+    ) -> str:
+        """Open a page for manual login, store cookies, and return the key."""
         async with PlaywrightWrapper(
             browser_type=self.browser,
             user_data_dir=self.user_data_dir,
@@ -269,4 +272,7 @@ class PlaywrightBrowserClient(IBrowserClient):
                     pass
             else:
                 await page.wait_for_timeout(timeout * 1000)
-            return await wrapper.get_cookies()
+            cookies = await wrapper.get_cookies()
+            key = store_key or f"browser.cookies/{urllib.parse.urlparse(url).netloc or 'unknown domain'}"
+            kv_store.set(key, cookies, ttl_seconds=86400)
+            return key

@@ -128,6 +128,11 @@ class BrowserClient(BrowserClientInterface):
                     "description": "Seconds to wait for wait_url before returning cookies",
                     "default": 60,
                 },
+                "store_key": {
+                    "type": "string",
+                    "description": "Key to store retrieved cookies in KV store",
+                    "default": "browser.cookies/<domain>",
+                },
                 "headless": {
                     "type": "boolean",
                     "description": "Whether to run the browser in headless mode.",
@@ -342,10 +347,15 @@ class BrowserClient(BrowserClientInterface):
             elif operation == "get_cookies":
                 wait_url = arguments.get("wait_url")
                 timeout = arguments.get("timeout", 60)
-                cookies = await client.get_cookies_after_login(
-                    url, wait_url, headless=headless, timeout=timeout
+                store_key = arguments.get("store_key") or f"browser.cookies/{_get_domain_from_url(url)}"
+                cookies_key = await client.get_cookies_after_login(
+                    url,
+                    wait_url,
+                    headless=headless,
+                    timeout=timeout,
+                    store_key=store_key,
                 )
-                return {"success": True, "cookies": cookies}
+                return {"success": True, "cookies_key": cookies_key}
             elif operation == "capture_panels":
                 selector = arguments.get("selector", ".react-grid-item")
                 out_dir = arguments.get("out_dir", "charts")

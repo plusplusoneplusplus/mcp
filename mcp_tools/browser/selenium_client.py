@@ -53,11 +53,14 @@ class SeleniumBrowserClient(IBrowserClient):
         wait_url: str,
         headless: bool = False,
         timeout: int = 60,
-    ) -> List[Dict[str, Any]]:
-        raise NotImplementedError("Cookie retrieval is not supported for Selenium client")
+        store_key: Optional[str] = None,
+    ) -> str:
+        raise NotImplementedError(
+            "Cookie retrieval is not supported for Selenium client"
+        )
 
     """Selenium-based browser client implementation.
-    
+
     This class provides a browser automation implementation using Selenium WebDriver.
     It supports Chrome and Edge browsers.
     """
