@@ -105,9 +105,18 @@ from mcp_tools.browser.client import BrowserClient
 async def example():
     # Get HTML from a webpage
     html = await BrowserClient.get_page_html("https://example.com")
-    
+
     # Take a screenshot of a webpage
     success = await BrowserClient.take_screenshot("https://example.com", "screenshot.png")
-    
+
+    # Launch login page and fetch cookies after URL match
+    cookies = await BrowserClient.get_cookies(
+        url="https://example.com/login",
+        wait_url="dashboard",
+        headless=False,
+    )
+    print(cookies)
+
 # Run the async example
-asyncio.run(example()) 
+asyncio.run(example())
+```

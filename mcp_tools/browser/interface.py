@@ -4,7 +4,7 @@ This module defines the core interfaces for browser automation clients.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Union, Literal
+from typing import Dict, Any, Optional, Union, Literal, List
 
 
 class IBrowserClient(ABC):
@@ -92,5 +92,26 @@ class IBrowserClient(ABC):
                     - Path: Path to the panel image
                     - Content: The content inside the panel image recognized by OCR
                 - URL: Dashboard URL visited
+        """
+        pass
+
+    @abstractmethod
+    async def get_cookies_after_login(
+        self,
+        url: str,
+        wait_url: str,
+        headless: bool = False,
+        timeout: int = 60,
+    ) -> List[Dict[str, Any]]:
+        """Open a login page and return cookies after URL match.
+
+        Args:
+            url: Initial URL to open for login.
+            wait_url: URL substring or pattern indicating login success.
+            headless: Whether to run browser in headless mode.
+            timeout: Seconds to wait for URL to match before returning.
+
+        Returns:
+            List of cookies dictionaries.
         """
         pass
