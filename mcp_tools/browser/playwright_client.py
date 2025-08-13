@@ -5,6 +5,7 @@ This module provides a browser client implementation using Playwright.
 
 import asyncio
 from typing import Optional, Any, Literal, List, Dict
+import re
 
 from mcp_tools.browser.interface import IBrowserClient
 from utils.playwright.playwright_wrapper import PlaywrightWrapper
@@ -242,3 +243,30 @@ class PlaywrightBrowserClient(IBrowserClient):
     async def close(self):
         """Close the browser and clean up resources."""
         pass
+
+    async def get_cookies_after_login(
+        self,
+        url: str,
+        wait_url: str,
+        headless: bool = False,
+        timeout: int = 60,
+    ) -> List[Dict[str, Any]]:
+        """Open a page for manual login and return cookies after URL match."""
+        async with PlaywrightWrapper(
+            browser_type=self.browser,
+            user_data_dir=self.user_data_dir,
+            headless=headless,
+        ) as wrapper:
+            page = await wrapper.open_page(
+                url, wait_until="domcontentloaded", wait_time=0
+            )
+            if wait_url:
+                try:
+                    await page.wait_for_url(
+                        re.compile(wait_url), timeout=timeout * 1000
+                    )
+                except Exception:
+                    pass
+            else:
+                await page.wait_for_timeout(timeout * 1000)
+            return await wrapper.get_cookies()

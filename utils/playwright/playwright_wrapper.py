@@ -343,6 +343,21 @@ class PlaywrightWrapper:
             raise RuntimeError("Page not initialized. Call open_page first.")
         return await self.page.content()
 
+    async def get_cookies(self) -> list:
+        """Return cookies for the current browser context.
+
+        Raises:
+            RuntimeError: If no browser context is initialized.
+
+        Returns:
+            List of cookie dictionaries as returned by Playwright.
+        """
+        if not self.context:
+            raise RuntimeError(
+                "Context not initialized. Use 'async with PlaywrightWrapper()' block."
+            )
+        return await self.context.cookies()
+
     async def close(self):
         # Close all pages
         for p in getattr(self, "pages", []):

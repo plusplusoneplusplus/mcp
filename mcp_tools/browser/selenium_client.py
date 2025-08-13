@@ -10,7 +10,7 @@ import socket
 import subprocess
 import platform
 import asyncio
-from typing import Optional, Dict, Any, Union, Literal
+from typing import Optional, Dict, Any, Union, Literal, List
 from concurrent.futures import ThreadPoolExecutor
 
 from selenium import webdriver
@@ -46,6 +46,15 @@ class SeleniumBrowserClient(IBrowserClient):
         autoscroll: bool = False,
     ) -> int:
         raise NotImplementedError
+
+    async def get_cookies_after_login(
+        self,
+        url: str,
+        wait_url: str,
+        headless: bool = False,
+        timeout: int = 60,
+    ) -> List[Dict[str, Any]]:
+        raise NotImplementedError("Cookie retrieval is not supported for Selenium client")
 
     """Selenium-based browser client implementation.
     

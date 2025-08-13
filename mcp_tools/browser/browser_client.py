@@ -93,8 +93,8 @@ class BrowserClient(BrowserClientInterface):
             "properties": {
                 "operation": {
                     "type": "string",
-                    "description": "The operation to perform (get_page_html, take_screenshot, get_page_markdown, capture_panels)",
-                    "enum": ["get_page_html", "take_screenshot", "get_page_markdown"],
+                    "description": "The operation to perform (get_page_html, take_screenshot, get_page_markdown, get_cookies, capture_panels)",
+                    "enum": ["get_page_html", "take_screenshot", "get_page_markdown", "get_cookies"],
                     "default": "get_page_markdown",
                 },
                 "url": {"type": "string", "description": "The URL to visit"},
@@ -117,6 +117,16 @@ class BrowserClient(BrowserClientInterface):
                     "type": "boolean",
                     "description": "Whether to include image references in the extracted markdown (for get_page_markdown)",
                     "default": False,
+                },
+                "wait_url": {
+                    "type": "string",
+                    "description": "URL substring or regex that indicates login success (for get_cookies)",
+                    "nullable": True,
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Seconds to wait for wait_url before returning cookies",
+                    "default": 60,
                 },
                 "headless": {
                     "type": "boolean",
@@ -329,6 +339,13 @@ class BrowserClient(BrowserClientInterface):
                     )
 
                 return result
+            elif operation == "get_cookies":
+                wait_url = arguments.get("wait_url")
+                timeout = arguments.get("timeout", 60)
+                cookies = await client.get_cookies_after_login(
+                    url, wait_url, headless=headless, timeout=timeout
+                )
+                return {"success": True, "cookies": cookies}
             elif operation == "capture_panels":
                 selector = arguments.get("selector", ".react-grid-item")
                 out_dir = arguments.get("out_dir", "charts")
