@@ -110,13 +110,16 @@ async def example():
     success = await BrowserClient.take_screenshot("https://example.com", "screenshot.png")
 
     # Launch login page and fetch cookies after URL match
-    cookies = await BrowserClient.get_cookies(
+    cookies_key = await BrowserClient.get_cookies(
         url="https://example.com/login",
         wait_url="dashboard",
         headless=False,
     )
-    print(cookies)
+    print(f"Cookies stored under key {cookies_key}")
 
 # Run the async example
 asyncio.run(example())
 ```
+
+By default, cookies are saved under a key in the format `browser.cookies/<domain>`
+derived from the login URL.
