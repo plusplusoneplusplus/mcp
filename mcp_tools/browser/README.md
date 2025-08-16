@@ -7,8 +7,7 @@ This document outlines the requirements and setup instructions for using the `Br
 - Google Chrome browser or Microsoft Edge browser
 - ChromeDriver executable or Microsoft EdgeDriver executable
 - Python packages:
-  - selenium
-  - webdriver-manager
+  - playwright
 
 ## Installation
 
@@ -71,18 +70,16 @@ sudo apt install chromium-chromedriver
 ### 3. Install Python Packages
 Use `uv` (or `pip`) to install the necessary packages:
 ```
-uv pip install selenium webdriver-manager
+uv pip install playwright
+playwright install
 ```
 
 ## WSL-specific Setup
 
-If using Windows Subsystem for Linux with a browser installed on the Windows host:
+If using Windows Subsystem for Linux:
 
-1. Install Chrome or Edge in Windows (not WSL).
-2. Install the corresponding WebDriver *in WSL*:
-   - For Chrome: `sudo apt install chromium-chromedriver` (or let `webdriver-manager` handle it)
-   - For Edge: `webdriver-manager` should handle downloading the correct EdgeDriver for Linux if needed, but you might need to point Selenium to the Windows Edge binary location. Using Chrome is often simpler in WSL scenarios.
-3. For non-headless mode, you'll need an X server running in Windows (e.g., VcXsrv, X410) and configure the `DISPLAY` environment variable in WSL.
+1. Install browsers using Playwright: `playwright install`
+2. For GUI mode, you'll need an X server running in Windows (e.g., VcXsrv, X410) and configure the `DISPLAY` environment variable in WSL.
 
 ## Troubleshooting
 

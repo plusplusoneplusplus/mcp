@@ -10,8 +10,6 @@ import time
 import asyncio
 from mcp_tools.browser.factory import BrowserClientFactory
 from utils.html_to_markdown import extract_and_format_html
-from selenium.webdriver.chrome.options import Options as ChromeOptions
-from selenium.webdriver.edge.options import Options as EdgeOptions
 
 
 async def main():
@@ -83,7 +81,7 @@ async def main():
     )
     parser.add_argument(
         "--client-type",
-        choices=["selenium", "playwright"],
+        choices=["playwright"],
         default="playwright",
         help="Type of browser client to use (default: playwright)",
     )
@@ -143,32 +141,14 @@ async def main():
 
     browser_client = None
     try:
-        # Set up browser options
+        # Set up browser options - Playwright only
         browser_options = None
-
-        if args.client_type == "selenium":
-            # Selenium-specific options
-            if args.profile_path and not args.no_profile:
-                if args.browser == "chrome":
-                    browser_options = ChromeOptions()
-                    browser_options.add_argument(f"user-data-dir={args.profile_path}")
-                    browser_options.add_argument(
-                        f"profile-directory={args.profile_dir}"
-                    )
-                elif args.browser == "edge":
-                    browser_options = EdgeOptions()
-                    browser_options.add_argument(f"user-data-dir={args.profile_path}")
-                    browser_options.add_argument(
-                        f"profile-directory={args.profile_dir}"
-                    )
-        else:
-            # Playwright-specific options
-            if args.browser == "edge":
-                # For Edge, we use Chromium with Edge-specific channel
-                browser_options = {"channel": "msedge"}
-            elif args.profile_path and not args.no_profile:
-                # For other browsers, we can use the profile path
-                browser_options = {"user_data_dir": args.profile_path}
+        if args.browser == "edge":
+            # For Edge, we use Chromium with Edge-specific channel
+            browser_options = {"channel": "msedge"}
+        elif args.profile_path and not args.no_profile:
+            # For other browsers, we can use the profile path
+            browser_options = {"user_data_dir": args.profile_path}
 
         # Create a browser client
         browser_client = BrowserClientFactory.create_client(

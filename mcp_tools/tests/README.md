@@ -42,7 +42,7 @@ The tests require:
 - pytest
 - pytest-asyncio
 - psutil (for process management in tests)
-- selenium (for browser-related tests)
+- playwright (for browser-related tests)
 
 ## Notes
 

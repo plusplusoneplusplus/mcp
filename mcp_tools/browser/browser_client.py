@@ -48,7 +48,7 @@ class BrowserClient(BrowserClientInterface):
     """Client for browser automation operations.
 
     This class provides a simplified interface for browser operations like opening pages,
-    capturing screenshots, etc. using Selenium with Chrome or Microsoft Edge.
+    capturing screenshots, etc. using Playwright with Chrome or Microsoft Edge.
 
     This class is a wrapper around the browser client implementation provided by the factory.
 

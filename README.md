@@ -90,7 +90,7 @@ Private overrides can be placed in `server/.private/` or in a folder pointed to 
 
 Tools are modular plugins registered through `mcp_tools`. Built-in utilities include:
 - **Command Executor** – Synchronous and asynchronous command execution with run-to-completion support
-- **Browser Automation** – Selenium and Playwright integration for web interaction
+- **Browser Automation** – Playwright integration for web interaction
 - **PyEval** – Secure Python expression evaluation using RestrictedPython
 - **DataFrame Service** – Data analysis and visualization with web interface
 - **Time Helpers** – Time-based utilities and scheduling
