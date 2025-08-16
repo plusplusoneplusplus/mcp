@@ -170,3 +170,18 @@ utils/secret_scanner/**/__pycache__/
 .claude/**/node_modules/
 # External plugin clones
 plugins_external/
+
+# Node.js / Frontend
+node_modules/
+dist/
+.vite/
+package-lock.json
+yarn.lock
+.pnpm-store/
+
+# Rust
+target/
+Cargo.lock
+
+# Tauri
+.tauri/
