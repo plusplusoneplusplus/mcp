@@ -50,7 +50,7 @@ class Annotations(BaseModel)
   - `yaml_tools.py` - YAML-based tool configuration
 
 - **Tool Implementations**:
-  - `browser/` - Browser automation tools (Selenium, Playwright)
+  - `browser/` - Browser automation tools (Playwright)
   - `command_executor/` - Command execution framework
   - `kv_store/` - Key-value storage tools
   - `time/` - Time-related utilities
@@ -62,8 +62,7 @@ class Annotations(BaseModel)
 
 **Dependencies**: Extensive external dependencies including:
 - `pydantic>=2.0.0` - Data validation
-- `selenium>=4.0.0` - Browser automation
-- `playwright>=1.42.0` - Modern browser automation
+- `playwright>=1.42.0` - Browser automation
 - `psutil>=5.9.0` - Process utilities
 - `pyyaml>=6.0.2` - YAML parsing
 - And many more...

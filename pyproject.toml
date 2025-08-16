@@ -35,9 +35,7 @@ dependencies = [
     "openai>=1.14.3", # OpenAI Python SDK
     # graphrag
     "graphrag==2.3.0", # Microsoft GraphRAG for knowledge graph construction
-    # Webdriver tools
-    "selenium==4.18.1",
-    "webdriver-manager==4.0.1",
+    # Browser automation
     "playwright>=1.42.0", # Modern browser automation
     # Text processing
     "trafilatura>=1.6.2", # Web content extraction

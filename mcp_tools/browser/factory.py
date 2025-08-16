@@ -6,7 +6,6 @@ This module provides a factory for creating browser clients.
 from typing import Optional, Literal
 
 from mcp_tools.browser.interface import IBrowserClient
-from mcp_tools.browser.selenium_client import SeleniumBrowserClient
 from mcp_tools.browser.playwright_client import PlaywrightBrowserClient
 from config.manager import EnvironmentManager
 
@@ -26,11 +25,9 @@ class BrowserClientFactory:
         """Create a browser client of the specified type.
 
         Args:
-            client_type: Type of client to create ('selenium' or 'playwright')
+            client_type: Type of client to create (only 'playwright' supported)
             user_data_dir: Path to user data directory for browser profiles
-            browser_type: Type of browser to use:
-                        - For selenium: 'chrome' or 'edge'
-                        - For playwright: 'chrome' or 'edge'
+            browser_type: Type of browser to use: 'chrome' or 'edge'
 
         Returns:
             Browser client instance
@@ -46,13 +43,7 @@ class BrowserClientFactory:
             )
         # print(f"Creating browser client with user data directory: {user_data_dir}")
 
-        if client_type == "selenium":
-            if browser_type not in [None, "chrome", "edge"]:
-                raise ValueError(
-                    f"Unsupported browser type for Selenium: {browser_type}"
-                )
-            return SeleniumBrowserClient(browser_type or "chrome")
-        elif client_type == "playwright":
+        if client_type == "playwright":
             if browser_type not in [None, "chrome", "edge"]:
                 raise ValueError(
                     f"Unsupported browser type for Playwright: {browser_type}"
