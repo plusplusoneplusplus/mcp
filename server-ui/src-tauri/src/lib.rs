@@ -27,6 +27,8 @@ pub struct ServerOutput {
     pub content: String,
 }
 
+
+
 pub struct ServerManager {
     process: Arc<Mutex<Option<Child>>>,
     status: Arc<Mutex<ServerStatus>>,
@@ -79,6 +81,27 @@ fn save_config_to_file(config: &ServerConfig) -> Result<(), String> {
 
     Ok(())
 }
+
+fn get_server_env_path() -> Result<PathBuf, String> {
+    // Use CARGO_MANIFEST_DIR to get the src-tauri directory, then navigate to project root
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
+        .map_err(|_| "CARGO_MANIFEST_DIR environment variable not set")?;
+
+    let src_tauri_path = PathBuf::from(manifest_dir);
+
+    // From src-tauri/ go up to server-ui/, then up to project root (mcp/)
+    let working_dir = src_tauri_path
+        .parent() // from src-tauri/ to server-ui/
+        .and_then(|p| p.parent()) // from server-ui/ to project root (mcp/)
+        .ok_or("Failed to get project root directory")?
+        .to_path_buf();
+
+    Ok(working_dir.join("server").join(".env"))
+}
+
+
+
+
 
 impl Default for ServerManager {
     fn default() -> Self {
@@ -354,6 +377,60 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+
+
+
+
+#[tauri::command]
+async fn get_env_file_path() -> Result<String, String> {
+    let env_path = get_server_env_path()?;
+    Ok(env_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn load_env_file_raw() -> Result<String, String> {
+    let env_path = get_server_env_path()?;
+
+    if !env_path.exists() {
+        // If .env file doesn't exist, try to copy from env.template
+        let template_path = env_path
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.join("config").join("env.template"))
+            .ok_or("Failed to construct template path")?;
+
+        if template_path.exists() {
+            fs::copy(&template_path, &env_path)
+                .map_err(|e| format!("Failed to copy env.template: {}", e))?;
+        } else {
+            // Create empty .env file
+            fs::write(&env_path, "")
+                .map_err(|e| format!("Failed to create .env file: {}", e))?;
+        }
+    }
+
+    let content = fs::read_to_string(&env_path)
+        .map_err(|e| format!("Failed to read .env file: {}", e))?;
+
+    Ok(content)
+}
+
+#[tauri::command]
+async fn save_env_file_raw(content: String) -> Result<(), String> {
+    let env_path = get_server_env_path()?;
+
+    // Ensure parent directory exists
+    if let Some(parent) = env_path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    fs::write(&env_path, content)
+        .map_err(|e| format!("Failed to write .env file: {}", e))?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -369,7 +446,10 @@ pub fn run() {
             get_server_status,
             get_server_config,
             set_server_config,
-            browse_working_directory
+            browse_working_directory,
+            get_env_file_path,
+            load_env_file_raw,
+            save_env_file_raw
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
