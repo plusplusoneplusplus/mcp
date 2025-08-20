@@ -127,7 +127,7 @@ impl ServerManager {
                     use std::process::Command;
                     // Use taskkill with /T flag to kill process tree
                     let _ = Command::new("taskkill")
-                        .args(&["/F", "/T", "/PID", &pid.to_string()])
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
                         .creation_flags(0x08000000) // CREATE_NO_WINDOW
                         .output();
                 }
@@ -280,7 +280,7 @@ async fn stop_server_internal(manager: &ServerManager) -> Result<ServerStatus, S
                 use std::process::Command;
                 // Use taskkill with /T flag to kill process tree
                 let _ = Command::new("taskkill")
-                    .args(&["/F", "/T", "/PID", &pid.to_string()])
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
                     .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .output();
             }
