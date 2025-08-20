@@ -352,6 +352,17 @@
   border-color: #545b62;
 }
 
+.btn-danger {
+  color: white;
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
 .btn.disabled {
   opacity: 0.5;
   cursor: not-allowed;

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::path::PathBuf;
 use std::io::{BufRead, BufReader};
 use std::fs;
-use tauri::{State, Emitter};
+use tauri::{State, Emitter, Manager};
 use serde::{Deserialize, Serialize};
 
 
@@ -225,6 +225,13 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
         command.process_group(0);
     }
 
+    // On Windows, create a new process group as well
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
+    }
+
     let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to start server in {}: {}", working_dir.display(), e))?;
@@ -249,16 +256,53 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
         }
     });
 
+    // Monitor stderr for startup errors
     let app_clone = app.clone();
+    let status_arc = manager.status.clone();
+    let process_arc = manager.process.clone();
     tokio::spawn(async move {
         let reader = BufReader::new(stderr);
         for line in reader.lines().map_while(Result::ok) {
             let output = ServerOutput {
                 timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
                 stream: "stderr".to_string(),
-                content: line,
+                content: line.clone(),
             };
             let _ = app_clone.emit("server-output", &output);
+
+            // Check for various server startup errors
+            if line.contains("address already in use") ||
+               line.contains("Errno 48") ||
+               (line.contains("bind on address") && line.contains("address already in use")) ||
+               line.contains("Port already in use") ||
+               line.contains("OSError: [Errno 48]") ||
+               line.contains("Cannot bind to address") {
+                println!("Server startup failed: Port already in use");
+
+                // Update server status to indicate failure
+                if let Ok(mut status_guard) = status_arc.lock() {
+                    status_guard.running = false;
+                    status_guard.pid = None;
+                    status_guard.port = None;
+                }
+
+                // Kill the failed process
+                if let Ok(mut process_guard) = process_arc.lock() {
+                    if let Some(mut child) = process_guard.take() {
+                        let _ = child.kill();
+                        let _ = child.wait();
+                    }
+                }
+
+                // Emit a server startup failure event
+                let failure_output = ServerOutput {
+                    timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
+                    stream: "error".to_string(),
+                    content: "Server startup failed: Port already in use".to_string(),
+                };
+                let _ = app_clone.emit("server-startup-failed", &failure_output);
+                break;
+            }
         }
     });
 
@@ -431,6 +475,157 @@ async fn save_env_file_raw(content: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn find_port_processes(port: u16) -> Result<Vec<String>, String> {
+    let mut processes = Vec::new();
+
+    #[cfg(unix)]
+    {
+        // Use lsof to find processes using the port
+        let output = Command::new("lsof")
+            .args(["-i", &format!(":{}", port)])
+            .output()
+            .map_err(|e| format!("Failed to run lsof: {}", e))?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines().skip(1) { // Skip header line
+                if !line.trim().is_empty() {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if parts.len() >= 2 {
+                        let command = parts[0];
+                        let pid = parts[1];
+                        processes.push(format!("{} (PID: {})", command, pid));
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        // Use netstat to find processes using the port
+        let output = Command::new("netstat")
+            .args(["-ano"])
+            .output()
+            .map_err(|e| format!("Failed to run netstat: {}", e))?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains(&format!(":{}", port)) && line.contains("LISTENING") {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if let Some(pid) = parts.last() {
+                        // Get process name from PID
+                        let tasklist_output = Command::new("tasklist")
+                            .args(["/FI", &format!("PID eq {}", pid), "/FO", "CSV", "/NH"])
+                            .output();
+
+                        if let Ok(tasklist_result) = tasklist_output {
+                            let tasklist_stdout = String::from_utf8_lossy(&tasklist_result.stdout);
+                            if let Some(first_line) = tasklist_stdout.lines().next() {
+                                let csv_parts: Vec<&str> = first_line.split(',').collect();
+                                if let Some(process_name) = csv_parts.first() {
+                                    let clean_name = process_name.trim_matches('"');
+                                    processes.push(format!("{} (PID: {})", clean_name, pid));
+                                }
+                            }
+                        } else {
+                            processes.push(format!("Unknown process (PID: {})", pid));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(processes)
+}
+
+#[tauri::command]
+async fn kill_port_processes(port: u16) -> Result<String, String> {
+    let mut killed_processes = Vec::new();
+
+    #[cfg(unix)]
+    {
+        // Use lsof to find PIDs, then kill them
+        let output = Command::new("lsof")
+            .args(["-t", "-i", &format!(":{}", port)])
+            .output()
+            .map_err(|e| format!("Failed to run lsof: {}", e))?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if let Ok(pid) = line.trim().parse::<u32>() {
+                    // Try graceful kill first (SIGTERM)
+                    let kill_result = Command::new("kill")
+                        .args(["-TERM", &pid.to_string()])
+                        .output();
+
+                    if kill_result.is_ok() {
+                        // Wait a moment for graceful shutdown
+                        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
+                        // Check if process is still running
+                        let check_result = Command::new("kill")
+                            .args(["-0", &pid.to_string()])
+                            .output();
+
+                        // If process is still running, force kill
+                        if check_result.is_ok() && check_result.unwrap().status.success() {
+                            let _ = Command::new("kill")
+                                .args(["-KILL", &pid.to_string()])
+                                .output();
+                        }
+
+                        killed_processes.push(pid.to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    {
+        // Use netstat to find PIDs, then use taskkill
+        let output = Command::new("netstat")
+            .args(["-ano"])
+            .output()
+            .map_err(|e| format!("Failed to run netstat: {}", e))?;
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                if line.contains(&format!(":{}", port)) && line.contains("LISTENING") {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if let Some(pid) = parts.last() {
+                        if let Ok(pid_num) = pid.parse::<u32>() {
+                            // Use taskkill to force terminate the process
+                            let kill_result = Command::new("taskkill")
+                                .args(["/F", "/PID", &pid_num.to_string()])
+                                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                                .output();
+
+                            if kill_result.is_ok() {
+                                killed_processes.push(pid_num.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if killed_processes.is_empty() {
+        Ok("No processes found using the port".to_string())
+    } else {
+        Ok(format!("Killed {} process(es) with PID(s): {}",
+                  killed_processes.len(),
+                  killed_processes.join(", ")))
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -449,8 +644,136 @@ pub fn run() {
             browse_working_directory,
             get_env_file_path,
             load_env_file_raw,
-            save_env_file_raw
+            save_env_file_raw,
+            find_port_processes,
+            kill_port_processes
         ])
+        .setup(|_app| {
+            // Add signal handlers to handle crashes and force kills
+            #[cfg(unix)]
+            {
+                use std::sync::atomic::{AtomicBool, Ordering};
+                use std::thread;
+
+                // Spawn a background thread to monitor for termination signals
+                thread::spawn(move || {
+                    static SIGNAL_RECEIVED: AtomicBool = AtomicBool::new(false);
+
+                    unsafe {
+                        // Set up signal handlers
+                        libc::signal(libc::SIGTERM, handle_signal as libc::sighandler_t);
+                        libc::signal(libc::SIGINT, handle_signal as libc::sighandler_t);
+                        libc::signal(libc::SIGQUIT, handle_signal as libc::sighandler_t);
+                        libc::signal(libc::SIGABRT, handle_signal as libc::sighandler_t);
+                    }
+
+                    // Signal handler function
+                    extern "C" fn handle_signal(sig: libc::c_int) {
+                        if SIGNAL_RECEIVED.swap(true, Ordering::SeqCst) {
+                            // If we've already received a signal, force immediate exit
+                            unsafe {
+                                libc::_exit(1);
+                            }
+                        }
+
+                        let signal_name = match sig {
+                            libc::SIGTERM => "SIGTERM",
+                            libc::SIGINT => "SIGINT",
+                            libc::SIGQUIT => "SIGQUIT",
+                            libc::SIGABRT => "SIGABRT",
+                            _ => "UNKNOWN",
+                        };
+
+                        println!("Received {} signal, performing emergency cleanup...", signal_name);
+
+                        // Force immediate process group kill to ensure child processes are terminated
+                        unsafe {
+                            // Kill our entire process group (including all child processes)
+                            libc::kill(0, libc::SIGKILL);
+                        }
+                    }
+
+                    // Keep the thread alive to handle signals
+                    loop {
+                        thread::sleep(std::time::Duration::from_secs(1));
+                    }
+                });
+
+                // Also register an atexit handler for additional safety
+                unsafe {
+                    libc::atexit(cleanup_at_exit);
+                }
+
+                // Static cleanup function for atexit
+                extern "C" fn cleanup_at_exit() {
+                    println!("Process exiting, performing final cleanup...");
+                    // Kill our entire process group to ensure all child processes are terminated
+                    unsafe {
+                        libc::kill(0, libc::SIGKILL);
+                    }
+                }
+            }
+
+            // Add Windows-specific signal handling
+            #[cfg(windows)]
+            {
+                use std::thread;
+                use std::ptr;
+
+                // Register console control handler for Windows
+                thread::spawn(move || {
+                    unsafe {
+                        extern "system" {
+                            fn SetConsoleCtrlHandler(
+                                handler: Option<extern "system" fn(u32) -> i32>,
+                                add: i32,
+                            ) -> i32;
+                        }
+
+                        extern "system" fn console_handler(ctrl_type: u32) -> i32 {
+                            match ctrl_type {
+                                0 => println!("Received CTRL+C, performing emergency cleanup..."), // CTRL_C_EVENT
+                                1 => println!("Received CTRL+BREAK, performing emergency cleanup..."), // CTRL_BREAK_EVENT
+                                2 => println!("Received close signal, performing emergency cleanup..."), // CTRL_CLOSE_EVENT
+                                5 => println!("Received logoff signal, performing emergency cleanup..."), // CTRL_LOGOFF_EVENT
+                                6 => println!("Received shutdown signal, performing emergency cleanup..."), // CTRL_SHUTDOWN_EVENT
+                                _ => println!("Received unknown signal {}, performing emergency cleanup...", ctrl_type),
+                            }
+
+                            // Kill all child processes when we receive any termination signal
+                            let _ = std::process::Command::new("taskkill")
+                                .args(["/F", "/T", "/IM", "python.exe"])
+                                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                                .output();
+
+                            let _ = std::process::Command::new("taskkill")
+                                .args(["/F", "/T", "/IM", "uv.exe"])
+                                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                                .output();
+
+                            1 // Return 1 to indicate we handled the signal
+                        }
+
+                        SetConsoleCtrlHandler(Some(console_handler), 1);
+                    }
+
+                    // Keep the thread alive to handle signals
+                    loop {
+                        thread::sleep(std::time::Duration::from_secs(1));
+                    }
+                });
+            }
+
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                println!("App window closing, cleaning up server...");
+                // Get the server manager state and clean up
+                let server_manager = window.state::<ServerManager>();
+                server_manager.cleanup();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
