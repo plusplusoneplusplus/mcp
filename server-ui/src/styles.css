@@ -141,6 +141,11 @@
   background-color: #28a745;
 }
 
+.status.starting {
+  color: #fd7e14;
+  background-color: #fd7e14;
+}
+
 .status.stopped {
   color: #dc3545;
   background-color: #dc3545;
@@ -232,6 +237,16 @@
   border-color: #545b62;
 }
 
+.btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn.disabled:hover {
+  opacity: 0.5;
+}
+
 input[type="number"],
 input[type="text"] {
   border-radius: 6px;
@@ -293,7 +308,9 @@ input[type="text"]:focus {
     background-color: #1a1a1a;
   }
 
-  .header, .config-panel, .logs-section {
+  .header,
+  .config-panel,
+  .logs-section {
     background: #2d2d2d;
     border: 1px solid #404040;
   }
@@ -348,6 +365,16 @@ input[type="text"]:focus {
   .btn-secondary:hover {
     background-color: #3d4349;
     border-color: #343a40;
+  }
+
+  .btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .btn.disabled:hover {
+    opacity: 0.5;
   }
 
   .logs {

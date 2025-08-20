@@ -6,8 +6,7 @@ use std::fs;
 use tauri::{State, Emitter};
 use serde::{Deserialize, Serialize};
 
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerStatus {
@@ -96,6 +95,56 @@ impl ServerManager {
             config: Arc::new(Mutex::new(loaded_config)),
         }
     }
+
+    // Cleanup method to ensure server is stopped when manager is dropped
+    pub fn cleanup(&self) {
+        if let Ok(mut process_guard) = self.process.lock() {
+            if let Some(mut child) = process_guard.take() {
+                let pid = child.id();
+
+                // Try graceful termination first
+                let _ = child.kill();
+
+                // Force kill the process group to ensure cleanup
+                #[cfg(unix)]
+                {
+                    unsafe {
+                        // Kill the entire process group
+                        libc::kill(-(pid as i32), libc::SIGKILL);
+                        // Also kill the specific process as fallback
+                        libc::kill(pid as i32, libc::SIGKILL);
+                    }
+                }
+
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    use std::process::Command;
+                    // Use taskkill with /T flag to kill process tree
+                    let _ = Command::new("taskkill")
+                        .args(&["/F", "/T", "/PID", &pid.to_string()])
+                        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                        .output();
+                }
+
+                let _ = child.wait();
+            }
+        }
+
+        // Update status
+        if let Ok(mut status_guard) = self.status.lock() {
+            status_guard.running = false;
+            status_guard.pid = None;
+            status_guard.port = None;
+        }
+    }
+}
+
+// Implement Drop to ensure cleanup when ServerManager is dropped
+impl Drop for ServerManager {
+    fn drop(&mut self) {
+        self.cleanup();
+    }
 }
 
 async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, port: Option<u16>) -> Result<ServerStatus, String> {
@@ -143,7 +192,10 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
 
     // Create a new process group on Unix to enable killing entire process tree
     #[cfg(unix)]
-    command.process_group(0);
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
 
     let mut child = command
         .spawn()
