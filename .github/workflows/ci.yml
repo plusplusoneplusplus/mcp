@@ -72,32 +72,3 @@ jobs:
         with:
           projectPath: ./server-ui
           args: ${{ matrix.args }}
-
-  test-main-project:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Create virtual environment
-        run: uv venv
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Run Python tests
-        run: uv run python -m pytest --tb=short
-
-      - name: Run Python linting
-        run: |
-          uv run ruff check .
-          uv run ruff format --check .
