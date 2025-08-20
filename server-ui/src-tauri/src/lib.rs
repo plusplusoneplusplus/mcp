@@ -6,6 +6,9 @@ use std::fs;
 use tauri::{State, Emitter, Manager};
 use serde::{Deserialize, Serialize};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerStatus {
@@ -718,7 +721,6 @@ pub fn run() {
             #[cfg(windows)]
             {
                 use std::thread;
-                use std::ptr;
 
                 // Register console control handler for Windows
                 thread::spawn(move || {
