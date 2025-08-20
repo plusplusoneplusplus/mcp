@@ -30,6 +30,39 @@ A Tauri-based desktop application for managing MCP (Model Context Protocol) serv
    npm install
    ```
 
+3. Install Tauri CLI (if not already installed globally):
+   ```bash
+   # Option 1: Install globally (recommended)
+   npm install -g @tauri-apps/cli@latest
+
+   # Option 2: Use npx (alternative if you don't want global install)
+   # You can use 'npx tauri' instead of 'tauri' in subsequent commands
+   ```
+
+## Troubleshooting
+
+### "tauri: command not found" Error
+
+If you encounter `sh: tauri: command not found` when running `npm run tauri dev`, try one of these solutions:
+
+1. **Install Tauri CLI globally** (recommended):
+   ```bash
+   npm install -g @tauri-apps/cli@latest
+   ```
+
+2. **Use npx instead**:
+   ```bash
+   npx tauri dev
+   ```
+
+3. **Use npm scripts with npx**:
+   ```bash
+   # Modify package.json scripts to use npx, or run directly:
+   npm run dev  # This runs the Vite dev server only
+   # Then in another terminal:
+   npx tauri dev --no-dev-server
+   ```
+
 ## Development
 
 To run the application in development mode:

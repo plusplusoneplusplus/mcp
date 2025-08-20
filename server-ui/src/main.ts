@@ -20,6 +20,7 @@ interface ServerOutput {
 
 let serverStatus: ServerStatus = { running: false };
 let serverConfig: ServerConfig = { default_port: 8000 };
+let serverReady: boolean = false; // Track if Uvicorn startup log has been seen
 let statusEl: HTMLElement | null;
 let statusTextEl: HTMLElement | null;
 let startBtn: HTMLElement | null;
@@ -56,18 +57,51 @@ async function loadServerConfig() {
 
 function updateUI() {
   if (statusEl) {
-    statusEl.className = serverStatus.running ? "status running" : "status stopped";
+    if (serverStatus.running && !serverReady) {
+      statusEl.className = "status starting";
+    } else {
+      statusEl.className = serverStatus.running ? "status running" : "status stopped";
+    }
   }
 
   if (statusTextEl) {
-    statusTextEl.textContent = serverStatus.running
-      ? `Running (PID: ${serverStatus.pid}, Port: ${serverStatus.port})`
-      : "Stopped";
+    if (serverStatus.running && !serverReady) {
+      statusTextEl.textContent = `Starting... (PID: ${serverStatus.pid}, Port: ${serverStatus.port})`;
+    } else {
+      statusTextEl.textContent = serverStatus.running
+        ? `Running (PID: ${serverStatus.pid}, Port: ${serverStatus.port})`
+        : "Stopped";
+    }
   }
 
   if (startBtn) startBtn.style.display = serverStatus.running ? "none" : "inline-flex";
-  if (stopBtn) stopBtn.style.display = serverStatus.running ? "inline-flex" : "none";
-  if (restartBtn) restartBtn.style.display = serverStatus.running ? "inline-flex" : "none";
+
+  // Show stop/restart buttons when server is running, but disable them if not ready
+  if (stopBtn) {
+    stopBtn.style.display = serverStatus.running ? "inline-flex" : "none";
+    if (serverStatus.running) {
+      if (serverReady) {
+        stopBtn.classList.remove("disabled");
+        stopBtn.removeAttribute("disabled");
+      } else {
+        stopBtn.classList.add("disabled");
+        stopBtn.setAttribute("disabled", "true");
+      }
+    }
+  }
+
+  if (restartBtn) {
+    restartBtn.style.display = serverStatus.running ? "inline-flex" : "none";
+    if (serverStatus.running) {
+      if (serverReady) {
+        restartBtn.classList.remove("disabled");
+        restartBtn.removeAttribute("disabled");
+      } else {
+        restartBtn.classList.add("disabled");
+        restartBtn.setAttribute("disabled", "true");
+      }
+    }
+  }
 }
 
 function updateConfigUI() {
@@ -95,12 +129,22 @@ function addServerOutput(output: ServerOutput) {
     logsEl.innerHTML += `<div class="${className}">[${output.timestamp}] ${prefix} ${output.content}</div>`;
     logsEl.scrollTop = logsEl.scrollHeight;
   }
+
+  // Check if this is the Uvicorn startup log indicating server is ready
+  if (output.content.includes("Uvicorn running on http://") && !serverReady) {
+    serverReady = true;
+    updateUI();
+    addLog("Server is ready for connections");
+  }
 }
 
 async function startServer() {
   try {
     const port = portInput?.value ? parseInt(portInput.value) : serverConfig.default_port;
     addLog(`Starting server on port ${port}...`);
+
+    // Reset server ready state when starting
+    serverReady = false;
 
     serverStatus = await invoke("start_server", { port });
     updateUI();
@@ -115,6 +159,10 @@ async function stopServer() {
   try {
     addLog("Stopping server...");
     serverStatus = await invoke("stop_server");
+
+    // Reset server ready state when stopping
+    serverReady = false;
+
     updateUI();
     addLog("Server stopped successfully");
   } catch (error) {
@@ -127,6 +175,9 @@ async function restartServer() {
   try {
     const port = portInput?.value ? parseInt(portInput.value) : serverConfig.default_port;
     addLog(`Restarting server on port ${port}...`);
+
+    // Reset server ready state when restarting
+    serverReady = false;
 
     serverStatus = await invoke("restart_server", { port });
     updateUI();
