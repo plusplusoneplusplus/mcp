@@ -18,19 +18,13 @@ interface ServerOutput {
   content: string;
 }
 
-interface EnvVariable {
-  key: string;
-  value: string;
-  comment?: string;
-}
 
-type EnvVariables = EnvVariable[];
 
 let serverStatus: ServerStatus = { running: false };
 let serverConfig: ServerConfig = { default_port: 8000 };
 let serverReady: boolean = false; // Track if Uvicorn startup log has been seen
 let startupTimeoutId: number | null = null; // Track startup timeout
-let envVariables: EnvVariables = [];
+
 let statusEl: HTMLElement | null;
 let statusTextEl: HTMLElement | null;
 let startBtn: HTMLElement | null;
@@ -44,7 +38,7 @@ let browseBtn: HTMLElement | null;
 let saveConfigBtn: HTMLElement | null;
 let clearLogsBtn: HTMLElement | null;
 let forceKillBtn: HTMLElement | null;
-let envPanel: HTMLElement | null;
+
 let envListEl: HTMLElement | null;
 
 let saveEnvBtn: HTMLElement | null;
@@ -295,26 +289,9 @@ async function saveConfig() {
   }
 }
 
-async function loadEnvFile() {
-  try {
-    envVariables = await invoke("load_env_file");
-    updateEnvUI();
-    addLog(`Loaded ${envVariables.length} environment variables`);
-  } catch (error) {
-    console.error("Failed to load env file:", error);
-    addLog(`Failed to load env file: ${error}`);
-  }
-}
 
-async function saveEnvFile() {
-  try {
-    await invoke("save_env_file", { variables: envVariables });
-    addLog("Environment variables saved successfully");
-  } catch (error) {
-    console.error("Failed to save env file:", error);
-    addLog(`Failed to save env file: ${error}`);
-  }
-}
+
+
 
 async function loadEnvFileRaw() {
   try {
@@ -350,29 +327,11 @@ async function getEnvFilePath() {
   }
 }
 
-function addEnvVariable(key?: string, value?: string, comment?: string) {
-  const newVar: EnvVariable = {
-    key: key || "",
-    value: value || "",
-    comment: comment || undefined
-  };
-  envVariables.push(newVar);
-  updateEnvUI();
-}
 
-function removeEnvVariable(index: number) {
-  envVariables.splice(index, 1);
-  updateEnvUI();
-}
 
-function updateEnvVariable(index: number, field: keyof EnvVariable, value: string) {
-  if (field === 'comment') {
-    envVariables[index][field] = value || undefined;
-  } else {
-    envVariables[index][field] = value;
-  }
-  updateEnvUI();
-}
+
+
+
 
 function switchTab(tabName: string) {
   // Update tab headers
@@ -571,7 +530,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   clearLogsBtn = document.querySelector("#clear-logs");
   forceKillBtn = document.querySelector("#force-kill-btn");
 
-  envPanel = document.querySelector("#env-panel");
+
   envListEl = document.querySelector("#env-list");
 
   saveEnvBtn = document.querySelector("#save-env-btn");
