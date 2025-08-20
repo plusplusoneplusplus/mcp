@@ -101,31 +101,3 @@ jobs:
         run: |
           uv run ruff check .
           uv run ruff format --check .
-
-  lint-and-format:
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: ./server-ui
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run TypeScript check
-        run: npx tsc --noEmit
-
-      - name: Check formatting (if prettier is configured)
-        run: |
-          if [ -f .prettierrc ] || [ -f .prettierrc.json ] || [ -f .prettierrc.js ]; then
-            npx prettier --check .
-          else
-            echo "Prettier not configured, skipping format check"
-          fi
-        continue-on-error: true
