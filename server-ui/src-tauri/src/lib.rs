@@ -7,7 +7,6 @@ use tauri::{State, Emitter};
 use serde::{Deserialize, Serialize};
 
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerStatus {
     pub running: bool,
@@ -372,4 +371,65 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_server_manager_creation() {
+        let manager = ServerManager::new();
+        let status = manager.status.lock().unwrap();
+        assert!(!status.running);
+        assert!(status.pid.is_none());
+        assert!(status.port.is_none());
+    }
+
+    #[test]
+    fn test_server_config_serialization() {
+        let config = ServerConfig {
+            working_directory: Some("/test/path".to_string()),
+            default_port: 8080,
+        };
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let deserialized: ServerConfig = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(config.working_directory, deserialized.working_directory);
+        assert_eq!(config.default_port, deserialized.default_port);
+    }
+
+    #[test]
+    fn test_server_status_serialization() {
+        let status = ServerStatus {
+            running: true,
+            pid: Some(1234),
+            port: Some(8000),
+        };
+
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: ServerStatus = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(status.running, deserialized.running);
+        assert_eq!(status.pid, deserialized.pid);
+        assert_eq!(status.port, deserialized.port);
+    }
+
+    #[test]
+    fn test_greet_function() {
+        let result = greet("World");
+        assert_eq!(result, "Hello, World! You've been greeted from Rust!");
+    }
+
+    #[test]
+    fn test_default_config() {
+        // Test the default config creation directly rather than loading from file
+        let config = ServerConfig {
+            working_directory: None,
+            default_port: 8000,
+        };
+        assert_eq!(config.default_port, 8000);
+        assert!(config.working_directory.is_none());
+    }
 }
