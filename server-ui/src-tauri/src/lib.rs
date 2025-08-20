@@ -80,6 +80,12 @@ fn save_config_to_file(config: &ServerConfig) -> Result<(), String> {
     Ok(())
 }
 
+impl Default for ServerManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServerManager {
     pub fn new() -> Self {
         let loaded_config = load_config_from_file();
@@ -184,7 +190,7 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
 
     let mut command = Command::new("uv");
     command
-        .args(&["run", "server/main.py", "--port", &port.to_string()])
+        .args(["run", "server/main.py", "--port", &port.to_string()])
         .current_dir(&working_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -210,30 +216,26 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
     let app_clone = app.clone();
     tokio::spawn(async move {
         let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let output = ServerOutput {
-                    timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
-                    stream: "stdout".to_string(),
-                    content: line,
-                };
-                let _ = app_clone.emit("server-output", &output);
-            }
+        for line in reader.lines().map_while(Result::ok) {
+            let output = ServerOutput {
+                timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
+                stream: "stdout".to_string(),
+                content: line,
+            };
+            let _ = app_clone.emit("server-output", &output);
         }
     });
 
     let app_clone = app.clone();
     tokio::spawn(async move {
         let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let output = ServerOutput {
-                    timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
-                    stream: "stderr".to_string(),
-                    content: line,
-                };
-                let _ = app_clone.emit("server-output", &output);
-            }
+        for line in reader.lines().map_while(Result::ok) {
+            let output = ServerOutput {
+                timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
+                stream: "stderr".to_string(),
+                content: line,
+            };
+            let _ = app_clone.emit("server-output", &output);
         }
     });
 
@@ -248,7 +250,7 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
 
 #[tauri::command]
 async fn start_server(manager: State<'_, ServerManager>, app: tauri::AppHandle, port: Option<u16>) -> Result<ServerStatus, String> {
-    start_server_internal(&*manager, app, port).await
+    start_server_internal(&manager, app, port).await
 }
 
 async fn stop_server_internal(manager: &ServerManager) -> Result<ServerStatus, String> {
@@ -303,14 +305,14 @@ async fn stop_server_internal(manager: &ServerManager) -> Result<ServerStatus, S
 
 #[tauri::command]
 async fn stop_server(manager: State<'_, ServerManager>) -> Result<ServerStatus, String> {
-    stop_server_internal(&*manager).await
+    stop_server_internal(&manager).await
 }
 
 #[tauri::command]
 async fn restart_server(manager: State<'_, ServerManager>, app: tauri::AppHandle, port: Option<u16>) -> Result<ServerStatus, String> {
-    stop_server_internal(&*manager).await?;
+    stop_server_internal(&manager).await?;
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-    start_server_internal(&*manager, app, port).await
+    start_server_internal(&manager, app, port).await
 }
 
 #[tauri::command]
