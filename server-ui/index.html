@@ -1,57 +1,83 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/styles.css" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MCP Server Manager</title>
-    <script type="module" src="/src/main.ts" defer></script>
-  </head>
 
-  <body>
-    <main class="container">
-      <div class="header">
-        <h1>MCP Server Manager</h1>
-        <div class="status-controls">
-          <div class="status-indicator">
-            <div id="server-status" class="status stopped">●</div>
-            <span id="status-text">Stopped</span>
-          </div>
-          <div class="action-buttons">
-            <button id="start-btn" class="btn btn-start">▶ Start</button>
-            <button id="stop-btn" class="btn btn-stop" style="display: none;">⏹ Stop</button>
-            <button id="restart-btn" class="btn btn-restart" style="display: none;">🔄 Restart</button>
-            <button id="config-toggle" class="btn btn-secondary">⚙ Config</button>
-          </div>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="/src/styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCP Server Manager</title>
+  <script type="module" src="/src/main.ts" defer></script>
+</head>
+
+<body>
+  <main class="container">
+    <div class="header">
+      <h1>MCP Server Manager</h1>
+      <div class="status-controls">
+        <div class="status-indicator">
+          <div id="server-status" class="status stopped">●</div>
+          <span id="status-text">Stopped</span>
+        </div>
+        <div class="action-buttons">
+          <button id="start-btn" class="btn btn-start">▶ Start</button>
+          <button id="stop-btn" class="btn btn-stop" style="display: none;">⏹ Stop</button>
+          <button id="restart-btn" class="btn btn-restart" style="display: none;">🔄 Restart</button>
+          <button id="force-kill-btn" class="btn btn-danger">💀 Force Kill Port</button>
         </div>
       </div>
+    </div>
 
-      <div id="config-panel" class="config-panel collapsed">
-        <div class="config-grid">
-          <div class="config-item">
-            <label for="working-dir-input">Working Directory</label>
-            <div class="input-group">
-              <input id="working-dir-input" type="text" placeholder="Auto-detect" />
-              <button id="browse-btn" class="btn-icon" title="Suggest Path">📁</button>
+    <div class="tabs-container">
+      <div class="tab-headers">
+        <button class="tab-header active" data-tab="logs">📋 Logs</button>
+        <button class="tab-header" data-tab="config">⚙ Config</button>
+        <button class="tab-header" data-tab="env">🌍 Environment</button>
+      </div>
+
+      <div class="tab-content">
+        <div id="logs-panel" class="tab-panel active">
+          <div class="logs-header">
+            <span>Server Logs</span>
+            <button id="clear-logs" class="btn-icon" title="Clear logs">🗑</button>
+          </div>
+          <div id="logs" class="logs"></div>
+        </div>
+
+        <div id="config-panel" class="tab-panel">
+          <div class="config-grid">
+            <div class="config-item">
+              <label for="working-dir-input">Working Directory</label>
+              <div class="input-group">
+                <input id="working-dir-input" type="text" placeholder="Auto-detect" />
+                <button id="browse-btn" class="btn-icon" title="Suggest Path">📁</button>
+              </div>
+            </div>
+            <div class="config-item">
+              <label for="port-input">Port</label>
+              <input id="port-input" type="number" value="8000" min="1000" max="65535" />
+            </div>
+            <div class="config-actions">
+              <button id="save-config-btn" class="btn btn-secondary">Save</button>
             </div>
           </div>
-          <div class="config-item">
-            <label for="port-input">Port</label>
-            <input id="port-input" type="number" value="8000" min="1000" max="65535" />
-          </div>
-          <div class="config-actions">
-            <button id="save-config-btn" class="btn btn-secondary">Save</button>
-          </div>
         </div>
-      </div>
 
-      <div class="logs-section">
-        <div class="logs-header">
-          <span>Server Logs</span>
-          <button id="clear-logs" class="btn-icon" title="Clear logs">🗑</button>
+        <div id="env-panel" class="tab-panel">
+          <div class="env-header">
+            <div class="env-info">
+              <span class="env-file-label">Environment File:</span>
+              <span id="env-file-path" class="env-file-path"></span>
+            </div>
+            <div class="env-actions">
+              <button id="load-env-btn" class="btn btn-secondary">Load</button>
+              <button id="save-env-btn" class="btn btn-primary">Save</button>
+            </div>
+          </div>
+          <div id="env-list" class="env-list"></div>
         </div>
-        <div id="logs" class="logs"></div>
       </div>
-    </main>
-  </body>
+    </div>
+  </main>
+</body>
+
 </html>

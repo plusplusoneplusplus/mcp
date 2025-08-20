@@ -18,22 +18,32 @@ interface ServerOutput {
   content: string;
 }
 
+
+
 let serverStatus: ServerStatus = { running: false };
 let serverConfig: ServerConfig = { default_port: 8000 };
 let serverReady: boolean = false; // Track if Uvicorn startup log has been seen
+let startupTimeoutId: number | null = null; // Track startup timeout
+
 let statusEl: HTMLElement | null;
 let statusTextEl: HTMLElement | null;
 let startBtn: HTMLElement | null;
 let stopBtn: HTMLElement | null;
 let restartBtn: HTMLElement | null;
-let configToggleBtn: HTMLElement | null;
-let configPanel: HTMLElement | null;
+let tabHeaders: NodeListOf<HTMLElement> | null;
 let portInput: HTMLInputElement | null;
 let logsEl: HTMLElement | null;
 let workingDirInput: HTMLInputElement | null;
 let browseBtn: HTMLElement | null;
 let saveConfigBtn: HTMLElement | null;
 let clearLogsBtn: HTMLElement | null;
+let forceKillBtn: HTMLElement | null;
+
+let envListEl: HTMLElement | null;
+
+let saveEnvBtn: HTMLElement | null;
+let loadEnvBtn: HTMLElement | null;
+let envFilePathEl: HTMLElement | null;
 
 async function updateServerStatus() {
   try {
@@ -133,6 +143,13 @@ function addServerOutput(output: ServerOutput) {
   // Check if this is the Uvicorn startup log indicating server is ready
   if (output.content.includes("Uvicorn running on http://") && !serverReady) {
     serverReady = true;
+
+    // Clear startup timeout since server is now ready
+    if (startupTimeoutId) {
+      clearTimeout(startupTimeoutId);
+      startupTimeoutId = null;
+    }
+
     updateUI();
     addLog("Server is ready for connections");
   }
@@ -146,12 +163,36 @@ async function startServer() {
     // Reset server ready state when starting
     serverReady = false;
 
+    // Clear any existing startup timeout
+    if (startupTimeoutId) {
+      clearTimeout(startupTimeoutId);
+    }
+
+    // Set a timeout to reset state if server doesn't become ready
+    startupTimeoutId = window.setTimeout(() => {
+      if (serverStatus.running && !serverReady) {
+        addLog("Server startup timeout - resetting state. Check if port is available.");
+        serverReady = false;
+        updateServerStatus(); // This will refresh the actual server status
+      }
+    }, 30000); // 30 second timeout
+
     serverStatus = await invoke("start_server", { port });
     updateUI();
     addLog(`Server started successfully (PID: ${serverStatus.pid})`);
   } catch (error) {
     console.error("Failed to start server:", error);
     addLog(`Failed to start server: ${error}`);
+
+    // Clear timeout on startup failure
+    if (startupTimeoutId) {
+      clearTimeout(startupTimeoutId);
+      startupTimeoutId = null;
+    }
+
+    // Reset state on startup failure
+    serverReady = false;
+    await updateServerStatus();
   }
 }
 
@@ -162,6 +203,12 @@ async function stopServer() {
 
     // Reset server ready state when stopping
     serverReady = false;
+
+    // Clear any startup timeout
+    if (startupTimeoutId) {
+      clearTimeout(startupTimeoutId);
+      startupTimeoutId = null;
+    }
 
     updateUI();
     addLog("Server stopped successfully");
@@ -179,12 +226,36 @@ async function restartServer() {
     // Reset server ready state when restarting
     serverReady = false;
 
+    // Clear any existing startup timeout
+    if (startupTimeoutId) {
+      clearTimeout(startupTimeoutId);
+    }
+
+    // Set a timeout to reset state if server doesn't become ready
+    startupTimeoutId = window.setTimeout(() => {
+      if (serverStatus.running && !serverReady) {
+        addLog("Server restart timeout - resetting state. Check if port is available.");
+        serverReady = false;
+        updateServerStatus(); // This will refresh the actual server status
+      }
+    }, 30000); // 30 second timeout
+
     serverStatus = await invoke("restart_server", { port });
     updateUI();
     addLog(`Server restarted successfully (PID: ${serverStatus.pid})`);
   } catch (error) {
     console.error("Failed to restart server:", error);
     addLog(`Failed to restart server: ${error}`);
+
+    // Clear timeout on restart failure
+    if (startupTimeoutId) {
+      clearTimeout(startupTimeoutId);
+      startupTimeoutId = null;
+    }
+
+    // Reset state on restart failure
+    serverReady = false;
+    await updateServerStatus();
   }
 }
 
@@ -218,10 +289,71 @@ async function saveConfig() {
   }
 }
 
-function toggleConfig() {
-  if (configPanel) {
-    configPanel.classList.toggle("collapsed");
+
+
+
+
+async function loadEnvFileRaw() {
+  try {
+    const content = await invoke<string>("load_env_file_raw");
+    updateEnvTextArea(content);
+    addLog("Environment file loaded successfully");
+  } catch (error) {
+    console.error("Failed to load env file:", error);
+    addLog(`Failed to load env file: ${error}`);
   }
+}
+
+async function saveEnvFileRaw() {
+  try {
+    const content = getEnvTextAreaContent();
+    await invoke("save_env_file_raw", { content });
+    addLog("Environment file saved successfully");
+  } catch (error) {
+    console.error("Failed to save env file:", error);
+    addLog(`Failed to save env file: ${error}`);
+  }
+}
+
+async function getEnvFilePath() {
+  try {
+    const path = await invoke<string>("get_env_file_path");
+    if (envFilePathEl) {
+      envFilePathEl.textContent = path;
+    }
+  } catch (error) {
+    console.error("Failed to get env file path:", error);
+    addLog(`Failed to get env file path: ${error}`);
+  }
+}
+
+
+
+
+
+
+
+function switchTab(tabName: string) {
+  // Update tab headers
+  if (tabHeaders) {
+    tabHeaders.forEach(header => {
+      if (header.dataset.tab === tabName) {
+        header.classList.add("active");
+      } else {
+        header.classList.remove("active");
+      }
+    });
+  }
+
+  // Update tab panels
+  const tabPanels = document.querySelectorAll(".tab-panel");
+  tabPanels.forEach(panel => {
+    if (panel.id === `${tabName}-panel`) {
+      panel.classList.add("active");
+    } else {
+      panel.classList.remove("active");
+    }
+  });
 }
 
 function clearLogs() {
@@ -231,33 +363,216 @@ function clearLogs() {
   }
 }
 
+function showErrorNotification(message: string) {
+  // Create a temporary error notification element
+  const notification = document.createElement("div");
+  notification.className = "error-notification";
+  notification.textContent = message;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #f44336;
+    color: white;
+    padding: 16px;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-width: 400px;
+    word-wrap: break-word;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+  `;
+
+  document.body.appendChild(notification);
+
+  // Remove the notification after 5 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  }, 5000);
+}
+
+function showSuccessNotification(message: string) {
+  // Create a temporary success notification element
+  const notification = document.createElement("div");
+  notification.className = "success-notification";
+  notification.textContent = message;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #4caf50;
+    color: white;
+    padding: 16px;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    max-width: 400px;
+    word-wrap: break-word;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+  `;
+
+  document.body.appendChild(notification);
+
+  // Remove the notification after 3 seconds
+  setTimeout(() => {
+    if (notification.parentNode) {
+      notification.parentNode.removeChild(notification);
+    }
+  }, 3000);
+}
+
+async function forceKillPort() {
+  if (!portInput) return;
+
+  const port = parseInt(portInput.value);
+  if (isNaN(port) || port < 1000 || port > 65535) {
+    showErrorNotification("Please enter a valid port number in the Config tab (1000-65535)");
+    return;
+  }
+
+  try {
+    addLog(`Checking for processes using port ${port}...`);
+
+    // First, find what processes are using the port
+    const processes: string[] = await invoke("find_port_processes", { port });
+
+    if (processes.length === 0) {
+      showSuccessNotification(`No processes found using port ${port}`);
+      addLog(`No processes found using port ${port}`);
+      return;
+    }
+
+    // Show confirmation dialog
+    const processList = processes.join('\n');
+    const confirmed = confirm(
+      `Found ${processes.length} process(es) using port ${port}:\n\n${processList}\n\nDo you want to kill these processes?`
+    );
+
+    if (!confirmed) {
+      addLog("Force kill cancelled by user");
+      return;
+    }
+
+    addLog(`Killing processes using port ${port}...`);
+
+    // Kill the processes
+    const result: string = await invoke("kill_port_processes", { port });
+    showSuccessNotification(result);
+    addLog(`Force kill completed: ${result}`);
+
+    // Reset server state after force kill
+    serverReady = false;
+
+    // Clear any startup timeout
+    if (startupTimeoutId) {
+      clearTimeout(startupTimeoutId);
+      startupTimeoutId = null;
+    }
+
+    // Explicitly set server status to stopped after force kill
+    serverStatus = { running: false };
+    updateUI();
+
+    // Also update from backend to ensure consistency
+    await updateServerStatus();
+    addLog("Server state reset - you can now start the server");
+
+  } catch (error) {
+    const errorMessage = `Failed to kill processes on port ${port}: ${error}`;
+    showErrorNotification(errorMessage);
+    addLog(errorMessage);
+  }
+}
+
+function updateEnvTextArea(content: string) {
+  if (!envListEl) return;
+
+  // Clear existing content
+  envListEl.innerHTML = "";
+
+  // Create text area element
+  const textArea = document.createElement("textarea");
+  textArea.className = "env-textarea";
+  textArea.placeholder = "Enter environment variables here...\n\nExample:\n# Database configuration\nDB_HOST=localhost\nDB_PORT=5432\n\n# API Keys\nAPI_KEY=your_key_here";
+  textArea.value = content;
+  textArea.rows = 20;
+  textArea.spellcheck = false;
+
+  // Add to container
+  envListEl.appendChild(textArea);
+}
+
+function getEnvTextAreaContent(): string {
+  if (!envListEl) return "";
+
+  const textArea = envListEl.querySelector("textarea");
+  return textArea ? textArea.value : "";
+}
+
 window.addEventListener("DOMContentLoaded", async () => {
   statusEl = document.querySelector("#server-status");
   statusTextEl = document.querySelector("#status-text");
   startBtn = document.querySelector("#start-btn");
   stopBtn = document.querySelector("#stop-btn");
   restartBtn = document.querySelector("#restart-btn");
-  configToggleBtn = document.querySelector("#config-toggle");
-  configPanel = document.querySelector("#config-panel");
+  tabHeaders = document.querySelectorAll(".tab-header");
   portInput = document.querySelector("#port-input");
   logsEl = document.querySelector("#logs");
   workingDirInput = document.querySelector("#working-dir-input");
   browseBtn = document.querySelector("#browse-btn");
   saveConfigBtn = document.querySelector("#save-config-btn");
   clearLogsBtn = document.querySelector("#clear-logs");
+  forceKillBtn = document.querySelector("#force-kill-btn");
+
+
+  envListEl = document.querySelector("#env-list");
+
+  saveEnvBtn = document.querySelector("#save-env-btn");
+  loadEnvBtn = document.querySelector("#load-env-btn");
+  envFilePathEl = document.querySelector("#env-file-path");
 
   startBtn?.addEventListener("click", startServer);
   stopBtn?.addEventListener("click", stopServer);
   restartBtn?.addEventListener("click", restartServer);
-  configToggleBtn?.addEventListener("click", toggleConfig);
+  // Tab switching
+  tabHeaders?.forEach(header => {
+    header.addEventListener("click", (e) => {
+      const tabName = (e.target as HTMLElement).dataset.tab;
+      if (tabName) {
+        switchTab(tabName);
+      }
+    });
+  });
   browseBtn?.addEventListener("click", browseWorkingDirectory);
   saveConfigBtn?.addEventListener("click", saveConfig);
   clearLogsBtn?.addEventListener("click", clearLogs);
+  forceKillBtn?.addEventListener("click", forceKillPort);
+
+  saveEnvBtn?.addEventListener("click", saveEnvFileRaw);
+  loadEnvBtn?.addEventListener("click", loadEnvFileRaw);
 
   // Listen for server output events
   await listen("server-output", (event) => {
     const output = event.payload as ServerOutput;
     addServerOutput(output);
+  });
+
+  // Listen for server startup failure events
+  await listen("server-startup-failed", (event) => {
+    const output = event.payload as ServerOutput;
+    addServerOutput(output);
+
+    // Force update server status to reflect the failure
+    setTimeout(updateServerStatus, 500);
+
+    // Show error notification
+    showErrorNotification("Server startup failed: Port already in use. Please try a different port or stop any existing server.");
   });
 
   // Update status every 2 seconds
@@ -266,4 +581,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   // Initial loads
   loadServerConfig();
   updateServerStatus();
+  getEnvFilePath();
+  loadEnvFileRaw();
 });
