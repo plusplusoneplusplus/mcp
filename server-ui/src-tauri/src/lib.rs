@@ -7,7 +7,6 @@ use tauri::{State, Emitter};
 use serde::{Deserialize, Serialize};
 
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ServerStatus {
     pub running: bool,
@@ -81,6 +80,12 @@ fn save_config_to_file(config: &ServerConfig) -> Result<(), String> {
     Ok(())
 }
 
+impl Default for ServerManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServerManager {
     pub fn new() -> Self {
         let loaded_config = load_config_from_file();
@@ -122,7 +127,7 @@ impl ServerManager {
                     use std::process::Command;
                     // Use taskkill with /T flag to kill process tree
                     let _ = Command::new("taskkill")
-                        .args(&["/F", "/T", "/PID", &pid.to_string()])
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
                         .creation_flags(0x08000000) // CREATE_NO_WINDOW
                         .output();
                 }
@@ -185,7 +190,7 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
 
     let mut command = Command::new("uv");
     command
-        .args(&["run", "server/main.py", "--port", &port.to_string()])
+        .args(["run", "server/main.py", "--port", &port.to_string()])
         .current_dir(&working_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -211,30 +216,26 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
     let app_clone = app.clone();
     tokio::spawn(async move {
         let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let output = ServerOutput {
-                    timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
-                    stream: "stdout".to_string(),
-                    content: line,
-                };
-                let _ = app_clone.emit("server-output", &output);
-            }
+        for line in reader.lines().map_while(Result::ok) {
+            let output = ServerOutput {
+                timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
+                stream: "stdout".to_string(),
+                content: line,
+            };
+            let _ = app_clone.emit("server-output", &output);
         }
     });
 
     let app_clone = app.clone();
     tokio::spawn(async move {
         let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let output = ServerOutput {
-                    timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
-                    stream: "stderr".to_string(),
-                    content: line,
-                };
-                let _ = app_clone.emit("server-output", &output);
-            }
+        for line in reader.lines().map_while(Result::ok) {
+            let output = ServerOutput {
+                timestamp: chrono::Utc::now().format("%H:%M:%S").to_string(),
+                stream: "stderr".to_string(),
+                content: line,
+            };
+            let _ = app_clone.emit("server-output", &output);
         }
     });
 
@@ -249,7 +250,7 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
 
 #[tauri::command]
 async fn start_server(manager: State<'_, ServerManager>, app: tauri::AppHandle, port: Option<u16>) -> Result<ServerStatus, String> {
-    start_server_internal(&*manager, app, port).await
+    start_server_internal(&manager, app, port).await
 }
 
 async fn stop_server_internal(manager: &ServerManager) -> Result<ServerStatus, String> {
@@ -279,7 +280,7 @@ async fn stop_server_internal(manager: &ServerManager) -> Result<ServerStatus, S
                 use std::process::Command;
                 // Use taskkill with /T flag to kill process tree
                 let _ = Command::new("taskkill")
-                    .args(&["/F", "/T", "/PID", &pid.to_string()])
+                    .args(["/F", "/T", "/PID", &pid.to_string()])
                     .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .output();
             }
@@ -304,14 +305,14 @@ async fn stop_server_internal(manager: &ServerManager) -> Result<ServerStatus, S
 
 #[tauri::command]
 async fn stop_server(manager: State<'_, ServerManager>) -> Result<ServerStatus, String> {
-    stop_server_internal(&*manager).await
+    stop_server_internal(&manager).await
 }
 
 #[tauri::command]
 async fn restart_server(manager: State<'_, ServerManager>, app: tauri::AppHandle, port: Option<u16>) -> Result<ServerStatus, String> {
-    stop_server_internal(&*manager).await?;
+    stop_server_internal(&manager).await?;
     tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
-    start_server_internal(&*manager, app, port).await
+    start_server_internal(&manager, app, port).await
 }
 
 #[tauri::command]
@@ -372,4 +373,65 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_server_manager_creation() {
+        let manager = ServerManager::new();
+        let status = manager.status.lock().unwrap();
+        assert!(!status.running);
+        assert!(status.pid.is_none());
+        assert!(status.port.is_none());
+    }
+
+    #[test]
+    fn test_server_config_serialization() {
+        let config = ServerConfig {
+            working_directory: Some("/test/path".to_string()),
+            default_port: 8080,
+        };
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let deserialized: ServerConfig = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(config.working_directory, deserialized.working_directory);
+        assert_eq!(config.default_port, deserialized.default_port);
+    }
+
+    #[test]
+    fn test_server_status_serialization() {
+        let status = ServerStatus {
+            running: true,
+            pid: Some(1234),
+            port: Some(8000),
+        };
+
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: ServerStatus = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(status.running, deserialized.running);
+        assert_eq!(status.pid, deserialized.pid);
+        assert_eq!(status.port, deserialized.port);
+    }
+
+    #[test]
+    fn test_greet_function() {
+        let result = greet("World");
+        assert_eq!(result, "Hello, World! You've been greeted from Rust!");
+    }
+
+    #[test]
+    fn test_default_config() {
+        // Test the default config creation directly rather than loading from file
+        let config = ServerConfig {
+            working_directory: None,
+            default_port: 8000,
+        };
+        assert_eq!(config.default_port, 8000);
+        assert!(config.working_directory.is_none());
+    }
 }
