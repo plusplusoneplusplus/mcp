@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 import mimetypes
 import base64
-from typing import Optional
-from config import env
+from typing import Optional, cast
+from config.manager import EnvironmentManager, env_manager
 from mcp.types import ImageContent, TextContent, Tool
 
 
@@ -23,8 +23,12 @@ def get_tool_def() -> Tool:
 
 
 def handle_tool(arguments: dict):
-    if ("session_id" not in arguments or "image_name" not in arguments or
-        arguments.get("session_id") is None or arguments.get("image_name") is None):
+    if (
+        "session_id" not in arguments
+        or "image_name" not in arguments
+        or arguments.get("session_id") is None
+        or arguments.get("image_name") is None
+    ):
         return [
             TextContent(
                 type="text", text="Error: session_id and image_name are required."
@@ -36,7 +40,8 @@ def handle_tool(arguments: dict):
 
 def get_image_dir() -> Path:
     """Get the image directory from configuration."""
-    image_dir = env.get_setting("image_dir", None)
+    manager: EnvironmentManager = cast(EnvironmentManager, env_manager)
+    image_dir = manager.get_setting("image_dir", None)
     if not image_dir:
         raise RuntimeError(
             "IMAGE_DIR is not defined in your MCP configuration. "
@@ -57,6 +62,13 @@ def get_session_image(
     image_path = image_dir / session_id / image_name
     if not image_path.is_file():
         return [TextContent(type="text", text="Image not found.")]
+
+    # Special-case support for JSON files: return raw text content
+    if str(image_path).lower().endswith(".json"):
+        with open(image_path, "r", encoding="utf-8") as f:
+            json_text = f.read()
+        return [TextContent(type="text", text=json_text)]
+
     mime_type, _ = mimetypes.guess_type(str(image_path))
     with open(image_path, "rb") as f:
         image_bytes = f.read()
