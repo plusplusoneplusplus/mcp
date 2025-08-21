@@ -14,7 +14,7 @@ from server.startup_tracer import (
     log_startup_summary,
     save_startup_report,
     start_timing,
-    finish_timing
+    finish_timing,
 )
 
 # Starlette and uvicorn imports
@@ -43,6 +43,7 @@ from mcp_tools.plugin_config import config
 from config import env
 
 from server import image_tool
+from server.tool_result_processor import process_tool_result
 
 # Create the server
 server = Server("mymcp")
@@ -107,6 +108,7 @@ if plugin_summary.get("plugin_groups"):
 
 # Plugin root directories information
 from mcp_tools.plugin_config import config
+
 plugin_roots = config.get_plugin_roots()
 if plugin_roots:
     logging.info(f"Plugin root directories:")
@@ -122,7 +124,9 @@ if plugin_summary.get("discovered_plugin_paths"):
 logging.info(f"Active tool details:")
 for tool in active_tool_instances:
     source = tool_sources.get(tool.name, "unknown")
-    source_prefix = "[CODE]" if source == "code" else "[YAML]" if source == "yaml" else "[UNKNOWN]"
+    source_prefix = (
+        "[CODE]" if source == "code" else "[YAML]" if source == "yaml" else "[UNKNOWN]"
+    )
     logging.info(f"  {source_prefix} {tool.name}: {tool.description}")
 
 logging.info("=" * 60)
@@ -202,7 +206,9 @@ async def list_tools() -> list[Tool]:
 
 
 @server.call_tool()
-async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextContent, ImageContent]]:
+async def call_tool_handler(
+    name: str, arguments: dict
+) -> list[Union[TextContent, ImageContent]]:
     logging.info(f"TOOL CALL HANDLER INVOKED: {name} with arguments: {arguments}")
     logging.info(f"Handler running on platform: {os.name}")
 
@@ -235,7 +241,9 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         error_msg = f"Error: Tool '{name}' not found. Available tools: {', '.join(available_tools) if available_tools else 'None'}"
 
         # Log additional debugging information for Windows troubleshooting
-        logging.debug(f"Tool lookup failed for '{name}' - Platform: {os.name}, Worker: {os.environ.get('PYTEST_WORKER_ID', 'unknown')}")
+        logging.debug(
+            f"Tool lookup failed for '{name}' - Platform: {os.name}, Worker: {os.environ.get('PYTEST_WORKER_ID', 'unknown')}"
+        )
 
         record_tool_invocation(
             name, arguments, error_msg, 0, False, error_msg, invocation_dir
@@ -263,28 +271,13 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         result = await tool.execute_tool(arguments)
         duration_ms = (time.time() - start_time) * 1000
         logging.info(f"Tool '{name}' executed successfully in {duration_ms:.2f}ms")
-        if isinstance(result, list) and all(isinstance(item, dict) for item in result):
-            text_content = [TextContent(**item) for item in result]
-        elif isinstance(result, list) and all(
-            hasattr(item, "type") and hasattr(item, "text") for item in result
-        ):
-            text_content = [
-                TextContent(
-                    type=item.type,
-                    text=item.text,
-                    annotations=getattr(item, "annotations", None),
-                )
-                for item in result
-            ]
-        elif isinstance(result, dict):
-            text = format_result_as_text(result)
-            text_content = [TextContent(type="text", text=text)]
-        else:
-            text_content = [TextContent(type="text", text=str(result))]
+
+        # Process the tool result into appropriate content types
+        content_items = process_tool_result(result)
         record_tool_invocation(
             name, arguments, result, duration_ms, True, None, invocation_dir
         )
-        return text_content
+        return content_items
     except Exception as e:
         logging.exception(f"Error executing tool {name}")
         error_msg = f"Error executing tool {name}: {str(e)}"
@@ -292,27 +285,14 @@ async def call_tool_handler(name: str, arguments: dict) -> List[Union[TextConten
         duration_ms = (time.time() - start_time) * 1000
 
         # Enhanced error logging for debugging
-        logging.debug(f"Tool execution exception details - Tool: {name}, Platform: {os.name}, Exception: {repr(e)}")
+        logging.debug(
+            f"Tool execution exception details - Tool: {name}, Platform: {os.name}, Exception: {repr(e)}"
+        )
 
         record_tool_invocation(
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
         return [TextContent(type="text", text=error_msg)]
-
-
-def format_result_as_text(result: dict) -> str:
-    """Format a result dictionary as text."""
-    if not result.get("success", True):
-        return f"Error: {result.get('error', 'Unknown error')}"
-
-    # Different formatting based on the type of result
-    if "output" in result:
-        return result.get("output", "")
-    elif "html" in result:
-        return f"HTML content (length: {result.get('html_length', 0)}):\n{result.get('html', '')}"
-    else:
-        # Generic formatting
-        return "\n".join(f"{k}: {v}" for k, v in result.items() if k != "success")
 
 
 # Setup SSE transport
@@ -347,49 +327,62 @@ from server.api.base import PERSIST_DIR
 async def index(request: Request):
     # Redirect to knowledge page as the main landing page
     from starlette.responses import RedirectResponse
+
     return RedirectResponse(url="/knowledge", status_code=302)
+
 
 # --- New Page Routes ---
 async def knowledge(request: Request):
     return templates.TemplateResponse(
-        "knowledge.html", {"request": request, "import_path": PERSIST_DIR, "current_page": "knowledge"}
+        "knowledge.html",
+        {"request": request, "import_path": PERSIST_DIR, "current_page": "knowledge"},
     )
+
 
 async def jobs(request: Request):
     return templates.TemplateResponse(
         "jobs.html", {"request": request, "current_page": "jobs"}
     )
 
+
 async def config_page(request: Request):
     return templates.TemplateResponse(
         "config.html", {"request": request, "current_page": "config"}
     )
+
 
 async def tools_page(request: Request):
     return templates.TemplateResponse(
         "tools.html", {"request": request, "current_page": "tools"}
     )
 
+
 async def tool_history_page(request: Request):
     return templates.TemplateResponse(
         "tool_history.html", {"request": request, "current_page": "tool_history"}
     )
 
+
 async def visualizations_page(request: Request):
     return templates.TemplateResponse(
-        "task_visualization.html", {"request": request, "current_page": "visualizations"}
+        "task_visualization.html",
+        {"request": request, "current_page": "visualizations"},
     )
+
 
 async def dataframes_page(request: Request):
     return templates.TemplateResponse(
         "dataframes.html", {"request": request, "current_page": "dataframes"}
     )
 
+
 async def dataframe_detail_page(request: Request):
     df_id = request.path_params["df_id"]
     return templates.TemplateResponse(
-        "dataframe_detail.html", {"request": request, "current_page": "dataframes", "df_id": df_id}
+        "dataframe_detail.html",
+        {"request": request, "current_page": "dataframes", "df_id": df_id},
     )
+
 
 async def pyeval_page(request: Request):
     return templates.TemplateResponse(
@@ -411,7 +404,11 @@ routes = [
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
-    Mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static"),
+    Mount(
+        "/static",
+        StaticFiles(directory=str(Path(__file__).parent / "static")),
+        name="static",
+    ),
 ] + api_routes
 
 # Create Starlette app
@@ -464,20 +461,20 @@ def setup():
     with time_operation("Environment Initialization"):
         # Initialize environment using the new module
         env.load()
-        logger.info(
-            f"Initialized environment: Git root={env.get_git_root()}"
-        )
+        logger.info(f"Initialized environment: Git root={env.get_git_root()}")
 
         # Log tool history settings
         if env.is_tool_history_enabled():
             history_path = get_new_invocation_dir("NEW_SERVER_START")
-            logger.info(f"Tool history recording is enabled. Recording to: {history_path}")
+            logger.info(
+                f"Tool history recording is enabled. Recording to: {history_path}"
+            )
         else:
             logger.info("Tool history recording is disabled")
 
 
 @click.command()
-@click.option('--port', default=None, type=int, help='Port to run the server on')
+@click.option("--port", default=None, type=int, help="Port to run the server on")
 @trace_startup_time("Main Server Startup")
 def main(port: Optional[int] = None) -> None:
     with time_operation("Complete Server Initialization"):
@@ -486,7 +483,7 @@ def main(port: Optional[int] = None) -> None:
 
         # Determine port from CLI argument, environment variable, or default
         if port is None:
-            port = int(os.environ.get('SERVER_PORT', 8000))
+            port = int(os.environ.get("SERVER_PORT", 8000))
 
         logging.info(f"Starting server on port {port}")
 
