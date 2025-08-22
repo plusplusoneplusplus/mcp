@@ -92,10 +92,10 @@ fn get_server_env_path() -> Result<PathBuf, String> {
 
     let src_tauri_path = PathBuf::from(manifest_dir);
 
-    // From src-tauri/ go up to server-ui/, then up to project root (mcp/)
+    // From src-tauri/ go up to app/, then up to project root (mcp/)
     let working_dir = src_tauri_path
-        .parent() // from src-tauri/ to server-ui/
-        .and_then(|p| p.parent()) // from server-ui/ to project root (mcp/)
+        .parent() // from src-tauri/ to app/
+        .and_then(|p| p.parent()) // from app/ to project root (mcp/)
         .ok_or("Failed to get project root directory")?
         .to_path_buf();
 

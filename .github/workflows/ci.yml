@@ -37,8 +37,8 @@ jobs:
         uses: actions/cache@v4
         id: cache-npm
         with:
-          path: server-ui/node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('server-ui/package-lock.json') }}
+          path: app/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('app/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
 
@@ -55,33 +55,33 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Debug - Check directory contents
-        working-directory: ./server-ui
+        working-directory: ./app
         shell: bash
         run: |
-          echo "Contents of server-ui directory:"
+          echo "Contents of app directory:"
           ls -la
           echo "package-lock.json exists:"
           test -f package-lock.json && echo "YES" || echo "NO"
 
       - name: Install frontend dependencies
-        working-directory: ./server-ui
+        working-directory: ./app
         run: npm install
 
       - name: Run frontend tests
-        working-directory: ./server-ui
+        working-directory: ./app
         run: npm run build
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './server-ui/src-tauri -> target'
+          workspaces: './app/src-tauri -> target'
 
       - name: Run Rust tests
-        working-directory: ./server-ui
+        working-directory: ./app
         run: cd src-tauri && cargo test
 
       - name: Run Rust clippy
-        working-directory: ./server-ui
+        working-directory: ./app
         run: cd src-tauri && cargo clippy -- -D warnings
 
       - name: Build Tauri app
@@ -89,5 +89,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: ./server-ui
+          projectPath: ./app
           args: ${{ matrix.args }}
