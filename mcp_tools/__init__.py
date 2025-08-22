@@ -37,6 +37,7 @@ from mcp_tools.yaml_tools import YamlToolBase, discover_and_register_yaml_tools
 
 # Import tools
 from mcp_tools.kv_store import KVStoreTool
+from mcp_tools.image_tool import ImageTool
 
 # Import types (formerly from mcp_core)
 from mcp_tools.mcp_types import TextContent, Tool, ToolResult, Annotations
@@ -67,6 +68,7 @@ __all__ = [
     "discover_and_register_yaml_tools",
     # Tools
     "KVStoreTool",
+    "ImageTool",
     # Types (formerly from mcp_core)
     "TextContent",
     "Tool",

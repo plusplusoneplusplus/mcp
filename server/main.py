@@ -42,7 +42,7 @@ from mcp_tools.plugin_config import config
 
 from config import env
 
-from server import image_tool
+
 from server.tool_result_processor import process_tool_result
 
 # Create the server
@@ -201,7 +201,6 @@ async def list_tools() -> list[Tool]:
         )
         mcp_tools.append(mcp_tool)
 
-    mcp_tools.append(image_tool.get_tool_def())
     return mcp_tools
 
 
@@ -215,17 +214,6 @@ async def call_tool_handler(
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
     )
-
-    # Special case for image_tool
-    if name == "get_session_image":
-        try:
-            return image_tool.handle_tool(arguments)
-        except Exception as e:
-            return [TextContent(type="text", text=str(e))]
-        finally:
-            record_tool_invocation(
-                name, arguments, None, 0, False, None, invocation_dir
-            )
 
     tool = injector.get_tool_instance(name)
     if tool and invocation_dir:
