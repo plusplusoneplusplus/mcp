@@ -54,10 +54,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Debug - Check directory contents
+        working-directory: ./server-ui
+        run: |
+          echo "Contents of server-ui directory:"
+          ls -la
+          echo "package-lock.json exists:"
+          test -f package-lock.json && echo "YES" || echo "NO"
+
       - name: Install frontend dependencies
         working-directory: ./server-ui
-        if: steps.cache-npm.outputs.cache-hit != 'true'
-        run: npm ci
+        run: npm install
 
       - name: Run frontend tests
         working-directory: ./server-ui
