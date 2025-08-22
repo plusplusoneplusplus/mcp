@@ -20,9 +20,9 @@ A Tauri-based desktop application for managing MCP (Model Context Protocol) serv
 
 ## Installation
 
-1. Navigate to the server-ui directory:
+1. Navigate to the app directory:
    ```bash
-   cd server-ui
+   cd app
    ```
 
 2. Install dependencies:
