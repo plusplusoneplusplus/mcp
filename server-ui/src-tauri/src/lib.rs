@@ -228,11 +228,12 @@ async fn start_server_internal(manager: &ServerManager, app: tauri::AppHandle, p
         command.process_group(0);
     }
 
-    // On Windows, create a new process group as well
+    // On Windows, create a new process group and hide the console window
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        command.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
+        // Combine CREATE_NEW_PROCESS_GROUP and CREATE_NO_WINDOW flags
+        command.creation_flags(0x00000200 | 0x08000000); // CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
     }
 
     let mut child = command
@@ -742,14 +743,11 @@ pub fn run() {
                                 _ => println!("Received unknown signal {}, performing emergency cleanup...", ctrl_type),
                             }
 
-                            // Kill all child processes when we receive any termination signal
+                            // Kill our process group when we receive any termination signal
+                            // This will terminate our process and its children, but not unrelated processes
+                            let current_pid = std::process::id();
                             let _ = std::process::Command::new("taskkill")
-                                .args(["/F", "/T", "/IM", "python.exe"])
-                                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                                .output();
-
-                            let _ = std::process::Command::new("taskkill")
-                                .args(["/F", "/T", "/IM", "uv.exe"])
+                                .args(["/F", "/T", "/PID", &current_pid.to_string()])
                                 .creation_flags(0x08000000) // CREATE_NO_WINDOW
                                 .output();
 
