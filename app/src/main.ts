@@ -583,4 +583,25 @@ window.addEventListener("DOMContentLoaded", async () => {
   updateServerStatus();
   getEnvFilePath();
   loadEnvFileRaw();
+
+  // Sidebar navigation: activate selected section/view
+  const sidebarItems: NodeListOf<HTMLButtonElement> | null = document.querySelectorAll('.sidebar-item');
+  const views: NodeListOf<HTMLElement> | null = document.querySelectorAll('.view');
+
+  sidebarItems?.forEach(item => {
+    item.addEventListener('click', () => {
+      // Update active state on sidebar
+      sidebarItems.forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+
+      // Show corresponding view by data-section -> #{section}-view
+      const section = item.dataset.section;
+      if (!section) return;
+      views?.forEach(v => v.classList.remove('active'));
+      const target = document.getElementById(`${section}-view`);
+      if (target) {
+        target.classList.add('active');
+      }
+    });
+  });
 });
