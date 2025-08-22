@@ -32,8 +32,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'server-ui/package-lock.json'
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        id: cache-npm
+        with:
+          path: server-ui/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('server-ui/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -46,6 +53,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Debug - Check directory contents
+        working-directory: ./server-ui
+        shell: bash
+        run: |
+          echo "Contents of server-ui directory:"
+          ls -la
+          echo "package-lock.json exists:"
+          test -f package-lock.json && echo "YES" || echo "NO"
 
       - name: Install frontend dependencies
         working-directory: ./server-ui
