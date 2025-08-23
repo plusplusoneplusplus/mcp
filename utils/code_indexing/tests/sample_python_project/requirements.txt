@@ -1,0 +1,13 @@
+# Python Sample Project Dependencies
+# For demonstration purposes only - standard library modules are used
+# in the actual code to ensure ctags compatibility
+
+# Development and testing dependencies (optional)
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+mypy>=1.0.0
+black>=22.0.0
+flake8>=5.0.0
+
+# Type checking and linting
+types-setuptools
