@@ -76,6 +76,11 @@ dependencies = [
     "neo4j>=5.15.0", # Neo4j Python driver
     "typing-extensions>=4.8.0", # Enhanced typing support
     "restrictedpython>=7.0.0", # Secure Python expression evaluation
+    "tree-sitter>=0.25.1",
+    "tree-sitter-cpp>=0.23.4",
+    "tree-sitter-python>=0.23.6",
+    "tree-sitter-javascript>=0.23.1",
+    "tree-sitter-java>=0.23.5",
 ]
 
 [tool.setuptools]
