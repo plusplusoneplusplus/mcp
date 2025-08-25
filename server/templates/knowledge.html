@@ -63,9 +63,9 @@
     <div class="card">
         <h2>Import Knowledge Directory</h2>
         <form id="import-form" enctype="multipart/form-data">
-            <label for="import-files" style="font-weight:bold;">Select Files:</label>
+            <label for="import-files" style="font-weight:bold;">Select Folder:</label>
             <div style="margin-bottom:0.5em;">
-                <span style="font-size:0.97em;">Show extensions:</span>
+                <span style="font-size:0.97em;">Include file extensions:</span>
                 <label style="margin-left:1em;"><input type="checkbox" class="ext-filter" value=".md" checked>
                     .md</label>
                 <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".txt"> .txt</label>
@@ -73,7 +73,8 @@
                 <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".docx"> .docx</label>
                 <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".pdf"> .pdf</label>
             </div>
-            <input type="file" id="import-files" name="files" multiple accept=".md" style="margin-bottom:1em;" />
+            <input type="file" id="import-files" name="files" webkitdirectory directory accept=".md" style="margin-bottom:1em;" />
+            <div id="selection-help" style="font-size:0.9em; color:#666; margin-bottom:0.5em;">Click "Choose Files" to select a folder. All files with selected extensions in the folder and subfolders will be imported.</div>
             <div id="selected-folder-path" style="font-size:0.95em; color:#666; margin:0.5em 0 0.2em 0;"></div>
             <div id="selected-files-list" style="margin:0.2em 0 0.5em 0;"></div>
             <label>Collection name (optional): <input type="text" name="collection" /></label>
@@ -192,6 +193,7 @@
         }
     }
 
+
     // --- Import Extension Filters ---
     function updateImportAccept() {
         const fileInput = document.getElementById('import-files');
@@ -203,41 +205,69 @@
         cb.addEventListener('change', updateImportAccept);
     });
 
-    // --- Show Selected Files (Top 10) and Folder Name ---
+    // --- Show Selected Files and Folder Name ---
     document.getElementById('import-files').addEventListener('change', function (e) {
         const files = Array.from(e.target.files);
         const listDiv = document.getElementById('selected-files-list');
         const folderDiv = document.getElementById('selected-folder-path');
+        
         if (!files.length) {
-            listDiv.textContent = '';
-            folderDiv.textContent = '';
+            listDiv.innerHTML = '';
+            folderDiv.innerHTML = '';
             return;
         }
+        
+        // Get selected extensions
         const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
-        const filtered = files.filter(f => exts.some(ext => f.name.endsWith(ext)));
-        const shown = filtered.slice(0, 10).map(f => f.name).join(', ');
-        listDiv.textContent = filtered.length ? `Selected (${filtered.length}): ${shown}${filtered.length > 10 ? ', ...' : ''}` : 'No matching files selected.';
+        
+        // Filter files by selected extensions
+        const filtered = files.filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext.toLowerCase())));
+        
+        // Display folder information
         let folder = '';
-        for (const file of files) {
-            if (file.webkitRelativePath) {
-                folder = file.webkitRelativePath.split('/')[0];
-                break;
+        if (files[0] && files[0].webkitRelativePath) {
+            folder = files[0].webkitRelativePath.split('/')[0];
+            folderDiv.innerHTML = `<b>Selected folder:</b> <code>${folder}</code> <span title='Browsers do not expose the absolute path for security.' style='color:#888;'>(absolute path not available)</span>`;
+        }
+        
+        // Display file list
+        if (filtered.length === 0) {
+            if (files.length > 0) {
+                listDiv.innerHTML = `<span style="color:#666;">No files match the selected extensions. Found ${files.length} total files, but none have the selected extensions. Files will be ignored during import.</span>`;
+            } else {
+                listDiv.innerHTML = '<span style="color:#666;">No files found in the selected folder.</span>';
             }
+            return;
         }
-        if (folder) {
-            folderDiv.innerHTML = `<b>Selected folder:</b> <code>${folder}</code> <span title='Browsers do not expose the absolute path for privacy.' style='color:#888;'>(absolute path not available)</span>`;
-        } else {
-            folderDiv.innerHTML = `<span style='color:#888;'>Absolute path not available for privacy. Showing top-level folder name if possible.</span>`;
-        }
-        let html = '<b>Selected files:</b><ul style="margin:0.3em 0 0.3em 1em;">';
-        const showFiles = files.slice(0, 10);
+        
+        // Group files by extension for better display
+        const filesByExt = {};
+        filtered.forEach(file => {
+            const ext = exts.find(e => file.name.toLowerCase().endsWith(e.toLowerCase())) || 'other';
+            if (!filesByExt[ext]) filesByExt[ext] = [];
+            filesByExt[ext].push(file);
+        });
+        
+        let html = `<b>Found ${filtered.length} matching files:</b>`;
+        
+        // Show breakdown by extension
+        const extCounts = Object.entries(filesByExt).map(([ext, files]) => `${files.length} ${ext}`);
+        html += `<div style="color:#666; font-size:0.9em; margin:0.2em 0;">${extCounts.join(', ')}</div>`;
+        
+        // Show file list (limited to first 15 for performance)
+        html += '<ul style="margin:0.3em 0 0.3em 1em; max-height:200px; overflow-y:auto;">';
+        const showFiles = filtered.slice(0, 15);
         for (const file of showFiles) {
-            html += `<li>${file.webkitRelativePath || file.name}</li>`;
+            const displayName = file.webkitRelativePath || file.name;
+            const ext = exts.find(e => file.name.toLowerCase().endsWith(e.toLowerCase())) || '';
+            html += `<li><span style="color:#007acc;">${ext}</span> ${displayName}</li>`;
         }
         html += '</ul>';
-        if (files.length > 10) {
-            html += `<span style='color:#888;'>...and ${files.length - 10} more files.</span>`;
+        
+        if (filtered.length > 15) {
+            html += `<div style='color:#888; font-size:0.9em;'>...and ${filtered.length - 15} more files</div>`;
         }
+        
         listDiv.innerHTML = html;
     });
 
@@ -245,9 +275,50 @@
     document.getElementById('import-form').addEventListener('submit', async function (e) {
         e.preventDefault();
         const statusDiv = document.getElementById('import-status');
-        statusDiv.textContent = 'Uploading and importing...';
+        const fileInput = document.getElementById('import-files');
+        const files = Array.from(fileInput.files);
+        
+        if (!files.length) {
+            statusDiv.innerHTML = '<span style="color:red;">Please select a folder to import.</span>';
+            return;
+        }
+        
+        // Get selected extensions
+        const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+        if (!exts.length) {
+            statusDiv.innerHTML = '<span style="color:red;">Please select at least one file extension to import.</span>';
+            return;
+        }
+        
+        // Filter files by selected extensions
+        const filtered = files.filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext.toLowerCase())));
+        
+        if (!filtered.length) {
+            statusDiv.innerHTML = `<span style="color:orange;">No files match the selected extensions. Found ${files.length} total files, but none have the selected extensions. Nothing to import.</span>`;
+            return;
+        }
+        
+        statusDiv.innerHTML = `<span style='color:blue;'>Uploading and importing ${filtered.length} files (ignoring ${files.length - filtered.length} non-matching files)...</span>`;
+        
         const form = e.target;
-        const formData = new FormData(form);
+        const formData = new FormData();
+        
+        // Add only the filtered files to the form data
+        filtered.forEach(file => {
+            formData.append('files', file);
+        });
+        
+        // Add other form fields
+        const collection = form.querySelector('input[name="collection"]').value;
+        const overwrite = form.querySelector('input[name="overwrite"]').checked;
+        
+        if (collection) {
+            formData.append('collection', collection);
+        }
+        if (overwrite) {
+            formData.append('overwrite', 'true');
+        }
+        
         try {
             const response = await fetch('/api/import-knowledge', {
                 method: 'POST',
@@ -255,10 +326,11 @@
             });
             const result = await response.json();
             if (result.success) {
-                statusDiv.innerHTML = `<span style='color:green;'>Successfully imported ${result.imported_files} markdown files. Total segments stored: ${result.total_segments}.</span>`;
+                statusDiv.innerHTML = `<span style='color:green;'>Successfully imported ${result.imported_files} files. Total segments stored: ${result.total_segments}.</span>`;
                 form.reset();
                 document.getElementById('selected-files-list').innerHTML = '';
                 document.getElementById('selected-folder-path').innerHTML = '';
+                
                 await loadCollections();
             } else {
                 statusDiv.innerHTML = `<span style='color:red;'>Error: ${result.error || 'Unknown error'}</span>`;
