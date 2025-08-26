@@ -116,7 +116,7 @@ case "$GROUP_NAME" in
         ;;
 
     "utils-group-1")
-        echo -e "${BLUE}Running utils group 1: html_to_markdown, vector_store, secret_scanner, memory, dataframe_manager, pyeval, code_indexing${NC}"
+        echo -e "${BLUE}Running utils group 1: html_to_markdown, vector_store, secret_scanner, memory, dataframe_manager, pyeval, code_indexing, knowledge_sync${NC}"
         echo ""
         run_component_tests "utils.html_to_markdown" "utils/html_to_markdown/tests" "$TEST_PATTERN"
         run_component_tests "utils.vector_store" "utils/vector_store/tests" "$TEST_PATTERN"
@@ -125,6 +125,7 @@ case "$GROUP_NAME" in
         run_component_tests "utils.dataframe_manager" "utils/dataframe_manager/tests" "$TEST_PATTERN"
         run_component_tests "utils.pyeval" "utils/pyeval/tests" "$TEST_PATTERN"
         run_component_tests "utils.code_indexing" "utils/code_indexing/tests" "$TEST_PATTERN"
+        run_component_tests "utils.knowledge_sync" "utils/knowledge_sync/tests" "$TEST_PATTERN"
         ;;
 
     "utils-group-2")

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Knowledge Sync</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #f9f9f9;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        .button.danger {
+            background-color: #dc3545;
+        }
+        .button.danger:hover {
+            background-color: #c82333;
+        }
+        .button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .folder-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .folder-item {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .folder-path {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .loading {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Knowledge Sync</h1>
+
+    <div class="card">
+        <h2>Configuration Status</h2>
+        <div id="status-info" class="status info">Loading configuration...</div>
+        <button class="button" onclick="loadStatus()">Refresh Status</button>
+    </div>
+
+    <div class="card" id="sync-controls" style="display: none;">
+        <h2>Sync Controls</h2>
+
+        <div style="margin: 20px 0;">
+            <button class="button" onclick="runSync(false)" id="sync-btn">
+                <span class="loading" id="sync-loading">⏳</span>
+                Sync Folders
+            </button>
+            <button class="button danger" onclick="runSync(true)" id="resync-btn">
+                <span class="loading" id="resync-loading">⏳</span>
+                Re-sync (Clear & Rebuild)
+            </button>
+        </div>
+
+        <div id="sync-results"></div>
+    </div>
+
+    <div class="card" id="folder-list" style="display: none;">
+        <h2>Configured Folders</h2>
+        <ul id="folders" class="folder-list"></ul>
+    </div>
+
+    <script>
+        async function loadStatus() {
+            document.getElementById('status-info').textContent = 'Loading...';
+
+            try {
+                const response = await fetch('/api/knowledge-sync/status');
+                const data = await response.json();
+
+                if (data.enabled) {
+                    document.getElementById('status-info').className = 'status success';
+                    document.getElementById('status-info').textContent =
+                        `Knowledge sync is enabled. ${data.configured_folders} folders configured.`;
+
+                    document.getElementById('sync-controls').style.display = 'block';
+                    document.getElementById('folder-list').style.display = 'block';
+
+                    // Display folder list
+                    const foldersHtml = data.folders.map(folder => `
+                        <li class="folder-item">
+                            <strong>Collection:</strong> ${folder.collection}<br>
+                            <strong>Path:</strong> <span class="folder-path">${folder.path}</span><br>
+                            <strong>Resolved:</strong> ${folder.resolved_path || 'Not found'}
+                            <button class="button" onclick="syncSingleFolder('${folder.path}', '${folder.collection}', false)">Sync</button>
+                            <button class="button danger" onclick="syncSingleFolder('${folder.path}', '${folder.collection}', true)">Re-sync</button>
+                        </li>
+                    `).join('');
+
+                    document.getElementById('folders').innerHTML = foldersHtml;
+                } else {
+                    document.getElementById('status-info').className = 'status error';
+                    document.getElementById('status-info').textContent =
+                        'Knowledge sync is disabled. Please enable KNOWLEDGE_SYNC_ENABLED in your environment configuration.';
+
+                    document.getElementById('sync-controls').style.display = 'none';
+                    document.getElementById('folder-list').style.display = 'none';
+                }
+            } catch (error) {
+                document.getElementById('status-info').className = 'status error';
+                document.getElementById('status-info').textContent = `Error loading status: ${error.message}`;
+            }
+        }
+
+        async function runSync(resync) {
+            const button = resync ? document.getElementById('resync-btn') : document.getElementById('sync-btn');
+            const loading = resync ? document.getElementById('resync-loading') : document.getElementById('sync-loading');
+
+            button.disabled = true;
+            loading.style.display = 'inline';
+
+            try {
+                const response = await fetch('/api/knowledge-sync/trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ resync: resync })
+                });
+
+                const result = await response.json();
+                displaySyncResults(result, resync);
+            } catch (error) {
+                displaySyncResults({ success: false, error: error.message }, resync);
+            } finally {
+                button.disabled = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        async function syncSingleFolder(folderPath, collectionName, overwrite) {
+            try {
+                const response = await fetch('/api/knowledge-sync/folder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        folder_path: folderPath,
+                        collection_name: collectionName,
+                        overwrite: overwrite
+                    })
+                });
+
+                const result = await response.json();
+                displaySyncResults(result, overwrite, `Single folder (${collectionName})`);
+            } catch (error) {
+                displaySyncResults({ success: false, error: error.message }, overwrite, `Single folder (${collectionName})`);
+            }
+        }
+
+        function displaySyncResults(result, resync, title = null) {
+            const resultsDiv = document.getElementById('sync-results');
+            const action = title || (resync ? 'Re-syncing' : 'Syncing');
+
+            let html = `<h3>${action} Results</h3>`;
+
+            if (result.success) {
+                html += `<div class="status success">
+                    ✅ ${action} completed successfully!<br>`;
+
+                if (result.total_folders) {
+                    html += `Processed ${result.total_folders} folders, `;
+                    html += `synced ${result.total_imported_files} files.<br>`;
+                }
+
+                if (result.imported_files !== undefined) {
+                    html += `Synced ${result.imported_files} files.<br>`;
+                }
+
+                html += `</div>`;
+
+                if (result.results) {
+                    html += '<h4>Detailed Results:</h4>';
+                    result.results.forEach(folderResult => {
+                        const status = folderResult.success ? 'success' : 'error';
+                        html += `<div class="status ${status}">
+                            <strong>${folderResult.collection}:</strong> `;
+
+                        if (folderResult.success) {
+                            html += `${folderResult.imported_files || 0} files synced`;
+                            if (folderResult.warning) {
+                                html += ` (${folderResult.warning})`;
+                            }
+                        } else {
+                            html += `Error: ${folderResult.error}`;
+                        }
+
+                        html += `</div>`;
+                    });
+                }
+            } else {
+                html += `<div class="status error">
+                    ❌ ${action} failed: ${result.error}
+                </div>`;
+            }
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Load status on page load
+        window.onload = loadStatus;
+    </script>
+</body>
+</html>
