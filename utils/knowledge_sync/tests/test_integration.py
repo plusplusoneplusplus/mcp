@@ -144,16 +144,16 @@ class TestKnowledgeSyncIntegration:
         # Verify mixed results
         assert result["success"] is False  # Overall failure due to one error
         assert result["total_folders"] == 2
-        assert result["successful_folders"] == 0  # First one should fail due to missing indexer
-        assert result["failed_folders"] == 2
+        assert result["successful_folders"] == 1  # First one succeeds, second fails
+        assert result["failed_folders"] == 1
 
         # Check individual results
         assert len(result["results"]) == 2
 
-        # Both should fail - first due to indexer issues, second due to missing folder
-        for folder_result in result["results"]:
-            assert folder_result["success"] is False
-            assert "error" in folder_result
+        # First should succeed, second should fail due to missing folder
+        assert result["results"][0]["success"] is True
+        assert result["results"][1]["success"] is False
+        assert "error" in result["results"][1]
 
     @pytest.mark.asyncio
     async def test_service_lifecycle(self, mock_env):

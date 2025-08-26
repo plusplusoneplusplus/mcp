@@ -32,8 +32,8 @@ class KnowledgeSyncService:
 
     def get_folder_collections(self) -> List[Tuple[str, str]]:
         """Parse and return list of (folder_path, collection_name) tuples."""
-        folders_str = env.get_setting("knowledge_sync_folders", "").strip()
-        collections_str = env.get_setting("knowledge_sync_collections", "").strip()
+        folders_str = (env.get_setting("knowledge_sync_folders", "") or "").strip()
+        collections_str = (env.get_setting("knowledge_sync_collections", "") or "").strip()
 
         if not folders_str:
             return []
@@ -121,7 +121,7 @@ class KnowledgeSyncService:
         if not markdown_files:
             warning_msg = f"No markdown files found in folder: {folder_path}"
             self.logger.warning(warning_msg)
-            return {"success": True, "warning": warning_msg, "folder": folder_path, "collection": collection_name, "imported_files": 0}
+            return {"success": True, "warning": warning_msg, "folder": folder_path, "collection": collection_name, "imported_files": 0, "resolved_path": str(resolved_path)}
 
         # Prepare indexing arguments
         indexer_args = {
@@ -134,6 +134,7 @@ class KnowledgeSyncService:
             # Execute indexing
             result = await self.indexer_tool.execute_tool(indexer_args)
             result["folder"] = folder_path
+            result["collection"] = collection_name
             result["resolved_path"] = str(resolved_path)
             return result
         except Exception as e:

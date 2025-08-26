@@ -145,7 +145,7 @@ class TestKnowledgeSyncService:
             os.chdir(temp_dir)
             result = self.service.resolve_folder_path("docs")
             expected = Path(temp_dir) / "docs"
-            assert result == expected
+            assert result.resolve() == expected.resolve()
         finally:
             os.chdir(original_cwd)
 
