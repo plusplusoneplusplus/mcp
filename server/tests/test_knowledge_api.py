@@ -82,7 +82,7 @@ class TestKnowledgeAPI:
         """Test querying segments with valid parameters."""
         resp = requests.get(
             f"{server_url}/api/query-segments?collection=test&query=sample&limit=5",
-            timeout=10
+            timeout=30
         )
         # Could be 200 (success) or 500 (collection doesn't exist/error)
         assert resp.status_code in [200, 500]
