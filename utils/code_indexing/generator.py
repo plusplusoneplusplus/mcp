@@ -89,6 +89,9 @@ def run_ctags(
 
         return result.returncode
 
+    except subprocess.CalledProcessError as e:
+        print(f"Error: ctags command failed with exit code {e.returncode}", file=sys.stderr)
+        return e.returncode
     except FileNotFoundError:
         print("Error: ctags command not found. Please install ctags.", file=sys.stderr)
         print("On macOS: brew install universal-ctags", file=sys.stderr)

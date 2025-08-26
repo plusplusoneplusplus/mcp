@@ -42,8 +42,8 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.slow)
             item.add_marker(pytest.mark.performance)
 
-        # Add requires_ctags marker to tests that need ctags
-        if any(keyword in item.nodeid.lower() for keyword in ["ctags", "integration"]):
+        # Add requires_ctags marker to integration tests that need ctags, but not unit tests with mocks
+        if "integration" in item.nodeid.lower() and "ctags" in item.nodeid.lower():
             item.add_marker(pytest.mark.requires_ctags)
 
 

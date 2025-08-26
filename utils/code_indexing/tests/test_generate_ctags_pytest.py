@@ -60,9 +60,9 @@ class TestGenerateCtags:
         assert result == 0
         mock_run.assert_called_once()
 
-        # Verify command structure
-        called_args = mock_run.call_args[0][0]
-        assert called_args[0] == "ctags"
+        # Verify command structure - since we use shell=True, the command is a string
+        called_args = mock_run.call_args[0][0]  # This is the shell command string
+        assert "ctags" in called_args
         assert "-R" in called_args
         assert "--languages=C++" in called_args
         assert "--output-format=json" in called_args
@@ -76,7 +76,7 @@ class TestGenerateCtags:
         result = run_ctags(test_dir, test_output, languages="Python,Rust")
 
         assert result == 0
-        called_args = mock_run.call_args[0][0]
+        called_args = mock_run.call_args[0][0]  # This is the shell command string
         assert "--languages=Python,Rust" in called_args
 
     @patch("subprocess.run")
@@ -89,7 +89,7 @@ class TestGenerateCtags:
         result = run_ctags(test_dir, test_output, additional_args=additional_args)
 
         assert result == 0
-        called_args = mock_run.call_args[0][0]
+        called_args = mock_run.call_args[0][0]  # This is the shell command string
         assert "--extras=+f" in called_args
         assert "--fields=+l" in called_args
 
@@ -269,7 +269,7 @@ def test_parametrized_languages(mock_run, languages, expected_lang):
         result = run_ctags(test_dir, test_output, languages=languages)
 
         assert result == 0
-        called_args = mock_run.call_args[0][0]
+        called_args = mock_run.call_args[0][0]  # This is the shell command string
         assert expected_lang in called_args
     finally:
         if os.path.exists(test_dir):
@@ -296,7 +296,7 @@ def test_parametrized_additional_args(mock_run, additional_args, expected_args):
         result = run_ctags(test_dir, test_output, additional_args=additional_args)
 
         assert result == 0
-        called_args = mock_run.call_args[0][0]
+        called_args = mock_run.call_args[0][0]  # This is the shell command string
         for expected_arg in expected_args:
             assert expected_arg in called_args
     finally:
