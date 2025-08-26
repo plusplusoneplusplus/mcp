@@ -5,6 +5,7 @@ with optimized parameters for analysis.
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -56,21 +57,18 @@ def run_ctags(
     print(f"Running from {source_dir}: {' '.join(cmd)}")
 
     try:
-        # Use shell execution with explicit cd to handle permissions better
-        # Properly escape arguments for shell execution
-        escaped_args = []
-        for arg in cmd:
-            if ' ' in arg:
-                escaped_args.append(f"'{arg}'")
-            else:
-                escaped_args.append(arg)
-
-        shell_cmd = f"cd '{source_dir}' && {' '.join(escaped_args)}"
-        print(f"Shell command: {shell_cmd}")
+        # Convert paths to absolute paths to avoid issues
+        source_dir_abs = Path(source_dir).resolve()
+        output_file_abs = Path(output_file).resolve()
+        
+        # Update the command with absolute output path
+        cmd[cmd.index("-o") + 1] = str(output_file_abs)
+        
+        print(f"Shell command: cd {source_dir_abs} && {' '.join(cmd)}")
 
         result = subprocess.run(
-            shell_cmd,
-            shell=True,
+            cmd,
+            cwd=str(source_dir_abs),
             check=False,  # Don't raise on non-zero exit
             capture_output=True,
             text=True
