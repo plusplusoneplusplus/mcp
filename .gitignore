@@ -109,6 +109,7 @@ server/.browserprofile/
 server/.extracted_charts/
 server/.images/
 server/.vector_store/
+server/.code_indexing/
 
 settings.yaml
 

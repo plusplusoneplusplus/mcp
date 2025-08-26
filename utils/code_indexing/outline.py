@@ -220,5 +220,49 @@ def main_outline() -> None:
         print(render_text(classes, by_class, args.only, args.by_file))
 
 
+def generate_outline_from_ctags(tags_file_path: str) -> Dict[str, Any]:
+    """Generate outline data structure from ctags JSON file.
+
+    Args:
+        tags_file_path: Path to the ctags JSON file
+
+    Returns:
+        Dictionary containing outline data with text and plantuml formats
+    """
+    tags = load_tags(tags_file_path)
+    if not tags:
+        return {"error": "No tag entries found in file"}
+
+    classes, by_class = build_index(tags)
+
+    # Generate both text and PlantUML formats
+    text_outline = render_text(classes, by_class, show_file=True)
+    plantuml_outline = render_plantuml(classes, by_class)
+
+    # Also generate stats
+    total_classes = len(classes)
+    total_functions = sum(
+        1 for tag in tags
+        if tag.get("kind") in METHOD_KINDS
+    )
+    total_members = sum(
+        1 for tag in tags
+        if tag.get("kind") in MEMBER_KINDS
+    )
+
+    return {
+        "classes": classes,
+        "class_details": by_class,
+        "text_outline": text_outline,
+        "plantuml_outline": plantuml_outline,
+        "stats": {
+            "total_classes": total_classes,
+            "total_functions": total_functions,
+            "total_members": total_members,
+            "total_tags": len(tags)
+        }
+    }
+
+
 if __name__ == "__main__":
     main_outline()

@@ -558,6 +558,60 @@ class MultiLanguageParser:
         return edges
 
 
+    def analyze_code(self, content: str, language: str) -> Dict[str, Any]:
+        """Analyze code content and return structured information.
+
+        Args:
+            content: Source code content
+            language: Programming language (cpp, python, javascript, java)
+
+        Returns:
+            Dictionary containing parsed functions, classes, and calls
+        """
+        try:
+            # Convert content to bytes
+            src = content.encode('utf-8')
+
+            # Parse the code
+            if language not in self.parsers:
+                return {
+                    "error": f"Unsupported language: {language}",
+                    "functions": [],
+                    "classes": [],
+                    "calls": []
+                }
+
+            tree = self.parsers[language].parse(src)
+            root = tree.root_node
+
+            # Extract functions and classes
+            functions, classes = self.parse_definitions(src, language)
+
+            # Extract function calls
+            calls = self.parse_calls(src, language)
+
+            return {
+                "functions": functions,
+                "classes": classes,
+                "calls": calls,
+                "total_nodes": len(list(self._walk_tree(root)))
+            }
+
+        except Exception as e:
+            return {
+                "error": str(e),
+                "functions": [],
+                "classes": [],
+                "calls": []
+            }
+
+    def _walk_tree(self, node: Node):
+        """Walk the AST tree and yield all nodes."""
+        yield node
+        for child in node.children:
+            yield from self._walk_tree(child)
+
+
 def main():
     """Example usage of the MultiLanguageParser."""
     parser = MultiLanguageParser()
