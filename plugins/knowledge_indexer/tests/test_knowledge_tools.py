@@ -294,7 +294,7 @@ class TestKnowledgeQueryTool:
             )
 
         assert result["success"] is False
-        assert "Knowledge query failed" in result["error"]
+        assert "Failed to initialize embedding model" in result["error"]
 
 
 class TestKnowledgeCollectionManagerTool:
