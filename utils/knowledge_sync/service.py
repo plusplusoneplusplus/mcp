@@ -92,8 +92,11 @@ class KnowledgeSyncService:
                         # Get relative path from the indexed folder
                         rel_path = md_file.relative_to(folder_path)
 
+                        # Use forward slashes for cross-platform consistency
+                        filename = str(rel_path).replace("\\", "/")
+
                         markdown_files.append({
-                            "filename": str(rel_path),
+                            "filename": filename,
                             "content": content,
                             "encoding": "utf-8"
                         })
