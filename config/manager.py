@@ -65,6 +65,10 @@ class EnvironmentManager:
         "kusto_dataframe_threshold_mb": (1, int),
         "kusto_dataframe_auto_summarize": (True, bool),
         "kusto_dataframe_summary_type": ("auto", str),
+        # Knowledge sync settings
+        "knowledge_sync_enabled": (False, bool),
+        "knowledge_sync_folders": ("", str),
+        "knowledge_sync_collections": ("", str),
     }
 
     # Default Azure repo settings with their types

@@ -14,6 +14,9 @@ from .knowledge import (
     api_list_documents,
     api_query_segments,
     api_delete_collection,
+    api_knowledge_sync_status,
+    api_knowledge_sync_trigger,
+    api_knowledge_sync_folder,
 )
 
 from .background_jobs import (
@@ -77,6 +80,11 @@ api_routes = [
     Route("/api/collection-documents", endpoint=api_list_documents, methods=["GET"]),
     Route("/api/query-segments", endpoint=api_query_segments, methods=["GET"]),
     Route("/api/delete-collection", endpoint=api_delete_collection, methods=["POST"]),
+
+    # Knowledge sync endpoints
+    Route("/api/knowledge-sync/status", endpoint=api_knowledge_sync_status, methods=["GET"]),
+    Route("/api/knowledge-sync/trigger", endpoint=api_knowledge_sync_trigger, methods=["POST"]),
+    Route("/api/knowledge-sync/folder", endpoint=api_knowledge_sync_folder, methods=["POST"]),
 
     # Background job management endpoints
     Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),

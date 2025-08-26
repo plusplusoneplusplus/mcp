@@ -45,6 +45,9 @@ from config import env
 
 from server.tool_result_processor import process_tool_result
 
+# Import knowledge sync service
+from utils.knowledge_sync import knowledge_sync_service
+
 # Create the server
 server = Server("mymcp")
 
@@ -372,6 +375,12 @@ async def dataframe_detail_page(request: Request):
     )
 
 
+async def knowledge_sync_page(request: Request):
+    return templates.TemplateResponse(
+        "knowledge_sync.html", {"request": request, "current_page": "knowledge_sync"}
+    )
+
+
 async def pyeval_page(request: Request):
     return templates.TemplateResponse(
         "pyeval.html", {"request": request, "current_page": "pyeval"}
@@ -389,6 +398,7 @@ routes = [
     Route("/dataframes", endpoint=dataframes_page, methods=["GET"]),
     Route("/dataframes/{df_id}", endpoint=dataframe_detail_page, methods=["GET"]),
     Route("/pyeval", endpoint=pyeval_page, methods=["GET"]),
+    Route("/knowledge-sync", endpoint=knowledge_sync_page, methods=["GET"]),
     Route("/config", endpoint=config_page, methods=["GET"]),
     Route("/sse", endpoint=handle_sse),
     Mount("/messages/", app=sse.handle_post_message),
@@ -399,8 +409,28 @@ routes = [
     ),
 ] + api_routes
 
-# Create Starlette app
-starlette_app = Starlette(routes=routes)
+# Knowledge sync service startup/shutdown handlers
+async def startup_knowledge_sync():
+    """Initialize the knowledge sync service on application startup."""
+    try:
+        await knowledge_sync_service.start_knowledge_sync_service()
+    except Exception as e:
+        logging.error(f"Failed to initialize knowledge sync service: {e}")
+
+async def shutdown_knowledge_sync():
+    """Shutdown the knowledge sync service on application shutdown."""
+    try:
+        knowledge_sync_service.shutdown()
+        logging.info("Knowledge sync service shut down successfully")
+    except Exception as e:
+        logging.error(f"Error shutting down knowledge sync service: {e}")
+
+# Create Starlette app with event handlers
+starlette_app = Starlette(
+    routes=routes,
+    on_startup=[startup_knowledge_sync],
+    on_shutdown=[shutdown_knowledge_sync]
+)
 
 
 # Setup function for logging and environment
