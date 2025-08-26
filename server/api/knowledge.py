@@ -247,10 +247,20 @@ async def api_query_segments(request: Request):
                 {"error": "Missing collection or query parameter."}, status_code=400
             )
 
-        # Execute the knowledge query tool
-        result = await get_knowledge_query().execute_tool(
-            {"query": query_text, "collection": collection, "limit": limit}
-        )
+        # Execute the knowledge query tool with timeout handling
+        import asyncio
+        try:
+            result = await asyncio.wait_for(
+                get_knowledge_query().execute_tool(
+                    {"query": query_text, "collection": collection, "limit": limit}
+                ),
+                timeout=25.0  # Set 25-second timeout to prevent hanging
+            )
+        except asyncio.TimeoutError:
+            return JSONResponse(
+                {"error": "Query timed out. This may be due to model initialization or vector store issues."}, 
+                status_code=500
+            )
 
         if result.get("success"):
             # Return the results in the expected format
