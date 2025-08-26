@@ -264,11 +264,15 @@ class KnowledgeQueryTool(ToolInterface):
             if not query_text:
                 return {"success": False, "error": "Query text is required"}
 
-            # Initialize embedder and vector store
-            from sentence_transformers import SentenceTransformer
+            # Initialize embedder using the embedding service with fallback support
+            from utils.vector_store.embedding_service import SentenceTransformerEmbedding
 
-            embedder = SentenceTransformer("all-MiniLM-L6-v2")
-            query_vec = embedder.encode([query_text]).tolist()
+            embedder = SentenceTransformerEmbedding(model_name="all-MiniLM-L6-v2")
+            query_vec = embedder.encode(query_text)
+
+            # Ensure query_vec is in the right format for ChromaDB (list of lists)
+            if isinstance(query_vec, list) and len(query_vec) > 0 and not isinstance(query_vec[0], list):
+                query_vec = [query_vec]
 
             store = ChromaVectorStore(
                 collection_name=collection, persist_directory=persist_directory
