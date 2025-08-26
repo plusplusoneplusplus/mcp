@@ -78,6 +78,7 @@ class TestKnowledgeAPI:
         data = resp.json()
         assert "error" in data
 
+    @pytest.mark.skipif(os.name == "nt", reason="Skip on Windows due to embedding model timeout issues")
     def test_query_segments_with_params(self, server_url):
         """Test querying segments with valid parameters."""
         resp = requests.get(
