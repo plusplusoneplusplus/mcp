@@ -67,22 +67,42 @@ class SentenceTransformerEmbedding(EmbeddingInterface):
     def _initialize_model(self):
         """Initialize the SentenceTransformer model with fallback support."""
         from sentence_transformers import SentenceTransformer
+        import signal
+        import os
 
-        # Try to load the primary model
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Model loading timed out")
+
+        # Set a timeout for model loading (15 seconds) to prevent hanging in tests
+        original_handler = None
         try:
-            logger.info(f"Attempting to load primary model: {self._model_name}")
-            model = SentenceTransformer(self._model_name, device=self._device)
-            logger.info(f"Successfully loaded model: {self._model_name}")
-            return model
-        except ValueError as e:
-            if "Unrecognized model" in str(e):
-                logger.warning(f"Failed to load primary model {self._model_name}: {e}")
-                return self._try_fallback_models()
-            else:
+            if hasattr(signal, 'SIGALRM') and not os.name == 'nt':  # Unix systems only
+                original_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(15)
+
+            # Try to load the primary model
+            try:
+                logger.info(f"Attempting to load primary model: {self._model_name}")
+                model = SentenceTransformer(self._model_name, device=self._device)
+                logger.info(f"Successfully loaded model: {self._model_name}")
+                return model
+            except ValueError as e:
+                if "Unrecognized model" in str(e):
+                    logger.warning(f"Failed to load primary model {self._model_name}: {e}")
+                    return self._try_fallback_models()
+                else:
+                    raise
+            except TimeoutError:
+                logger.error(f"Model loading timed out for {self._model_name}")
+                raise RuntimeError(f"Model loading timed out after 15 seconds for {self._model_name}")
+            except Exception as e:
+                logger.error(f"Unexpected error loading model {self._model_name}: {e}")
                 raise
-        except Exception as e:
-            logger.error(f"Unexpected error loading model {self._model_name}: {e}")
-            raise
+        finally:
+            # Reset the alarm
+            if hasattr(signal, 'SIGALRM') and not os.name == 'nt' and original_handler is not None:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, original_handler)
 
     def _try_fallback_models(self):
         """Try loading fallback models."""
