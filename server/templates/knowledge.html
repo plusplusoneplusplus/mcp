@@ -43,6 +43,41 @@
         margin-bottom: 1em;
         margin-left: 2em;
     }
+
+    /* Sync-specific styles */
+    .sync-status {
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+    .sync-status.sync-success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    .sync-status.sync-error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+    .sync-status.sync-info {
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+    }
+    .sync-folder-item {
+        background-color: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 10px 0;
+    }
+    .sync-folder-path {
+        font-family: monospace;
+        background-color: #f8f9fa;
+        padding: 5px;
+        border-radius: 3px;
+    }
 </style>
 {% endblock %}
 
@@ -56,6 +91,7 @@
     <button class="tab-btn" data-tab="list-tab">List</button>
     <button class="tab-btn" data-tab="query-tab">Query</button>
     <button class="tab-btn" data-tab="collections-tab">Collections</button>
+    <button class="tab-btn" data-tab="sync-tab">Sync</button>
 </div>
 
 <!-- Import Tab -->
@@ -135,6 +171,37 @@
         <div id="collections-list-area" style="margin-top:1em;"></div>
     </div>
 </div>
+
+<!-- Sync Tab -->
+<div class="tab-content" id="sync-tab" style="display:none;">
+    <div class="card">
+        <h2>Configuration Status</h2>
+        <div id="sync-status-info" class="sync-status sync-info">Loading configuration...</div>
+        <button id="refresh-sync-status-btn" style="background:#007bff;color:white;border:none;padding:0.5em 1em;border-radius:4px;cursor:pointer;margin:0.5em 0;">Refresh Status</button>
+    </div>
+
+    <div class="card" id="sync-controls" style="display:none;">
+        <h2>Sync Controls</h2>
+
+        <div style="margin:1em 0;">
+            <button id="sync-btn" style="background:#007bff;color:white;border:none;padding:0.7em 1.2em;border-radius:4px;cursor:pointer;margin:0.3em;">
+                <span class="sync-loading" id="sync-loading" style="display:none;">⏳</span>
+                Sync Folders
+            </button>
+            <button id="resync-btn" style="background:#dc3545;color:white;border:none;padding:0.7em 1.2em;border-radius:4px;cursor:pointer;margin:0.3em;">
+                <span class="sync-loading" id="resync-loading" style="display:none;">⏳</span>
+                Re-sync (Clear & Rebuild)
+            </button>
+        </div>
+
+        <div id="sync-results"></div>
+    </div>
+
+    <div class="card" id="folder-list" style="display:none;">
+        <h2>Configured Folders</h2>
+        <ul id="sync-folders" style="list-style-type:none;padding:0;"></ul>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -147,6 +214,7 @@
             btn.classList.add('active');
             document.getElementById(btn.dataset.tab).style.display = 'block';
             if (btn.dataset.tab === 'collections-tab') loadCollectionsList();
+            if (btn.dataset.tab === 'sync-tab') loadSyncStatus();
         });
     });
 
@@ -210,26 +278,26 @@
         const files = Array.from(e.target.files);
         const listDiv = document.getElementById('selected-files-list');
         const folderDiv = document.getElementById('selected-folder-path');
-        
+
         if (!files.length) {
             listDiv.innerHTML = '';
             folderDiv.innerHTML = '';
             return;
         }
-        
+
         // Get selected extensions
         const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
-        
+
         // Filter files by selected extensions
         const filtered = files.filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext.toLowerCase())));
-        
+
         // Display folder information
         let folder = '';
         if (files[0] && files[0].webkitRelativePath) {
             folder = files[0].webkitRelativePath.split('/')[0];
             folderDiv.innerHTML = `<b>Selected folder:</b> <code>${folder}</code> <span title='Browsers do not expose the absolute path for security.' style='color:#888;'>(absolute path not available)</span>`;
         }
-        
+
         // Display file list
         if (filtered.length === 0) {
             if (files.length > 0) {
@@ -239,7 +307,7 @@
             }
             return;
         }
-        
+
         // Group files by extension for better display
         const filesByExt = {};
         filtered.forEach(file => {
@@ -247,13 +315,13 @@
             if (!filesByExt[ext]) filesByExt[ext] = [];
             filesByExt[ext].push(file);
         });
-        
+
         let html = `<b>Found ${filtered.length} matching files:</b>`;
-        
+
         // Show breakdown by extension
         const extCounts = Object.entries(filesByExt).map(([ext, files]) => `${files.length} ${ext}`);
         html += `<div style="color:#666; font-size:0.9em; margin:0.2em 0;">${extCounts.join(', ')}</div>`;
-        
+
         // Show file list (limited to first 15 for performance)
         html += '<ul style="margin:0.3em 0 0.3em 1em; max-height:200px; overflow-y:auto;">';
         const showFiles = filtered.slice(0, 15);
@@ -263,11 +331,11 @@
             html += `<li><span style="color:#007acc;">${ext}</span> ${displayName}</li>`;
         }
         html += '</ul>';
-        
+
         if (filtered.length > 15) {
             html += `<div style='color:#888; font-size:0.9em;'>...and ${filtered.length - 15} more files</div>`;
         }
-        
+
         listDiv.innerHTML = html;
     });
 
@@ -277,48 +345,48 @@
         const statusDiv = document.getElementById('import-status');
         const fileInput = document.getElementById('import-files');
         const files = Array.from(fileInput.files);
-        
+
         if (!files.length) {
             statusDiv.innerHTML = '<span style="color:red;">Please select a folder to import.</span>';
             return;
         }
-        
+
         // Get selected extensions
         const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
         if (!exts.length) {
             statusDiv.innerHTML = '<span style="color:red;">Please select at least one file extension to import.</span>';
             return;
         }
-        
+
         // Filter files by selected extensions
         const filtered = files.filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext.toLowerCase())));
-        
+
         if (!filtered.length) {
             statusDiv.innerHTML = `<span style="color:orange;">No files match the selected extensions. Found ${files.length} total files, but none have the selected extensions. Nothing to import.</span>`;
             return;
         }
-        
+
         statusDiv.innerHTML = `<span style='color:blue;'>Uploading and importing ${filtered.length} files (ignoring ${files.length - filtered.length} non-matching files)...</span>`;
-        
+
         const form = e.target;
         const formData = new FormData();
-        
+
         // Add only the filtered files to the form data
         filtered.forEach(file => {
             formData.append('files', file);
         });
-        
+
         // Add other form fields
         const collection = form.querySelector('input[name="collection"]').value;
         const overwrite = form.querySelector('input[name="overwrite"]').checked;
-        
+
         if (collection) {
             formData.append('collection', collection);
         }
         if (overwrite) {
             formData.append('overwrite', 'true');
         }
-        
+
         try {
             const response = await fetch('/api/import-knowledge', {
                 method: 'POST',
@@ -330,7 +398,7 @@
                 form.reset();
                 document.getElementById('selected-files-list').innerHTML = '';
                 document.getElementById('selected-folder-path').innerHTML = '';
-                
+
                 await loadCollections();
             } else {
                 statusDiv.innerHTML = `<span style='color:red;'>Error: ${result.error || 'Unknown error'}</span>`;
@@ -490,5 +558,153 @@
     // Load collections on page load for both dropdowns
     loadCollections();
     loadQueryCollections();
+
+    // --- Sync Tab Functions ---
+    async function loadSyncStatus() {
+        document.getElementById('sync-status-info').textContent = 'Loading...';
+
+        try {
+            const response = await fetch('/api/knowledge-sync/status');
+            const data = await response.json();
+
+            if (data.enabled) {
+                document.getElementById('sync-status-info').className = 'sync-status sync-success';
+                document.getElementById('sync-status-info').textContent =
+                    `Knowledge sync is enabled. ${data.configured_folders} folders configured.`;
+
+                document.getElementById('sync-controls').style.display = 'block';
+                document.getElementById('folder-list').style.display = 'block';
+
+                // Display folder list
+                const foldersHtml = data.folders.map(folder => `
+                    <li class="sync-folder-item">
+                        <strong>Collection:</strong> ${folder.collection}<br>
+                        <strong>Path:</strong> <span class="sync-folder-path">${folder.path}</span><br>
+                        <strong>Resolved:</strong> ${folder.resolved_path || 'Not found'}
+                        <button onclick="syncSingleFolder('${folder.path}', '${folder.collection}', false)" style="background:#007bff;color:white;border:none;padding:0.3em 0.8em;border-radius:4px;cursor:pointer;margin:0.3em;">Sync</button>
+                        <button onclick="syncSingleFolder('${folder.path}', '${folder.collection}', true)" style="background:#dc3545;color:white;border:none;padding:0.3em 0.8em;border-radius:4px;cursor:pointer;margin:0.3em;">Re-sync</button>
+                    </li>
+                `).join('');
+
+                document.getElementById('sync-folders').innerHTML = foldersHtml;
+            } else {
+                document.getElementById('sync-status-info').className = 'sync-status sync-error';
+                document.getElementById('sync-status-info').textContent =
+                    'Knowledge sync is disabled. Please enable KNOWLEDGE_SYNC_ENABLED in your environment configuration.';
+
+                document.getElementById('sync-controls').style.display = 'none';
+                document.getElementById('folder-list').style.display = 'none';
+            }
+        } catch (error) {
+            document.getElementById('sync-status-info').className = 'sync-status sync-error';
+            document.getElementById('sync-status-info').textContent = `Error loading status: ${error.message}`;
+        }
+    }
+
+    document.getElementById('refresh-sync-status-btn').addEventListener('click', loadSyncStatus);
+
+    document.getElementById('sync-btn').addEventListener('click', function() {
+        runSync(false);
+    });
+
+    document.getElementById('resync-btn').addEventListener('click', function() {
+        runSync(true);
+    });
+
+    async function runSync(resync) {
+        const button = resync ? document.getElementById('resync-btn') : document.getElementById('sync-btn');
+        const loading = resync ? document.getElementById('resync-loading') : document.getElementById('sync-loading');
+
+        button.disabled = true;
+        loading.style.display = 'inline';
+
+        try {
+            const response = await fetch('/api/knowledge-sync/trigger', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ resync: resync })
+            });
+
+            const result = await response.json();
+            displaySyncResults(result, resync);
+        } catch (error) {
+            displaySyncResults({ success: false, error: error.message }, resync);
+        } finally {
+            button.disabled = false;
+            loading.style.display = 'none';
+        }
+    }
+
+    async function syncSingleFolder(folderPath, collectionName, overwrite) {
+        try {
+            const response = await fetch('/api/knowledge-sync/folder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    folder_path: folderPath,
+                    collection_name: collectionName,
+                    overwrite: overwrite
+                })
+            });
+
+            const result = await response.json();
+            displaySyncResults(result, overwrite, `Single folder (${collectionName})`);
+        } catch (error) {
+            displaySyncResults({ success: false, error: error.message }, overwrite, `Single folder (${collectionName})`);
+        }
+    }
+
+    function displaySyncResults(result, resync, title = null) {
+        const resultsDiv = document.getElementById('sync-results');
+        const action = title || (resync ? 'Re-syncing' : 'Syncing');
+
+        let html = `<h3>${action} Results</h3>`;
+
+        if (result.success) {
+            html += `<div class="sync-status sync-success">
+                ✅ ${action} completed successfully!<br>`;
+
+            if (result.total_folders) {
+                html += `Processed ${result.total_folders} folders, `;
+                html += `synced ${result.total_imported_files} files.<br>`;
+            }
+
+            if (result.imported_files !== undefined) {
+                html += `Synced ${result.imported_files} files.<br>`;
+            }
+
+            html += `</div>`;
+
+            if (result.results) {
+                html += '<h4>Detailed Results:</h4>';
+                result.results.forEach(folderResult => {
+                    const status = folderResult.success ? 'sync-success' : 'sync-error';
+                    html += `<div class="sync-status ${status}">
+                        <strong>${folderResult.collection}:</strong> `;
+
+                    if (folderResult.success) {
+                        html += `${folderResult.imported_files || 0} files synced`;
+                        if (folderResult.warning) {
+                            html += ` (${folderResult.warning})`;
+                        }
+                    } else {
+                        html += `Error: ${folderResult.error}`;
+                    }
+
+                    html += `</div>`;
+                });
+            }
+        } else {
+            html += `<div class="sync-status sync-error">
+                ❌ ${action} failed: ${result.error}
+            </div>`;
+        }
+
+        resultsDiv.innerHTML = html;
+    }
 </script>
 {% endblock %}
