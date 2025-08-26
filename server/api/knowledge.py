@@ -470,7 +470,17 @@ async def api_code_indexing_ctags(request: Request):
 
         if exit_code != 0:
             return JSONResponse(
-                {"success": False, "error": f"ctags generation failed with exit code {exit_code}"},
+                {
+                    "success": False, 
+                    "error": f"ctags generation failed with exit code {exit_code}",
+                    "git_info": git_info,
+                    "output_files": {
+                        "tags": str(tags_file),
+                        "outline": str(outline_file),
+                        "base_dir": str(base_indexing_dir),
+                        "subfolder": str(code_indexing_dir)
+                    }
+                },
                 status_code=500
             )
 

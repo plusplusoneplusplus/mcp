@@ -71,8 +71,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 
-# Configure pytest-asyncio
-pytest_plugins = ["pytest_asyncio"]
+# pytest-asyncio is configured in the root conftest.py
 
 # Set up logging for debugging
 logging.basicConfig(level=logging.DEBUG)
