@@ -17,6 +17,10 @@ from .knowledge import (
     api_knowledge_sync_status,
     api_knowledge_sync_trigger,
     api_knowledge_sync_folder,
+    api_code_indexing_ctags,
+    api_code_indexing_tree_sitter,
+    api_code_viewer_paths,
+    api_code_viewer_classes,
 )
 
 from .background_jobs import (
@@ -85,6 +89,14 @@ api_routes = [
     Route("/api/knowledge-sync/status", endpoint=api_knowledge_sync_status, methods=["GET"]),
     Route("/api/knowledge-sync/trigger", endpoint=api_knowledge_sync_trigger, methods=["POST"]),
     Route("/api/knowledge-sync/folder", endpoint=api_knowledge_sync_folder, methods=["POST"]),
+
+    # Code indexing endpoints
+    Route("/api/code-indexing/ctags", endpoint=api_code_indexing_ctags, methods=["POST"]),
+    Route("/api/code-indexing/tree-sitter", endpoint=api_code_indexing_tree_sitter, methods=["POST"]),
+
+    # Code viewer endpoints
+    Route("/api/code-viewer/paths", endpoint=api_code_viewer_paths, methods=["GET"]),
+    Route("/api/code-viewer/classes/{path_hash}", endpoint=api_code_viewer_classes, methods=["GET"]),
 
     # Background job management endpoints
     Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),

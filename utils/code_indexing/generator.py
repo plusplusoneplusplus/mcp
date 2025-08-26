@@ -5,6 +5,7 @@ with optimized parameters for analysis.
 """
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -33,36 +34,65 @@ def run_ctags(
         print(f"Error: Source directory '{source_dir}' does not exist", file=sys.stderr)
         return 1
 
-    # Build ctags command
+    # Build command for running from source directory
     cmd = [
         "ctags",
-        "-R",  # Recursive
         f"--languages={languages}",
         "--output-format=json",
-        "--fields=+n+S+a+K+Z+t",  # Extended fields: line numbers, signatures, access, kind, scope, type
-        "--extras=+q",  # Include qualified tags
-        "--tag-relative=never",  # Use absolute paths
+        "--fields=+n+S+a+K+Z+t",
+        "--extras=+q",
+        "--tag-relative=never",
         "-o",
         output_file,
-        source_dir,
     ]
 
-    # Add any additional arguments
+    # Add arguments, using relative paths when possible
     if additional_args:
         cmd.extend(additional_args)
+        if not any(arg == "-L" for arg in additional_args):
+            cmd.extend(["-R", "."])
+    else:
+        cmd.extend(["-R", "."])
 
-    print(f"Running: {' '.join(cmd)}")
+    print(f"Running from {source_dir}: {' '.join(cmd)}")
 
     try:
-        result = subprocess.run(cmd, check=True)
-        print(f"Successfully generated tags in '{output_file}'")
+        # Convert paths to absolute paths to avoid issues
+        source_dir_abs = Path(source_dir).resolve()
+        output_file_abs = Path(output_file).resolve()
+        
+        # Update the command with absolute output path
+        cmd[cmd.index("-o") + 1] = str(output_file_abs)
+        
+        print(f"Shell command: cd {source_dir_abs} && {' '.join(cmd)}")
+
+        result = subprocess.run(
+            cmd,
+            cwd=str(source_dir_abs),
+            check=False,  # Don't raise on non-zero exit
+            capture_output=True,
+            text=True
+        )
+
+        # Print warnings/info to stdout but don't treat them as errors
+        if result.stderr:
+            print(f"ctags stderr: {result.stderr}")
+        if result.stdout:
+            print(f"ctags stdout: {result.stdout}")
+
+        if result.returncode == 0:
+            print(f"Successfully generated tags in '{output_file}'")
+        else:
+            print(f"ctags returned exit code {result.returncode}")
+
         return result.returncode
+
     except subprocess.CalledProcessError as e:
-        print(f"Error running ctags: {e}", file=sys.stderr)
+        print(f"Error: ctags command failed with exit code {e.returncode}", file=sys.stderr)
         return e.returncode
     except FileNotFoundError:
         print("Error: ctags command not found. Please install ctags.", file=sys.stderr)
-        print("On macOS: brew install ctags", file=sys.stderr)
+        print("On macOS: brew install universal-ctags", file=sys.stderr)
         print("On Ubuntu/Debian: sudo apt install universal-ctags", file=sys.stderr)
         return 1
 

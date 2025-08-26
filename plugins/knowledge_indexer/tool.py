@@ -218,6 +218,8 @@ class KnowledgeQueryTool(ToolInterface):
         super().__init__()
         # Use configuration manager to get vector store path
         self.persist_dir = env.get_vector_store_path()
+        # Cache the embedder to avoid reinitialization
+        self._embedder = None
 
     @property
     def name(self) -> str:
@@ -264,20 +266,40 @@ class KnowledgeQueryTool(ToolInterface):
             if not query_text:
                 return {"success": False, "error": "Query text is required"}
 
-            # Initialize embedder and vector store
-            from sentence_transformers import SentenceTransformer
+            # Initialize embedder using the embedding service with fallback support
+            # Cache the embedder to avoid reinitialization on every request
+            if self._embedder is None:
+                from utils.vector_store.embedding_service import SentenceTransformerEmbedding
+                try:
+                    self._embedder = SentenceTransformerEmbedding(model_name="all-MiniLM-L6-v2")
+                except Exception as e:
+                    return {"success": False, "error": f"Failed to initialize embedding model: {str(e)}"}
+            
+            query_vec = self._embedder.encode(query_text)
 
-            embedder = SentenceTransformer("all-MiniLM-L6-v2")
-            query_vec = embedder.encode([query_text]).tolist()
+            # Ensure query_vec is in the right format for ChromaDB (list of lists)
+            if isinstance(query_vec, list) and len(query_vec) > 0 and not isinstance(query_vec[0], list):
+                query_vec = [query_vec]
 
-            store = ChromaVectorStore(
-                collection_name=collection, persist_directory=persist_directory
-            )
+            try:
+                store = ChromaVectorStore(
+                    collection_name=collection, persist_directory=persist_directory
+                )
 
-            # Perform the query
-            results = store.collection.query(
-                query_embeddings=query_vec, n_results=limit
-            )
+                # Perform the query
+                results = store.collection.query(
+                    query_embeddings=query_vec, n_results=limit
+                )
+            except Exception as e:
+                # Handle collection not found or other vector store errors gracefully
+                error_msg = str(e).lower()
+                if "not found" in error_msg or "does not exist" in error_msg:
+                    return {
+                        "success": False, 
+                        "error": f"Collection '{collection}' does not exist. Please create it first by indexing some documents."
+                    }
+                else:
+                    return {"success": False, "error": f"Vector store query failed: {str(e)}"}
 
             # Handle potential None results with safe defaults
             result_ids = results.get("ids") or [[]]

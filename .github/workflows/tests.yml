@@ -49,6 +49,22 @@ jobs:
       #     sudo mv chromedriver /usr/local/bin/
       #     sudo chmod +x /usr/local/bin/chromedriver
 
+      - name: Install system dependencies (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y universal-ctags
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install universal-ctags
+          fi
+
+      - name: Install system dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Install ctags using chocolatey
+          choco install universal-ctags -y
+
       - name: Install uv (Unix)
         if: runner.os != 'Windows'
         run: |
