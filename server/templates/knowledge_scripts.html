@@ -1,0 +1,1212 @@
+<script>
+    // --- Tab Switching ---
+    function switchToTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tc => tc.style.display = 'none');
+
+        const targetBtn = document.querySelector(`[data-tab="${tabId}"]`);
+        const targetContent = document.getElementById(tabId);
+
+        if (targetBtn && targetContent) {
+            targetBtn.classList.add('active');
+            targetContent.style.display = 'block';
+
+            // Update URL hash
+            history.replaceState(null, null, `#${tabId}`);
+
+            // Load tab-specific content
+            if (tabId === 'collections-tab') loadCollectionsList();
+            if (tabId === 'sync-tab') loadSyncStatus();
+            if (tabId === 'code-viewer-tab') loadCodeViewerPaths();
+        }
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            switchToTab(btn.dataset.tab);
+        });
+    });
+
+    // --- Manage Collections Tab ---
+    async function loadCollectionsList() {
+        const area = document.getElementById('collections-list-area');
+        area.innerHTML = 'Loading collections...';
+        try {
+            const resp = await fetch('/api/collections');
+            const data = await resp.json();
+            if (!data.collections || data.collections.length === 0) {
+                area.innerHTML = '<span>No collections found.</span>';
+                return;
+            }
+            let html = '<ul style="list-style:none;padding:0;">';
+            data.collections.forEach(col => {
+                html += `<li style='margin-bottom:0.7em;'><span style='font-family:monospace;'>${col}</span> <button class='delete-col-btn' data-col='${col}' style='color:#fff;background:#d9534f;border:none;border-radius:4px;padding:0.3em 0.8em;cursor:pointer;margin-left:1em;'>Delete</button></li>`;
+            });
+            html += '</ul>';
+            area.innerHTML = html;
+            document.querySelectorAll('.delete-col-btn').forEach(btn => {
+                btn.addEventListener('click', async function () {
+                    const col = btn.dataset.col;
+                    if (!confirm(`Are you sure you want to delete collection '${col}'? This cannot be undone.`)) return;
+                    btn.disabled = true;
+                    btn.textContent = 'Deleting...';
+                    const resp = await fetch('/api/delete-collection', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ collection: col })
+                    });
+                    const result = await resp.json();
+                    if (result.success) {
+                        btn.parentElement.remove();
+                    } else {
+                        alert('Failed to delete: ' + (result.error || 'Unknown error'));
+                        btn.disabled = false;
+                        btn.textContent = 'Delete';
+                    }
+                });
+            });
+        } catch (err) {
+            area.innerHTML = `<span style='color:red;'>Error loading collections: ${err}</span>`;
+        }
+    }
+
+
+    // --- Import Extension Filters ---
+    function updateImportAccept() {
+        const fileInput = document.getElementById('import-files');
+        const checked = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+        fileInput.setAttribute('accept', checked.join(','));
+        fileInput.dispatchEvent(new Event('change'));
+    }
+    document.querySelectorAll('.ext-filter').forEach(cb => {
+        cb.addEventListener('change', updateImportAccept);
+    });
+
+    // --- Show Selected Files and Folder Name ---
+    document.getElementById('import-files').addEventListener('change', function (e) {
+        const files = Array.from(e.target.files);
+        const listDiv = document.getElementById('selected-files-list');
+        const folderDiv = document.getElementById('selected-folder-path');
+
+        if (!files.length) {
+            listDiv.innerHTML = '';
+            folderDiv.innerHTML = '';
+            return;
+        }
+
+        // Get selected extensions
+        const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+
+        // Filter files by selected extensions
+        const filtered = files.filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext.toLowerCase())));
+
+        // Display folder information
+        let folder = '';
+        if (files[0] && files[0].webkitRelativePath) {
+            folder = files[0].webkitRelativePath.split('/')[0];
+            folderDiv.innerHTML = `<b>Selected folder:</b> <code>${folder}</code> <span title='Browsers do not expose the absolute path for security.' style='color:#888;'>(absolute path not available)</span>`;
+        }
+
+        // Display file list
+        if (filtered.length === 0) {
+            if (files.length > 0) {
+                listDiv.innerHTML = `<span style="color:#666;">No files match the selected extensions. Found ${files.length} total files, but none have the selected extensions. Files will be ignored during import.</span>`;
+            } else {
+                listDiv.innerHTML = '<span style="color:#666;">No files found in the selected folder.</span>';
+            }
+            return;
+        }
+
+        // Group files by extension for better display
+        const filesByExt = {};
+        filtered.forEach(file => {
+            const ext = exts.find(e => file.name.toLowerCase().endsWith(e.toLowerCase())) || 'other';
+            if (!filesByExt[ext]) filesByExt[ext] = [];
+            filesByExt[ext].push(file);
+        });
+
+        let html = `<b>Found ${filtered.length} matching files:</b>`;
+
+        // Show breakdown by extension
+        const extCounts = Object.entries(filesByExt).map(([ext, files]) => `${files.length} ${ext}`);
+        html += `<div style="color:#666; font-size:0.9em; margin:0.2em 0;">${extCounts.join(', ')}</div>`;
+
+        // Show file list (limited to first 15 for performance)
+        html += '<ul style="margin:0.3em 0 0.3em 1em; max-height:200px; overflow-y:auto;">';
+        const showFiles = filtered.slice(0, 15);
+        for (const file of showFiles) {
+            const displayName = file.webkitRelativePath || file.name;
+            const ext = exts.find(e => file.name.toLowerCase().endsWith(e.toLowerCase())) || '';
+            html += `<li><span style="color:#007acc;">${ext}</span> ${displayName}</li>`;
+        }
+        html += '</ul>';
+
+        if (filtered.length > 15) {
+            html += `<div style='color:#888; font-size:0.9em;'>...and ${filtered.length - 15} more files</div>`;
+        }
+
+        listDiv.innerHTML = html;
+    });
+
+    // --- Import Knowledge AJAX ---
+    document.getElementById('import-form').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const statusDiv = document.getElementById('import-status');
+        const fileInput = document.getElementById('import-files');
+        const files = Array.from(fileInput.files);
+
+        if (!files.length) {
+            statusDiv.innerHTML = '<span style="color:red;">Please select a folder to import.</span>';
+            return;
+        }
+
+        // Get selected extensions
+        const exts = Array.from(document.querySelectorAll('.ext-filter:checked')).map(cb => cb.value);
+        if (!exts.length) {
+            statusDiv.innerHTML = '<span style="color:red;">Please select at least one file extension to import.</span>';
+            return;
+        }
+
+        // Filter files by selected extensions
+        const filtered = files.filter(f => exts.some(ext => f.name.toLowerCase().endsWith(ext.toLowerCase())));
+
+        if (!filtered.length) {
+            statusDiv.innerHTML = `<span style="color:orange;">No files match the selected extensions. Found ${files.length} total files, but none have the selected extensions. Nothing to import.</span>`;
+            return;
+        }
+
+        statusDiv.innerHTML = `<span style='color:blue;'>Uploading and importing ${filtered.length} files (ignoring ${files.length - filtered.length} non-matching files)...</span>`;
+
+        const form = e.target;
+        const formData = new FormData();
+
+        // Add only the filtered files to the form data
+        filtered.forEach(file => {
+            formData.append('files', file);
+        });
+
+        // Add other form fields
+        const collection = form.querySelector('input[name="collection"]').value;
+        const overwrite = form.querySelector('input[name="overwrite"]').checked;
+
+        if (collection) {
+            formData.append('collection', collection);
+        }
+        if (overwrite) {
+            formData.append('overwrite', 'true');
+        }
+
+        try {
+            const response = await fetch('/api/import-knowledge', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            if (result.success) {
+                statusDiv.innerHTML = `<span style='color:green;'>Successfully imported ${result.imported_files} files. Total segments stored: ${result.total_segments}.</span>`;
+                form.reset();
+                document.getElementById('selected-files-list').innerHTML = '';
+                document.getElementById('selected-folder-path').innerHTML = '';
+
+                await loadCollections();
+            } else {
+                statusDiv.innerHTML = `<span style='color:red;'>Error: ${result.error || 'Unknown error'}</span>`;
+            }
+        } catch (err) {
+            statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+        }
+    });
+
+    // --- Collections Dropdown and List Documents ---
+    async function loadCollections() {
+        const dropdown = document.getElementById('collections-dropdown');
+        dropdown.innerHTML = '';
+        try {
+            const resp = await fetch('/api/collections');
+            const data = await resp.json();
+            if (data.collections && data.collections.length > 0) {
+                data.collections.forEach(col => {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.textContent = col;
+                    dropdown.appendChild(opt);
+                });
+            } else {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No collections';
+                dropdown.appendChild(opt);
+            }
+        } catch (err) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Error loading collections';
+            dropdown.appendChild(opt);
+        }
+    }
+
+    document.getElementById('list-docs-btn').addEventListener('click', async function () {
+        const dropdown = document.getElementById('collections-dropdown');
+        const col = dropdown.value;
+        const docsStatus = document.getElementById('docs-status');
+        const docViewer = document.getElementById('doc-viewer-area');
+        const docSelector = document.getElementById('doc-selector');
+        const docContentArea = document.getElementById('doc-content-area');
+        docViewer.style.display = 'none';
+        docSelector.innerHTML = '';
+        docContentArea.value = '';
+        if (!col) {
+            docsStatus.innerHTML = '<span style="color:red;">Please select a collection.</span>';
+            return;
+        }
+        docsStatus.textContent = 'Loading documents...';
+        try {
+            const resp = await fetch(`/api/collection-documents?collection=${encodeURIComponent(col)}`);
+            const data = await resp.json();
+            if (data.error) {
+                docsStatus.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
+            } else if (data.documents && data.documents.length > 0) {
+                docsStatus.innerHTML = `<span style='color:green;'>Found ${data.documents.length} documents.</span>`;
+                docSelector.innerHTML = '';
+                data.documents.forEach((doc, i) => {
+                    const id = (data.ids && data.ids[i]) ? data.ids[i] : `#${i + 1}`;
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = id.length > 40 ? id.slice(0, 40) + '...' : id;
+                    docSelector.appendChild(opt);
+                });
+                docContentArea.value = data.documents[0] || '';
+                const docMetadataArea = document.getElementById('doc-metadata-area');
+                function setMetadata(idx) {
+                    const meta = (data.metadatas && data.metadatas[idx]) ? data.metadatas[idx] : undefined;
+                    docMetadataArea.value = meta ? JSON.stringify(meta, null, 2) : '';
+                }
+                setMetadata(0);
+                docViewer.style.display = '';
+                docSelector.onchange = function () {
+                    const idx = parseInt(this.value);
+                    docContentArea.value = data.documents[idx] || '';
+                    setMetadata(idx);
+                };
+            } else {
+                docsStatus.innerHTML = '<span>No documents found in this collection.</span>';
+                docViewer.style.display = 'none';
+            }
+        } catch (err) {
+            docsStatus.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+            docViewer.style.display = 'none';
+        }
+    });
+
+    // --- Query Segments (Semantic Search) ---
+    async function loadQueryCollections() {
+        const dropdown = document.getElementById('query-collections-dropdown');
+        dropdown.innerHTML = '';
+        try {
+            const resp = await fetch('/api/collections');
+            const data = await resp.json();
+            if (data.collections && data.collections.length > 0) {
+                data.collections.forEach(col => {
+                    const opt = document.createElement('option');
+                    opt.value = col;
+                    opt.textContent = col;
+                    dropdown.appendChild(opt);
+                });
+            } else {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'No collections';
+                dropdown.appendChild(opt);
+            }
+        } catch (err) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Error loading collections';
+            dropdown.appendChild(opt);
+        }
+    }
+
+    document.getElementById('run-query-btn').addEventListener('click', async function () {
+        const col = document.getElementById('query-collections-dropdown').value;
+        const query = document.getElementById('query-text').value;
+        const limit = document.getElementById('query-limit').value || 3;
+        const statusDiv = document.getElementById('query-status');
+        const resultsList = document.getElementById('query-results');
+        resultsList.innerHTML = '';
+        if (!col) {
+            statusDiv.innerHTML = '<span style="color:red;">Please select a collection.</span>';
+            return;
+        }
+        if (!query) {
+            statusDiv.innerHTML = '<span style="color:red;">Please enter a query.</span>';
+            return;
+        }
+        statusDiv.textContent = 'Searching...';
+        try {
+            const resp = await fetch(`/api/query-segments?collection=${encodeURIComponent(col)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+            const data = await resp.json();
+            if (data.error) {
+                statusDiv.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
+            } else if (data.documents && data.documents.length > 0) {
+                statusDiv.innerHTML = `<span style='color:green;'>Top ${data.documents.length} results:</span>`;
+                data.documents.forEach((doc, i) => {
+                    const li = document.createElement('li');
+                    const meta = data.metadatas && data.metadatas[i] ? JSON.stringify(data.metadatas[i]) : '';
+                    const score = data.distances && data.distances[i] !== undefined ? ` (distance: ${data.distances[i].toFixed(4)})` : '';
+                    li.innerHTML = `<b>#${i + 1}</b> ${doc.length > 100 ? doc.slice(0, 100) + '...' : doc} <small>${meta}${score}</small>`;
+                    resultsList.appendChild(li);
+                });
+            } else {
+                statusDiv.innerHTML = '<span>No relevant segments found.</span>';
+            }
+        } catch (err) {
+            statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+        }
+    });
+
+    // Load collections on page load for both dropdowns
+    loadCollections();
+    loadQueryCollections();
+
+    // --- Sync Tab Functions ---
+    async function loadSyncStatus() {
+        document.getElementById('sync-status-info').textContent = 'Loading...';
+
+        try {
+            const response = await fetch('/api/knowledge-sync/status');
+            const data = await response.json();
+
+            if (data.enabled) {
+                document.getElementById('sync-status-info').className = 'sync-status sync-success';
+                document.getElementById('sync-status-info').textContent =
+                    `Knowledge sync is enabled. ${data.configured_folders} folders configured.`;
+
+                document.getElementById('sync-controls').style.display = 'block';
+                document.getElementById('folder-list').style.display = 'block';
+
+                // Display folder list
+                const foldersHtml = data.folders.map(folder => `
+                    <li class="sync-folder-item">
+                        <strong>Collection:</strong> ${folder.collection}<br>
+                        <strong>Path:</strong> <span class="sync-folder-path">${folder.path}</span><br>
+                        <strong>Resolved:</strong> ${folder.resolved_path || 'Not found'}
+                        <button onclick="syncSingleFolder('${folder.path}', '${folder.collection}', false)" style="background:#007bff;color:white;border:none;padding:0.3em 0.8em;border-radius:4px;cursor:pointer;margin:0.3em;">Sync</button>
+                        <button onclick="syncSingleFolder('${folder.path}', '${folder.collection}', true)" style="background:#dc3545;color:white;border:none;padding:0.3em 0.8em;border-radius:4px;cursor:pointer;margin:0.3em;">Re-sync</button>
+                    </li>
+                `).join('');
+
+                document.getElementById('sync-folders').innerHTML = foldersHtml;
+            } else {
+                document.getElementById('sync-status-info').className = 'sync-status sync-error';
+                document.getElementById('sync-status-info').textContent =
+                    'Knowledge sync is disabled. Please enable KNOWLEDGE_SYNC_ENABLED in your environment configuration.';
+
+                document.getElementById('sync-controls').style.display = 'none';
+                document.getElementById('folder-list').style.display = 'none';
+            }
+        } catch (error) {
+            document.getElementById('sync-status-info').className = 'sync-status sync-error';
+            document.getElementById('sync-status-info').textContent = `Error loading status: ${error.message}`;
+        }
+    }
+
+    document.getElementById('refresh-sync-status-btn').addEventListener('click', loadSyncStatus);
+
+    document.getElementById('sync-btn').addEventListener('click', function() {
+        runSync(false);
+    });
+
+    document.getElementById('resync-btn').addEventListener('click', function() {
+        runSync(true);
+    });
+
+    async function runSync(resync) {
+        const button = resync ? document.getElementById('resync-btn') : document.getElementById('sync-btn');
+        const loading = resync ? document.getElementById('resync-loading') : document.getElementById('sync-loading');
+
+        button.disabled = true;
+        loading.style.display = 'inline';
+
+        try {
+            const response = await fetch('/api/knowledge-sync/trigger', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ resync: resync })
+            });
+
+            const result = await response.json();
+            displaySyncResults(result, resync);
+        } catch (error) {
+            displaySyncResults({ success: false, error: error.message }, resync);
+        } finally {
+            button.disabled = false;
+            loading.style.display = 'none';
+        }
+    }
+
+    async function syncSingleFolder(folderPath, collectionName, overwrite) {
+        try {
+            const response = await fetch('/api/knowledge-sync/folder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    folder_path: folderPath,
+                    collection_name: collectionName,
+                    overwrite: overwrite
+                })
+            });
+
+            const result = await response.json();
+            displaySyncResults(result, overwrite, `Single folder (${collectionName})`);
+        } catch (error) {
+            displaySyncResults({ success: false, error: error.message }, overwrite, `Single folder (${collectionName})`);
+        }
+    }
+
+    function displaySyncResults(result, resync, title = null) {
+        const resultsDiv = document.getElementById('sync-results');
+        const action = title || (resync ? 'Re-syncing' : 'Syncing');
+
+        let html = `<h3>${action} Results</h3>`;
+
+        if (result.success) {
+            html += `<div class="sync-status sync-success">
+                ✅ ${action} completed successfully!<br>`;
+
+            if (result.total_folders) {
+                html += `Processed ${result.total_folders} folders, `;
+                html += `synced ${result.total_imported_files} files.<br>`;
+            }
+
+            if (result.imported_files !== undefined) {
+                html += `Synced ${result.imported_files} files.<br>`;
+            }
+
+            html += `</div>`;
+
+            if (result.results) {
+                html += '<h4>Detailed Results:</h4>';
+                result.results.forEach(folderResult => {
+                    const status = folderResult.success ? 'sync-success' : 'sync-error';
+                    html += `<div class="sync-status ${status}">
+                        <strong>${folderResult.collection}:</strong> `;
+
+                    if (folderResult.success) {
+                        html += `${folderResult.imported_files || 0} files synced`;
+                        if (folderResult.warning) {
+                            html += ` (${folderResult.warning})`;
+                        }
+                    } else {
+                        html += `Error: ${folderResult.error}`;
+                    }
+
+                    html += `</div>`;
+                });
+            }
+        } else {
+            html += `<div class="sync-status sync-error">
+                ❌ ${action} failed: ${result.error}
+            </div>`;
+        }
+
+        resultsDiv.innerHTML = html;
+    }
+
+    // --- Code Indexing Tab Functions ---
+    let selectedIndexingMethod = null;
+
+    // Handle indexing method selection
+    document.querySelectorAll('.indexing-option').forEach(option => {
+        option.addEventListener('click', function() {
+            // Remove previous selection
+            document.querySelectorAll('.indexing-option').forEach(opt => opt.classList.remove('selected'));
+
+            // Add selection to clicked option
+            this.classList.add('selected');
+            selectedIndexingMethod = this.dataset.method;
+
+            // Show/hide method-specific options
+            const ctagsOptions = document.getElementById('ctags-options');
+            if (selectedIndexingMethod === 'ctags') {
+                ctagsOptions.style.display = 'block';
+            } else {
+                ctagsOptions.style.display = 'none';
+            }
+
+            // Enable the start button if we have both path and method
+            updateStartButton();
+        });
+    });
+
+    // Handle source path input
+    document.getElementById('source-path-input').addEventListener('input', updateStartButton);
+
+    function updateStartButton() {
+        const pathInput = document.getElementById('source-path-input').value.trim();
+        const startBtn = document.getElementById('start-indexing-btn');
+
+        if (pathInput && selectedIndexingMethod) {
+            startBtn.disabled = false;
+            startBtn.style.opacity = '1';
+        } else {
+            startBtn.disabled = true;
+            startBtn.style.opacity = '0.5';
+        }
+    }
+
+    // Handle indexing start
+    document.getElementById('start-indexing-btn').addEventListener('click', async function() {
+        const sourcePath = document.getElementById('source-path-input').value.trim();
+        const statusDiv = document.getElementById('indexing-status');
+        const resultsDiv = document.getElementById('indexing-results');
+
+        if (!sourcePath || !selectedIndexingMethod) {
+            statusDiv.innerHTML = '<span style="color:red;">Please select a source path and indexing method.</span>';
+            return;
+        }
+
+        // Disable button during processing
+        const startBtn = this;
+        startBtn.disabled = true;
+        startBtn.innerHTML = '⏳ Indexing...';
+
+        statusDiv.innerHTML = '<span style="color:blue;">Starting code indexing...</span>';
+        resultsDiv.innerHTML = '';
+
+        try {
+            let endpoint, requestData;
+
+            if (selectedIndexingMethod === 'ctags') {
+                endpoint = '/api/code-indexing/ctags';
+                const languages = document.getElementById('languages-input').value.trim();
+                requestData = {
+                    source_path: sourcePath,
+                    languages: languages
+                };
+            } else if (selectedIndexingMethod === 'tree-sitter') {
+                endpoint = '/api/code-indexing/tree-sitter';
+                requestData = {
+                    source_path: sourcePath
+                };
+            }
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                statusDiv.innerHTML = '<span style="color:green;">✅ Code indexing completed successfully!</span>';
+                displayIndexingResults(result);
+            } else {
+                statusDiv.innerHTML = `<span style="color:red;">❌ Error: ${result.error}</span>`;
+            }
+
+        } catch (error) {
+            statusDiv.innerHTML = `<span style="color:red;">❌ Unexpected error: ${error.message}</span>`;
+        } finally {
+            // Re-enable button
+            startBtn.disabled = false;
+            startBtn.innerHTML = 'Start Indexing';
+        }
+    });
+
+    function displayIndexingResults(result) {
+        const resultsDiv = document.getElementById('indexing-results');
+        let html = '<h3>Indexing Results</h3>';
+
+        // Show git information if available
+        if (result.git_info) {
+            const gitInfo = result.git_info;
+            html += `
+                <div class="code-indexing-result">
+                    <strong>Repository Info:</strong><br>
+                    ${gitInfo.is_git_repo ? '📂 Git repository detected' : '📁 Not a git repository'}<br>
+                    ${gitInfo.is_git_repo ? `📝 Git tracked files: ${gitInfo.tracked_files_count}<br>` : ''}
+                    ${gitInfo.processed_files !== undefined ? `✅ Files processed: ${gitInfo.processed_files}<br>` : ''}
+                    ${gitInfo.skipped_files !== undefined && gitInfo.skipped_files > 0 ? `⏭️ Files skipped (not tracked): ${gitInfo.skipped_files}<br>` : ''}
+                    ${gitInfo.path_hash ? `🔢 Path hash: ${gitInfo.path_hash}<br>` : ''}
+                </div>
+            `;
+        }
+
+        if (selectedIndexingMethod === 'ctags') {
+            html += `
+                <div class="code-indexing-result">
+                    <strong>CTags Results:</strong><br>
+                    📄 Tags generated: ${result.tags_count}<br>
+                    📁 Output directory: ${result.output_files.subfolder}<br>
+                    📄 Output files:<br>
+                    &nbsp;&nbsp;• Tags: ${result.output_files.tags}<br>
+                    &nbsp;&nbsp;• Outline: ${result.output_files.outline}<br>
+                    &nbsp;&nbsp;• Meta: ${result.output_files.subfolder}/meta.txt
+                </div>
+            `;
+
+            if (result.outline) {
+                html += '<h4>Code Outline Preview:</h4>';
+                html += '<div class="code-indexing-result">';
+                html += '<pre>' + JSON.stringify(result.outline, null, 2) + '</pre>';
+                html += '</div>';
+            }
+
+        } else if (selectedIndexingMethod === 'tree-sitter') {
+            html += `
+                <div class="code-indexing-result">
+                    <strong>Tree-Sitter Results:</strong><br>
+                    📁 Files parsed: ${result.parsed_files_count}<br>
+                    🔧 Functions found: ${result.total_functions}<br>
+                    📦 Classes found: ${result.total_classes}<br>
+                    📁 Output directory: ${result.output_files.subfolder}<br>
+                    📄 Output files:<br>
+                    &nbsp;&nbsp;• Analysis: ${result.output_files.tree_sitter}<br>
+                    &nbsp;&nbsp;• Meta: ${result.output_files.subfolder}/meta.txt
+                </div>
+            `;
+
+            if (result.results && result.results.length > 0) {
+                html += '<h4>Analysis Preview:</h4>';
+                html += '<div class="code-indexing-result">';
+
+                // Show summary of each file
+                result.results.slice(0, 5).forEach(file => {
+                    html += `<div style="margin-bottom:10px;">
+                        <strong>${file.file_path} (${file.language})</strong><br>
+                        &nbsp;&nbsp;Functions: ${file.functions ? file.functions.length : 0}<br>
+                        &nbsp;&nbsp;Classes: ${file.classes ? file.classes.length : 0}<br>
+                    </div>`;
+                });
+
+                if (result.results.length > 5) {
+                    html += `<div>... and ${result.results.length - 5} more files</div>`;
+                }
+
+                html += '</div>';
+            }
+        }
+
+        resultsDiv.innerHTML = html;
+    }
+
+    // --- Code Viewer Tab Functions ---
+    let cvIndexedPaths = [];
+    let cvSelectedPath = null;
+    let cvAllClasses = [];
+    let cvOriginalPath = null;
+
+    async function loadCodeViewerPaths() {
+        const loadingDiv = document.getElementById('cv-paths-loading');
+        const errorDiv = document.getElementById('cv-paths-error');
+        const containerDiv = document.getElementById('cv-paths-container');
+
+        try {
+            // Fetch available indexed paths
+            const response = await fetch('/api/code-viewer/paths');
+            const data = await response.json();
+
+            if (data.success) {
+                cvIndexedPaths = data.paths;
+                displayCodeViewerPaths();
+
+                loadingDiv.style.display = 'none';
+                containerDiv.style.display = 'block';
+            } else {
+                throw new Error(data.error || 'Failed to load paths');
+            }
+        } catch (error) {
+            console.error('Error loading paths:', error);
+            loadingDiv.style.display = 'none';
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = `❌ Error loading paths: ${error.message}`;
+        }
+    }
+
+    function displayCodeViewerPaths() {
+        const pathsList = document.getElementById('cv-indexed-paths');
+
+        if (cvIndexedPaths.length === 0) {
+            pathsList.innerHTML = `
+                <div class="no-results">
+                    No indexed paths found. Please index some code first using the Code Indexing tab.
+                </div>
+            `;
+            return;
+        }
+
+        const pathsHtml = cvIndexedPaths.map(path => `
+            <div class="path-item">
+                <div onclick="selectCodeViewerPath('${path.hash}')" style="flex: 1; cursor: pointer;">
+                    <div class="path-original">${path.original_path}</div>
+                    <div class="path-meta">
+                        Hash: ${path.hash} | Created: ${new Date(path.created).toLocaleString()}
+                    </div>
+                </div>
+                <button onclick="event.stopPropagation(); cleanupCodeViewerPath('${path.hash}', '${path.original_path}')"
+                        class="cleanup-btn"
+                        title="Remove this indexed path">
+                    🗑️ Remove
+                </button>
+            </div>
+        `).join('');
+
+        pathsList.innerHTML = pathsHtml;
+    }
+
+    async function selectCodeViewerPath(hash) {
+        // Update UI selection
+        document.querySelectorAll('#cv-indexed-paths .path-item').forEach(item => {
+            item.classList.remove('selected');
+        });
+        event.target.closest('.path-item').classList.add('selected');
+
+        // Find the selected path
+        cvSelectedPath = cvIndexedPaths.find(p => p.hash === hash);
+
+        // Show path details
+        displayCodeViewerPathDetails(cvSelectedPath);
+
+        // Load class data for the selected path
+        await loadCodeViewerClassData(hash);
+
+        // Show search section
+        document.getElementById('cv-search-section').style.display = 'block';
+    }
+
+    function displayCodeViewerPathDetails(path) {
+        const detailsDiv = document.getElementById('cv-path-details');
+        const infoDiv = document.getElementById('cv-selected-path-info');
+
+        detailsDiv.innerHTML = `
+            <div class="path-meta">
+                <strong>Original Path:</strong> <code>${path.original_path}</code><br>
+                <strong>Hash:</strong> <code>${path.hash}</code><br>
+                <strong>Created:</strong> ${new Date(path.created).toLocaleString()}<br>
+                <strong>Classes Available:</strong> ${path.class_count || 'Loading...'}
+            </div>
+        `;
+
+        infoDiv.style.display = 'block';
+    }
+
+    async function loadCodeViewerClassData(hash) {
+        try {
+            const response = await fetch(`/api/code-viewer/classes/${hash}`);
+            const data = await response.json();
+
+            if (data.success) {
+                cvAllClasses = data.classes;
+                cvOriginalPath = data.original_path;
+
+                // Update path details with class count
+                const path = cvIndexedPaths.find(p => p.hash === hash);
+                if (path) {
+                    path.class_count = cvAllClasses.length;
+                    displayCodeViewerPathDetails(path);
+                }
+
+                // Update search stats
+                const statsDiv = document.getElementById('cv-search-stats');
+                statsDiv.innerHTML = `📊 ${cvAllClasses.length} classes available for search`;
+                statsDiv.style.display = 'block';
+
+                // Clear previous search
+                clearCodeViewerSearchResults();
+            } else {
+                throw new Error(data.error || 'Failed to load class data');
+            }
+        } catch (error) {
+            console.error('Error loading class data:', error);
+            document.getElementById('cv-search-results').innerHTML = `
+                <div class="error">Error loading class data: ${error.message}</div>
+            `;
+        }
+    }
+
+    // Search functionality
+    document.getElementById('cv-class-search-input').addEventListener('input', function(e) {
+        const query = e.target.value.trim().toLowerCase();
+
+        if (!cvSelectedPath) {
+            return;
+        }
+
+        if (query === '') {
+            clearCodeViewerSearchResults();
+            return;
+        }
+
+        searchCodeViewerClasses(query);
+    });
+
+    function searchCodeViewerClasses(query) {
+        if (!cvAllClasses || cvAllClasses.length === 0) {
+            document.getElementById('cv-search-results').innerHTML = `
+                <div class="no-results">No class data available</div>
+            `;
+            return;
+        }
+
+        // Filter classes based on query (search both name and file path)
+        const matchedClasses = cvAllClasses.filter(classInfo =>
+            classInfo.name.toLowerCase().includes(query) ||
+            classInfo.file_path.toLowerCase().includes(query)
+        ).slice(0, 20); // Limit to top 20 results
+
+        if (matchedClasses.length === 0) {
+            document.getElementById('cv-search-results').innerHTML = `
+                <div class="no-results">No classes found matching "${query}"</div>
+            `;
+            return;
+        }
+
+        displayCodeViewerSearchResults(matchedClasses, query);
+    }
+
+    function displayCodeViewerSearchResults(classes, query) {
+        const resultsDiv = document.getElementById('cv-search-results');
+
+        const resultsHtml = classes.map(classInfo => {
+            // Generate UML-like representation with members
+            const umlDiagram = generateCodeViewerUMLDiagram(classInfo.name, classInfo.members || []);
+
+            // Format file path display
+            const filePathDisplay = classInfo.file_path === 'Unknown' ?
+                '<em>File path not available</em>' :
+                `<code>${highlightCodeViewerText(classInfo.file_path, query)}</code>`;
+
+            // Add line number if available
+            const lineInfo = classInfo.line > 0 ? ` (line ${classInfo.line})` : '';
+
+            // Show member count
+            const memberCount = classInfo.members ? classInfo.members.length : 0;
+            const memberInfo = memberCount > 0 ? ` (${memberCount} members)` : '';
+
+            return `
+                <div class="class-card">
+                    <div class="class-name">${highlightCodeViewerText(classInfo.name, query)}${memberInfo}</div>
+                    <div class="class-info">
+                        <strong>📁 File:</strong> ${filePathDisplay} ${lineInfo ? `<span class="line-number">${lineInfo}</span>` : ''}<br>
+                        <strong>🔧 Source:</strong> <span class="source-badge">${classInfo.source || 'Unknown'}</span><br>
+                        <strong>📦 Project:</strong> <code>${cvOriginalPath || cvSelectedPath.original_path}</code>
+                    </div>
+                    <div class="uml-diagram">
+${umlDiagram}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        resultsDiv.innerHTML = resultsHtml;
+    }
+
+    function generateCodeViewerUMLDiagram(className, members = []) {
+        // Generate a UML-like text representation with actual members and expandable sections
+        const cleanName = className.replace(/^__anon[a-f0-9]+/, 'Anonymous');
+        const uniqueId = `cv_uml_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Calculate box width based on content
+        const maxNameLength = Math.max(
+            cleanName.length,
+            ...members.map(m => formatCodeViewerMemberForUML(m).length)
+        );
+        const boxWidth = Math.max(30, maxNameLength + 6); // Minimum 30 chars
+
+        // Create borders
+        const topBorder = `┌─ ${cleanName} ─${'─'.repeat(boxWidth - cleanName.length - 4)}┐`;
+        const separator = `├${'─'.repeat(boxWidth - 2)}┤`;
+        const bottomBorder = `└${'─'.repeat(boxWidth - 2)}┘`;
+
+        // Start building the diagram
+        let diagramHtml = '';
+
+        // Add namespace info if present
+        if (className.includes('::')) {
+            const parts = className.split('::');
+            const namespace = parts.slice(0, -1).join('::');
+            diagramHtml += `🏛️  Namespace: ${namespace}\n\n`;
+        }
+
+        diagramHtml += topBorder + '\n';
+
+        // Add members
+        if (members.length > 0) {
+            diagramHtml += separator + '\n';
+
+            // Separate methods and variables
+            const methods = members.filter(m => m.kind === 'member' || m.kind === 'method' || m.kind === 'function');
+            const variables = members.filter(m => m.kind === 'variable');
+
+            // Add methods (show first 8, with expandable section for the rest)
+            const displayMethods = methods.slice(0, 8);
+            displayMethods.forEach(member => {
+                const memberText = formatCodeViewerMemberForUML(member);
+                const padding = ' '.repeat(Math.max(0, boxWidth - memberText.length - 2));
+                diagramHtml += `│ ${memberText}${padding}│\n`;
+            });
+
+            // Create expandable section for additional methods
+            if (methods.length > 8) {
+                const remainingMethods = methods.slice(8);
+                const moreCount = remainingMethods.length;
+
+                // Container for both expand toggle and expanded content
+                diagramHtml += `<div id="${uniqueId}_methods_container">`;
+
+                // Show expandable toggle (visible by default)
+                const expandText = `... and ${moreCount} more methods`;
+                const expandPadding = ' '.repeat(Math.max(0, boxWidth - expandText.length - 2));
+                diagramHtml += `<div id="${uniqueId}_methods_toggle" class="uml-toggle-section">`;
+                diagramHtml += `│ <span class="uml-expand-toggle" onclick="toggleCodeViewerUMLSection('${uniqueId}_methods')">${expandText}</span>${expandPadding}│\n`;
+                diagramHtml += `</div>`;
+
+                // Hidden expanded section
+                diagramHtml += `<div id="${uniqueId}_methods" class="uml-expanded-section">`;
+                remainingMethods.forEach(member => {
+                    const memberText = formatCodeViewerMemberForUML(member);
+                    const padding = ' '.repeat(Math.max(0, boxWidth - memberText.length - 2));
+                    diagramHtml += `│ ${memberText}${padding}│\n`;
+                });
+
+                // Add collapse toggle
+                const collapseText = `click to collapse ${moreCount} methods`;
+                const collapsePadding = ' '.repeat(Math.max(0, boxWidth - collapseText.length - 2));
+                diagramHtml += `│ <span class="uml-collapse-toggle" onclick="toggleCodeViewerUMLSection('${uniqueId}_methods')">${collapseText}</span>${collapsePadding}│\n`;
+                diagramHtml += '</div>';
+
+                diagramHtml += '</div>';
+            }
+
+            // Add separator if we have both methods and variables
+            if (methods.length > 0 && variables.length > 0) {
+                diagramHtml += separator + '\n';
+            }
+
+            // Add variables (show first 5, with expandable section for the rest)
+            const displayVars = variables.slice(0, 5);
+            displayVars.forEach(member => {
+                const memberText = formatCodeViewerMemberForUML(member);
+                const padding = ' '.repeat(Math.max(0, boxWidth - memberText.length - 2));
+                diagramHtml += `│ ${memberText}${padding}│\n`;
+            });
+
+            // Create expandable section for additional variables
+            if (variables.length > 5) {
+                const remainingVars = variables.slice(5);
+                const moreCount = remainingVars.length;
+
+                // Container for both expand toggle and expanded content
+                diagramHtml += `<div id="${uniqueId}_vars_container">`;
+
+                // Show expandable toggle (visible by default)
+                const expandText = `... and ${moreCount} more attributes`;
+                const expandPadding = ' '.repeat(Math.max(0, boxWidth - expandText.length - 2));
+                diagramHtml += `<div id="${uniqueId}_vars_toggle" class="uml-toggle-section">`;
+                diagramHtml += `│ <span class="uml-expand-toggle" onclick="toggleCodeViewerUMLSection('${uniqueId}_vars')">${expandText}</span>${expandPadding}│\n`;
+                diagramHtml += `</div>`;
+
+                // Hidden expanded section
+                diagramHtml += `<div id="${uniqueId}_vars" class="uml-expanded-section">`;
+                remainingVars.forEach(member => {
+                    const memberText = formatCodeViewerMemberForUML(member);
+                    const padding = ' '.repeat(Math.max(0, boxWidth - memberText.length - 2));
+                    diagramHtml += `│ ${memberText}${padding}│\n`;
+                });
+
+                // Add collapse toggle
+                const collapseText = `click to collapse ${moreCount} attributes`;
+                const collapsePadding = ' '.repeat(Math.max(0, boxWidth - collapseText.length - 2));
+                diagramHtml += `│ <span class="uml-collapse-toggle" onclick="toggleCodeViewerUMLSection('${uniqueId}_vars')">${collapseText}</span>${collapsePadding}│\n`;
+                diagramHtml += '</div>';
+
+                diagramHtml += '</div>';
+            }
+        } else {
+            // Empty class or no member info
+            diagramHtml += separator + '\n';
+            const emptyText = '(no member info)';
+            const padding = ' '.repeat(Math.max(0, boxWidth - emptyText.length - 2));
+            diagramHtml += `│ ${emptyText}${padding}│\n`;
+        }
+
+        diagramHtml += bottomBorder;
+
+        return diagramHtml;
+    }
+
+    function formatCodeViewerMemberForUML(member) {
+        // Format member for UML display
+        const accessSymbol = member.access === 'private' ? '-' :
+                           member.access === 'protected' ? '#' : '+';
+
+        let memberText = `${accessSymbol} ${member.name}`;
+
+        // For methods, show simplified signature
+        if (member.kind === 'member' || member.kind === 'method' || member.kind === 'function') {
+            if (member.signature && member.signature.includes('(')) {
+                // Extract parameter list - simplified
+                const params = extractCodeViewerSimpleParams(member.signature);
+                memberText += `(${params})`;
+            } else {
+                memberText += '()';
+            }
+        }
+
+        // Limit length to keep UML readable
+        if (memberText.length > 40) {
+            memberText = memberText.substring(0, 37) + '...';
+        }
+
+        return memberText;
+    }
+
+    function extractCodeViewerSimpleParams(signature) {
+        // Extract and simplify parameter list
+        const match = signature.match(/\(([^)]*)\)/);
+        if (!match) return '';
+
+        const params = match[1];
+        if (!params || params.trim() === 'self' || params.trim() === '') return '';
+
+        // Simplify complex parameter lists
+        const paramList = params.split(',').map(p => {
+            const trimmed = p.trim();
+            // Just get the parameter name (after the last space)
+            const parts = trimmed.split(/\s+/);
+            return parts[parts.length - 1].replace(/[=].*/, ''); // Remove default values
+        }).filter(p => p && p !== 'self');
+
+        // Limit number of parameters shown
+        if (paramList.length > 3) {
+            return paramList.slice(0, 3).join(', ') + '...';
+        }
+
+        return paramList.join(', ');
+    }
+
+    // Function to toggle UML expandable sections
+    function toggleCodeViewerUMLSection(sectionId) {
+        const expandedSection = document.getElementById(sectionId);
+        const toggleSection = document.getElementById(sectionId + '_toggle');
+
+        if (expandedSection && toggleSection) {
+            if (expandedSection.classList.contains('visible')) {
+                // Hide expanded, show toggle
+                expandedSection.classList.remove('visible');
+                toggleSection.classList.remove('hidden');
+            } else {
+                // Show expanded, hide toggle
+                expandedSection.classList.add('visible');
+                toggleSection.classList.add('hidden');
+            }
+        }
+    }
+
+    // Make toggleCodeViewerUMLSection globally available
+    window.toggleCodeViewerUMLSection = toggleCodeViewerUMLSection;
+
+    function highlightCodeViewerText(text, query) {
+        if (!query) return text;
+
+        const regex = new RegExp(`(${query})`, 'gi');
+        return text.replace(regex, '<mark style="background-color: #fff3cd; padding: 2px 4px; border-radius: 2px;">$1</mark>');
+    }
+
+    function clearCodeViewerSearchResults() {
+        document.getElementById('cv-search-results').innerHTML = `
+            <div class="no-results" id="cv-no-search-message">
+                Enter a class name above to search for definitions
+            </div>
+        `;
+    }
+
+    async function cleanupCodeViewerPath(pathHash, originalPath) {
+        if (!confirm(`Are you sure you want to remove the indexed data for "${originalPath}"? This action cannot be undone.`)) {
+            return;
+        }
+
+        const button = event.target;
+        const originalText = button.innerHTML;
+
+        try {
+            // Disable button and show loading state
+            button.disabled = true;
+            button.innerHTML = '⏳ Removing...';
+
+            const response = await fetch('/api/code-viewer/cleanup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ path_hash: pathHash })
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Remove the path item from the UI
+                const pathItem = button.closest('.path-item');
+                pathItem.remove();
+
+                // Update the paths array
+                cvIndexedPaths = cvIndexedPaths.filter(p => p.hash !== pathHash);
+
+                // If this was the selected path, clear the selection
+                if (cvSelectedPath && cvSelectedPath.hash === pathHash) {
+                    cvSelectedPath = null;
+                    document.getElementById('cv-selected-path-info').style.display = 'none';
+                    document.getElementById('cv-search-section').style.display = 'none';
+                }
+
+                // Show success message
+                alert(`Successfully removed indexed data for: ${originalPath}`);
+
+                // If no paths left, show the no paths message
+                if (cvIndexedPaths.length === 0) {
+                    displayCodeViewerPaths();
+                }
+            } else {
+                alert(`Error removing indexed data: ${result.error}`);
+                // Restore button state
+                button.disabled = false;
+                button.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error during cleanup:', error);
+            alert(`Unexpected error: ${error.message}`);
+            // Restore button state
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    }
+
+    // Make cleanupCodeViewerPath globally available
+    window.cleanupCodeViewerPath = cleanupCodeViewerPath;
+
+    // --- Initialize page with hash-based tab on load ---
+    function initializePageFromHash() {
+        const hash = window.location.hash.substr(1); // Remove # from hash
+        const validTabs = ['import-tab', 'list-tab', 'query-tab', 'collections-tab', 'sync-tab', 'code-indexing-tab', 'code-viewer-tab'];
+
+        if (hash && validTabs.includes(hash)) {
+            switchToTab(hash);
+        } else {
+            // Default to import-tab if no valid hash
+            switchToTab('import-tab');
+        }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initializePageFromHash);
+
+    // Handle browser back/forward navigation
+    window.addEventListener('hashchange', initializePageFromHash);
+</script>

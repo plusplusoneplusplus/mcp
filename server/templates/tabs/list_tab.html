@@ -1,0 +1,21 @@
+<!-- List Tab -->
+<div class="tab-content" id="list-tab" style="display:none;">
+    <div class="card">
+        <h2>List Documents in Collection</h2>
+        <label for="collections-dropdown">Select collection:</label>
+        <select id="collections-dropdown"></select>
+        <button id="list-docs-btn">List Documents</button>
+        <div id="docs-status" style="margin-top:1em;"></div>
+        <div id="doc-viewer-area" style="margin-top:1em; display:none;">
+            <label for="doc-selector" style="font-family:monospace;">Select document:</label>
+            <select id="doc-selector" style="font-family:monospace;"></select>
+            <br><br>
+            <textarea id="doc-content-area" rows="24"
+                style="width:100%;font-family:monospace;resize:vertical;"></textarea>
+            <br>
+            <label for="doc-metadata-area" style="font-family:monospace;">Metadata:</label>
+            <textarea id="doc-metadata-area" rows="8" style="width:100%;font-family:monospace;resize:vertical;"
+                readonly></textarea>
+        </div>
+    </div>
+</div>

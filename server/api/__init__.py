@@ -21,6 +21,7 @@ from .knowledge import (
     api_code_indexing_tree_sitter,
     api_code_viewer_paths,
     api_code_viewer_classes,
+    api_code_viewer_cleanup,
 )
 
 from .background_jobs import (
@@ -97,6 +98,7 @@ api_routes = [
     # Code viewer endpoints
     Route("/api/code-viewer/paths", endpoint=api_code_viewer_paths, methods=["GET"]),
     Route("/api/code-viewer/classes/{path_hash}", endpoint=api_code_viewer_classes, methods=["GET"]),
+    Route("/api/code-viewer/cleanup", endpoint=api_code_viewer_cleanup, methods=["POST"]),
 
     # Background job management endpoints
     Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),

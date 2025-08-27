@@ -258,7 +258,7 @@ async def api_query_segments(request: Request):
             )
         except asyncio.TimeoutError:
             return JSONResponse(
-                {"error": "Query timed out. This may be due to model initialization or vector store issues."}, 
+                {"error": "Query timed out. This may be due to model initialization or vector store issues."},
                 status_code=500
             )
 
@@ -481,7 +481,7 @@ async def api_code_indexing_ctags(request: Request):
         if exit_code != 0:
             return JSONResponse(
                 {
-                    "success": False, 
+                    "success": False,
                     "error": f"ctags generation failed with exit code {exit_code}",
                     "git_info": git_info,
                     "output_files": {
@@ -904,6 +904,56 @@ async def api_code_viewer_classes(request: Request):
             "classes": unique_classes,
             "total_count": len(unique_classes),
             "original_path": original_source_path
+        })
+
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+
+async def api_code_viewer_cleanup(request: Request):
+    """Delete an indexed code path and all its associated files."""
+    try:
+        # Parse request body
+        body = await request.json()
+        path_hash = body.get("path_hash")
+
+        if not path_hash:
+            return JSONResponse(
+                {"success": False, "error": "path_hash is required"},
+                status_code=400
+            )
+
+        server_dir = Path(__file__).resolve().parent.parent  # server/api -> server
+        base_indexing_dir = server_dir / ".code_indexing"
+        code_indexing_dir = base_indexing_dir / path_hash
+
+        if not code_indexing_dir.exists():
+            return JSONResponse(
+                {"success": False, "error": f"No indexed data found for hash: {path_hash}"},
+                status_code=404
+            )
+
+        # Get the original path from meta.txt for logging
+        original_path = "unknown"
+        meta_file = code_indexing_dir / "meta.txt"
+        if meta_file.exists():
+            try:
+                with open(meta_file, 'r') as f:
+                    meta_content = f.read()
+                for line in meta_content.split('\n'):
+                    if line.startswith('Original Path: '):
+                        original_path = line[15:].strip()
+                        break
+            except Exception:
+                pass
+
+        # Remove the entire directory
+        shutil.rmtree(code_indexing_dir)
+
+        return JSONResponse({
+            "success": True,
+            "message": f"Successfully removed indexed data for path: {original_path}",
+            "removed_hash": path_hash
         })
 
     except Exception as e:
