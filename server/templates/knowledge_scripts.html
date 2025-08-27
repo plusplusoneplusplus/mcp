@@ -1262,10 +1262,7 @@ ${umlDiagram}
             }
         }
 
-        // Limit length to keep UML readable
-        if (memberText.length > 40) {
-            memberText = memberText.substring(0, 37) + '...';
-        }
+        // Keep full function names for better readability
 
         return memberText;
     }
