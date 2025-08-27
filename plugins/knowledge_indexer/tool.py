@@ -29,7 +29,7 @@ class KnowledgeIndexerTool(ToolInterface):
 
     @property
     def description(self) -> str:
-        return "Upload and index new knowledge from files (markdown format) into a vector store. This tool is intended for users to add new documents and knowledge bases that can later be searched and retrieved. Supports multiple file uploads and organizes content into searchable collections. Files with fewer than the configured line count threshold (default: 500 lines) are stored as single segments without chunking."
+        return "Upload and index new knowledge from files (markdown format) into a vector store. This tool is intended for users to add new documents and knowledge bases that can later be searched and retrieved. Supports multiple file uploads and organizes content into searchable collections. Files with fewer than the configured line count threshold (default: 200 lines) are stored as single segments without chunking."
 
     @property
     def input_schema(self) -> Dict[str, Any]:
@@ -72,7 +72,7 @@ class KnowledgeIndexerTool(ToolInterface):
                 },
                 "line_count_threshold": {
                     "type": "integer",
-                    "default": 500,
+                    "default": 200,
                     "minimum": 1,
                     "description": "Minimum number of lines before chunking is applied. Files with fewer lines are kept as single segments",
                 },
@@ -87,7 +87,7 @@ class KnowledgeIndexerTool(ToolInterface):
             collection = arguments.get("collection", "default")
             overwrite = arguments.get("overwrite", False)
             persist_directory = arguments.get("persist_directory", self.persist_dir)
-            line_count_threshold = arguments.get("line_count_threshold", 500)
+            line_count_threshold = arguments.get("line_count_threshold", 200)
 
             if not files:
                 return {"success": False, "error": "No files provided for indexing"}

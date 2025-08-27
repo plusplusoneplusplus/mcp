@@ -328,41 +328,147 @@
 
     document.getElementById('run-query-btn').addEventListener('click', async function () {
         const col = document.getElementById('query-collections-dropdown').value;
-        const query = document.getElementById('query-text').value;
-        const limit = document.getElementById('query-limit').value || 3;
+        const query = document.getElementById('query-text').value.trim();
+        const limit = document.getElementById('query-limit').value || 5;
         const statusDiv = document.getElementById('query-status');
-        const resultsList = document.getElementById('query-results');
-        resultsList.innerHTML = '';
+        const resultsContainer = document.getElementById('query-results-container');
+        
+        // Clear previous results
+        resultsContainer.innerHTML = '';
+        statusDiv.className = '';
+        
+        // Validation
         if (!col) {
-            statusDiv.innerHTML = '<span style="color:red;">Please select a collection.</span>';
+            statusDiv.innerHTML = '<span style="color:#dc3545; font-weight: bold;">⚠️ Please select a collection.</span>';
+            statusDiv.style.backgroundColor = '#f8d7da';
+            statusDiv.style.border = '1px solid #f5c6cb';
             return;
         }
         if (!query) {
-            statusDiv.innerHTML = '<span style="color:red;">Please enter a query.</span>';
+            statusDiv.innerHTML = '<span style="color:#dc3545; font-weight: bold;">⚠️ Please enter a search query.</span>';
+            statusDiv.style.backgroundColor = '#f8d7da';
+            statusDiv.style.border = '1px solid #f5c6cb';
             return;
         }
-        statusDiv.textContent = 'Searching...';
+        
+        // Show loading state
+        statusDiv.innerHTML = '<span style="color:#0066cc; font-weight: bold;">🔍 Searching...</span>';
+        statusDiv.style.backgroundColor = '#cce7ff';
+        statusDiv.style.border = '1px solid #99d6ff';
+        
         try {
+            const startTime = performance.now();
             const resp = await fetch(`/api/query-segments?collection=${encodeURIComponent(col)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
             const data = await resp.json();
+            const searchTime = ((performance.now() - startTime) / 1000).toFixed(2);
+            
             if (data.error) {
-                statusDiv.innerHTML = `<span style='color:red;'>Error: ${data.error}</span>`;
+                statusDiv.innerHTML = `<span style="color:#dc3545; font-weight: bold;">❌ Error: ${data.error}</span>`;
+                statusDiv.style.backgroundColor = '#f8d7da';
+                statusDiv.style.border = '1px solid #f5c6cb';
             } else if (data.documents && data.documents.length > 0) {
-                statusDiv.innerHTML = `<span style='color:green;'>Top ${data.documents.length} results:</span>`;
-                data.documents.forEach((doc, i) => {
-                    const li = document.createElement('li');
-                    const meta = data.metadatas && data.metadatas[i] ? JSON.stringify(data.metadatas[i]) : '';
-                    const score = data.distances && data.distances[i] !== undefined ? ` (distance: ${data.distances[i].toFixed(4)})` : '';
-                    li.innerHTML = `<b>#${i + 1}</b> ${doc.length > 100 ? doc.slice(0, 100) + '...' : doc} <small>${meta}${score}</small>`;
-                    resultsList.appendChild(li);
-                });
+                // Success status
+                statusDiv.innerHTML = `<span style="color:#28a745; font-weight: bold;">✅ Found ${data.documents.length} result${data.documents.length > 1 ? 's' : ''} in ${searchTime}s</span>`;
+                statusDiv.style.backgroundColor = '#d4edda';
+                statusDiv.style.border = '1px solid #c3e6cb';
+                
+                // Create detailed results
+                const resultsHTML = data.documents.map((doc, i) => {
+                    const meta = data.metadatas && data.metadatas[i] ? data.metadatas[i] : {};
+                    const distance = data.distances && data.distances[i] !== undefined ? data.distances[i] : null;
+                    const id = data.ids && data.ids[i] ? data.ids[i] : `result-${i + 1}`;
+                    
+                    // Calculate relevance percentage (lower distance = higher relevance)
+                    const relevancePercent = distance !== null ? Math.max(0, Math.min(100, (1 - distance) * 100)) : null;
+                    
+                    // Extract filename from metadata or ID
+                    const filename = meta.filename || meta.source || id.split('/').pop() || 'Unknown';
+                    
+                    // Truncate document for preview
+                    const preview = doc.length > 300 ? doc.substring(0, 300) + '...' : doc;
+                    
+                    // Highlight query terms in preview (simple highlighting)
+                    let highlightedPreview = preview;
+                    const queryTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 2);
+                    queryTerms.forEach(term => {
+                        const regex = new RegExp(`(${term})`, 'gi');
+                        highlightedPreview = highlightedPreview.replace(regex, '<mark style="background-color: #ffeb3b; padding: 1px 2px;">$1</mark>');
+                    });
+                    
+                    return `
+                        <div style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 1em; padding: 1em; background: #fafafa; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5em;">
+                                <div style="flex-grow: 1;">
+                                    <h4 style="margin: 0; color: #333; font-size: 16px; font-weight: bold;">
+                                        📄 ${filename}
+                                    </h4>
+                                    <div style="font-size: 12px; color: #666; margin-top: 0.2em;">
+                                        Result #${i + 1}
+                                        ${relevancePercent !== null ? `• Relevance: <span style="font-weight: bold; color: ${relevancePercent > 70 ? '#28a745' : relevancePercent > 40 ? '#ffc107' : '#dc3545'}">${relevancePercent.toFixed(1)}%</span>` : ''}
+                                        ${distance !== null ? `• Distance: ${distance.toFixed(4)}` : ''}
+                                    </div>
+                                </div>
+                                <div style="text-align: right; margin-left: 1em;">
+                                    <button onclick="expandResult(${i})" style="background: #007bff; color: white; border: none; padding: 0.3em 0.8em; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                        View Full
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="result-preview" style="line-height: 1.5; color: #444; font-size: 14px; border-left: 3px solid #007bff; padding-left: 1em; margin: 0.5em 0;">
+                                ${highlightedPreview}
+                            </div>
+                            
+                            <div class="result-full" id="full-content-${i}" style="display: none; line-height: 1.5; color: #444; font-size: 14px; border-left: 3px solid #28a745; padding-left: 1em; margin: 0.5em 0; background: white; padding: 1em; border-radius: 4px;">
+                                ${doc.replace(/\n/g, '<br>')}
+                            </div>
+                            
+                            ${Object.keys(meta).length > 0 ? `
+                                <details style="margin-top: 0.5em;">
+                                    <summary style="cursor: pointer; color: #666; font-size: 12px;">📋 Metadata</summary>
+                                    <pre style="background: #f5f5f5; padding: 0.5em; border-radius: 4px; font-size: 11px; margin-top: 0.5em; overflow-x: auto;">${JSON.stringify(meta, null, 2)}</pre>
+                                </details>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                resultsContainer.innerHTML = resultsHTML;
+                
             } else {
-                statusDiv.innerHTML = '<span>No relevant segments found.</span>';
+                statusDiv.innerHTML = '<span style="color:#6c757d; font-weight: bold;">🔍 No relevant segments found for your query.</span>';
+                statusDiv.style.backgroundColor = '#f8f9fa';
+                statusDiv.style.border = '1px solid #dee2e6';
+                
+                resultsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 2em; color: #6c757d;">
+                        <div style="font-size: 48px; margin-bottom: 0.5em;">📭</div>
+                        <p>Try different keywords or check if the collection contains relevant documents.</p>
+                    </div>
+                `;
             }
         } catch (err) {
-            statusDiv.innerHTML = `<span style='color:red;'>Unexpected error: ${err}</span>`;
+            statusDiv.innerHTML = `<span style="color:#dc3545; font-weight: bold;">❌ Unexpected error: ${err.message}</span>`;
+            statusDiv.style.backgroundColor = '#f8d7da';
+            statusDiv.style.border = '1px solid #f5c6cb';
         }
     });
+    
+    // Function to expand/collapse full result content
+    window.expandResult = function(index) {
+        const fullContent = document.getElementById(`full-content-${index}`);
+        const button = event.target;
+        
+        if (fullContent.style.display === 'none') {
+            fullContent.style.display = 'block';
+            button.textContent = 'Hide Full';
+            button.style.background = '#6c757d';
+        } else {
+            fullContent.style.display = 'none';
+            button.textContent = 'View Full';
+            button.style.background = '#007bff';
+        }
+    };
 
     // Load collections on page load for both dropdowns
     loadCollections();

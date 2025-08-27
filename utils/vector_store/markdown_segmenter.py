@@ -23,9 +23,9 @@ class MarkdownSegmenter:
         vector_store: ChromaVectorStore,
         model_name: str = "all-MiniLM-L6-v2",
         chunk_size: int = 1000,
-        chunk_overlap: int = 200,
+        chunk_overlap: int = 100,
         table_max_rows: int = 500,
-        line_count_threshold: int = 500,
+        line_count_threshold: int = 200,
         embedding_service: Optional[EmbeddingInterface] = None,
     ):
         """

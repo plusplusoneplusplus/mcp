@@ -495,7 +495,13 @@ class EnvironmentManager:
 
     def get_vector_store_path(self) -> str:
         """Get the vector store persistence path"""
-        return self.get_setting("vector_store_path", ".vector_store")
+        path = self.get_setting("vector_store_path", ".vector_store")
+        # Ensure the path is always resolved relative to the server directory
+        from pathlib import Path
+        if not Path(path).is_absolute():
+            server_root = Path(__file__).parent.parent / "server"
+            path = str((server_root / path).resolve())
+        return path
 
     # Configuration Management Methods for Web Interface
     def get_all_configuration(self) -> Dict[str, Any]:
