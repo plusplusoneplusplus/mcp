@@ -301,11 +301,13 @@ class MultiLanguageParser:
         elif language == "cpp":
             # For C++: more complex due to declarators
             if node.type == "function_definition":
-                # Look for function_declarator -> identifier or qualified_identifier
+                # Look for function_declarator -> identifier, field_identifier, or qualified_identifier
                 for child in node.children:
                     if child.type == "function_declarator":
                         for subchild in child.children:
-                            if subchild.type == "identifier":
+                            if subchild.type in ["identifier", "field_identifier"]:
+                                return subchild.text.decode("utf-8", errors="ignore")
+                            elif subchild.type == "destructor_name":
                                 return subchild.text.decode("utf-8", errors="ignore")
                             elif subchild.type == "qualified_identifier":
                                 # For methods like Calculator::add, extract just the method name
@@ -316,10 +318,12 @@ class MultiLanguageParser:
                             elif subchild.type == "function_declarator":
                                 # Nested declarators for constructors
                                 for nested in subchild.children:
-                                    if nested.type == "identifier":
+                                    if nested.type in ["identifier", "field_identifier"]:
                                         return nested.text.decode(
                                             "utf-8", errors="ignore"
                                         )
+                                    elif nested.type == "destructor_name":
+                                        return nested.text.decode("utf-8", errors="ignore")
                                     elif nested.type == "qualified_identifier":
                                         parts = nested.text.decode(
                                             "utf-8", errors="ignore"
@@ -331,6 +335,8 @@ class MultiLanguageParser:
                     if child.type == "function_declarator":
                         for subchild in child.children:
                             if subchild.type == "identifier":
+                                return subchild.text.decode("utf-8", errors="ignore")
+                            elif subchild.type == "destructor_name":
                                 return subchild.text.decode("utf-8", errors="ignore")
                             elif subchild.type == "qualified_identifier":
                                 parts = subchild.text.decode(
@@ -344,6 +350,8 @@ class MultiLanguageParser:
                                         return nested.text.decode(
                                             "utf-8", errors="ignore"
                                         )
+                                    elif nested.type == "destructor_name":
+                                        return nested.text.decode("utf-8", errors="ignore")
                                     elif nested.type == "qualified_identifier":
                                         parts = nested.text.decode(
                                             "utf-8", errors="ignore"
@@ -383,41 +391,103 @@ class MultiLanguageParser:
     def _extract_class_members(self, class_node: Node, src: bytes, language: str) -> List[Dict[str, Any]]:
         """Extract class members (methods, properties) from a class definition node."""
         members = []
+        current_access = "public"  # Track current access level for C++
+        class_name = self._get_class_name(class_node, language) or ""
 
-        def traverse_class_body(node):
+        def traverse_class_body(node, access="public"):
+            nonlocal current_access
+            
+            # Handle C++ access specifiers
+            if language == "cpp" and node.type == "access_specifier":
+                access_text = node.text.decode("utf-8", errors="ignore").strip()
+                if access_text.startswith("public"):
+                    current_access = "public"
+                elif access_text.startswith("private"):
+                    current_access = "private"
+                elif access_text.startswith("protected"):
+                    current_access = "protected"
+                return  # Don't traverse children of access specifier nodes
+            
             # Look for methods/functions inside class
-            if self._is_function_node(node, language):
-                name = self._get_function_name(node, language)
+            if self._is_function_node(node, language) or self._is_method_declaration(node, language):
+                name = self._get_function_name(node, language) or self._get_method_declaration_name(node, language)
                 if name:
                     # Determine member type
                     member_kind = "method"
+                    
+                    # Check for constructor
                     if language == "python" and name == "__init__":
                         member_kind = "constructor"
                     elif language == "java" and node.type == "constructor_declaration":
                         member_kind = "constructor"
-                    elif language == "cpp" and name == class_node.text.decode("utf-8", errors="ignore").split()[-1]:
-                        member_kind = "constructor"
+                    elif language == "cpp":
+                        # Constructor: same name as class (handle qualified names)
+                        simple_class_name = class_name.split("::")[-1] if "::" in class_name else class_name
+                        simple_method_name = name.split("::")[-1] if "::" in name else name
+                        if simple_method_name == simple_class_name:
+                            member_kind = "constructor"
+                        # Destructor: starts with ~
+                        elif name.startswith("~"):
+                            member_kind = "destructor"
+                    
+                    # Check for storage class specifiers and virtual methods in C++
+                    is_virtual = False
+                    is_override = False
+                    is_static = False
+                    if language == "cpp":
+                        # Look for virtual keyword, override specifier, and static keyword
+                        full_text = node.text.decode("utf-8", errors="ignore")
+                        if "virtual" in full_text:
+                            is_virtual = True
+                        if "override" in full_text:
+                            is_override = True
+                        if "static" in full_text:
+                            is_static = True
+                        
+                        # Also check for storage_class_specifier nodes
+                        def check_storage_specifiers(n):
+                            nonlocal is_static
+                            if n.type == "storage_class_specifier" and "static" in n.text.decode("utf-8", errors="ignore"):
+                                is_static = True
+                            for child in n.children:
+                                check_storage_specifiers(child)
+                        
+                        check_storage_specifiers(node)
 
                     # Get signature if available
-                    signature = self._get_function_signature(node, src, language)
-
+                    signature = self._get_function_signature(node, src, language) or self._get_method_signature(node, language)
+                    
+                    # Add static/virtual info to name prefix
+                    prefix = ""
+                    if is_static:
+                        prefix = "static "
+                    if is_virtual:
+                        prefix = "virtual "
+                    
                     members.append({
-                        "name": name,
+                        "name": f"{prefix}{name}",
                         "kind": member_kind,
                         "signature": signature or "",
-                        "access": "public",  # Default to public, could be enhanced
-                        "line": node.start_point[0] + 1
+                        "access": current_access,
+                        "line": node.start_point[0] + 1,
+                        "static": is_static,
+                        "virtual": is_virtual,
+                        "override": is_override
                     })
 
             # Look for field/property declarations
             elif self._is_field_node(node, language):
                 field_names = self._get_field_names(node, language)
                 for field_name in field_names:
+                    # Get field type info if possible
+                    field_type = self._get_field_type(node, language)
+                    signature = f": {field_type}" if field_type else ""
+                    
                     members.append({
                         "name": field_name,
                         "kind": "field",
-                        "signature": "",
-                        "access": "public",
+                        "signature": signature,
+                        "access": current_access,
                         "line": node.start_point[0] + 1
                     })
 
@@ -429,20 +499,52 @@ class MultiLanguageParser:
                         "name": enum_info["name"],
                         "kind": "enum",
                         "signature": f"{{ {', '.join(enum_info['values'])} }}" if enum_info["values"] else "",
-                        "access": "public",
+                        "access": current_access,
                         "line": node.start_point[0] + 1
                     })
 
-            # Traverse children
+            # Look for typedef or using declarations in C++
+            elif language == "cpp" and node.type in ["alias_declaration", "type_definition"]:
+                alias_name = self._get_alias_name(node, language)
+                if alias_name:
+                    members.append({
+                        "name": alias_name,
+                        "kind": "alias",
+                        "signature": "",
+                        "access": current_access,
+                        "line": node.start_point[0] + 1
+                    })
+
+            # Traverse children with updated access level
             for child in node.children:
-                traverse_class_body(child)
+                traverse_class_body(child, current_access)
 
         traverse_class_body(class_node)
 
-        # Sort members: constructors first, then methods, then enums, then fields
+        # Also look for inherited members by examining base class list
+        if language == "cpp":
+            base_classes = self._get_base_classes(class_node, language)
+            for base_class in base_classes:
+                members.append({
+                    "name": f"inherits from {base_class['name']}",
+                    "kind": "inheritance",
+                    "signature": base_class.get('access', 'public'),
+                    "access": "public",
+                    "line": class_node.start_point[0] + 1
+                })
+
+        # Sort members: constructors first, destructors, then methods, inheritance, enums, then fields
         def sort_key(member):
-            order = {"constructor": 0, "method": 1, "enum": 2, "field": 3}
-            return (order.get(member["kind"], 4), member["name"])
+            order = {
+                "constructor": 0, 
+                "destructor": 1, 
+                "method": 2, 
+                "inheritance": 3,
+                "enum": 4, 
+                "alias": 5,
+                "field": 6
+            }
+            return (order.get(member["kind"], 7), member["name"])
 
         members.sort(key=sort_key)
         return members
@@ -493,6 +595,23 @@ class MultiLanguageParser:
             "java": {"field_declaration", "variable_declarator"},
             "cpp": {"declaration", "field_declaration", "member_declaration"}
         }
+        
+        # For C++, we need to filter out function declarations 
+        if language == "cpp" and node.type == "declaration":
+            # Check if this declaration contains a function_declarator (which would make it a function declaration)
+            has_function_declarator = False
+            def check_for_function_declarator(n):
+                nonlocal has_function_declarator
+                if n.type == "function_declarator":
+                    has_function_declarator = True
+                    return
+                for child in n.children:
+                    check_for_function_declarator(child)
+            
+            check_for_function_declarator(node)
+            if has_function_declarator:
+                return False  # This is a function declaration, not a field
+        
         return node.type in field_types.get(language, set())
 
     def _get_field_names(self, node: Node, language: str) -> List[str]:
@@ -538,17 +657,214 @@ class MultiLanguageParser:
                                 extract_identifiers(child)
                     extract_identifiers(node)
                 elif node.type == "field_declaration":
-                    # Direct field declarations within struct/class
-                    for child in node.children:
-                        if child.type == "field_identifier":
-                            field_names.append(child.text.decode("utf-8", errors="ignore"))
-                        elif child.type == "identifier":
-                            field_names.append(child.text.decode("utf-8", errors="ignore"))
+                    # Direct field declarations within struct/class - search recursively
+                    def extract_field_identifiers(n):
+                        if n.type == "field_identifier":
+                            field_names.append(n.text.decode("utf-8", errors="ignore"))
+                        elif n.type == "identifier" and n.parent and n.parent.type != "primitive_type":
+                            # Avoid extracting type names like "int", "void", etc.
+                            field_names.append(n.text.decode("utf-8", errors="ignore"))
+                        else:
+                            for child in n.children:
+                                extract_field_identifiers(child)
+                    
+                    extract_field_identifiers(node)
 
         except Exception:
             pass
 
         return field_names
+
+    def _get_field_type(self, node: Node, language: str) -> Optional[str]:
+        """Extract field type from a field declaration node."""
+        try:
+            if language == "cpp":
+                # Look for type information in the declaration
+                def find_type(node):
+                    # Common type nodes in C++
+                    if node.type in ["primitive_type", "type_identifier", "qualified_identifier"]:
+                        return node.text.decode("utf-8", errors="ignore")
+                    elif node.type == "pointer_declarator":
+                        # Handle pointer types
+                        for child in node.children:
+                            child_type = find_type(child)
+                            if child_type:
+                                return child_type + "*"
+                    elif node.type == "reference_declarator":
+                        # Handle reference types
+                        for child in node.children:
+                            child_type = find_type(child)
+                            if child_type:
+                                return child_type + "&"
+                    else:
+                        # Recursively search children
+                        for child in node.children:
+                            result = find_type(child)
+                            if result:
+                                return result
+                    return None
+                
+                return find_type(node)
+                
+            elif language == "java":
+                # Java field declarations have type information
+                for child in node.children:
+                    if child.type in ["type_identifier", "integral_type", "floating_point_type", "boolean_type"]:
+                        return child.text.decode("utf-8", errors="ignore")
+                    elif child.type == "generic_type":
+                        return child.text.decode("utf-8", errors="ignore")
+                        
+            elif language == "python":
+                # Python type annotations
+                for child in node.children:
+                    if child.type == "type":
+                        return child.text.decode("utf-8", errors="ignore")
+                        
+        except Exception:
+            pass
+        
+        return None
+
+    def _get_alias_name(self, node: Node, language: str) -> Optional[str]:
+        """Extract alias name from typedef/using declaration."""
+        try:
+            if language == "cpp":
+                if node.type == "alias_declaration":
+                    # using alias_name = type;
+                    for child in node.children:
+                        if child.type == "type_identifier":
+                            return child.text.decode("utf-8", errors="ignore")
+                elif node.type == "type_definition":
+                    # typedef type alias_name;
+                    identifiers = []
+                    for child in node.children:
+                        if child.type == "type_identifier":
+                            identifiers.append(child.text.decode("utf-8", errors="ignore"))
+                    # Last identifier is usually the alias name
+                    return identifiers[-1] if identifiers else None
+        except Exception:
+            pass
+        
+        return None
+
+    def _get_base_classes(self, class_node: Node, language: str) -> List[Dict[str, str]]:
+        """Extract base classes from inheritance list."""
+        base_classes = []
+        
+        try:
+            if language == "cpp":
+                # Look for base_class_clause
+                for child in class_node.children:
+                    if child.type == "base_class_clause":
+                        # Parse base classes
+                        for base_child in child.children:
+                            if base_child.type == "access_specifier":
+                                # Skip access specifiers in base class list
+                                continue
+                            elif base_child.type in ["type_identifier", "qualified_identifier"]:
+                                base_name = base_child.text.decode("utf-8", errors="ignore")
+                                # Determine access level (default is private for class, public for struct)
+                                access = "private"  # Default for class inheritance
+                                base_classes.append({"name": base_name, "access": access})
+                            elif base_child.type == "base_class_clause":
+                                # Handle nested base class structures
+                                for nested in base_child.children:
+                                    if nested.type in ["type_identifier", "qualified_identifier"]:
+                                        base_name = nested.text.decode("utf-8", errors="ignore")
+                                        base_classes.append({"name": base_name, "access": "public"})
+            
+            elif language == "java":
+                # Java extends and implements
+                for child in class_node.children:
+                    if child.type == "superclass":
+                        # extends SuperClass
+                        for nested in child.children:
+                            if nested.type == "type_identifier":
+                                base_name = nested.text.decode("utf-8", errors="ignore")
+                                base_classes.append({"name": base_name, "access": "extends"})
+                    elif child.type == "super_interfaces":
+                        # implements Interface1, Interface2
+                        for nested in child.children:
+                            if nested.type == "type_identifier":
+                                base_name = nested.text.decode("utf-8", errors="ignore")
+                                base_classes.append({"name": base_name, "access": "implements"})
+                                
+            elif language == "python":
+                # Python class inheritance
+                for child in class_node.children:
+                    if child.type == "argument_list":
+                        # class MyClass(BaseClass):
+                        for nested in child.children:
+                            if nested.type == "identifier":
+                                base_name = nested.text.decode("utf-8", errors="ignore")
+                                base_classes.append({"name": base_name, "access": "inherits"})
+        
+        except Exception:
+            pass
+            
+        return base_classes
+
+    def _is_method_declaration(self, node: Node, language: str) -> bool:
+        """Check if a field_declaration node is actually a method declaration."""
+        if language == "cpp" and node.type == "field_declaration":
+            # Look for function_declarator in the field_declaration
+            def has_function_declarator(n):
+                if n.type == "function_declarator":
+                    return True
+                for child in n.children:
+                    if has_function_declarator(child):
+                        return True
+                return False
+            
+            return has_function_declarator(node)
+        
+        return False
+
+    def _get_method_declaration_name(self, node: Node, language: str) -> Optional[str]:
+        """Extract method name from a field_declaration that's actually a method."""
+        if language == "cpp" and node.type == "field_declaration":
+            # Look for function_declarator and extract the identifier
+            def find_function_name(n):
+                if n.type == "function_declarator":
+                    # Look for identifier types in the function_declarator
+                    for child in n.children:
+                        if child.type in ["identifier", "field_identifier"]:
+                            return child.text.decode("utf-8", errors="ignore")
+                        elif child.type == "destructor_name":
+                            # Handle destructor
+                            return child.text.decode("utf-8", errors="ignore")
+                        elif child.type == "qualified_identifier":
+                            # Handle qualified names
+                            parts = child.text.decode("utf-8", errors="ignore").split("::")
+                            return parts[-1] if parts else None
+                for child in n.children:
+                    result = find_function_name(child)
+                    if result:
+                        return result
+                return None
+            
+            return find_function_name(node)
+        
+        return None
+
+    def _get_method_signature(self, node: Node, language: str) -> Optional[str]:
+        """Extract method signature from a field_declaration that's actually a method."""
+        if language == "cpp" and node.type == "field_declaration":
+            # Look for function_declarator and extract parameter_list
+            def find_parameter_list(n):
+                if n.type == "function_declarator":
+                    for child in n.children:
+                        if child.type == "parameter_list":
+                            return child.text.decode("utf-8", errors="ignore")
+                for child in n.children:
+                    result = find_parameter_list(child)
+                    if result:
+                        return result
+                return None
+            
+            return find_parameter_list(node)
+        
+        return None
 
     def _is_enum_node(self, node: Node, language: str) -> bool:
         """Check if a node represents an enum declaration."""
@@ -610,7 +926,7 @@ class MultiLanguageParser:
         return None
 
     def _is_function_node(self, node: Node, language: str) -> bool:
-        """Check if a node represents a function definition."""
+        """Check if a node represents a function definition or declaration."""
         func_types = {
             "python": {"function_definition"},
             "javascript": {
