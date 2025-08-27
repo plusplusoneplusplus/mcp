@@ -1,0 +1,48 @@
+<!-- Code Indexing Tab -->
+<div class="tab-content" id="code-indexing-tab" style="display:none;">
+    <div class="card">
+        <h2>Code Indexing</h2>
+        <p>Index your source code using different methods. Results will be saved to a <code>server/.code_indexing/[hash]</code> subfolder, where [hash] is based on your source path.</p>
+        <p><strong>Note:</strong> If the directory is under git version control, only git-tracked files will be indexed. Non-git directories will process all files.</p>
+
+        <div class="code-indexing-section">
+            <label for="source-path-input" style="font-weight:bold;">Source Directory Path:</label>
+            <input type="text" id="source-path-input" placeholder="/path/to/your/project" style="width:100%; padding:8px; margin:10px 0; border:1px solid #ddd; border-radius:4px;">
+        </div>
+
+        <div class="code-indexing-section">
+            <h3>Choose Indexing Method:</h3>
+
+            <div class="indexing-option" data-method="ctags">
+                <div class="option-title">🏷️ CTags + Outline Generation</div>
+                <div class="option-description">
+                    Generates comprehensive tags using Universal CTags and creates a structured outline.
+                    <br><strong>Features:</strong> Function definitions, classes, variables, file structure
+                    <br><strong>Languages:</strong> C++, Python, JavaScript, Java and more
+                </div>
+            </div>
+
+            <div class="indexing-option" data-method="tree-sitter">
+                <div class="option-title">🌳 Tree-Sitter Parsing</div>
+                <div class="option-description">
+                    Advanced syntax tree parsing for deep code analysis and relationships.
+                    <br><strong>Features:</strong> Function calls, class hierarchies, detailed AST analysis
+                    <br><strong>Languages:</strong> C++, Python, JavaScript, Java
+                </div>
+            </div>
+        </div>
+
+        <div class="code-indexing-section" id="ctags-options" style="display:none;">
+            <h4>CTags Options</h4>
+            <label for="languages-input">Languages (comma-separated):</label>
+            <input type="text" id="languages-input" value="C++,Python,JavaScript,Java" style="width:100%; padding:8px; margin:5px 0; border:1px solid #ddd; border-radius:4px;">
+        </div>
+
+        <button id="start-indexing-btn" style="background:#28a745;color:white;border:none;padding:12px 24px;border-radius:4px;cursor:pointer;font-size:1em;margin:15px 0;" disabled>
+            Start Indexing
+        </button>
+
+        <div id="indexing-status" style="margin:15px 0;"></div>
+        <div id="indexing-results" style="margin:15px 0;"></div>
+    </div>
+</div>

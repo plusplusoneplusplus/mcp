@@ -1,0 +1,52 @@
+<!-- Code Viewer Tab -->
+<div class="tab-content" id="code-viewer-tab" style="display:none;">
+    <div class="card">
+        <h2>Code Viewer</h2>
+        <p>Browse indexed code repositories and search for class definitions with UML-like visualization.</p>
+
+        <!-- Path Selection Section -->
+        <div class="path-selector">
+            <h3>📁 Select Indexed Path</h3>
+            <p>Choose from the indexed code repositories below:</p>
+
+            <div id="cv-paths-loading" class="loading">
+                ⏳ Loading indexed paths...
+            </div>
+
+            <div id="cv-paths-error" class="error" style="display: none;">
+                ❌ Error loading paths
+            </div>
+
+            <div id="cv-paths-container" style="display: none;">
+                <div class="indexed-paths-list" id="cv-indexed-paths">
+                    <!-- Paths will be populated here -->
+                </div>
+
+                <div id="cv-selected-path-info" style="display: none;">
+                    <h4>Selected Path Information:</h4>
+                    <div id="cv-path-details"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Search Section -->
+        <div class="search-section" id="cv-search-section" style="display: none;">
+            <h3>🔍 Search Class Definitions</h3>
+            <p>Search for classes in the selected codebase:</p>
+
+            <input type="text"
+                   id="cv-class-search-input"
+                   class="search-input"
+                   placeholder="Search classes by name or file path (e.g., 'RedisModule', 'Table', '.py', 'utils/')"
+                   autocomplete="off">
+
+            <div id="cv-search-stats" class="search-stats" style="display: none;"></div>
+
+            <div id="cv-search-results" class="class-results">
+                <div class="no-results" id="cv-no-search-message">
+                    Enter a class name above to search for definitions
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

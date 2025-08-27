@@ -1,0 +1,29 @@
+<!-- Import Tab -->
+<div class="tab-content" id="import-tab">
+    <div class="card">
+        <h2>Import Knowledge Directory</h2>
+        <form id="import-form" enctype="multipart/form-data">
+            <label for="import-files" style="font-weight:bold;">Select Folder:</label>
+            <div style="margin-bottom:0.5em;">
+                <span style="font-size:0.97em;">Include file extensions:</span>
+                <label style="margin-left:1em;"><input type="checkbox" class="ext-filter" value=".md" checked>
+                    .md</label>
+                <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".txt"> .txt</label>
+                <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".rst"> .rst</label>
+                <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".docx"> .docx</label>
+                <label style="margin-left:0.5em;"><input type="checkbox" class="ext-filter" value=".pdf"> .pdf</label>
+            </div>
+            <input type="file" id="import-files" name="files" webkitdirectory directory accept=".md" style="margin-bottom:1em;" />
+            <div id="selection-help" style="font-size:0.9em; color:#666; margin-bottom:0.5em;">Click "Choose Files" to select a folder. All files with selected extensions in the folder and subfolders will be imported.</div>
+            <div id="selected-folder-path" style="font-size:0.95em; color:#666; margin:0.5em 0 0.2em 0;"></div>
+            <div id="selected-files-list" style="margin:0.2em 0 0.5em 0;"></div>
+            <label>Collection name (optional): <input type="text" name="collection" /></label>
+            <div style="margin:0.5em 0;">
+                <label><input type="checkbox" id="import-overwrite" name="overwrite" value="true"> Overwrite collection
+                    (delete all existing documents first)</label>
+            </div>
+            <button type="submit" style="margin-left:1em;">Import</button>
+        </form>
+        <div id="import-status" style="margin-top:1em;"></div>
+    </div>
+</div>

@@ -1,0 +1,30 @@
+<!-- Sync Tab -->
+<div class="tab-content" id="sync-tab" style="display:none;">
+    <div class="card">
+        <h2>Configuration Status</h2>
+        <div id="sync-status-info" class="sync-status sync-info">Loading configuration...</div>
+        <button id="refresh-sync-status-btn" style="background:#007bff;color:white;border:none;padding:0.5em 1em;border-radius:4px;cursor:pointer;margin:0.5em 0;">Refresh Status</button>
+    </div>
+
+    <div class="card" id="sync-controls" style="display:none;">
+        <h2>Sync Controls</h2>
+
+        <div style="margin:1em 0;">
+            <button id="sync-btn" style="background:#007bff;color:white;border:none;padding:0.7em 1.2em;border-radius:4px;cursor:pointer;margin:0.3em;">
+                <span class="sync-loading" id="sync-loading" style="display:none;">⏳</span>
+                Sync Folders
+            </button>
+            <button id="resync-btn" style="background:#dc3545;color:white;border:none;padding:0.7em 1.2em;border-radius:4px;cursor:pointer;margin:0.3em;">
+                <span class="sync-loading" id="resync-loading" style="display:none;">⏳</span>
+                Re-sync (Clear & Rebuild)
+            </button>
+        </div>
+
+        <div id="sync-results"></div>
+    </div>
+
+    <div class="card" id="folder-list" style="display:none;">
+        <h2>Configured Folders</h2>
+        <ul id="sync-folders" style="list-style-type:none;padding:0;"></ul>
+    </div>
+</div>
