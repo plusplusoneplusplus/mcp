@@ -277,29 +277,38 @@ async def api_code_viewer_classes(request: Request):
                     with open(tree_sitter_file, 'r') as f:
                         tree_sitter_data = json.load(f)
 
-                    # Extract class names from tree-sitter analysis
+                    # Extract classes from tree-sitter analysis
                     for file_analysis in tree_sitter_data:
                         file_path = file_analysis.get("file_path", "Unknown")
+
+                        # Make file path relative to original source if possible
+                        relative_path = file_path
+                        if original_source_path and file_path.startswith(original_source_path):
+                            relative_path = file_path[len(original_source_path):].lstrip('/')
 
                         if "classes" in file_analysis:
                             for class_info in file_analysis["classes"]:
                                 class_name = ""
                                 line_number = 0
+                                members = []
 
                                 if isinstance(class_info, dict):
                                     class_name = class_info.get("name", "")
-                                    line_number = class_info.get("line", 0)
+                                    line_number = class_info.get("start_line", class_info.get("line", 0))
+                                    # Extract members if available
+                                    if "members" in class_info and isinstance(class_info["members"], list):
+                                        members = class_info["members"]
                                 elif isinstance(class_info, str):
                                     class_name = class_info
 
                                 if class_name:
                                     class_info_list.append({
                                         "name": class_name,
-                                        "file_path": file_path,
+                                        "file_path": relative_path,
                                         "full_path": file_path,
                                         "line": line_number,
                                         "source": "tree-sitter",
-                                        "members": []
+                                        "members": members
                                     })
                 except Exception as e:
                     print(f"Error reading tree_sitter_analysis.json: {e}")
