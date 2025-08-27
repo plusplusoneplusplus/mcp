@@ -558,6 +558,10 @@
         }
     }
 
+    // Global variables for status tracking
+    let statusInterval = null;
+    let currentStatusToken = null;
+
     // Handle indexing start
     document.getElementById('start-indexing-btn').addEventListener('click', async function() {
         const sourcePath = document.getElementById('source-path-input').value.trim();
@@ -569,13 +573,85 @@
             return;
         }
 
+        // Check execution mode
+        const executionMode = document.querySelector('input[name="execution-mode"]:checked').value;
+
         // Disable button during processing
         const startBtn = this;
         startBtn.disabled = true;
-        startBtn.innerHTML = '⏳ Indexing...';
 
         statusDiv.innerHTML = '<span style="color:blue;">Starting code indexing...</span>';
         resultsDiv.innerHTML = '';
+
+        if (executionMode === 'async') {
+            await handleAsyncIndexing(sourcePath, startBtn, statusDiv, resultsDiv);
+        } else {
+            await handleSyncIndexing(sourcePath, startBtn, statusDiv, resultsDiv);
+        }
+    });
+
+    async function handleAsyncIndexing(sourcePath, startBtn, statusDiv, resultsDiv) {
+        startBtn.innerHTML = '⏳ Starting...';
+
+        try {
+            // Use async endpoint
+            const requestData = {
+                source_path: sourcePath,
+                method: selectedIndexingMethod
+            };
+
+            if (selectedIndexingMethod === 'ctags') {
+                const languages = document.getElementById('languages-input').value.trim();
+                requestData.languages = languages;
+            }
+
+            const response = await fetch('/api/code-indexing/async', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                currentStatusToken = result.status_token;
+                statusDiv.innerHTML = '<span style="color:blue;">📊 Code indexing started successfully!</span>';
+
+                // Add status display
+                resultsDiv.innerHTML = `
+                    <div id="status-container" style="margin: 20px 0;">
+                        <h4>Indexing Status</h4>
+                        <div id="status-message" style="padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; font-family: monospace;">Initializing...</div>
+                        <div id="status-details" style="margin-top: 10px; color: #666; font-size: 0.9em;"></div>
+                        <button id="cancel-indexing-btn" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-top: 10px;">Cancel</button>
+                    </div>
+                `;
+
+                // Set up cancel button
+                document.getElementById('cancel-indexing-btn').addEventListener('click', () => {
+                    cancelIndexing();
+                });
+
+                // Start status polling
+                startStatusPolling();
+
+            } else {
+                statusDiv.innerHTML = `<span style="color:red;">❌ Error: ${result.error}</span>`;
+                startBtn.disabled = false;
+                startBtn.innerHTML = 'Start Indexing';
+            }
+
+        } catch (error) {
+            statusDiv.innerHTML = `<span style="color:red;">❌ Unexpected error: ${error.message}</span>`;
+            startBtn.disabled = false;
+            startBtn.innerHTML = 'Start Indexing';
+        }
+    }
+
+    async function handleSyncIndexing(sourcePath, startBtn, statusDiv, resultsDiv) {
+        startBtn.innerHTML = '⏳ Indexing...';
 
         try {
             let endpoint, requestData;
@@ -618,7 +694,140 @@
             startBtn.disabled = false;
             startBtn.innerHTML = 'Start Indexing';
         }
-    });
+    }
+
+    function startStatusPolling() {
+        if (statusInterval) {
+            clearInterval(statusInterval);
+        }
+
+        statusInterval = setInterval(async () => {
+            if (!currentStatusToken) return;
+
+            try {
+                const response = await fetch(`/api/code-indexing/status/${currentStatusToken}`);
+                const status = await response.json();
+
+                if (status.error) {
+                    console.error('Status fetch error:', status.error);
+                    return;
+                }
+
+                updateStatusDisplay(status);
+
+                // Stop polling if completed or failed
+                if (status.status === 'completed') {
+                    stopStatusPolling();
+                    handleIndexingComplete(status);
+                } else if (status.status === 'failed') {
+                    stopStatusPolling();
+                    handleIndexingFailed(status);
+                }
+
+            } catch (error) {
+                console.error('Status polling error:', error);
+            }
+        }, 1000); // Poll every second
+    }
+
+    function stopStatusPolling() {
+        if (statusInterval) {
+            clearInterval(statusInterval);
+            statusInterval = null;
+        }
+    }
+
+    function updateStatusDisplay(status) {
+        const statusMessage = document.getElementById('status-message');
+        const statusDetails = document.getElementById('status-details');
+
+        if (statusMessage) {
+            statusMessage.textContent = status.message;
+
+            // Update background color based on status
+            if (status.status === 'running') {
+                statusMessage.style.background = '#e3f2fd';
+                statusMessage.style.borderLeftColor = '#2196f3';
+            } else if (status.status === 'completed') {
+                statusMessage.style.background = '#e8f5e8';
+                statusMessage.style.borderLeftColor = '#4caf50';
+            } else if (status.status === 'failed') {
+                statusMessage.style.background = '#ffebee';
+                statusMessage.style.borderLeftColor = '#f44336';
+            }
+        }
+
+        if (statusDetails) {
+            const runtime = Math.round(status.runtime);
+            statusDetails.textContent = `Runtime: ${runtime}s`;
+        }
+    }
+
+    async function handleIndexingComplete(status) {
+        const statusDiv = document.getElementById('indexing-status');
+        const resultsDiv = document.getElementById('indexing-results');
+        const startBtn = document.getElementById('start-indexing-btn');
+
+        statusDiv.innerHTML = '<span style="color:green;">✅ Code indexing completed successfully!</span>';
+
+        resultsDiv.innerHTML = `
+            <div style="margin: 20px 0;">
+                <h4>✅ Indexing Completed Successfully!</h4>
+                <div style="background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 15px; margin: 10px 0;">
+                    <strong>Final Status:</strong> ${status.message}<br>
+                    <strong>Total Runtime:</strong> ${Math.round(status.runtime)}s<br>
+                    <strong>Method:</strong> ${selectedIndexingMethod}<br>
+                </div>
+                <p><em>Results have been saved to the server's code indexing directory. You can now use the Code Viewer tab to explore the indexed code.</em></p>
+            </div>
+        `;
+
+        // Re-enable the start button
+        startBtn.disabled = false;
+        startBtn.innerHTML = 'Start Indexing';
+        currentStatusToken = null;
+    }
+
+    function handleIndexingFailed(status) {
+        const statusDiv = document.getElementById('indexing-status');
+        const resultsDiv = document.getElementById('indexing-results');
+        const startBtn = document.getElementById('start-indexing-btn');
+
+        statusDiv.innerHTML = `<span style="color:red;">❌ Indexing failed: ${status.message}</span>`;
+
+        resultsDiv.innerHTML = `
+            <div style="margin: 20px 0;">
+                <h4>❌ Indexing Failed</h4>
+                <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 15px; margin: 10px 0;">
+                    <strong>Error:</strong> ${status.message}<br>
+                    <strong>Runtime:</strong> ${Math.round(status.runtime)}s<br>
+                </div>
+            </div>
+        `;
+
+        // Re-enable the start button
+        startBtn.disabled = false;
+        startBtn.innerHTML = 'Start Indexing';
+        currentStatusToken = null;
+    }
+
+    function cancelIndexing() {
+        if (currentStatusToken) {
+            stopStatusPolling();
+
+            const statusDiv = document.getElementById('indexing-status');
+            const resultsDiv = document.getElementById('indexing-results');
+            const startBtn = document.getElementById('start-indexing-btn');
+
+            statusDiv.innerHTML = '<span style="color:orange;">⚠️ Indexing cancelled by user</span>';
+            resultsDiv.innerHTML = '<div style="margin: 20px 0;"><p>Indexing operation was cancelled.</p></div>';
+
+            // Re-enable the start button
+            startBtn.disabled = false;
+            startBtn.innerHTML = 'Start Indexing';
+            currentStatusToken = null;
+        }
+    }
 
     function displayIndexingResults(result) {
         const resultsDiv = document.getElementById('indexing-results');

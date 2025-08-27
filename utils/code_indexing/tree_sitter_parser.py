@@ -256,14 +256,14 @@ class MultiLanguageParser:
             if self._is_class_node(node, language):
                 name = self._get_class_name(node, language)
                 if name:
-                    classes.append(
-                        {
-                            "name": name,
-                            "kind": "class",
-                            "start_line": node.start_point[0] + 1,
-                            "end_line": node.end_point[0] + 1,
-                        }
-                    )
+                    class_info = {
+                        "name": name,
+                        "kind": "class",
+                        "start_line": node.start_point[0] + 1,
+                        "end_line": node.end_point[0] + 1,
+                        "members": self._extract_class_members(node, src, language)
+                    }
+                    classes.append(class_info)
 
             # Traverse children
             for child in node.children:
@@ -377,6 +377,235 @@ class MultiLanguageParser:
             for child in node.children:
                 if child.type == "type_identifier":
                     return child.text.decode("utf-8", errors="ignore")
+
+        return None
+
+    def _extract_class_members(self, class_node: Node, src: bytes, language: str) -> List[Dict[str, Any]]:
+        """Extract class members (methods, properties) from a class definition node."""
+        members = []
+
+        def traverse_class_body(node):
+            # Look for methods/functions inside class
+            if self._is_function_node(node, language):
+                name = self._get_function_name(node, language)
+                if name:
+                    # Determine member type
+                    member_kind = "method"
+                    if language == "python" and name == "__init__":
+                        member_kind = "constructor"
+                    elif language == "java" and node.type == "constructor_declaration":
+                        member_kind = "constructor"
+                    elif language == "cpp" and name == class_node.text.decode("utf-8", errors="ignore").split()[-1]:
+                        member_kind = "constructor"
+
+                    # Get signature if available
+                    signature = self._get_function_signature(node, src, language)
+
+                    members.append({
+                        "name": name,
+                        "kind": member_kind,
+                        "signature": signature or "",
+                        "access": "public",  # Default to public, could be enhanced
+                        "line": node.start_point[0] + 1
+                    })
+
+            # Look for field/property declarations
+            elif self._is_field_node(node, language):
+                field_names = self._get_field_names(node, language)
+                for field_name in field_names:
+                    members.append({
+                        "name": field_name,
+                        "kind": "field",
+                        "signature": "",
+                        "access": "public",
+                        "line": node.start_point[0] + 1
+                    })
+
+            # Look for enum declarations (especially important for C++)
+            elif self._is_enum_node(node, language):
+                enum_info = self._get_enum_info(node, language)
+                if enum_info:
+                    members.append({
+                        "name": enum_info["name"],
+                        "kind": "enum",
+                        "signature": f"{{ {', '.join(enum_info['values'])} }}" if enum_info["values"] else "",
+                        "access": "public",
+                        "line": node.start_point[0] + 1
+                    })
+
+            # Traverse children
+            for child in node.children:
+                traverse_class_body(child)
+
+        traverse_class_body(class_node)
+
+        # Sort members: constructors first, then methods, then enums, then fields
+        def sort_key(member):
+            order = {"constructor": 0, "method": 1, "enum": 2, "field": 3}
+            return (order.get(member["kind"], 4), member["name"])
+
+        members.sort(key=sort_key)
+        return members
+
+    def _get_function_signature(self, node: Node, src: bytes, language: str) -> Optional[str]:
+        """Extract function signature from a function node."""
+        try:
+            if language == "python":
+                # For Python: extract parameters from function definition
+                for child in node.children:
+                    if child.type == "parameters":
+                        return child.text.decode("utf-8", errors="ignore")
+
+            elif language == "javascript":
+                # For JavaScript: extract parameters
+                for child in node.children:
+                    if child.type in ["formal_parameters", "parameter_list"]:
+                        return child.text.decode("utf-8", errors="ignore")
+
+            elif language == "java":
+                # For Java: extract formal parameters
+                for child in node.children:
+                    if child.type == "formal_parameters":
+                        return child.text.decode("utf-8", errors="ignore")
+
+            elif language == "cpp":
+                # For C++: extract parameter list from function declarator
+                for child in node.children:
+                    if child.type == "function_declarator":
+                        for subchild in child.children:
+                            if subchild.type == "parameter_list":
+                                return subchild.text.decode("utf-8", errors="ignore")
+                            elif subchild.type == "function_declarator":
+                                # Nested declarators
+                                for nested in subchild.children:
+                                    if nested.type == "parameter_list":
+                                        return nested.text.decode("utf-8", errors="ignore")
+        except Exception:
+            pass
+
+        return None
+
+    def _is_field_node(self, node: Node, language: str) -> bool:
+        """Check if a node represents a field/property declaration."""
+        field_types = {
+            "python": {"assignment", "annotated_assignment"},
+            "javascript": {"field_definition", "public_field_definition", "property_declaration"},
+            "java": {"field_declaration", "variable_declarator"},
+            "cpp": {"declaration", "field_declaration", "member_declaration"}
+        }
+        return node.type in field_types.get(language, set())
+
+    def _get_field_names(self, node: Node, language: str) -> List[str]:
+        """Extract field names from a field declaration node."""
+        field_names = []
+
+        try:
+            if language == "python":
+                # Python assignments: x = value or x: type = value
+                for child in node.children:
+                    if child.type == "identifier":
+                        field_names.append(child.text.decode("utf-8", errors="ignore"))
+
+            elif language == "javascript":
+                # JavaScript field definitions
+                for child in node.children:
+                    if child.type == "property_identifier":
+                        field_names.append(child.text.decode("utf-8", errors="ignore"))
+
+            elif language == "java":
+                # Java field declarations
+                def extract_identifiers(node):
+                    if node.type == "identifier":
+                        field_names.append(node.text.decode("utf-8", errors="ignore"))
+                    for child in node.children:
+                        extract_identifiers(child)
+                extract_identifiers(node)
+
+            elif language == "cpp":
+                # C++ field declarations - handle various patterns
+                if node.type == "declaration":
+                    # Standard field declarations: int x; float y;
+                    def extract_identifiers(node):
+                        if node.type == "identifier":
+                            field_names.append(node.text.decode("utf-8", errors="ignore"))
+                        elif node.type == "init_declarator":
+                            # Handle initialized fields: int x = 5;
+                            for child in node.children:
+                                if child.type == "identifier":
+                                    field_names.append(child.text.decode("utf-8", errors="ignore"))
+                        else:
+                            for child in node.children:
+                                extract_identifiers(child)
+                    extract_identifiers(node)
+                elif node.type == "field_declaration":
+                    # Direct field declarations within struct/class
+                    for child in node.children:
+                        if child.type == "field_identifier":
+                            field_names.append(child.text.decode("utf-8", errors="ignore"))
+                        elif child.type == "identifier":
+                            field_names.append(child.text.decode("utf-8", errors="ignore"))
+
+        except Exception:
+            pass
+
+        return field_names
+
+    def _is_enum_node(self, node: Node, language: str) -> bool:
+        """Check if a node represents an enum declaration."""
+        enum_types = {
+            "cpp": {"enum_specifier"},
+            "java": {"enum_declaration"},
+            "javascript": set(),  # JavaScript doesn't have native enums
+            "python": set()  # Python uses classes for enums
+        }
+        return node.type in enum_types.get(language, set())
+
+    def _get_enum_info(self, node: Node, language: str) -> Optional[Dict[str, Any]]:
+        """Extract enum name and values from an enum declaration."""
+        try:
+            enum_name = ""
+            enum_values = []
+
+            if language == "cpp":
+                # For C++: enum [name] { value1, value2, ... }
+                for child in node.children:
+                    if child.type == "type_identifier":
+                        enum_name = child.text.decode("utf-8", errors="ignore")
+                    elif child.type == "enumerator_list":
+                        # Extract enum values
+                        for enum_child in child.children:
+                            if enum_child.type == "enumerator":
+                                for identifier_child in enum_child.children:
+                                    if identifier_child.type == "identifier":
+                                        value_name = identifier_child.text.decode("utf-8", errors="ignore")
+                                        enum_values.append(value_name)
+
+                # Handle anonymous enums (common in C++)
+                if not enum_name:
+                    enum_name = "enum"
+
+            elif language == "java":
+                # For Java: enum Name { VALUE1, VALUE2, ... }
+                for child in node.children:
+                    if child.type == "identifier":
+                        enum_name = child.text.decode("utf-8", errors="ignore")
+                    elif child.type == "enum_body":
+                        # Extract enum constants
+                        for enum_child in child.children:
+                            if enum_child.type == "enum_constant":
+                                for identifier_child in enum_child.children:
+                                    if identifier_child.type == "identifier":
+                                        value_name = identifier_child.text.decode("utf-8", errors="ignore")
+                                        enum_values.append(value_name)
+
+            if enum_name or enum_values:
+                return {
+                    "name": enum_name or "enum",
+                    "values": enum_values
+                }
+
+        except Exception:
+            pass
 
         return None
 
@@ -585,7 +814,9 @@ class MultiLanguageParser:
             root = tree.root_node
 
             # Extract functions and classes
-            functions, classes = self.parse_definitions(src, language)
+            definitions = self.parse_definitions(src, language)
+            functions = definitions["functions"]
+            classes = definitions["classes"]
 
             # Extract function calls
             calls = self.parse_calls(src, language)
