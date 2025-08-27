@@ -17,7 +17,7 @@ plugins/
 ## How to Create a Plugin
 
 1. Create a new directory for your plugin in the `plugins` directory
-2. Implement a class that inherits from `mcp_tools.interfaces.ToolInterface` 
+2. Implement a class that inherits from `mcp_tools.interfaces.ToolInterface`
 3. Register your tool using the `@register_tool` decorator
 4. Make your plugin discoverable by adding it to Python's path
 
@@ -30,6 +30,7 @@ plugins/
 - **git_tool**: Execute Git operations such as status, diff, and branch management
 - **knowledge_indexer**: Index files into a vector store for semantic search
 - **kusto**: Run queries against Azure Data Explorer (Kusto)
+- **mcp_admin**: Administrative tools for managing MCP server and plugins
 
 ## Installation
 
@@ -46,4 +47,4 @@ The MCP tools plugin framework automatically discovers and registers tools that 
 2. Making your plugin discoverable through the Python package system
 3. Calling `discover_and_register_tools()` to register all available tools
 
-For more details, see the README.md in each plugin directory. 
+For more details, see the README.md in each plugin directory.

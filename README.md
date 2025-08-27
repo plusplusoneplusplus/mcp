@@ -31,7 +31,7 @@ pip install -e .
 Configuration is controlled by `.env` files. Create one from the template and edit it with your settings:
 
 ```bash
-cp config/templates/env.template .env
+cp config/env.template .env
 ```
 
 Important variables include repository paths (`GIT_ROOT`), Azure Repo details (`AZREPO_ORG`, `AZREPO_PROJECT`, `AZREPO_REPO`), and optional `PRIVATE_TOOL_ROOT` for external tool configuration. The environment manager automatically loads `.env` files from the repository root, current directory, and your home directory.
@@ -129,7 +129,7 @@ Execute all test suites with:
 scripts/run_tests.sh
 ```
 
-Or run `pytest` directly on `mcp_core/tests`, `mcp_tools/tests`, or `server/tests`.
+Or run `pytest` directly on `mcp_tools/tests`, `plugins/*/tests`, or `server/tests`.
 
 ## Key Features (v0.2.0)
 
