@@ -700,8 +700,6 @@
     // --- Code Viewer Tab Functions ---
     let cvIndexedPaths = [];
     let cvSelectedPath = null;
-    let cvAllClasses = [];
-    let cvOriginalPath = null;
 
     async function loadCodeViewerPaths() {
         const loadingDiv = document.getElementById('cv-paths-loading');
@@ -774,11 +772,13 @@
         // Show path details
         displayCodeViewerPathDetails(cvSelectedPath);
 
-        // Load class data for the selected path
-        await loadCodeViewerClassData(hash);
-
         // Show search section
         document.getElementById('cv-search-section').style.display = 'block';
+
+        // Update search stats to show that we're ready to search
+        const statsDiv = document.getElementById('cv-search-stats');
+        statsDiv.innerHTML = `📊 Ready to search classes in this codebase`;
+        statsDiv.style.display = 'block';
     }
 
     function displayCodeViewerPathDetails(path) {
@@ -789,54 +789,25 @@
             <div class="path-meta">
                 <strong>Original Path:</strong> <code>${path.original_path}</code><br>
                 <strong>Hash:</strong> <code>${path.hash}</code><br>
-                <strong>Created:</strong> ${new Date(path.created).toLocaleString()}<br>
-                <strong>Classes Available:</strong> ${path.class_count || 'Loading...'}
+                <strong>Created:</strong> ${new Date(path.created).toLocaleString()}
             </div>
         `;
 
         infoDiv.style.display = 'block';
     }
 
-    async function loadCodeViewerClassData(hash) {
-        try {
-            const response = await fetch(`/api/code-viewer/classes/${hash}`);
-            const data = await response.json();
-
-            if (data.success) {
-                cvAllClasses = data.classes;
-                cvOriginalPath = data.original_path;
-
-                // Update path details with class count
-                const path = cvIndexedPaths.find(p => p.hash === hash);
-                if (path) {
-                    path.class_count = cvAllClasses.length;
-                    displayCodeViewerPathDetails(path);
-                }
-
-                // Update search stats
-                const statsDiv = document.getElementById('cv-search-stats');
-                statsDiv.innerHTML = `📊 ${cvAllClasses.length} classes available for search`;
-                statsDiv.style.display = 'block';
-
-                // Clear previous search
-                clearCodeViewerSearchResults();
-            } else {
-                throw new Error(data.error || 'Failed to load class data');
-            }
-        } catch (error) {
-            console.error('Error loading class data:', error);
-            document.getElementById('cv-search-results').innerHTML = `
-                <div class="error">Error loading class data: ${error.message}</div>
-            `;
-        }
-    }
-
-    // Search functionality
+    // Search functionality with debouncing
+    let searchTimeout;
     document.getElementById('cv-class-search-input').addEventListener('input', function(e) {
-        const query = e.target.value.trim().toLowerCase();
+        const query = e.target.value.trim();
 
         if (!cvSelectedPath) {
             return;
+        }
+
+        // Clear previous timeout
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
         }
 
         if (query === '') {
@@ -844,31 +815,53 @@
             return;
         }
 
-        searchCodeViewerClasses(query);
+        // Debounce search requests (wait 300ms after user stops typing)
+        searchTimeout = setTimeout(() => {
+            searchCodeViewerClasses(query);
+        }, 300);
     });
 
-    function searchCodeViewerClasses(query) {
-        if (!cvAllClasses || cvAllClasses.length === 0) {
+    async function searchCodeViewerClasses(query) {
+        if (!cvSelectedPath) {
             document.getElementById('cv-search-results').innerHTML = `
-                <div class="no-results">No class data available</div>
+                <div class="no-results">No path selected</div>
             `;
             return;
         }
 
-        // Filter classes based on query (search both name and file path)
-        const matchedClasses = cvAllClasses.filter(classInfo =>
-            classInfo.name.toLowerCase().includes(query) ||
-            classInfo.file_path.toLowerCase().includes(query)
-        ).slice(0, 20); // Limit to top 20 results
-
-        if (matchedClasses.length === 0) {
+        try {
+            // Show loading state
             document.getElementById('cv-search-results').innerHTML = `
-                <div class="no-results">No classes found matching "${query}"</div>
+                <div class="loading">🔍 Searching for "${query}"...</div>
             `;
-            return;
-        }
 
-        displayCodeViewerSearchResults(matchedClasses, query);
+            // Call server-side search API
+            const response = await fetch(`/api/code-viewer/classes/${cvSelectedPath.hash}?search=${encodeURIComponent(query)}`);
+            const data = await response.json();
+
+            if (data.success) {
+                if (data.classes.length === 0) {
+                    document.getElementById('cv-search-results').innerHTML = `
+                        <div class="no-results">No classes found matching "${query}"</div>
+                    `;
+                    return;
+                }
+
+                // Update search stats
+                const statsDiv = document.getElementById('cv-search-stats');
+                statsDiv.innerHTML = `🔍 Found ${data.classes.length} results for "${query}" (sorted by relevance)`;
+                statsDiv.style.display = 'block';
+
+                displayCodeViewerSearchResults(data.classes, query);
+            } else {
+                throw new Error(data.error || 'Failed to search classes');
+            }
+        } catch (error) {
+            console.error('Error searching classes:', error);
+            document.getElementById('cv-search-results').innerHTML = `
+                <div class="error">Error searching: ${error.message}</div>
+            `;
+        }
     }
 
     function displayCodeViewerSearchResults(classes, query) {
@@ -896,7 +889,7 @@
                     <div class="class-info">
                         <strong>📁 File:</strong> ${filePathDisplay} ${lineInfo ? `<span class="line-number">${lineInfo}</span>` : ''}<br>
                         <strong>🔧 Source:</strong> <span class="source-badge">${classInfo.source || 'Unknown'}</span><br>
-                        <strong>📦 Project:</strong> <code>${cvOriginalPath || cvSelectedPath.original_path}</code>
+                        <strong>📦 Project:</strong> <code>${cvSelectedPath.original_path}</code>
                     </div>
                     <div class="uml-diagram">
 ${umlDiagram}

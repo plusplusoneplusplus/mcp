@@ -705,6 +705,53 @@ async def api_code_viewer_paths(request: Request):
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
 
+def calculate_class_relevance_score(class_info, query):
+    """Calculate relevance score for a class based on search query."""
+    if not query:
+        return 0
+
+    class_name = class_info.get("name", "").lower()
+    file_path = class_info.get("file_path", "").lower()
+    query_lower = query.lower()
+
+    score = 0
+    match_type = ''
+
+    # Exact name match gets highest priority
+    if class_name == query_lower:
+        score = 1000
+        match_type = 'exact-name'
+    # Name starts with query
+    elif class_name.startswith(query_lower):
+        score = 800
+        match_type = 'name-prefix'
+    # Name contains query
+    elif query_lower in class_name:
+        score = 600
+        match_type = 'name-contains'
+    # File path contains query
+    elif query_lower in file_path:
+        score = 400
+        match_type = 'path-contains'
+    else:
+        return 0  # No match
+
+    # Boost score for shorter class names (more specific matches)
+    if 'name' in match_type:
+        score += max(0, 100 - len(class_name))
+
+    # Boost score based on member count (more complete class definitions)
+    members = class_info.get("members", [])
+    if members:
+        score += min(50, len(members) * 2)
+
+    # Boost score for ctags source (usually more complete info)
+    if class_info.get("source") == "ctags":
+        score += 20
+
+    return score
+
+
 async def api_code_viewer_classes(request: Request):
     """Get class definitions with file path information for a specific indexed path."""
     try:
@@ -716,6 +763,9 @@ async def api_code_viewer_classes(request: Request):
             )
 
         path_hash = path_parts[-1]  # Last part of the URL path
+
+        # Get optional search query parameter
+        search_query = request.query_params.get("search", "").strip()
 
         server_dir = Path(__file__).resolve().parent.parent  # server/api -> server
         base_indexing_dir = server_dir / ".code_indexing"
@@ -887,7 +937,7 @@ async def api_code_viewer_classes(request: Request):
                 except Exception as e:
                     print(f"Error reading tree_sitter_analysis.json: {e}")
 
-        # Remove duplicates based on name and file_path, then sort
+        # Remove duplicates based on name and file_path
         seen = set()
         unique_classes = []
         for class_info in class_info_list:
@@ -896,14 +946,32 @@ async def api_code_viewer_classes(request: Request):
                 seen.add(key)
                 unique_classes.append(class_info)
 
-        # Sort by class name
-        unique_classes.sort(key=lambda x: x["name"].lower())
+        # Apply search filtering and relevance scoring if search query provided
+        if search_query:
+            # Filter and score classes based on search query
+            scored_classes = []
+            for class_info in unique_classes:
+                score = calculate_class_relevance_score(class_info, search_query)
+                if score > 0:  # Only include matches
+                    class_info["_relevance_score"] = score
+                    scored_classes.append(class_info)
+
+            # Sort by relevance score (highest first), then by name
+            scored_classes.sort(key=lambda x: (-x["_relevance_score"], x["name"].lower()))
+
+            # Limit to top 20 results for search
+            final_classes = scored_classes[:20]
+        else:
+            # No search query - return all classes sorted by name
+            unique_classes.sort(key=lambda x: x["name"].lower())
+            final_classes = unique_classes
 
         return JSONResponse({
             "success": True,
-            "classes": unique_classes,
-            "total_count": len(unique_classes),
-            "original_path": original_source_path
+            "classes": final_classes,
+            "total_count": len(final_classes),
+            "original_path": original_source_path,
+            "search_query": search_query if search_query else None
         })
 
     except Exception as e:
