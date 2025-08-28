@@ -20,9 +20,9 @@ class KVStore:
                 expiry = time.time() + ttl_seconds
 
             self._store[key] = {
-                'value': value,
-                'expiry': expiry,
-                'created_at': time.time()
+                "value": value,
+                "expiry": expiry,
+                "created_at": time.time(),
             }
 
     def get(self, key: str) -> Optional[Any]:
@@ -34,11 +34,11 @@ class KVStore:
             entry = self._store[key]
 
             # Check if expired
-            if entry['expiry'] is not None and time.time() > entry['expiry']:
+            if entry["expiry"] is not None and time.time() > entry["expiry"]:
                 del self._store[key]
                 return None
 
-            return entry['value']
+            return entry["value"]
 
     def delete(self, key: str) -> bool:
         """Delete a key, returns True if key existed."""
@@ -57,7 +57,7 @@ class KVStore:
             entry = self._store[key]
 
             # Check if expired
-            if entry['expiry'] is not None and time.time() > entry['expiry']:
+            if entry["expiry"] is not None and time.time() > entry["expiry"]:
                 del self._store[key]
                 return False
 
@@ -71,7 +71,7 @@ class KVStore:
             expired_keys = []
 
             for key, entry in self._store.items():
-                if entry['expiry'] is not None and current_time > entry['expiry']:
+                if entry["expiry"] is not None and current_time > entry["expiry"]:
                     expired_keys.append(key)
                 else:
                     valid_keys.append(key)
@@ -90,7 +90,7 @@ class KVStore:
             expired_keys = []
 
             for key, entry in self._store.items():
-                if entry['expiry'] is not None and current_time > entry['expiry']:
+                if entry["expiry"] is not None and current_time > entry["expiry"]:
                     expired_keys.append(key)
                 else:
                     if not prefix:
@@ -98,18 +98,18 @@ class KVStore:
                         valid_keys.append(key)
                     elif key.startswith(prefix):
                         # Return the part after the prefix
-                        remaining = key[len(prefix):]
-                        if remaining.startswith('/'):
+                        remaining = key[len(prefix) :]
+                        if remaining.startswith("/"):
                             # For hierarchical keys like a/b/c, when prefix is a/b, return c
                             remaining = remaining[1:]  # Remove leading slash
                             # Only return the first segment after the prefix
-                            next_segment = remaining.split('/')[0]
+                            next_segment = remaining.split("/")[0]
                             if next_segment not in valid_keys:
                                 valid_keys.append(next_segment)
                         elif remaining == "":
                             # Exact match with prefix
                             valid_keys.append("")
-                        elif prefix and not remaining.startswith('/'):
+                        elif prefix and not remaining.startswith("/"):
                             # Handle case where prefix is "a" and key is "a/b/c"
                             # This shouldn't happen if prefix logic is correct
                             pass
@@ -135,10 +135,10 @@ class KVStore:
 
             entry = self._store[key]
 
-            if entry['expiry'] is None:
+            if entry["expiry"] is None:
                 return -1  # No TTL set
 
-            remaining = entry['expiry'] - time.time()
+            remaining = entry["expiry"] - time.time()
             if remaining <= 0:
                 del self._store[key]
                 return None
@@ -174,27 +174,37 @@ class KVStoreTool(ToolInterface):
                 "operation": {
                     "type": "string",
                     "description": "The operation to perform",
-                    "enum": ["set", "get", "delete", "exists", "keys", "list", "clear", "ttl"]
+                    "enum": [
+                        "set",
+                        "get",
+                        "delete",
+                        "exists",
+                        "keys",
+                        "list",
+                        "clear",
+                        "ttl",
+                    ],
                 },
                 "key": {
                     "type": "string",
-                    "description": "The key for the operation (required for all operations except 'keys', 'list', and 'clear')"
+                    "description": "The key for the operation (required for all operations except 'keys', 'list', and 'clear')",
                 },
                 "prefix": {
                     "type": "string",
                     "description": "The prefix to filter keys by (optional, only used for 'list' operation)",
-                    "default": ""
+                    "default": "",
                 },
                 "value": {
-                    "description": "The value to store (required for 'set' operation)"
+                    "type": ["string", "number", "boolean", "object", "array"],
+                    "description": "The value to store (required for 'set' operation)",
                 },
                 "ttl": {
                     "type": "integer",
                     "description": "Time-to-live in seconds (default: 86400 = 1 day). Use -1 for no expiration.",
-                    "default": 86400
-                }
+                    "default": 86400,
+                },
             },
-            "required": ["operation"]
+            "required": ["operation"],
         }
 
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -207,30 +217,49 @@ class KVStoreTool(ToolInterface):
         try:
             if operation == "set":
                 if key is None:
-                    return {"success": False, "error": "Key is required for set operation"}
+                    return {
+                        "success": False,
+                        "error": "Key is required for set operation",
+                    }
                 if value is None:
-                    return {"success": False, "error": "Value is required for set operation"}
+                    return {
+                        "success": False,
+                        "error": "Value is required for set operation",
+                    }
 
                 ttl_seconds = None if ttl == -1 else ttl
                 _kv_store.set(key, value, ttl_seconds)
                 return {
                     "success": True,
-                    "message": f"Set key '{key}' with TTL {ttl} seconds" if ttl != -1 else f"Set key '{key}' with no expiration"
+                    "message": (
+                        f"Set key '{key}' with TTL {ttl} seconds"
+                        if ttl != -1
+                        else f"Set key '{key}' with no expiration"
+                    ),
                 }
 
             elif operation == "get":
                 if key is None:
-                    return {"success": False, "error": "Key is required for get operation"}
+                    return {
+                        "success": False,
+                        "error": "Key is required for get operation",
+                    }
 
                 result = _kv_store.get(key)
                 if result is None:
-                    return {"success": False, "message": f"Key '{key}' not found or expired"}
+                    return {
+                        "success": False,
+                        "message": f"Key '{key}' not found or expired",
+                    }
 
                 return {"success": True, "value": result}
 
             elif operation == "delete":
                 if key is None:
-                    return {"success": False, "error": "Key is required for delete operation"}
+                    return {
+                        "success": False,
+                        "error": "Key is required for delete operation",
+                    }
 
                 deleted = _kv_store.delete(key)
                 if deleted:
@@ -240,7 +269,10 @@ class KVStoreTool(ToolInterface):
 
             elif operation == "exists":
                 if key is None:
-                    return {"success": False, "error": "Key is required for exists operation"}
+                    return {
+                        "success": False,
+                        "error": "Key is required for exists operation",
+                    }
 
                 exists = _kv_store.exists(key)
                 return {"success": True, "exists": exists}
@@ -251,7 +283,12 @@ class KVStoreTool(ToolInterface):
 
             elif operation == "list":
                 keys = _kv_store.list_keys(prefix)
-                return {"success": True, "keys": keys, "count": len(keys), "prefix": prefix}
+                return {
+                    "success": True,
+                    "keys": keys,
+                    "count": len(keys),
+                    "prefix": prefix,
+                }
 
             elif operation == "clear":
                 count = _kv_store.clear()
@@ -259,15 +296,29 @@ class KVStoreTool(ToolInterface):
 
             elif operation == "ttl":
                 if key is None:
-                    return {"success": False, "error": "Key is required for ttl operation"}
+                    return {
+                        "success": False,
+                        "error": "Key is required for ttl operation",
+                    }
 
                 ttl_remaining = _kv_store.ttl(key)
                 if ttl_remaining is None:
-                    return {"success": False, "message": f"Key '{key}' not found or expired"}
+                    return {
+                        "success": False,
+                        "message": f"Key '{key}' not found or expired",
+                    }
                 elif ttl_remaining == -1:
-                    return {"success": True, "ttl": -1, "message": f"Key '{key}' has no expiration"}
+                    return {
+                        "success": True,
+                        "ttl": -1,
+                        "message": f"Key '{key}' has no expiration",
+                    }
                 else:
-                    return {"success": True, "ttl": ttl_remaining, "message": f"Key '{key}' expires in {ttl_remaining} seconds"}
+                    return {
+                        "success": True,
+                        "ttl": ttl_remaining,
+                        "message": f"Key '{key}' expires in {ttl_remaining} seconds",
+                    }
 
             else:
                 return {"success": False, "error": f"Unknown operation: {operation}"}
@@ -275,14 +326,22 @@ class KVStoreTool(ToolInterface):
         except Exception as e:
             return {"success": False, "error": f"Operation failed: {str(e)}"}
 
-    def execute(self, operation: str, key: Optional[str] = None, value: Any = None, ttl: int = 86400, prefix: str = "") -> Dict[str, Any]:
+    def execute(
+        self,
+        operation: str,
+        key: Optional[str] = None,
+        value: Any = None,
+        ttl: int = 86400,
+        prefix: str = "",
+    ) -> Dict[str, Any]:
         """Synchronous wrapper for execute_tool for backwards compatibility and testing."""
         import asyncio
+
         arguments = {
             "operation": operation,
             "key": key,
             "value": value,
             "ttl": ttl,
-            "prefix": prefix
+            "prefix": prefix,
         }
         return asyncio.run(self.execute_tool(arguments))
