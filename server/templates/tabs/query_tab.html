@@ -12,10 +12,16 @@
             <input type="text" id="query-text" placeholder="Enter your intention or question..." style="width: 100%; max-width: 500px; padding: 0.5em; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;" />
         </div>
         
-        <div style="margin-bottom: 1em; display: flex; align-items: center; gap: 1em;">
+        <div style="margin-bottom: 1em; display: flex; align-items: center; gap: 1em; flex-wrap: wrap;">
             <div>
                 <label for="query-limit" style="display: block; margin-bottom: 0.5em; font-weight: bold;">Number of results:</label>
                 <input type="number" id="query-limit" min="1" max="20" value="5" style="width: 80px; padding: 0.5em; border: 1px solid #ccc; border-radius: 4px;" />
+            </div>
+            <div style="margin-top: 1.5em;">
+                <label style="display: flex; align-items: center; gap: 0.5em; cursor: pointer;">
+                    <input type="checkbox" id="unique-markdown-filter" style="margin: 0;" />
+                    <span style="font-size: 14px;">Show unique markdown files only</span>
+                </label>
             </div>
             <div style="margin-top: 1.5em;">
                 <button id="run-query-btn" style="background: #007bff; color: white; border: none; padding: 0.7em 1.5em; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;">🔍 Search</button>

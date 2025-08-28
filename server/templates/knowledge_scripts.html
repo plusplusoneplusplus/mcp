@@ -330,6 +330,7 @@
         const col = document.getElementById('query-collections-dropdown').value;
         const query = document.getElementById('query-text').value.trim();
         const limit = document.getElementById('query-limit').value || 5;
+        const uniqueMarkdownOnly = document.getElementById('unique-markdown-filter').checked;
         const statusDiv = document.getElementById('query-status');
         const resultsContainer = document.getElementById('query-results-container');
         
@@ -358,7 +359,8 @@
         
         try {
             const startTime = performance.now();
-            const resp = await fetch(`/api/query-segments?collection=${encodeURIComponent(col)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}`);
+            const uniqueMarkdownParam = uniqueMarkdownOnly ? '&unique_markdown_only=true' : '';
+            const resp = await fetch(`/api/query-segments?collection=${encodeURIComponent(col)}&query=${encodeURIComponent(query)}&limit=${encodeURIComponent(limit)}${uniqueMarkdownParam}`);
             const data = await resp.json();
             const searchTime = ((performance.now() - startTime) / 1000).toFixed(2);
             
@@ -372,6 +374,45 @@
                 statusDiv.style.backgroundColor = '#d4edda';
                 statusDiv.style.border = '1px solid #c3e6cb';
                 
+                // Create file list section
+                const uniqueFiles = new Set();
+                const fileList = [];
+                data.metadatas.forEach((meta, i) => {
+                    const filename = meta.file_name || meta.filename || meta.source || data.ids[i]?.split('/').pop() || 'Unknown';
+                    const filePath = meta.rel_path || meta.path || meta.source || 'Unknown path';
+                    const fileKey = `${filename}|${filePath}`;
+                    
+                    if (!uniqueFiles.has(fileKey)) {
+                        uniqueFiles.add(fileKey);
+                        fileList.push({ filename, filePath });
+                    }
+                });
+                
+                const fileListHTML = `
+                    <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; padding: 1em; margin-bottom: 1.5em;">
+                        <h4 style="margin: 0 0 0.75em 0; color: #495057; font-size: 16px; display: flex; align-items: center; gap: 0.5em;">
+                            📂 Files Found (${fileList.length})
+                        </h4>
+                        <div style="display: grid; gap: 0.5em;">
+                            ${fileList.map((file, i) => `
+                                <div style="display: flex; align-items: center; gap: 0.75em; padding: 0.5em; background: white; border: 1px solid #e9ecef; border-radius: 4px; transition: all 0.2s;">
+                                    <div style="flex-shrink: 0; font-size: 16px;">📄</div>
+                                    <div style="flex-grow: 1; min-width: 0;">
+                                        <div style="font-weight: 600; color: #212529; font-size: 14px;">${file.filename}</div>
+                                        <code style="font-size: 12px; color: #6c757d; word-break: break-all;">${file.filePath}</code>
+                                    </div>
+                                    <div style="flex-shrink: 0;">
+                                        <button onclick="scrollToResult(${data.metadatas.findIndex(m => (m.file_name || m.filename || m.source) === file.filename)})" 
+                                                style="background: #007bff; color: white; border: none; padding: 0.25em 0.5em; border-radius: 3px; cursor: pointer; font-size: 11px;">
+                                            View
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                
                 // Create detailed results
                 const resultsHTML = data.documents.map((doc, i) => {
                     const meta = data.metadatas && data.metadatas[i] ? data.metadatas[i] : {};
@@ -381,8 +422,9 @@
                     // Calculate relevance percentage (lower distance = higher relevance)
                     const relevancePercent = distance !== null ? Math.max(0, Math.min(100, (1 - distance) * 100)) : null;
                     
-                    // Extract filename from metadata or ID
-                    const filename = meta.filename || meta.source || id.split('/').pop() || 'Unknown';
+                    // Extract filename and path from metadata or ID
+                    const filename = meta.file_name || meta.filename || meta.source || id.split('/').pop() || 'Unknown';
+                    const filePath = meta.rel_path || meta.path || meta.source || 'Unknown path';
                     
                     // Truncate document for preview
                     const preview = doc.length > 300 ? doc.substring(0, 300) + '...' : doc;
@@ -396,7 +438,7 @@
                     });
                     
                     return `
-                        <div style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 1em; padding: 1em; background: #fafafa; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div id="result-${i}" style="border: 1px solid #ddd; border-radius: 8px; margin-bottom: 1em; padding: 1em; background: #fafafa; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5em;">
                                 <div style="flex-grow: 1;">
                                     <h4 style="margin: 0; color: #333; font-size: 16px; font-weight: bold;">
@@ -413,6 +455,11 @@
                                         View Full
                                     </button>
                                 </div>
+                            </div>
+                            
+                            <div style="background: #f8f9fa; padding: 0.5em; border-radius: 4px; margin-bottom: 0.75em; border-left: 3px solid #6c757d;">
+                                <div style="font-size: 12px; color: #495057; font-weight: bold; margin-bottom: 0.2em;">📁 File Path:</div>
+                                <code style="font-size: 13px; color: #212529; background: #e9ecef; padding: 0.2em 0.4em; border-radius: 3px; word-break: break-all;">${filePath}</code>
                             </div>
                             
                             <div class="result-preview" style="line-height: 1.5; color: #444; font-size: 14px; border-left: 3px solid #007bff; padding-left: 1em; margin: 0.5em 0;">
@@ -433,7 +480,7 @@
                     `;
                 }).join('');
                 
-                resultsContainer.innerHTML = resultsHTML;
+                resultsContainer.innerHTML = fileListHTML + resultsHTML;
                 
             } else {
                 statusDiv.innerHTML = '<span style="color:#6c757d; font-weight: bold;">🔍 No relevant segments found for your query.</span>';
@@ -467,6 +514,20 @@
             fullContent.style.display = 'none';
             button.textContent = 'View Full';
             button.style.background = '#007bff';
+        }
+    };
+
+    // Function to scroll to a specific result
+    window.scrollToResult = function(index) {
+        const resultElement = document.getElementById(`result-${index}`);
+        if (resultElement) {
+            resultElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // Briefly highlight the result
+            const originalBackground = resultElement.style.background;
+            resultElement.style.background = '#fff3cd';
+            setTimeout(() => {
+                resultElement.style.background = originalBackground;
+            }, 2000);
         }
     };
 

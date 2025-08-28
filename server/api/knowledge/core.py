@@ -111,6 +111,7 @@ async def api_query_segments(request: Request):
     try:
         collection = request.query_params.get("collection")
         query_text = request.query_params.get("query")
+        unique_markdown_only = request.query_params.get("unique_markdown_only") == "true"
         try:
             limit = int(request.query_params.get("limit", 3))
         except Exception:
@@ -125,7 +126,7 @@ async def api_query_segments(request: Request):
         try:
             result = await asyncio.wait_for(
                 get_knowledge_query().execute_tool(
-                    {"query": query_text, "collection": collection, "limit": limit}
+                    {"query": query_text, "collection": collection, "limit": limit, "unique_markdown_only": unique_markdown_only}
                 ),
                 timeout=25.0  # Set 25-second timeout to prevent hanging
             )
