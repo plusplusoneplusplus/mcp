@@ -186,14 +186,7 @@ class KVStoreTool(ToolInterface):
                     "default": ""
                 },
                 "value": {
-                    "description": "The value to store (required for 'set' operation)",
-                    "anyOf": [
-                        {"type": "string"},
-                        {"type": "number"},
-                        {"type": "boolean"},
-                        {"type": "object"},
-                        {"type": "array", "items": {}}
-                    ]
+                    "description": "The value to store (required for 'set' operation)"
                 },
                 "ttl": {
                     "type": "integer",
