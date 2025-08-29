@@ -28,6 +28,6 @@
       "Bash(mkfs:*)",
       "Bash(dd:*)"
     ],
-    "defaultMode": "allowEdits"
+    "defaultMode": "bypassPermissions"
   }
 }
