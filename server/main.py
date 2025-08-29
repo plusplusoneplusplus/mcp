@@ -493,8 +493,9 @@ def setup():
 
 @click.command()
 @click.option("--port", default=None, type=int, help="Port to run the server on")
+@click.option("--reload", is_flag=True, help="Enable auto-reload on code changes")
 @trace_startup_time("Main Server Startup")
-def main(port: Optional[int] = None) -> None:
+def main(port: Optional[int] = None, reload: bool = False) -> None:
     with time_operation("Complete Server Initialization"):
         # Run setup first (non-async)
         setup()
@@ -510,7 +511,15 @@ def main(port: Optional[int] = None) -> None:
         save_startup_report()
 
     # Then run uvicorn directly without nested asyncio.run
-    uvicorn.run(starlette_app, host="0.0.0.0", port=port)
+    # Enable reload for development (CLI flag takes precedence over env var)
+    if not reload:
+        reload = os.environ.get("RELOAD", "false").lower() == "true"
+
+    if reload:
+        # For reload to work, we need to pass the app as an import string
+        uvicorn.run("server.main:starlette_app", host="0.0.0.0", port=port, reload=True)
+    else:
+        uvicorn.run(starlette_app, host="0.0.0.0", port=port, reload=False)
 
 
 if __name__ == "__main__":
