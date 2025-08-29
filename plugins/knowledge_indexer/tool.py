@@ -159,7 +159,8 @@ class KnowledgeIndexerTool(ToolInterface):
                         # Get file metadata
                         stat = os.stat(md_path)
                         file_name = os.path.basename(md_path)
-                        rel_path = os.path.relpath(md_path, temp_dir)
+                        # Use absolute path instead of relative path
+                        abs_path = os.path.abspath(md_path)
                         file_size = stat.st_size
                         file_date = datetime.datetime.fromtimestamp(
                             stat.st_mtime
@@ -169,7 +170,7 @@ class KnowledgeIndexerTool(ToolInterface):
                         n_segments, _ = segmenter.segment_and_store(
                             content,
                             file_name=file_name,
-                            rel_path=rel_path,
+                            rel_path=abs_path,
                             file_size=file_size,
                             file_date=file_date,
                         )
@@ -247,6 +248,11 @@ class KnowledgeQueryTool(ToolInterface):
                     "maximum": 20,
                     "description": "Maximum number of results to return",
                 },
+                "unique_markdown_only": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Filter results to show only unique markdown files (.md, .markdown)",
+                },
                 "persist_directory": {
                     "type": "string",
                     "description": "Optional custom path for vector store persistence. If not provided, uses default server directory",
@@ -261,6 +267,7 @@ class KnowledgeQueryTool(ToolInterface):
             query_text = arguments.get("query")
             collection = arguments.get("collection", "default")
             limit = arguments.get("limit", 5)
+            unique_markdown_only = arguments.get("unique_markdown_only", False)
             persist_directory = arguments.get("persist_directory", self.persist_dir)
 
             if not query_text:
@@ -307,20 +314,62 @@ class KnowledgeQueryTool(ToolInterface):
             result_metadatas = results.get("metadatas") or [[]]
             result_distances = results.get("distances") or [[]]
 
+            # Extract arrays from nested structure
+            ids_list = result_ids[0] if result_ids else []
+            documents_list = result_documents[0] if result_documents else []
+            metadatas_list = result_metadatas[0] if result_metadatas else []
+            distances_list = result_distances[0] if result_distances else []
+
+            # Apply unique markdown filter if requested
+            if unique_markdown_only:
+                filtered_results = self._filter_unique_markdown_files(
+                    ids_list, documents_list, metadatas_list, distances_list
+                )
+                ids_list, documents_list, metadatas_list, distances_list = filtered_results
+
             return {
                 "success": True,
                 "query": query_text,
                 "collection": collection,
                 "results": {
-                    "ids": result_ids[0] if result_ids else [],
-                    "documents": result_documents[0] if result_documents else [],
-                    "metadatas": result_metadatas[0] if result_metadatas else [],
-                    "distances": result_distances[0] if result_distances else [],
+                    "ids": ids_list,
+                    "documents": documents_list,
+                    "metadatas": metadatas_list,
+                    "distances": distances_list,
                 },
             }
 
         except Exception as e:
             return {"success": False, "error": f"Knowledge query failed: {str(e)}"}
+
+    def _filter_unique_markdown_files(self, ids_list, documents_list, metadatas_list, distances_list):
+        """Filter results to show only unique markdown files."""
+        filtered_ids = []
+        filtered_documents = []
+        filtered_metadatas = []
+        filtered_distances = []
+        seen_files = set()
+
+        for i in range(len(ids_list)):
+            metadata = metadatas_list[i] if i < len(metadatas_list) else {}
+            
+            # Extract filename from metadata or ID
+            filename = metadata.get('file_name', '') or metadata.get('filename', '') or metadata.get('source', '') or ids_list[i]
+            
+            # Check if it's a markdown file
+            if filename.lower().endswith(('.md', '.markdown')):
+                # Use the filename as the unique identifier (not full path)
+                file_basename = filename.split('/')[-1] if '/' in filename else filename
+                
+                if file_basename not in seen_files:
+                    seen_files.add(file_basename)
+                    filtered_ids.append(ids_list[i])
+                    filtered_documents.append(documents_list[i] if i < len(documents_list) else "")
+                    filtered_metadatas.append(metadata)
+                    if i < len(distances_list):
+                        filtered_distances.append(distances_list[i])
+
+        return filtered_ids, filtered_documents, filtered_metadatas, filtered_distances
 
 
 @register_tool(os_type="all")
