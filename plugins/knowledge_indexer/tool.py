@@ -159,7 +159,8 @@ class KnowledgeIndexerTool(ToolInterface):
                         # Get file metadata
                         stat = os.stat(md_path)
                         file_name = os.path.basename(md_path)
-                        rel_path = os.path.relpath(md_path, temp_dir)
+                        # Use absolute path instead of relative path
+                        abs_path = os.path.abspath(md_path)
                         file_size = stat.st_size
                         file_date = datetime.datetime.fromtimestamp(
                             stat.st_mtime
@@ -169,7 +170,7 @@ class KnowledgeIndexerTool(ToolInterface):
                         n_segments, _ = segmenter.segment_and_store(
                             content,
                             file_name=file_name,
-                            rel_path=rel_path,
+                            rel_path=abs_path,
                             file_size=file_size,
                             file_date=file_date,
                         )
