@@ -207,6 +207,27 @@
         <button id="reset-all-config" class="btn-danger">Reset All to Defaults</button>
     </div>
 
+    <!-- Environment File Management -->
+    <div class="env-file-section">
+        <h3>Environment File (.env)</h3>
+        <div id="env-file-path-info" style="margin-bottom: 1em; padding: 0.5em; background-color: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 0.9em; color: #495057;">
+            <strong>Current .env file path:</strong> <span id="env-file-path">Not loaded</span>
+        </div>
+        <div class="env-file-actions">
+            <button id="view-env-file" class="btn-secondary">View .env File</button>
+            <button id="edit-env-file" class="btn-info">Edit .env File</button>
+            <button id="backup-env-file" class="btn-orange">Create Backup</button>
+        </div>
+        <div id="env-file-editor" style="display:none; margin-top: 1em;">
+            <textarea id="env-file-content" rows="20"></textarea>
+            <div class="env-file-controls">
+                <button id="save-env-file" class="btn-success">Save Changes</button>
+                <button id="cancel-env-edit" class="btn-secondary">Cancel</button>
+                <button id="validate-env-file" class="btn-blue">Validate Syntax</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Configuration Categories -->
     <div class="config-categories">
         <div class="config-category">
@@ -259,24 +280,6 @@
         </div>
     </div>
 
-    <!-- Environment File Management -->
-    <div class="env-file-section">
-        <h3>Environment File (.env)</h3>
-        <div class="env-file-actions">
-            <button id="view-env-file" class="btn-secondary">View .env File</button>
-            <button id="edit-env-file" class="btn-info">Edit .env File</button>
-            <button id="backup-env-file" class="btn-orange">Create Backup</button>
-        </div>
-        <div id="env-file-editor" style="display:none; margin-top: 1em;">
-            <textarea id="env-file-content" rows="20"></textarea>
-            <div class="env-file-controls">
-                <button id="save-env-file" class="btn-success">Save Changes</button>
-                <button id="cancel-env-edit" class="btn-secondary">Cancel</button>
-                <button id="validate-env-file" class="btn-blue">Validate Syntax</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Configuration Status -->
     <div id="config-status" class="config-status">
         <!-- Status messages will appear here -->
@@ -319,8 +322,30 @@
             currentConfig = config;
             populateConfigurationForm(config);
             updateConfigStatus('Configuration loaded successfully', 'success');
+            // Also load env file info to show the path
+            await loadEnvFileInfo();
         } catch (error) {
             updateConfigStatus('Error loading configuration: ' + error.message, 'error');
+        }
+    }
+
+    async function loadEnvFileInfo() {
+        try {
+            const response = await fetch('/api/configuration/env-file');
+            const result = await response.json();
+            const pathElement = document.getElementById('env-file-path');
+
+            if (result.success) {
+                pathElement.textContent = result.file_path || 'Path not available';
+                pathElement.style.color = '#28a745'; // Green for success
+            } else {
+                pathElement.textContent = result.error || 'No .env file found';
+                pathElement.style.color = '#dc3545'; // Red for error
+            }
+        } catch (error) {
+            const pathElement = document.getElementById('env-file-path');
+            pathElement.textContent = 'Error loading path info';
+            pathElement.style.color = '#dc3545'; // Red for error
         }
     }
 
@@ -506,8 +531,16 @@
                 originalEnvContent = result.content;
                 document.getElementById('env-file-content').value = result.content;
                 document.getElementById('env-file-editor').style.display = 'block';
+                // Update the path display
+                const pathElement = document.getElementById('env-file-path');
+                pathElement.textContent = result.file_path || 'Path not available';
+                pathElement.style.color = '#28a745'; // Green for success
                 updateConfigStatus(`Loaded .env file from ${result.file_path}`, 'success');
             } else {
+                // Update the path display for error case
+                const pathElement = document.getElementById('env-file-path');
+                pathElement.textContent = result.error || 'No .env file found';
+                pathElement.style.color = '#dc3545'; // Red for error
                 updateConfigStatus('Error loading .env file: ' + result.error, 'error');
             }
         } catch (error) {
