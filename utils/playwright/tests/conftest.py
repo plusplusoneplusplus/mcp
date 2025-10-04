@@ -1,3 +1,4 @@
+import os
 import pytest
 import subprocess
 import sys
@@ -60,6 +61,12 @@ def ensure_playwright_browser():
             pytest.skip("Playwright browser installation timed out")
         except Exception as e:
             pytest.skip(f"Failed to install Playwright browsers: {e}")
+
+        # Re-check after installation attempt. If still unavailable (e.g., missing Linux deps), skip.
+        if not check_playwright_browser_installed():
+            if os.getenv("CI") == "true" or sys.platform.startswith("linux"):
+                pytest.skip("Playwright Chromium not launchable in CI/Linux environment; skipping Playwright tests")
+            pytest.skip("Playwright Chromium not launchable after installation; skipping Playwright tests")
 
     return True
 
