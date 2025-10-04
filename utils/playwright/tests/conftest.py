@@ -1,3 +1,4 @@
+import os
 import pytest
 import subprocess
 import sys
@@ -45,21 +46,31 @@ def ensure_playwright_browser():
     if not PLAYWRIGHT_AVAILABLE:
         pytest.skip("Playwright not installed. Install with: pip install playwright")
 
+    # In CI, trust that the workflow already installed browsers
+    # Only do the check to verify they're launchable
     if not check_playwright_browser_installed():
-        # Try to install browsers
-        try:
-            result = subprocess.run(
-                [sys.executable, "-m", "playwright", "install", "chromium"],
-                capture_output=True,
-                text=True,
-                timeout=120
-            )
-            if result.returncode != 0:
-                pytest.skip(f"Failed to install Playwright browsers: {result.stderr}")
-        except subprocess.TimeoutExpired:
-            pytest.skip("Playwright browser installation timed out")
-        except Exception as e:
-            pytest.skip(f"Failed to install Playwright browsers: {e}")
+        # Only try to install if not in CI (CI workflow handles installation)
+        if os.getenv("CI") != "true":
+            # Try to install browsers for local development
+            try:
+                result = subprocess.run(
+                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+                if result.returncode != 0:
+                    pytest.skip(f"Failed to install Playwright browsers: {result.stderr}")
+            except subprocess.TimeoutExpired:
+                pytest.skip("Playwright browser installation timed out")
+            except Exception as e:
+                pytest.skip(f"Failed to install Playwright browsers: {e}")
+
+        # Re-check after installation attempt (or if in CI, after first check)
+        if not check_playwright_browser_installed():
+            if os.getenv("CI") == "true" or sys.platform.startswith("linux"):
+                pytest.skip("Playwright Chromium not launchable in CI/Linux environment; skipping Playwright tests")
+            pytest.skip("Playwright Chromium not launchable after installation; skipping Playwright tests")
 
     return True
 
