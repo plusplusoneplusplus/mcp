@@ -128,6 +128,124 @@
         margin-left: 1em;
         margin-bottom: 0.5em;
     }
+
+    /* Execution form styles */
+    .execution-section {
+        margin-top: 1em;
+        padding-top: 1em;
+        border-top: 2px solid #e0e0e0;
+    }
+
+    .execution-title {
+        font-weight: bold;
+        margin-bottom: 0.75em;
+        color: #333;
+        font-size: 1.1em;
+    }
+
+    .form-group {
+        margin-bottom: 1em;
+    }
+
+    .form-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.25em;
+        color: #333;
+    }
+
+    .form-input,
+    .form-textarea,
+    .form-select {
+        width: 100%;
+        padding: 0.5em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.95em;
+        box-sizing: border-box;
+    }
+
+    .form-textarea {
+        min-height: 80px;
+        font-family: 'Courier New', monospace;
+        resize: vertical;
+    }
+
+    .form-help {
+        font-size: 0.85em;
+        color: #666;
+        margin-top: 0.25em;
+    }
+
+    .execute-btn {
+        background: #28a745;
+        color: white;
+        padding: 0.6em 1.5em;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1em;
+        font-weight: 600;
+        transition: background 0.2s;
+    }
+
+    .execute-btn:hover:not(:disabled) {
+        background: #218838;
+    }
+
+    .execute-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .execution-result {
+        margin-top: 1em;
+        padding: 1em;
+        border-radius: 4px;
+        background: #f8f9fa;
+        border-left: 3px solid #28a745;
+    }
+
+    .execution-result.error {
+        background: #fff5f5;
+        border-left-color: #dc3545;
+    }
+
+    .result-title {
+        font-weight: bold;
+        margin-bottom: 0.5em;
+        color: #333;
+    }
+
+    .result-content {
+        background: white;
+        padding: 0.75em;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        max-height: 400px;
+        overflow-y: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .result-meta {
+        font-size: 0.85em;
+        color: #666;
+        margin-top: 0.5em;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5em;
+        cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        width: auto;
+    }
 </style>
 {% endblock %}
 
@@ -135,7 +253,7 @@
 <div class="card">
     <h2>Tools Dashboard</h2>
     <p>Total tools: <span id="tool-count">0</span></p>
-    <p><small>Click on any tool row to view its parameters</small></p>
+    <p><small>Click on any tool row to view its parameters and execute it</small></p>
     <div class="tools-table-container">
         <table class="tools-table">
             <thead>
@@ -155,10 +273,14 @@
 
 {% block extra_scripts %}
 <script>
+    // Store tools data globally for execution
+    let toolsData = [];
+
     async function loadTools() {
         try {
             const resp = await fetch('/api/tools');
             const data = await resp.json();
+            toolsData = data.tools;
             document.getElementById('tool-count').textContent = data.total;
             const body = document.getElementById('tools-table-body');
             body.innerHTML = '';
@@ -187,7 +309,7 @@
 
                 const parametersCell = document.createElement('td');
                 parametersCell.colSpan = 4;
-                parametersCell.innerHTML = createParametersContent(tool);
+                parametersCell.innerHTML = createParametersContent(tool, i);
                 parametersRow.appendChild(parametersCell);
 
                 // Add click handler to main row
@@ -203,60 +325,168 @@
         }
     }
 
-    function createParametersContent(tool) {
+    function createParametersContent(tool, toolIndex) {
         const schema = tool.input_schema;
+        const hasParameters = schema && schema.properties && Object.keys(schema.properties).length > 0;
 
-        if (!schema || !schema.properties || Object.keys(schema.properties).length === 0) {
-            return `
-            <div class="parameters-content">
-                <div class="parameters-title">Parameters</div>
-                <div class="no-parameters">This tool has no parameters</div>
-            </div>
-        `;
+        let parametersHtml = `<div class="parameters-content">`;
+
+        // Parameters documentation section
+        parametersHtml += `<div class="parameters-title">Parameters</div>`;
+
+        if (!hasParameters) {
+            parametersHtml += `<div class="no-parameters">This tool has no parameters</div>`;
+        } else {
+            const properties = schema.properties;
+            const required = schema.required || [];
+
+            for (const [propName, propDetails] of Object.entries(properties)) {
+                const isRequired = required.includes(propName);
+                const type = propDetails.type || 'unknown';
+                const description = propDetails.description || 'No description available';
+
+                parametersHtml += `
+                <div class="parameter-item">
+                    <div class="parameter-name">
+                        ${propName}
+                        ${isRequired ? '<span class="parameter-required">(required)</span>' : ''}
+                    </div>
+                    <div class="parameter-type">Type: ${type}</div>
+                    <div class="parameter-description">${description}</div>
+            `;
+
+                // Add additional details if available
+                if (propDetails.default !== undefined) {
+                    parametersHtml += `<div class="schema-details">Default: ${JSON.stringify(propDetails.default)}</div>`;
+                }
+                if (propDetails.enum) {
+                    parametersHtml += `<div class="schema-details">Allowed values: ${propDetails.enum.join(', ')}</div>`;
+                }
+                if (propDetails.minimum !== undefined) {
+                    parametersHtml += `<div class="schema-details">Minimum: ${propDetails.minimum}</div>`;
+                }
+                if (propDetails.maximum !== undefined) {
+                    parametersHtml += `<div class="schema-details">Maximum: ${propDetails.maximum}</div>`;
+                }
+
+                parametersHtml += '</div>';
+            }
         }
 
-        const properties = schema.properties;
-        const required = schema.required || [];
-
-        let parametersHtml = `
-        <div class="parameters-content">
-            <div class="parameters-title">Parameters</div>
-    `;
-
-        for (const [propName, propDetails] of Object.entries(properties)) {
-            const isRequired = required.includes(propName);
-            const type = propDetails.type || 'unknown';
-            const description = propDetails.description || 'No description available';
-
+        // Execution form section (only for active tools)
+        if (tool.active) {
+            parametersHtml += createExecutionForm(tool, toolIndex);
+        } else {
             parametersHtml += `
-            <div class="parameter-item">
-                <div class="parameter-name">
-                    ${propName}
-                    ${isRequired ? '<span class="parameter-required">(required)</span>' : ''}
+                <div class="execution-section">
+                    <div class="execution-title">Execution</div>
+                    <p style="color: #dc3545; font-style: italic;">This tool is not active and cannot be executed.</p>
                 </div>
-                <div class="parameter-type">Type: ${type}</div>
-                <div class="parameter-description">${description}</div>
-        `;
-
-            // Add additional details if available
-            if (propDetails.default !== undefined) {
-                parametersHtml += `<div class="schema-details">Default: ${JSON.stringify(propDetails.default)}</div>`;
-            }
-            if (propDetails.enum) {
-                parametersHtml += `<div class="schema-details">Allowed values: ${propDetails.enum.join(', ')}</div>`;
-            }
-            if (propDetails.minimum !== undefined) {
-                parametersHtml += `<div class="schema-details">Minimum: ${propDetails.minimum}</div>`;
-            }
-            if (propDetails.maximum !== undefined) {
-                parametersHtml += `<div class="schema-details">Maximum: ${propDetails.maximum}</div>`;
-            }
-
-            parametersHtml += '</div>';
+            `;
         }
 
         parametersHtml += '</div>';
         return parametersHtml;
+    }
+
+    function createExecutionForm(tool, toolIndex) {
+        const schema = tool.input_schema;
+        const hasParameters = schema && schema.properties && Object.keys(schema.properties).length > 0;
+
+        let formHtml = `
+            <div class="execution-section">
+                <div class="execution-title">Execute Tool</div>
+                <form id="execute-form-${toolIndex}" onsubmit="executeTool(event, ${toolIndex}); return false;">
+        `;
+
+        if (hasParameters) {
+            const properties = schema.properties;
+            const required = schema.required || [];
+
+            for (const [propName, propDetails] of Object.entries(properties)) {
+                const isRequired = required.includes(propName);
+                const type = propDetails.type || 'string';
+                const description = propDetails.description || '';
+
+                formHtml += `
+                    <div class="form-group">
+                        <label class="form-label" for="param-${toolIndex}-${propName}">
+                            ${propName}${isRequired ? ' <span class="parameter-required">*</span>' : ''}
+                        </label>
+                `;
+
+                // Generate appropriate input based on type
+                formHtml += generateInputField(toolIndex, propName, propDetails, isRequired);
+
+                if (description) {
+                    formHtml += `<div class="form-help">${description}</div>`;
+                }
+
+                formHtml += `</div>`;
+            }
+        } else {
+            formHtml += `<p style="color: #666; font-style: italic;">No parameters required for this tool.</p>`;
+        }
+
+        formHtml += `
+                    <button type="submit" class="execute-btn" id="execute-btn-${toolIndex}">
+                        Execute Tool
+                    </button>
+                    <div id="execution-result-${toolIndex}"></div>
+                </form>
+            </div>
+        `;
+
+        return formHtml;
+    }
+
+    function generateInputField(toolIndex, propName, propDetails, isRequired) {
+        const inputId = `param-${toolIndex}-${propName}`;
+        const type = propDetails.type || 'string';
+        const defaultValue = propDetails.default !== undefined ? propDetails.default : '';
+
+        // Handle enum/select fields
+        if (propDetails.enum && Array.isArray(propDetails.enum)) {
+            let selectHtml = `<select class="form-select" id="${inputId}" name="${propName}" ${isRequired ? 'required' : ''}>`;
+            if (!isRequired) {
+                selectHtml += `<option value="">-- Select --</option>`;
+            }
+            for (const option of propDetails.enum) {
+                const selected = option === defaultValue ? 'selected' : '';
+                selectHtml += `<option value="${option}" ${selected}>${option}</option>`;
+            }
+            selectHtml += `</select>`;
+            return selectHtml;
+        }
+
+        // Handle boolean/checkbox fields
+        if (type === 'boolean') {
+            const checked = defaultValue === true ? 'checked' : '';
+            return `
+                <label class="checkbox-label">
+                    <input type="checkbox" id="${inputId}" name="${propName}" ${checked}>
+                    <span>Enable</span>
+                </label>
+            `;
+        }
+
+        // Handle number fields
+        if (type === 'number' || type === 'integer') {
+            const min = propDetails.minimum !== undefined ? `min="${propDetails.minimum}"` : '';
+            const max = propDetails.maximum !== undefined ? `max="${propDetails.maximum}"` : '';
+            const step = type === 'integer' ? 'step="1"' : '';
+            return `<input type="number" class="form-input" id="${inputId}" name="${propName}" ${min} ${max} ${step} value="${defaultValue}" ${isRequired ? 'required' : ''}>`;
+        }
+
+        // Handle object/array types with textarea for JSON input
+        if (type === 'object' || type === 'array') {
+            const placeholder = type === 'object' ? '{}' : '[]';
+            const value = defaultValue ? JSON.stringify(defaultValue, null, 2) : '';
+            return `<textarea class="form-textarea" id="${inputId}" name="${propName}" placeholder="${placeholder}" ${isRequired ? 'required' : ''}>${value}</textarea>`;
+        }
+
+        // Default to text input for strings
+        return `<input type="text" class="form-input" id="${inputId}" name="${propName}" value="${defaultValue}" ${isRequired ? 'required' : ''}>`;
     }
 
     function toggleParameters(toolIndex) {
@@ -277,6 +507,136 @@
             expandIcon.classList.add('expanded');
             toolRow.classList.add('expanded');
         }
+    }
+
+    async function executeTool(event, toolIndex) {
+        event.preventDefault();
+
+        const tool = toolsData[toolIndex];
+        const form = document.getElementById(`execute-form-${toolIndex}`);
+        const executeBtn = document.getElementById(`execute-btn-${toolIndex}`);
+        const resultDiv = document.getElementById(`execution-result-${toolIndex}`);
+
+        // Disable button during execution
+        executeBtn.disabled = true;
+        executeBtn.textContent = 'Executing...';
+
+        // Show loading state
+        resultDiv.innerHTML = `
+            <div class="execution-result">
+                <div class="result-title">Executing...</div>
+                <div style="text-align: center; padding: 1em;">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        `;
+
+        try {
+            // Collect form data
+            const formData = new FormData(form);
+            const parameters = {};
+            const schema = tool.input_schema;
+
+            if (schema && schema.properties) {
+                for (const [propName, propDetails] of Object.entries(schema.properties)) {
+                    const inputId = `param-${toolIndex}-${propName}`;
+                    const inputElement = document.getElementById(inputId);
+
+                    if (!inputElement) continue;
+
+                    const type = propDetails.type || 'string';
+
+                    // Handle different input types
+                    if (type === 'boolean') {
+                        parameters[propName] = inputElement.checked;
+                    } else if (type === 'number' || type === 'integer') {
+                        const value = inputElement.value.trim();
+                        if (value !== '') {
+                            parameters[propName] = type === 'integer' ? parseInt(value, 10) : parseFloat(value);
+                        }
+                    } else if (type === 'object' || type === 'array') {
+                        const value = inputElement.value.trim();
+                        if (value !== '') {
+                            try {
+                                parameters[propName] = JSON.parse(value);
+                            } catch (e) {
+                                throw new Error(`Invalid JSON for parameter "${propName}": ${e.message}`);
+                            }
+                        }
+                    } else {
+                        // String or other types
+                        const value = inputElement.value.trim();
+                        if (value !== '') {
+                            parameters[propName] = value;
+                        }
+                    }
+                }
+            }
+
+            // Execute the tool
+            const startTime = Date.now();
+            const response = await fetch(`/api/tools/${tool.name}/execute`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(parameters)
+            });
+
+            const executionTime = Date.now() - startTime;
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+
+            // Display success result
+            displayExecutionResult(resultDiv, data.result, executionTime, false);
+
+        } catch (error) {
+            console.error('Error executing tool:', error);
+            displayExecutionResult(resultDiv, error.message, 0, true);
+        } finally {
+            // Re-enable button
+            executeBtn.disabled = false;
+            executeBtn.textContent = 'Execute Tool';
+        }
+    }
+
+    function displayExecutionResult(resultDiv, result, executionTime, isError) {
+        const resultClass = isError ? 'execution-result error' : 'execution-result';
+        const resultTitle = isError ? 'Execution Error' : 'Execution Result';
+
+        let resultContent = '';
+
+        if (typeof result === 'string') {
+            resultContent = result;
+        } else if (typeof result === 'object' && result !== null) {
+            resultContent = JSON.stringify(result, null, 2);
+        } else {
+            resultContent = String(result);
+        }
+
+        let metaHtml = '';
+        if (!isError && executionTime > 0) {
+            metaHtml = `<div class="result-meta">Execution time: ${executionTime}ms</div>`;
+        }
+
+        resultDiv.innerHTML = `
+            <div class="${resultClass}">
+                <div class="result-title">${resultTitle}</div>
+                <div class="result-content">${escapeHtml(resultContent)}</div>
+                ${metaHtml}
+            </div>
+        `;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     document.addEventListener('DOMContentLoaded', loadTools);
