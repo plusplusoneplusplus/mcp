@@ -611,11 +611,29 @@
 
         let resultContent = '';
 
-        if (typeof result === 'string') {
+        // Handle MCP content blocks format (array with type/text objects)
+        if (Array.isArray(result)) {
+            resultContent = result.map(item => {
+                if (item.type === 'text' && item.text) {
+                    return item.text;
+                }
+                return JSON.stringify(item, null, 2);
+            }).join('\n\n');
+        }
+        // Handle object with success/result structure
+        else if (typeof result === 'object' && result !== null) {
+            if (result.success !== undefined && result.result !== undefined) {
+                resultContent = result.result;
+            } else {
+                resultContent = JSON.stringify(result, null, 2);
+            }
+        }
+        // Handle plain string
+        else if (typeof result === 'string') {
             resultContent = result;
-        } else if (typeof result === 'object' && result !== null) {
-            resultContent = JSON.stringify(result, null, 2);
-        } else {
+        }
+        // Fallback
+        else {
             resultContent = String(result);
         }
 
