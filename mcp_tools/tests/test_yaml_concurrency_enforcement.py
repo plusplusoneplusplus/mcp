@@ -170,8 +170,8 @@ class TestConcurrencyEnforcementBasic:
         self, yaml_tool_with_concurrency, mock_command_executor, concurrency_manager
     ):
         """Test that tool execution is rejected when concurrency limit is exceeded."""
-        # Register concurrency config with limit of 1
-        config = ConcurrencyConfig(max_concurrent=1)
+        # Register concurrency config with limit of 1 and no wait timeout for immediate rejection
+        config = ConcurrencyConfig(max_concurrent=1, wait_timeout=None)
         concurrency_manager.register_config("test_concurrent_tool", config)
 
         # Start one operation manually to fill the limit
@@ -391,8 +391,8 @@ class TestConcurrencyEnforcementConcurrentExecution:
         self, yaml_tool_with_concurrency, concurrency_manager
     ):
         """Test multiple concurrent executions exceeding the concurrency limit."""
-        # Register concurrency config with limit of 1 (more restrictive)
-        config = ConcurrencyConfig(max_concurrent=1)
+        # Register concurrency config with limit of 1 and no wait timeout for immediate rejection
+        config = ConcurrencyConfig(max_concurrent=1, wait_timeout=None)
         concurrency_manager.register_config("test_concurrent_tool", config)
 
         # Pre-fill the concurrency limit by starting one operation manually
@@ -600,8 +600,8 @@ class TestConcurrencyEnforcementEdgeCases:
     @pytest.mark.asyncio
     async def test_zero_concurrency_limit(self, yaml_tool_with_concurrency, mock_command_executor, concurrency_manager):
         """Test behavior with zero concurrency limit."""
-        # Register concurrency config with zero limit
-        config = ConcurrencyConfig(max_concurrent=0)
+        # Register concurrency config with zero limit and no wait timeout for immediate rejection
+        config = ConcurrencyConfig(max_concurrent=0, wait_timeout=None)
         concurrency_manager.register_config("test_concurrent_tool", config)
 
         # Set up tool with dependencies

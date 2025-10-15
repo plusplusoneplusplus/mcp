@@ -44,6 +44,13 @@ tools:
     # and return the final result instead of just starting it asynchronously
     run_to_completion: false
 
+    # Concurrency control (optional)
+    # Controls how many instances of this tool can run at the same time
+    concurrency:
+      max_concurrent: 1         # Maximum number of concurrent executions (default: 1)
+      wait_timeout: 300         # Seconds to wait for a slot if limit is reached (default: 300 = 5 minutes)
+                                # Set to null for immediate rejection, or any positive number for custom timeout
+
     # Post-processing configuration demonstrating all features
     post_processing:
       # Standard output attachment options (existing features)
@@ -101,6 +108,51 @@ tools:
           type: number
           description: Optional timeout in seconds
           default: 60
+      required: []
+
+  # Example tool with concurrency wait timeout
+  example_concurrent_tool_with_wait:
+    enabled: true
+    name: example_concurrent_tool_with_wait
+    description: |
+      Example tool demonstrating concurrency control with wait timeout.
+      If the concurrency limit is reached, this tool will wait up to 5 minutes
+      for a slot to become available before rejecting the request.
+    type: script
+
+    # Only allow 1 concurrent execution, but wait for up to 5 minutes if busy
+    concurrency:
+      max_concurrent: 1
+      wait_timeout: 300  # 5 minutes
+
+    script: >
+      bash -c "echo 'Starting process...';
+      sleep 10;
+      echo 'Process complete'"
+
+    scripts:
+      windows: >
+        powershell -command "Write-Host 'Starting process...';
+        Start-Sleep -Seconds 10;
+        Write-Host 'Process complete'"
+      darwin: >
+        bash -c "echo 'Starting process...';
+        sleep 10;
+        echo 'Process complete'"
+      linux: >
+        bash -c "echo 'Starting process...';
+        sleep 10;
+        echo 'Process complete'"
+
+    run_to_completion: true  # Wait for completion
+
+    post_processing:
+      attach_stdout: true
+      attach_stderr: true
+
+    inputSchema:
+      type: object
+      properties: {}
       required: []
 
   # Example tool that waits for completion
@@ -178,3 +230,23 @@ tools:
 # 6. For synchronous execution (run_to_completion):
 #    run_to_completion: true
 #    # Tool waits for script completion and returns final result
+#
+# 7. Concurrency control examples:
+#
+#    a) Default behavior - wait up to 5 minutes:
+#       concurrency:
+#         max_concurrent: 1
+#         # wait_timeout defaults to 300 seconds
+#
+#    b) Reject immediately if busy (no waiting):
+#       concurrency:
+#         max_concurrent: 1
+#         wait_timeout: null
+#
+#    c) Allow 3 concurrent, wait up to 2 minutes:
+#       concurrency:
+#         max_concurrent: 3
+#         wait_timeout: 120
+#
+#    d) No concurrency limits (omit concurrency section):
+#       # No concurrency section = unlimited concurrent executions

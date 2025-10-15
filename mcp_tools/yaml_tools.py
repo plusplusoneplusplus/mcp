@@ -114,6 +114,8 @@ class YamlToolBase(ToolInterface):
 
         # Import required modules for concurrency control
         import uuid
+        import asyncio
+        import time as time_module
         from utils.concurrency import OperationContext
 
         # Generate unique operation ID for this execution
@@ -123,17 +125,57 @@ class YamlToolBase(ToolInterface):
 
         # Check if operation can start (only if concurrency config exists)
         check_result = concurrency_manager.can_start_operation(self._name, context)
+
+        # If not allowed, check if we should wait
         if not check_result["allowed"]:
-            logger.warning(f"Concurrency limit exceeded for tool '{self._name}': {check_result}")
-            return {
-                "success": False,
-                "error": check_result["error"],
-                "message": check_result["message"],
-                "retry_after": check_result["retry_after"],
-                "current_operations": check_result["current_operations"],
-                "max_allowed": check_result["max_allowed"],
-                "tool_name": check_result["tool_name"]
-            }
+            # Get the concurrency config to check wait_timeout
+            config = concurrency_manager._configs.get(self._name)
+            wait_timeout = config.wait_timeout if config else None
+
+            if wait_timeout and wait_timeout > 0:
+                # Wait for a slot to become available
+                logger.info(f"Concurrency limit reached for tool '{self._name}', waiting up to {wait_timeout}s for a slot")
+                wait_start = time_module.time()
+                wait_interval = 1.0  # Check every 1 second
+
+                while True:
+                    elapsed = time_module.time() - wait_start
+
+                    # Check if timeout has been reached
+                    if elapsed >= wait_timeout:
+                        logger.warning(f"Concurrency wait timeout ({wait_timeout}s) reached for tool '{self._name}'")
+                        return {
+                            "success": False,
+                            "error": check_result["error"],
+                            "message": f"Operation rejected: waited {elapsed:.1f}s but maximum concurrent operations ({check_result['max_allowed']}) still running for tool '{self._name}'",
+                            "retry_after": check_result["retry_after"],
+                            "current_operations": check_result["current_operations"],
+                            "max_allowed": check_result["max_allowed"],
+                            "tool_name": check_result["tool_name"],
+                            "waited_seconds": elapsed
+                        }
+
+                    # Wait before checking again
+                    await asyncio.sleep(wait_interval)
+
+                    # Check if operation can start now
+                    check_result = concurrency_manager.can_start_operation(self._name, context)
+                    if check_result["allowed"]:
+                        elapsed = time_module.time() - wait_start
+                        logger.info(f"Slot became available for tool '{self._name}' after waiting {elapsed:.1f}s")
+                        break
+            else:
+                # No wait timeout configured, reject immediately
+                logger.warning(f"Concurrency limit exceeded for tool '{self._name}': {check_result}")
+                return {
+                    "success": False,
+                    "error": check_result["error"],
+                    "message": check_result["message"],
+                    "retry_after": check_result["retry_after"],
+                    "current_operations": check_result["current_operations"],
+                    "max_allowed": check_result["max_allowed"],
+                    "tool_name": check_result["tool_name"]
+                }
 
         # Start operation tracking
         start_result = concurrency_manager.start_operation(self._name, context)
