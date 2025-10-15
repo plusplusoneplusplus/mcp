@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class ConcurrencyConfig:
     """Configuration for concurrency limits."""
     max_concurrent: int = 1
+    wait_timeout: Optional[float] = 300.0  # Timeout in seconds to wait for a slot (default: 5 minutes, None = no wait)
 
 
 @dataclass
@@ -242,5 +243,6 @@ def parse_concurrency_config(config_dict: Dict[str, Any]) -> ConcurrencyConfig:
         ConcurrencyConfig instance
     """
     return ConcurrencyConfig(
-        max_concurrent=config_dict.get("max_concurrent", 1)
+        max_concurrent=config_dict.get("max_concurrent", 1),
+        wait_timeout=config_dict.get("wait_timeout", 300.0)
     )
