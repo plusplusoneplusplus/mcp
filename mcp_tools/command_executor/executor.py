@@ -129,9 +129,8 @@ class CommandExecutor(CommandExecutorInterface):
         self.temp_files = {}  # Maps PIDs to (stdout_file, stderr_file) tuples
         self.cleanup_lock = asyncio.Lock()  # Lock to protect temp file operations
 
-        # Memory management for completed processes - using OrderedDict for LRU behavior
-        self.completed_processes = OrderedDict()  # Store results of completed processes
-        self.completed_process_timestamps = {}  # Track completion timestamps for TTL
+        # Note: completed_processes cache removed in Phase 3 migration
+        # MCP progress notifications eliminate need for result caching
 
         # Periodic status reporting attributes
         self.status_reporter_task: Optional[asyncio.Task] = None
@@ -151,36 +150,8 @@ class CommandExecutor(CommandExecutorInterface):
             "periodic_status_max_command_length", 60
         )
 
-        # Job history persistence settings
-        self.job_history_persistence_enabled = env_manager.get_setting(
-            "job_history_persistence_enabled", False
-        )
-        self.job_history_storage_backend = env_manager.get_setting(
-            "job_history_storage_backend", "json"
-        )
-        self.job_history_storage_path = Path(
-            env_manager.get_setting("job_history_storage_path", ".job_history.json")
-        )
-        self.job_history_max_entries = env_manager.get_setting(
-            "job_history_max_entries", 1000
-        )
-        self.job_history_max_age_days = env_manager.get_setting(
-            "job_history_max_age_days", 30
-        )
-
-        # Memory management settings with defaults
-        self.max_completed_processes = env_manager.get_setting(
-            "command_executor_max_completed_processes", 100
-        )
-        self.completed_process_ttl = env_manager.get_setting(
-            "command_executor_completed_process_ttl", 3600  # 1 hour default
-        )
-        self.auto_cleanup_enabled = env_manager.get_setting(
-            "command_executor_auto_cleanup_enabled", True
-        )
-        self.cleanup_interval = env_manager.get_setting(
-            "command_executor_cleanup_interval", 300  # 5 minutes default
-        )
+        # Note: Job history persistence removed in Phase 3 migration
+        # MCP progress notifications provide real-time updates without caching
 
         # Use specified temp dir or system default
         self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
@@ -194,18 +165,12 @@ class CommandExecutor(CommandExecutorInterface):
             {
                 "temp_dir": self.temp_dir,
                 "os_type": self.os_type,
-                "max_completed_processes": self.max_completed_processes,
-                "completed_process_ttl": self.completed_process_ttl,
-                "auto_cleanup_enabled": self.auto_cleanup_enabled,
-                "cleanup_interval": self.cleanup_interval
             },
         )
 
-        if self.job_history_persistence_enabled:
-            self._load_persisted_history()
-
+        # Note: Auto-cleanup and persistence removed in Phase 3
         # Start cleanup task if enabled
-        if self.auto_cleanup_enabled:
+        if False:  # Disabled
             self.start_cleanup_task()
 
     def __del__(self):
@@ -217,68 +182,12 @@ class CommandExecutor(CommandExecutorInterface):
             pass
 
     def _enforce_completed_process_limit(self) -> None:
-        """Enforce the maximum number of completed processes using LRU eviction.
-
-        This method removes the oldest completed processes when the limit would be exceeded.
-        """
-        # Remove processes if we exceed the limit
-        while len(self.completed_processes) > self.max_completed_processes:
-            # Remove the oldest item (FIFO/LRU behavior with OrderedDict)
-            oldest_token, oldest_result = self.completed_processes.popitem(last=False)
-
-            # Also remove from timestamps
-            if oldest_token in self.completed_process_timestamps:
-                del self.completed_process_timestamps[oldest_token]
-
-            _log_with_context(
-                logging.DEBUG,
-                "Evicted oldest completed process due to limit",
-                {
-                    "evicted_token": oldest_token[:8],
-                    "current_count": len(self.completed_processes),
-                    "max_limit": self.max_completed_processes
-                }
-            )
+        """No-op: completed_processes cache removed in Phase 3."""
+        pass
 
     def _cleanup_expired_processes(self) -> int:
-        """Clean up completed processes that have exceeded their TTL.
-
-        Returns:
-            Number of processes cleaned up
-        """
-        if self.completed_process_ttl <= 0:
-            return 0
-
-        current_time = time.time()
-        expired_tokens = []
-
-        # Find expired processes
-        for token, timestamp in self.completed_process_timestamps.items():
-            if current_time - timestamp > self.completed_process_ttl:
-                expired_tokens.append(token)
-
-        # Remove expired processes
-        cleanup_count = 0
-        for token in expired_tokens:
-            if token in self.completed_processes:
-                del self.completed_processes[token]
-                cleanup_count += 1
-            if token in self.completed_process_timestamps:
-                del self.completed_process_timestamps[token]
-
-        if cleanup_count > 0:
-            _log_with_context(
-                logging.DEBUG,
-                "Cleaned up expired completed processes",
-                {
-                    "cleanup_count": cleanup_count,
-                    "ttl_seconds": self.completed_process_ttl,
-                    "remaining_count": len(self.completed_processes)
-                }
-            )
-            self._persist_completed_processes()
-
-        return cleanup_count
+        """No-op: completed_processes cache removed in Phase 3."""
+        return 0
 
     async def _periodic_cleanup_task(self) -> None:
         """Background task that periodically cleans up expired completed processes."""
@@ -295,10 +204,10 @@ class CommandExecutor(CommandExecutorInterface):
                             "Periodic cleanup completed",
                             {
                                 "cleaned_processes": cleanup_count,
-                                "remaining_processes": len(self.completed_processes)
+                                "remaining_processes": 0  # Cache removed
                             }
                         )
-                        self._persist_completed_processes()
+                        # _persist_completed_processes() - removed
 
                 except Exception as e:
                     _log_with_context(
@@ -339,9 +248,7 @@ class CommandExecutor(CommandExecutorInterface):
                 logging.INFO,
                 "Started background cleanup task",
                 {
-                    "cleanup_interval": self.cleanup_interval,
-                    "ttl_seconds": self.completed_process_ttl,
-                    "max_processes": self.max_completed_processes
+                    "note": "Cleanup task disabled - completed_processes cache removed"
                 }
             )
         except RuntimeError:
@@ -380,73 +287,20 @@ class CommandExecutor(CommandExecutorInterface):
                 pass
 
     def cleanup_completed_processes(self, force_all: bool = False) -> Dict[str, Any]:
-        """Manually clean up completed processes.
-
-        Args:
-            force_all: If True, remove all completed processes regardless of TTL
-
-        Returns:
-            Dictionary with cleanup statistics
-        """
-        initial_count = len(self.completed_processes)
-
-        if force_all:
-            # Clear all completed processes
-            self.completed_processes.clear()
-            self.completed_process_timestamps.clear()
-            cleanup_count = initial_count
-
-            _log_with_context(
-                logging.INFO,
-                "Force cleaned all completed processes",
-                {"cleaned_count": cleanup_count}
-            )
-        else:
-            # Clean up expired processes only
-            cleanup_count = self._cleanup_expired_processes()
-
-            # Also enforce the limit
-            self._enforce_completed_process_limit()
-
-        if cleanup_count > 0:
-            self._persist_completed_processes()
-
+        """No-op: completed_processes cache removed in Phase 3."""
         return {
-            "initial_count": initial_count,
-            "cleaned_count": cleanup_count,
-            "remaining_count": len(self.completed_processes),
+            "initial_count": 0,
+            "cleaned_count": 0,
+            "remaining_count": 0,
             "force_all": force_all
         }
 
     def get_memory_stats(self) -> Dict[str, Any]:
-        """Get current memory usage statistics for completed processes.
-
-        Returns:
-            Dictionary with memory statistics
-        """
-        current_time = time.time()
-
-        # Calculate age statistics
-        ages = []
-        for timestamp in self.completed_process_timestamps.values():
-            ages.append(current_time - timestamp)
-
-        stats = {
-            "completed_processes_count": len(self.completed_processes),
-            "max_completed_processes": self.max_completed_processes,
-            "completed_process_ttl": self.completed_process_ttl,
-            "auto_cleanup_enabled": self.auto_cleanup_enabled,
-            "cleanup_interval": self.cleanup_interval,
+        """No-op: completed_processes cache removed in Phase 3."""
+        return {
+            "completed_processes_count": 0,
+            "note": "Completed processes cache removed in Phase 3 migration"
         }
-
-        if ages:
-            stats.update({
-                "oldest_process_age": max(ages),
-                "newest_process_age": min(ages),
-                "average_process_age": sum(ages) / len(ages)
-            })
-
-        return stats
 
     def _create_temp_files(self, prefix: str = "cmd_") -> tuple:
         """Create temporary files for stdout and stderr
@@ -515,62 +369,12 @@ class CommandExecutor(CommandExecutorInterface):
             return f"[Error reading output: {str(e)}]"
 
     def _persist_completed_processes(self) -> None:
-        """Persist completed processes to storage if enabled."""
-        if not self.job_history_persistence_enabled:
-            return
-
-        try:
-            self.job_history_storage_path.parent.mkdir(parents=True, exist_ok=True)
-            entries = []
-            now = time.time()
-            max_age = self.job_history_max_age_days * 86400
-            for token, result in self.completed_processes.items():
-                ts = self.completed_process_timestamps.get(token, now)
-                if self.job_history_max_age_days > 0 and now - ts > max_age:
-                    continue
-                entries.append({"token": token, "result": result, "timestamp": ts})
-
-            if self.job_history_max_entries > 0:
-                entries = entries[-self.job_history_max_entries :]
-            with open(self.job_history_storage_path, "w", encoding="utf-8") as f:
-                json.dump(entries, f)
-        except Exception as e:
-            _log_with_context(
-                logging.WARNING,
-                "Failed to persist job history",
-                {"error": str(e), "path": str(self.job_history_storage_path)},
-            )
+        """No-op: job history persistence removed in Phase 3."""
+        pass
 
     def _load_persisted_history(self) -> None:
-        """Load persisted job history from storage."""
-        if not self.job_history_persistence_enabled:
-            return
-
-        try:
-            if self.job_history_storage_path.exists():
-                with open(self.job_history_storage_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                now = time.time()
-                max_age = self.job_history_max_age_days * 86400
-                for entry in data:
-                    token = entry.get("token")
-                    result = entry.get("result")
-                    timestamp = entry.get("timestamp", now)
-                    if not token or not result:
-                        continue
-                    if self.job_history_max_age_days > 0 and now - timestamp > max_age:
-                        continue
-                    self.completed_processes[token] = result
-                    self.completed_process_timestamps[token] = timestamp
-
-                self._enforce_completed_process_limit()
-                self._cleanup_expired_processes()
-        except Exception as e:
-            _log_with_context(
-                logging.WARNING,
-                "Failed to load persisted job history",
-                {"error": str(e), "path": str(self.job_history_storage_path)},
-            )
+        """No-op: job history persistence removed in Phase 3."""
+        pass
 
     async def _cleanup_temp_files(self, pid: int, from_monitor: bool = False) -> None:
         """Clean up temporary files associated with a process
@@ -1052,93 +856,49 @@ class CommandExecutor(CommandExecutorInterface):
                 status_info["os_status"] = os_status
 
     async def get_process_status(self, token: str) -> Dict[str, Any]:
-        """Get the status of an asynchronous process
+        """DEPRECATED: Use MCP progress notifications instead of polling.
 
         Args:
             token: Process token to check
 
         Returns:
-            Dictionary with process status information
+            Dictionary with process status information (running processes only)
         """
-        # Check if the token exists
+        # Only check running processes - completed process cache removed
         if token not in self.process_tokens:
-            # Check if it's in completed processes
-            if token in self.completed_processes:
-                # Move to end to mark as recently accessed (LRU behavior)
-                result = self.completed_processes[token]
-                self.completed_processes.move_to_end(token)
-                return result
-
-            _log_with_context(
-                logging.WARNING, f"Process token not found: {token}", {"token": token}
-            )
             return {
                 "status": "not_found",
-                "error": f"Process with token {token} not found",
+                "error": f"Process with token {token} not found or already completed",
+                "_deprecated": "Use MCP progress notifications instead of polling"
             }
 
-        # Get the process ID
         pid = self.process_tokens[token]
-
-        # Check if the process is still running
         if pid not in self.running_processes:
-            _log_with_context(
-                logging.WARNING,
-                f"Process PID not found in running processes: {pid}",
-                {"token": token, "pid": pid},
-            )
             return {
-                "status": "unknown",
-                "error": f"Process with PID {pid} not found in running processes",
+                "status": "not_found",
+                "error": "Process not found in running processes",
+                "_deprecated": "Use MCP progress notifications instead of polling"
             }
 
         process_data = self.running_processes[pid]
         process = process_data["process"]
 
-        # Check if the process has exited
+        # If completed, wait for final result
         if process.returncode is not None:
-            # Process has completed
-            _log_with_context(
-                logging.INFO,
-                f"Process status check found completed process",
-                {"token": token, "pid": pid, "returncode": process.returncode},
-            )
+            return await self.wait_for_process(token)
 
-            # Get final result
-            result = await self.wait_for_process(token)
-            return result
-
-        # Check if the process has been marked as terminated
-        if "terminated" in process_data and process_data["terminated"]:
-            # Get additional process info if psutil is available
-            process_info = self.get_process_info(pid)
-
-            status_info = {
-                "status": "terminated",
-                "pid": pid,
-                "token": token,
-                "command": process_data["command"],
-                "runtime": time.time() - process_data["start_time"],
-            }
-
-            self._merge_psutil_info(status_info, process_info)
-
-            return status_info
-
-        # Process is still running
-        # Get additional process info if psutil is available
+        # Still running
         process_info = self.get_process_info(pid)
-
         status_info = {
             "status": "running",
             "pid": pid,
             "token": token,
             "command": process_data["command"],
             "runtime": time.time() - process_data["start_time"],
+            "_deprecated": "Use MCP progress notifications instead of polling"
         }
 
         self._merge_psutil_info(status_info, process_info)
-
         return status_info
 
     def get_allowed_commands(self) -> List[str]:
@@ -1286,18 +1046,10 @@ class CommandExecutor(CommandExecutorInterface):
         """
         # Check if the token exists
         if token not in self.process_tokens:
-            # Check if it's already in completed processes
-            if token in self.completed_processes:
-                _log_with_context(
-                    logging.INFO,
-                    f"Process already completed, no need to terminate",
-                    {"token": token},
-                )
-                return True
-
+            # Note: completed_processes cache removed - token not found
             _log_with_context(
                 logging.WARNING,
-                f"Cannot terminate: Process token not found: {token}",
+                f"Process token not found, may be already completed",
                 {"token": token},
             )
             return False
@@ -1354,9 +1106,8 @@ class CommandExecutor(CommandExecutorInterface):
         Returns:
             Dictionary with final process result
         """
-        # Check if already in completed processes
-        if token in self.completed_processes:
-            return self.completed_processes[token]
+        # Note: completed_processes cache removed in Phase 3
+        # Results are now returned directly without caching
 
         # Check if the token exists
         if token not in self.process_tokens:
@@ -1491,16 +1242,8 @@ class CommandExecutor(CommandExecutorInterface):
         if "terminated" in process_data and process_data["terminated"]:
             result["status"] = "terminated"
 
-        # Enforce memory limits before adding new process
-        self._enforce_completed_process_limit()
-
-        # Store in completed processes with timestamp
-        current_time = time.time()
-        self.completed_processes[token] = result
-        self.completed_process_timestamps[token] = current_time
-
-        # Persist job history
-        self._persist_completed_processes()
+        # Note: Caching and persistence removed in Phase 3
+        # Results are returned directly without caching
 
         _log_with_context(
             logging.INFO,
@@ -1511,7 +1254,6 @@ class CommandExecutor(CommandExecutorInterface):
                 "returncode": returncode,
                 "stdout_length": len(stdout_content),
                 "stderr_length": len(stderr_content),
-                "completed_processes_count": len(self.completed_processes),
             },
         )
 
