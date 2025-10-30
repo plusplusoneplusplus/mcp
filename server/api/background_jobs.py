@@ -3,11 +3,17 @@ Background job management API endpoints.
 
 This module contains all API endpoints related to background job management,
 including listing, getting details, terminating jobs, and getting statistics.
+
+DEPRECATION NOTICE:
+These token-based polling endpoints are deprecated and will be removed in version 2.0.
+Please use MCP progress notifications (progressToken in request metadata) instead.
+See docs/migration/progress/token-to-mcp-progress.md for migration guide.
 """
 
 import os
 import sys
 from pathlib import Path
+import logging
 
 # Add the project root to Python path so we can import plugins
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -18,21 +24,55 @@ import psutil
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+logger = logging.getLogger(__name__)
+
+# Deprecation settings
+DEPRECATION_WARNING = (
+    "DEPRECATED: This token polling endpoint is deprecated and will be removed in version 2.0. "
+    "Use MCP progressToken in request metadata instead. "
+    "See docs/migration/progress/token-to-mcp-progress.md"
+)
+SUNSET_DATE = "Fri, 31 Dec 2025 23:59:59 GMT"
+
 
 def get_command_executor():
-    """Get or create the command executor instance."""
+    """Get or create the command_executor instance."""
     from mcp_tools.dependency import injector
     return injector.get_tool_instance("command_executor")
 
 
+def add_deprecation_headers(response: JSONResponse) -> JSONResponse:
+    """Add deprecation headers to response."""
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = SUNSET_DATE
+    response.headers["Link"] = "</docs/migration/progress>; rel=\"deprecation\""
+    response.headers["Warning"] = f'299 - "{DEPRECATION_WARNING}"'
+    return response
+
+
+def add_deprecation_to_body(body: dict) -> dict:
+    """Add deprecation metadata to response body."""
+    body["_deprecated"] = True
+    body["_deprecation_message"] = DEPRECATION_WARNING
+    body["_removal_version"] = "2.0"
+    body["_sunset_date"] = SUNSET_DATE
+    return body
+
+
 async def api_list_background_jobs(request: Request):
-    """List all background jobs."""
+    """List all background jobs.
+
+    DEPRECATED: Use MCP progress notifications instead.
+    """
+    logger.warning(f"DEPRECATED: Token polling endpoint /api/background-jobs accessed")
+
     try:
         command_executor = get_command_executor()
         if not command_executor:
-            return JSONResponse(
+            response = JSONResponse(
                 {"error": "Command executor not available"}, status_code=500
             )
+            return add_deprecation_headers(response)
 
         # Get query parameters
         status_filter = request.query_params.get("status")
@@ -79,19 +119,29 @@ async def api_list_background_jobs(request: Request):
         # Apply limit
         jobs = jobs[:limit]
 
-        return JSONResponse({
+        response_body = {
             "jobs": jobs,
             "total_count": total_count,
             "running_count": running_count,
             "completed_count": completed_count,
-        })
+        }
+
+        response_body = add_deprecation_to_body(response_body)
+        response = JSONResponse(response_body)
+        return add_deprecation_headers(response)
 
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        response = JSONResponse({"error": str(e)}, status_code=500)
+        return add_deprecation_headers(response)
 
 
 async def api_get_background_job(request: Request):
-    """Get details of a specific background job."""
+    """Get details of a specific background job.
+
+    DEPRECATED: Use MCP progress notifications instead.
+    """
+    logger.warning(f"DEPRECATED: Token polling endpoint /api/background-jobs/{{token}} accessed")
+
     try:
         token = request.path_params.get("token")
         if not token:
@@ -105,7 +155,9 @@ async def api_get_background_job(request: Request):
         if hasattr(command_executor, "completed_processes") and token in command_executor.completed_processes:
             job_data = command_executor.completed_processes[token].copy()
             job_data["token"] = token
-            return JSONResponse(job_data)
+            job_data = add_deprecation_to_body(job_data)
+            response = JSONResponse(job_data)
+            return add_deprecation_headers(response)
 
         # Then check running processes by token
         if hasattr(command_executor, "process_tokens") and token in command_executor.process_tokens:
@@ -148,16 +200,25 @@ async def api_get_background_job(request: Request):
                     start_time = process_data.get("start_time", time.time())
                     job_data["duration"] = time.time() - start_time
 
-                return JSONResponse(job_data)
+                job_data = add_deprecation_to_body(job_data)
+                response = JSONResponse(job_data)
+                return add_deprecation_headers(response)
 
-        return JSONResponse({"error": "Job not found"}, status_code=404)
+        response = JSONResponse({"error": "Job not found"}, status_code=404)
+        return add_deprecation_headers(response)
 
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        response = JSONResponse({"error": str(e)}, status_code=500)
+        return add_deprecation_headers(response)
 
 
 async def api_terminate_background_job(request: Request):
-    """Terminate a specific background job."""
+    """Terminate a specific background job.
+
+    DEPRECATED: Use MCP progress notifications instead.
+    """
+    logger.warning(f"DEPRECATED: Token polling endpoint /api/background-jobs/{{token}}/terminate accessed")
+
     try:
         token = request.path_params.get("token")
         if not token:
@@ -188,7 +249,12 @@ async def api_terminate_background_job(request: Request):
 
 
 async def api_background_job_stats(request: Request):
-    """Get statistics about background jobs."""
+    """Get statistics about background jobs.
+
+    DEPRECATED: Use MCP progress notifications instead.
+    """
+    logger.warning(f"DEPRECATED: Token polling endpoint /api/background-jobs/stats accessed")
+
     try:
         command_executor = get_command_executor()
         if not command_executor:
@@ -234,14 +300,19 @@ async def api_background_job_stats(request: Request):
             "memory_usage": psutil.virtual_memory().percent,
         }
 
-        return JSONResponse({
+        response_body = {
             "current_running": current_running,
             "total_completed": total_completed,
             "total_failed": total_failed,
             "average_runtime": average_runtime,
             "longest_running_token": longest_running_token,
             "system_load": system_load,
-        })
+        }
+
+        response_body = add_deprecation_to_body(response_body)
+        response = JSONResponse(response_body)
+        return add_deprecation_headers(response)
 
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        response = JSONResponse({"error": str(e)}, status_code=500)
+        return add_deprecation_headers(response)

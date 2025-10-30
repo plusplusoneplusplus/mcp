@@ -14,6 +14,10 @@ import time
 # Type alias for progress callback
 ProgressCallback = Callable[[float, Optional[float], Optional[str]], Awaitable[None]]
 
+# Module-level variable that will be set during server initialization
+# This allows tests to patch it
+server = None
+
 
 class MCPProgressHandler:
     """Manages MCP progress notifications for active requests.
@@ -23,12 +27,12 @@ class MCPProgressHandler:
     notification flooding.
 
     Example:
-        handler = MCPProgressHandler(mcp_server)
+        handler = MCPProgressHandler()
 
         # Register a progress token from request
         handler.register_token("token-123")
 
-        # Send progress updates
+        # Send progress updates (must be called within MCP request context)
         await handler.send_progress("token-123", 50, 100, "Halfway done")
 
         # Unregister when complete
@@ -37,18 +41,15 @@ class MCPProgressHandler:
 
     def __init__(
         self,
-        mcp_server,
         min_update_interval: float = 0.1,
         max_update_interval: float = 5.0
     ):
         """Initialize the progress handler.
 
         Args:
-            mcp_server: The MCP server instance for sending notifications
             min_update_interval: Minimum seconds between updates (default 0.1s)
             max_update_interval: Maximum seconds between forced updates (default 5.0s)
         """
-        self.mcp_server = mcp_server
         self.active_tokens: Dict[str, bool] = {}  # Track active progress tokens
         self.logger = logging.getLogger(__name__)
         self._rate_limiters: Dict[str, float] = {}  # Last update time per token
@@ -147,18 +148,43 @@ class MCPProgressHandler:
         self._last_progress[progress_token] = progress
 
         try:
-            # Send notification through MCP server
-            await self.mcp_server.send_progress_notification(
-                progress_token=progress_token,
-                progress=progress,
-                total=total,
-                message=message
-            )
+            # Get the global server instance
+            # Note: This must be set during server initialization
+            global server
+            if server is None:
+                # Try to import if not set yet
+                try:
+                    from server import main
+                    server = main.server
+                except ImportError:
+                    self.logger.warning("Server not initialized yet")
+                    return False
 
-            self.logger.debug(
-                f"Sent progress: {progress}/{total if total else '?'} - {message}"
-            )
-            return True
+            # Get the request context to access the session
+            try:
+                context = server.request_context
+                session = context.session
+
+                # Send notification through MCP session
+                # Note: MCP spec doesn't include 'message' in progress params
+                # Messages should be logged separately or included in tool output
+                await session.send_progress_notification(
+                    progress_token=progress_token,
+                    progress=progress,
+                    total=total
+                )
+
+                self.logger.debug(
+                    f"Sent progress: {progress}/{total if total else '?'} - {message}"
+                )
+                return True
+
+            except LookupError:
+                # No request context available (e.g., called outside of request)
+                self.logger.warning(
+                    f"Cannot send progress - no active request context"
+                )
+                return False
 
         except Exception as e:
             self.logger.error(
@@ -214,7 +240,7 @@ def create_progress_callback(
         A progress callback function
 
     Example:
-        handler = MCPProgressHandler(mcp_server)
+        handler = MCPProgressHandler()
         handler.register_token("token-123")
 
         callback = create_progress_callback(handler, "token-123")
