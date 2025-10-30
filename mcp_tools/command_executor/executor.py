@@ -135,9 +135,6 @@ class CommandExecutor(CommandExecutorInterface):
         # Periodic status reporting attributes
         self.status_reporter_task: Optional[asyncio.Task] = None
 
-        # Background cleanup task
-        self.cleanup_task: Optional[asyncio.Task] = None
-
         # Load configuration from config manager
         env_manager.load()
         self.status_reporter_enabled = env_manager.get_setting(
@@ -169,17 +166,6 @@ class CommandExecutor(CommandExecutorInterface):
         )
 
         # Note: Auto-cleanup and persistence removed in Phase 3
-        # Start cleanup task if enabled
-        if False:  # Disabled
-            self.start_cleanup_task()
-
-    def __del__(self):
-        """Cleanup when the CommandExecutor is destroyed."""
-        try:
-            self.stop_cleanup_task()
-        except Exception:
-            # Ignore errors during cleanup
-            pass
 
     def _enforce_completed_process_limit(self) -> None:
         """No-op: completed_processes cache removed in Phase 3."""
@@ -231,60 +217,16 @@ class CommandExecutor(CommandExecutorInterface):
             )
 
     def start_cleanup_task(self) -> None:
-        """Start the background cleanup task."""
-        if not self.auto_cleanup_enabled:
-            return
-
-        # Stop existing task if running
-        self.stop_cleanup_task()
-
-        # Only start task if there's a running event loop
-        try:
-            loop = asyncio.get_running_loop()
-            # Start new cleanup task
-            self.cleanup_task = asyncio.create_task(self._periodic_cleanup_task())
-
-            _log_with_context(
-                logging.INFO,
-                "Started background cleanup task",
-                {
-                    "note": "Cleanup task disabled - completed_processes cache removed"
-                }
-            )
-        except RuntimeError:
-            # No event loop running, defer task creation
-            _log_with_context(
-                logging.DEBUG,
-                "No event loop running, deferring cleanup task creation",
-                {"auto_cleanup_enabled": self.auto_cleanup_enabled}
-            )
+        """No-op: cleanup task removed in Phase 3."""
+        pass
 
     def stop_cleanup_task(self) -> None:
-        """Stop the background cleanup task."""
-        if self.cleanup_task and not self.cleanup_task.done():
-            try:
-                self.cleanup_task.cancel()
-            except RuntimeError:
-                # Event loop might be closed, ignore the error
-                pass
-            self.cleanup_task = None
-
-        _log_with_context(
-            logging.INFO,
-            "Stopped background cleanup task",
-            {}
-        )
+        """No-op: cleanup task removed in Phase 3."""
+        pass
 
     def _ensure_cleanup_task_running(self) -> None:
-        """Ensure the cleanup task is running if auto cleanup is enabled."""
-        if (self.auto_cleanup_enabled and
-            (self.cleanup_task is None or self.cleanup_task.done())):
-            try:
-                loop = asyncio.get_running_loop()
-                self.start_cleanup_task()
-            except RuntimeError:
-                # No event loop running, can't start task
-                pass
+        """No-op: auto cleanup removed in Phase 3."""
+        pass
 
     def cleanup_completed_processes(self, force_all: bool = False) -> Dict[str, Any]:
         """No-op: completed_processes cache removed in Phase 3."""
