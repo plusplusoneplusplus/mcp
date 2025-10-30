@@ -114,6 +114,10 @@ class TestMCPProgressNotificationsE2E:
             logger.info("✅ Async command execution completed successfully")
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        __import__('os').name == 'nt',
+        reason="Skipping on Windows due to async process handling"
+    )
     async def test_multiple_commands_do_not_interfere(self, mcp_client_info):
         """Test that multiple commands can be executed without progress interference."""
         server_url = mcp_client_info['url']
@@ -143,6 +147,10 @@ class TestMCPProgressNotificationsE2E:
                 logger.info(f"✅ Command {i} completed successfully")
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        __import__('os').name == 'nt',
+        reason="Skipping on Windows due to async process handling"
+    )
     async def test_progress_handler_cleans_up_tokens(self, mcp_client_info):
         """Test that progress tokens are properly cleaned up after execution."""
         server_url = mcp_client_info['url']
