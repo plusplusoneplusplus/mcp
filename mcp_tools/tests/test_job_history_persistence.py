@@ -1,66 +1,30 @@
-import os
-import json
-import tempfile
-import time
-from unittest.mock import patch
+"""
+DEPRECATED: Job history persistence tests - REMOVED
 
-from mcp_tools.command_executor.executor import CommandExecutor
+This test file has been deprecated and removed as part of Phase 3 of the
+MCP progress notification migration.
 
+The job history persistence functionality tested here has been removed:
+- completed_processes cache
+- Job history JSON persistence
+- Persistence load/save operations
 
-class TestJobHistoryPersistence:
-    def test_json_persistence_roundtrip(self):
-        tmp_file = tempfile.NamedTemporaryFile(delete=False)
-        tmp_file.close()
-        path = tmp_file.name
+MIGRATION:
+==========
+Job history persistence is no longer needed with MCP native progress notifications.
+Progress updates are sent in real-time via MCP session, eliminating the need
+for result caching and persistence.
 
-        with patch('mcp_tools.command_executor.executor.env_manager') as mock_env:
-            mock_env.load.return_value = None
-            mock_env.get_setting.side_effect = lambda key, default: {
-                'periodic_status_enabled': False,
-                'periodic_status_interval': 30.0,
-                'periodic_status_max_command_length': 60,
-                'command_executor_max_completed_processes': 100,
-                'command_executor_completed_process_ttl': 3600,
-                'command_executor_auto_cleanup_enabled': False,
-                'command_executor_cleanup_interval': 300,
-                'job_history_persistence_enabled': True,
-                'job_history_storage_backend': 'json',
-                'job_history_storage_path': path,
-                'job_history_max_entries': 100,
-                'job_history_max_age_days': 30,
-            }.get(key, default)
+For MCP progress notification testing, see:
+  - server/tests/test_mcp_progress_handler.py (unit tests)
+  - server/tests/test_mcp_progress_notifications_e2e.py (integration tests)
 
-            executor = CommandExecutor()
-            token = 'tok1'
-            executor.completed_processes[token] = {'status': 'completed'}
-            executor.completed_process_timestamps[token] =  time.time()
-            executor._persist_completed_processes()
+For migration details, see:
+  docs/migration/progress/token-to-mcp-progress.md
 
-            # File should contain the job entry
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            assert len(data) >= 1
-            token = data[-1]['token']
+REMOVED IN: Version 2.0 (Phase 3)
+REMOVAL DATE: 2025-10-29
+"""
 
-        # Load new instance to verify history reloads
-        with patch('mcp_tools.command_executor.executor.env_manager') as mock_env:
-            mock_env.load.return_value = None
-            mock_env.get_setting.side_effect = lambda key, default: {
-                'periodic_status_enabled': False,
-                'periodic_status_interval': 30.0,
-                'periodic_status_max_command_length': 60,
-                'command_executor_max_completed_processes': 100,
-                'command_executor_completed_process_ttl': 3600,
-                'command_executor_auto_cleanup_enabled': False,
-                'command_executor_cleanup_interval': 300,
-                'job_history_persistence_enabled': True,
-                'job_history_storage_backend': 'json',
-                'job_history_storage_path': path,
-                'job_history_max_entries': 100,
-                'job_history_max_age_days': 30,
-            }.get(key, default)
-
-            executor2 = CommandExecutor()
-            assert token in executor2.completed_processes
-
-        os.remove(path)
+# This file is intentionally left as a stub to document the removal
+# All functionality has been migrated to MCP progress notifications
