@@ -2,7 +2,7 @@ import platform
 import subprocess
 import asyncio
 import uuid
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Callable, Awaitable
 import logging
 import shlex
 import time
@@ -21,6 +21,9 @@ from mcp_tools.plugin import register_tool
 
 # Import config manager
 from config import env_manager
+
+# Type alias for progress callback
+ProgressCallback = Callable[[float, Optional[float], Optional[str]], Awaitable[None]]
 
 g_config_sleep_when_running = True
 
@@ -846,14 +849,73 @@ class CommandExecutor(CommandExecutorInterface):
             # Try to clean up
             await self.wait_for_process(token, timeout=5, from_monitor=True)
 
+    async def _monitor_process_with_progress(self, pid: int) -> None:
+        """Monitor process and send periodic MCP progress notifications.
+
+        Args:
+            pid: Process ID to monitor
+        """
+        try:
+            process_data = self.running_processes.get(pid)
+            if not process_data:
+                return
+
+            callback = process_data.get("progress_callback")
+            if not callback:
+                return  # No MCP progress requested
+
+            start_time = process_data["start_time"]
+            command = process_data["command"]
+            update_interval = 5  # Send update every 5 seconds
+
+            while pid in self.running_processes:
+                runtime = time.time() - start_time
+
+                # Get process metrics if available
+                try:
+                    proc = psutil.Process(pid)
+                    cpu_percent = proc.cpu_percent(interval=0.1)
+                    memory_mb = proc.memory_info().rss / 1024 / 1024
+                    message = f"Running for {runtime:.1f}s | CPU: {cpu_percent:.1f}% | Memory: {memory_mb:.1f}MB"
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    message = f"Running for {runtime:.1f}s"
+
+                # Send progress (use runtime as progress indicator)
+                try:
+                    await callback(
+                        progress=runtime,
+                        total=None,  # Unknown total for command execution
+                        message=message
+                    )
+                except Exception as e:
+                    _log_with_context(
+                        logging.ERROR,
+                        "Error sending progress notification",
+                        {"pid": pid, "error": str(e)}
+                    )
+
+                await asyncio.sleep(update_interval)
+
+        except Exception as e:
+            _log_with_context(
+                logging.ERROR,
+                f"Error monitoring process {pid}",
+                {"pid": pid, "error": str(e)}
+            )
+
     async def execute_async(
-        self, command: str, timeout: Optional[float] = None
+        self,
+        command: str,
+        timeout: Optional[float] = None,
+        progress_callback: Optional[ProgressCallback] = None
     ) -> Dict[str, Any]:
-        """Execute a command asynchronously
+        """Execute a command asynchronously with optional progress notifications.
 
         Args:
             command: The command to execute
             timeout: Optional timeout in seconds (for process completion)
+            progress_callback: Optional callback for MCP progress notifications
+                Signature: async def callback(progress: float, total: Optional[float], message: Optional[str])
 
         Returns:
             Dictionary with process token and initial status
@@ -910,6 +972,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "token": token,
                 "start_time": time.time(),
                 "terminated": False,  # Initialize terminated flag
+                "progress_callback": progress_callback,  # Store progress callback
             }
 
             # Store temp file locations for cleanup
@@ -920,6 +983,20 @@ class CommandExecutor(CommandExecutorInterface):
                 f"Started async command",
                 {"command": command, "token": token, "pid": pid},
             )
+
+            # Send initial progress if callback provided
+            if progress_callback:
+                try:
+                    await progress_callback(0, None, f"Started: {command}")
+                except Exception as e:
+                    _log_with_context(
+                        logging.ERROR,
+                        "Failed to send initial progress notification",
+                        {"error": str(e), "token": token}
+                    )
+
+                # Start progress monitoring task
+                asyncio.create_task(self._monitor_process_with_progress(pid))
 
             # Start a task to monitor the process if timeout is specified
             if timeout:
@@ -1371,6 +1448,24 @@ class CommandExecutor(CommandExecutorInterface):
         returncode = process.returncode
         stdout_content = self._read_temp_file(stdout_path)
         stderr_content = self._read_temp_file(stderr_path)
+
+        # Send final progress notification if callback exists
+        callback = process_data.get("progress_callback")
+        if callback:
+            duration = time.time() - process_data.get("start_time", time.time())
+            status = "completed successfully" if returncode == 0 else f"failed with code {returncode}"
+            try:
+                await callback(
+                    progress=duration,
+                    total=duration,
+                    message=f"Process {status} in {duration:.1f}s"
+                )
+            except Exception as e:
+                _log_with_context(
+                    logging.ERROR,
+                    "Failed to send final progress notification",
+                    {"token": token, "error": str(e)}
+                )
 
         # Clean up process and temp files
         del self.running_processes[pid]

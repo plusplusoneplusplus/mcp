@@ -69,6 +69,11 @@ class EnvironmentManager:
         "knowledge_sync_enabled": (False, bool),
         "knowledge_sync_folders": ("", str),
         "knowledge_sync_collections": ("", str),
+        # MCP Progress Notification settings
+        "mcp_progress_enabled": (True, bool),
+        "legacy_token_polling_enabled": (True, bool),
+        "mcp_progress_update_interval": (5.0, float),
+        "mcp_progress_rate_limit": (0.1, float),
     }
 
     # Default Azure repo settings with their types
