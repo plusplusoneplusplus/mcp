@@ -194,24 +194,29 @@ class TestMCPProgressNotificationsE2E:
                 logger.info("⚠ time_tool not available, skipping test")
 
     @pytest.mark.asyncio
-    async def test_legacy_polling_endpoints_removed(self, server_url):
-        """Test that legacy polling endpoints return 404."""
+    async def test_background_jobs_api_available(self, server_url):
+        """Test that background jobs API endpoints are available for historical job access.
+
+        These endpoints serve a different purpose than MCP progress notifications:
+        - MCP progress = real-time updates during execution
+        - Background jobs API = historical record for debugging/auditing
+        """
         import requests
 
-        # These endpoints should no longer exist
-        legacy_endpoints = [
-            f"{server_url}/api/background-jobs",
-            f"{server_url}/api/background-jobs/test-token",
-            f"{server_url}/api/background-jobs/stats",
+        # These endpoints should exist and return 200 (even if empty)
+        endpoints_to_test = [
+            (f"{server_url}/api/background-jobs", 200),  # List jobs
+            (f"{server_url}/api/background-jobs/stats", 200),  # Get stats
         ]
 
-        for endpoint in legacy_endpoints:
-            try:
-                resp = requests.get(endpoint, timeout=5)
-                # Should get 404 or 405 (method not allowed) since routes don't exist
-                assert resp.status_code in [404, 405], \
-                    f"Expected 404/405 for {endpoint}, got {resp.status_code}"
-                logger.info(f"✅ Legacy endpoint {endpoint} correctly returns {resp.status_code}")
-            except requests.exceptions.ConnectionError:
-                # Connection error is also acceptable (route not found)
-                logger.info(f"✅ Legacy endpoint {endpoint} not found (connection error)")
+        for endpoint, expected_status in endpoints_to_test:
+            resp = requests.get(endpoint, timeout=5)
+            assert resp.status_code == expected_status, \
+                f"Expected {expected_status} for {endpoint}, got {resp.status_code}"
+            logger.info(f"✅ Background jobs endpoint {endpoint} correctly returns {resp.status_code}")
+
+        # Test that getting a non-existent job returns 404
+        resp = requests.get(f"{server_url}/api/background-jobs/nonexistent-token", timeout=5)
+        assert resp.status_code == 404, \
+            f"Expected 404 for nonexistent job, got {resp.status_code}"
+        logger.info("✅ Nonexistent job correctly returns 404")
