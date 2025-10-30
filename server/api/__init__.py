@@ -45,6 +45,13 @@ from .tool_history import (
     api_export_tool_history,
 )
 
+from .background_jobs import (
+    api_list_background_jobs,
+    api_get_background_job,
+    api_terminate_background_job,
+    api_background_job_stats,
+)
+
 from .tools import (
     api_list_tools,
     api_get_tool_detail,
@@ -99,9 +106,11 @@ api_routes = [
     Route("/api/code-viewer/classes/{path_hash}", endpoint=api_code_viewer_classes, methods=["GET"]),
     Route("/api/code-viewer/cleanup", endpoint=api_code_viewer_cleanup, methods=["POST"]),
 
-    # Background job management endpoints - REMOVED in Phase 3
-    # Legacy token polling endpoints removed in favor of MCP progress notifications
-    # See docs/migration/progress/token-to-mcp-progress.md for migration details
+    # Background job management endpoints
+    Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),
+    Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
+    Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
+    Route("/api/background-jobs/{token}/terminate", endpoint=api_terminate_background_job, methods=["POST"]),
 
     # Configuration management endpoints
     Route("/api/configuration", endpoint=api_get_configuration, methods=["GET"]),
