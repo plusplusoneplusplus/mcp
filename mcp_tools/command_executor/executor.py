@@ -129,11 +129,18 @@ class CommandExecutor(CommandExecutorInterface):
         self.temp_files = {}  # Maps PIDs to (stdout_file, stderr_file) tuples
         self.cleanup_lock = asyncio.Lock()  # Lock to protect temp file operations
 
-        # Note: completed_processes cache removed in Phase 3 migration
-        # MCP progress notifications eliminate need for result caching
+        # Memory management for completed processes - using OrderedDict for LRU behavior
+        # Note: This is separate from MCP progress notifications
+        # - MCP notifications = real-time progress updates during execution
+        # - completed_processes cache = historical record for debugging/auditing
+        self.completed_processes = OrderedDict()  # Store results of completed processes
+        self.completed_process_timestamps = {}  # Track completion timestamps for TTL
 
         # Periodic status reporting attributes
         self.status_reporter_task: Optional[asyncio.Task] = None
+
+        # Background cleanup task
+        self.cleanup_task: Optional[asyncio.Task] = None
 
         # Load configuration from config manager
         env_manager.load()
@@ -147,8 +154,36 @@ class CommandExecutor(CommandExecutorInterface):
             "periodic_status_max_command_length", 60
         )
 
-        # Note: Job history persistence removed in Phase 3 migration
-        # MCP progress notifications provide real-time updates without caching
+        # Job history persistence settings (separate from MCP progress notifications)
+        self.job_history_persistence_enabled = env_manager.get_setting(
+            "job_history_persistence_enabled", False
+        )
+        self.job_history_storage_backend = env_manager.get_setting(
+            "job_history_storage_backend", "json"
+        )
+        self.job_history_storage_path = Path(
+            env_manager.get_setting("job_history_storage_path", ".job_history.json")
+        )
+        self.job_history_max_entries = env_manager.get_setting(
+            "job_history_max_entries", 1000
+        )
+        self.job_history_max_age_days = env_manager.get_setting(
+            "job_history_max_age_days", 30
+        )
+
+        # Memory management settings with defaults
+        self.max_completed_processes = env_manager.get_setting(
+            "command_executor_max_completed_processes", 100
+        )
+        self.completed_process_ttl = env_manager.get_setting(
+            "command_executor_completed_process_ttl", 3600  # 1 hour default
+        )
+        self.auto_cleanup_enabled = env_manager.get_setting(
+            "command_executor_auto_cleanup_enabled", True
+        )
+        self.cleanup_interval = env_manager.get_setting(
+            "command_executor_cleanup_interval", 300  # 5 minutes default
+        )
 
         # Use specified temp dir or system default
         self.temp_dir = temp_dir if temp_dir else tempfile.gettempdir()
@@ -162,18 +197,90 @@ class CommandExecutor(CommandExecutorInterface):
             {
                 "temp_dir": self.temp_dir,
                 "os_type": self.os_type,
+                "max_completed_processes": self.max_completed_processes,
+                "completed_process_ttl": self.completed_process_ttl,
+                "auto_cleanup_enabled": self.auto_cleanup_enabled,
+                "cleanup_interval": self.cleanup_interval,
+                "job_history_persistence_enabled": self.job_history_persistence_enabled,
             },
         )
 
-        # Note: Auto-cleanup and persistence removed in Phase 3
+        # Load persisted job history if enabled
+        if self.job_history_persistence_enabled:
+            self._load_persisted_history()
+
+        # Start cleanup task if enabled
+        if self.auto_cleanup_enabled:
+            self.start_cleanup_task()
+
+    def __del__(self):
+        """Cleanup when the CommandExecutor is destroyed."""
+        try:
+            self.stop_cleanup_task()
+        except Exception:
+            # Ignore errors during cleanup
+            pass
 
     def _enforce_completed_process_limit(self) -> None:
-        """No-op: completed_processes cache removed in Phase 3."""
-        pass
+        """Enforce the maximum number of completed processes using LRU eviction.
+
+        This method removes the oldest completed processes when the limit would be exceeded.
+        """
+        # Remove processes if we exceed the limit
+        while len(self.completed_processes) > self.max_completed_processes:
+            # Remove the oldest item (FIFO from OrderedDict)
+            oldest_token, oldest_result = self.completed_processes.popitem(last=False)
+            self.completed_process_timestamps.pop(oldest_token, None)
+
+            _log_with_context(
+                logging.DEBUG,
+                "Evicted completed process due to memory limit",
+                {
+                    "token": oldest_token,
+                    "max_limit": self.max_completed_processes,
+                    "current_count": len(self.completed_processes),
+                },
+            )
 
     def _cleanup_expired_processes(self) -> int:
-        """No-op: completed_processes cache removed in Phase 3."""
-        return 0
+        """Clean up completed processes that have exceeded their TTL.
+
+        Returns:
+            Number of processes cleaned up
+        """
+        if self.completed_process_ttl <= 0:
+            return 0
+
+        current_time = time.time()
+        expired_tokens = []
+
+        # Find expired processes
+        for token, timestamp in self.completed_process_timestamps.items():
+            if current_time - timestamp > self.completed_process_ttl:
+                expired_tokens.append(token)
+
+        # Remove expired processes
+        cleanup_count = 0
+        for token in expired_tokens:
+            if token in self.completed_processes:
+                del self.completed_processes[token]
+                cleanup_count += 1
+            if token in self.completed_process_timestamps:
+                del self.completed_process_timestamps[token]
+
+        if cleanup_count > 0:
+            _log_with_context(
+                logging.DEBUG,
+                "Cleaned up expired completed processes",
+                {
+                    "cleanup_count": cleanup_count,
+                    "ttl_seconds": self.completed_process_ttl,
+                    "remaining_count": len(self.completed_processes)
+                }
+            )
+            self._persist_completed_processes()
+
+        return cleanup_count
 
     async def _periodic_cleanup_task(self) -> None:
         """Background task that periodically cleans up expired completed processes."""
@@ -190,10 +297,10 @@ class CommandExecutor(CommandExecutorInterface):
                             "Periodic cleanup completed",
                             {
                                 "cleaned_processes": cleanup_count,
-                                "remaining_processes": 0  # Cache removed
+                                "remaining_processes": len(self.completed_processes)
                             }
                         )
-                        # _persist_completed_processes() - removed
+                        self._persist_completed_processes()
 
                 except Exception as e:
                     _log_with_context(
@@ -217,31 +324,108 @@ class CommandExecutor(CommandExecutorInterface):
             )
 
     def start_cleanup_task(self) -> None:
-        """No-op: cleanup task removed in Phase 3."""
-        pass
+        """Start the background cleanup task."""
+        if not self.auto_cleanup_enabled:
+            return
+
+        # Stop existing task if running
+        self.stop_cleanup_task()
+
+        # Only start task if there's a running event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # Start new cleanup task
+            self.cleanup_task = asyncio.create_task(self._periodic_cleanup_task())
+
+            _log_with_context(
+                logging.INFO,
+                "Started background cleanup task",
+                {
+                    "cleanup_interval": self.cleanup_interval,
+                    "ttl_seconds": self.completed_process_ttl,
+                    "max_processes": self.max_completed_processes
+                }
+            )
+        except RuntimeError:
+            # No event loop running, defer task creation
+            _log_with_context(
+                logging.DEBUG,
+                "No event loop running, deferring cleanup task creation",
+                {"auto_cleanup_enabled": self.auto_cleanup_enabled}
+            )
 
     def stop_cleanup_task(self) -> None:
-        """No-op: cleanup task removed in Phase 3."""
-        pass
+        """Stop the background cleanup task."""
+        if self.cleanup_task and not self.cleanup_task.done():
+            try:
+                self.cleanup_task.cancel()
+            except RuntimeError:
+                # Event loop might be closed, ignore the error
+                pass
+            self.cleanup_task = None
+
+        _log_with_context(
+            logging.INFO,
+            "Stopped background cleanup task",
+            {}
+        )
 
     def _ensure_cleanup_task_running(self) -> None:
-        """No-op: auto cleanup removed in Phase 3."""
-        pass
+        """Ensure the cleanup task is running if auto cleanup is enabled."""
+        if (self.auto_cleanup_enabled and
+            (self.cleanup_task is None or self.cleanup_task.done())):
+            try:
+                loop = asyncio.get_running_loop()
+                self.start_cleanup_task()
+            except RuntimeError:
+                # No event loop running, can't start task
+                pass
 
     def cleanup_completed_processes(self, force_all: bool = False) -> Dict[str, Any]:
-        """No-op: completed_processes cache removed in Phase 3."""
+        """Manually clean up completed processes.
+
+        Args:
+            force_all: If True, remove all completed processes regardless of TTL
+
+        Returns:
+            Dictionary with cleanup statistics
+        """
+        initial_count = len(self.completed_processes)
+
+        if force_all:
+            # Clear all completed processes
+            self.completed_processes.clear()
+            self.completed_process_timestamps.clear()
+            cleanup_count = initial_count
+
+            _log_with_context(
+                logging.INFO,
+                "Force cleaned all completed processes",
+                {"cleaned_count": cleanup_count}
+            )
+        else:
+            # Clean up expired processes only
+            cleanup_count = self._cleanup_expired_processes()
+
+            # Also enforce the limit
+            self._enforce_completed_process_limit()
+
+        if cleanup_count > 0:
+            self._persist_completed_processes()
+
         return {
-            "initial_count": 0,
-            "cleaned_count": 0,
-            "remaining_count": 0,
-            "force_all": force_all
+            "initial_count": initial_count,
+            "cleaned_count": cleanup_count,
+            "remaining_count": len(self.completed_processes),
         }
 
     def get_memory_stats(self) -> Dict[str, Any]:
-        """No-op: completed_processes cache removed in Phase 3."""
+        """Get memory usage statistics for completed processes cache."""
         return {
-            "completed_processes_count": 0,
-            "note": "Completed processes cache removed in Phase 3 migration"
+            "completed_processes_count": len(self.completed_processes),
+            "max_completed_processes": self.max_completed_processes,
+            "completed_process_ttl": self.completed_process_ttl,
+            "auto_cleanup_enabled": self.auto_cleanup_enabled,
         }
 
     def _create_temp_files(self, prefix: str = "cmd_") -> tuple:
@@ -311,12 +495,62 @@ class CommandExecutor(CommandExecutorInterface):
             return f"[Error reading output: {str(e)}]"
 
     def _persist_completed_processes(self) -> None:
-        """No-op: job history persistence removed in Phase 3."""
-        pass
+        """Persist completed processes to storage if enabled."""
+        if not self.job_history_persistence_enabled:
+            return
+
+        try:
+            self.job_history_storage_path.parent.mkdir(parents=True, exist_ok=True)
+            entries = []
+            now = time.time()
+            max_age = self.job_history_max_age_days * 86400
+            for token, result in self.completed_processes.items():
+                ts = self.completed_process_timestamps.get(token, now)
+                if self.job_history_max_age_days > 0 and now - ts > max_age:
+                    continue
+                entries.append({"token": token, "result": result, "timestamp": ts})
+
+            if self.job_history_max_entries > 0:
+                entries = entries[-self.job_history_max_entries :]
+            with open(self.job_history_storage_path, "w", encoding="utf-8") as f:
+                json.dump(entries, f)
+        except Exception as e:
+            _log_with_context(
+                logging.WARNING,
+                "Failed to persist job history",
+                {"error": str(e), "path": str(self.job_history_storage_path)},
+            )
 
     def _load_persisted_history(self) -> None:
-        """No-op: job history persistence removed in Phase 3."""
-        pass
+        """Load persisted job history from storage."""
+        if not self.job_history_persistence_enabled:
+            return
+
+        try:
+            if self.job_history_storage_path.exists():
+                with open(self.job_history_storage_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                now = time.time()
+                max_age = self.job_history_max_age_days * 86400
+                for entry in data:
+                    token = entry.get("token")
+                    result = entry.get("result")
+                    timestamp = entry.get("timestamp", now)
+                    if not token or not result:
+                        continue
+                    if self.job_history_max_age_days > 0 and now - timestamp > max_age:
+                        continue
+                    self.completed_processes[token] = result
+                    self.completed_process_timestamps[token] = timestamp
+
+                self._enforce_completed_process_limit()
+                self._cleanup_expired_processes()
+        except Exception as e:
+            _log_with_context(
+                logging.WARNING,
+                "Failed to load persisted job history",
+                {"error": str(e), "path": str(self.job_history_storage_path)},
+            )
 
     async def _cleanup_temp_files(self, pid: int, from_monitor: bool = False) -> None:
         """Clean up temporary files associated with a process
@@ -1184,8 +1418,16 @@ class CommandExecutor(CommandExecutorInterface):
         if "terminated" in process_data and process_data["terminated"]:
             result["status"] = "terminated"
 
-        # Note: Caching and persistence removed in Phase 3
-        # Results are returned directly without caching
+        # Store result in completed_processes cache for history/debugging
+        # This is separate from MCP progress notifications
+        self.completed_processes[token] = result
+        self.completed_process_timestamps[token] = time.time()
+
+        # Enforce memory limits
+        self._enforce_completed_process_limit()
+
+        # Persist to disk if enabled
+        self._persist_completed_processes()
 
         _log_with_context(
             logging.INFO,
