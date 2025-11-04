@@ -19,8 +19,6 @@ from .knowledge import (
     api_knowledge_sync_folder,
     api_code_indexing_ctags,
     api_code_indexing_tree_sitter,
-    api_code_indexing_async,
-    api_code_indexing_status,
     api_code_viewer_paths,
     api_code_viewer_classes,
     api_code_viewer_cleanup,
@@ -96,10 +94,6 @@ api_routes = [
     # Code indexing endpoints
     Route("/api/code-indexing/ctags", endpoint=api_code_indexing_ctags, methods=["POST"]),
     Route("/api/code-indexing/tree-sitter", endpoint=api_code_indexing_tree_sitter, methods=["POST"]),
-
-    # Async code indexing endpoints
-    Route("/api/code-indexing/async", endpoint=api_code_indexing_async, methods=["POST"]),
-    Route("/api/code-indexing/status/{token}", endpoint=api_code_indexing_status, methods=["GET"]),
 
     # Code viewer endpoints
     Route("/api/code-viewer/paths", endpoint=api_code_viewer_paths, methods=["GET"]),

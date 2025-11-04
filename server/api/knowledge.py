@@ -22,8 +22,6 @@ from .knowledge import (
     # Code indexing operations
     api_code_indexing_ctags,
     api_code_indexing_tree_sitter,
-    api_code_indexing_async,
-    api_code_indexing_status,
 
     # Code viewer operations
     api_code_viewer_paths,

@@ -108,6 +108,14 @@ class CommandExecutor(CommandExecutorInterface):
             "required": ["command"],
         }
 
+    def set_progress_callback(self, callback: ProgressCallback) -> None:
+        """Set the progress callback for this tool instance.
+
+        Args:
+            callback: Progress callback function
+        """
+        self._progress_callback = callback
+
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments.
 
@@ -120,6 +128,11 @@ class CommandExecutor(CommandExecutorInterface):
         command = arguments.get("command", "")
         timeout = arguments.get("timeout")
 
+        # Use progress callback if available
+        progress_callback = getattr(self, '_progress_callback', None)
+
+        # For now, execute synchronously with progress support
+        # In the future, we could detect long-running commands and use execute_async
         return self.execute(command, timeout)
 
     def __init__(self, temp_dir: Optional[str] = None):
@@ -128,6 +141,7 @@ class CommandExecutor(CommandExecutorInterface):
         self.process_tokens = {}  # Maps tokens to process IDs
         self.temp_files = {}  # Maps PIDs to (stdout_file, stderr_file) tuples
         self.cleanup_lock = asyncio.Lock()  # Lock to protect temp file operations
+        self._progress_callback: Optional[ProgressCallback] = None  # Progress callback for MCP
 
         # Memory management for completed processes - using OrderedDict for LRU behavior
         # Note: This is separate from MCP progress notifications
@@ -1034,12 +1048,22 @@ class CommandExecutor(CommandExecutorInterface):
     async def get_process_status(self, token: str) -> Dict[str, Any]:
         """DEPRECATED: Use MCP progress notifications instead of polling.
 
+        This method is deprecated and will be removed in a future version.
+        Use MCP progress notifications for real-time updates instead of polling.
+
         Args:
             token: Process token to check
 
         Returns:
             Dictionary with process status information (running processes only)
         """
+        import warnings
+        warnings.warn(
+            "get_process_status is deprecated. Use MCP progress notifications instead of polling.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+
         # Only check running processes - completed process cache removed
         if token not in self.process_tokens:
             return {

@@ -1,11 +1,8 @@
 """
 Background job management API endpoints.
 
-This module contains all API endpoints related to background job management,
-including listing, getting details, terminating jobs, and getting statistics.
-
-This provides access to both running jobs and historical completed jobs for
-debugging and auditing purposes.
+This module contains API endpoints for monitoring currently running background jobs.
+For real-time progress updates, use MCP progress notifications instead of polling.
 """
 
 import os
