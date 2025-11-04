@@ -5,6 +5,8 @@ import click
 import json
 import datetime
 import time
+import asyncio
+import signal
 from typing import Dict, Any, Optional, Union, List
 
 # Import startup tracing utilities
@@ -475,11 +477,99 @@ async def shutdown_knowledge_sync():
         logging.error(f"Error shutting down knowledge sync service: {e}")
 
 
+async def shutdown_command_executor():
+    """Shutdown the command executor and terminate all running processes."""
+    try:
+        logging.info("Shutting down command executor...")
+        command_executor = injector.get_tool_instance("command_executor")
+        if command_executor:
+            # Terminate all running processes
+            running_processes = list(command_executor.running_processes.keys())
+            if running_processes:
+                logging.info(f"Terminating {len(running_processes)} running processes...")
+                for pid in running_processes:
+                    try:
+                        command_executor.terminate_process(pid)
+                        logging.debug(f"Terminated process {pid}")
+                    except Exception as e:
+                        logging.error(f"Error terminating process {pid}: {e}")
+                logging.info("All running processes terminated")
+            else:
+                logging.info("No running processes to terminate")
+
+            # Stop the cleanup task if it exists
+            if hasattr(command_executor, 'stop_cleanup_task'):
+                command_executor.stop_cleanup_task()
+                logging.info("Command executor cleanup task stopped")
+        else:
+            logging.debug("Command executor not found, skipping shutdown")
+    except Exception as e:
+        logging.error(f"Error shutting down command executor: {e}")
+
+
+async def shutdown_tool_instances():
+    """Cleanup tool instances that may have resources to release."""
+    try:
+        logging.info("Cleaning up tool instances...")
+        tool_instances = list(injector.get_all_instances().values())
+        cleaned_count = 0
+
+        for tool in tool_instances:
+            try:
+                # Check if tool has a cleanup/close method
+                if hasattr(tool, 'cleanup'):
+                    if asyncio.iscoroutinefunction(tool.cleanup):
+                        await tool.cleanup()
+                    else:
+                        tool.cleanup()
+                    cleaned_count += 1
+                    logging.debug(f"Cleaned up tool: {tool.name}")
+                elif hasattr(tool, 'close'):
+                    if asyncio.iscoroutinefunction(tool.close):
+                        await tool.close()
+                    else:
+                        tool.close()
+                    cleaned_count += 1
+                    logging.debug(f"Closed tool: {tool.name}")
+            except Exception as e:
+                logging.error(f"Error cleaning up tool {tool.name}: {e}")
+
+        if cleaned_count > 0:
+            logging.info(f"Cleaned up {cleaned_count} tool instances")
+        else:
+            logging.debug("No tool instances required cleanup")
+    except Exception as e:
+        logging.error(f"Error during tool instances cleanup: {e}")
+
+
+async def shutdown_logging_handlers():
+    """Close all logging file handlers to release file handles."""
+    try:
+        logging.info("Closing logging handlers...")
+        handlers_closed = 0
+        for handler in logging.root.handlers[:]:
+            try:
+                handler.close()
+                handlers_closed += 1
+            except Exception as e:
+                logging.error(f"Error closing handler {handler}: {e}")
+        logging.info(f"Closed {handlers_closed} logging handlers")
+    except Exception as e:
+        # Log to stderr since logging handlers might be closed
+        import sys
+        print(f"Error closing logging handlers: {e}", file=sys.stderr)
+
+
 # Create Starlette app with event handlers
 starlette_app = Starlette(
     routes=routes,
     on_startup=[startup_knowledge_sync],
-    on_shutdown=[shutdown_knowledge_sync],
+    on_shutdown=[
+        shutdown_knowledge_sync,
+        shutdown_command_executor,
+        shutdown_tool_instances,
+        shutdown_logging_handlers,
+    ],
 )
 
 
