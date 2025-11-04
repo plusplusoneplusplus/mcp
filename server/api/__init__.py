@@ -19,8 +19,6 @@ from .knowledge import (
     api_knowledge_sync_folder,
     api_code_indexing_ctags,
     api_code_indexing_tree_sitter,
-    api_code_indexing_async,
-    api_code_indexing_status,
     api_code_viewer_paths,
     api_code_viewer_classes,
     api_code_viewer_cleanup,
@@ -47,8 +45,6 @@ from .tool_history import (
 
 from .background_jobs import (
     api_list_background_jobs,
-    api_get_background_job,
-    api_terminate_background_job,
     api_background_job_stats,
 )
 
@@ -97,10 +93,6 @@ api_routes = [
     Route("/api/code-indexing/ctags", endpoint=api_code_indexing_ctags, methods=["POST"]),
     Route("/api/code-indexing/tree-sitter", endpoint=api_code_indexing_tree_sitter, methods=["POST"]),
 
-    # Async code indexing endpoints
-    Route("/api/code-indexing/async", endpoint=api_code_indexing_async, methods=["POST"]),
-    Route("/api/code-indexing/status/{token}", endpoint=api_code_indexing_status, methods=["GET"]),
-
     # Code viewer endpoints
     Route("/api/code-viewer/paths", endpoint=api_code_viewer_paths, methods=["GET"]),
     Route("/api/code-viewer/classes/{path_hash}", endpoint=api_code_viewer_classes, methods=["GET"]),
@@ -109,8 +101,6 @@ api_routes = [
     # Background job management endpoints
     Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),
     Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
-    Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
-    Route("/api/background-jobs/{token}/terminate", endpoint=api_terminate_background_job, methods=["POST"]),
 
     # Configuration management endpoints
     Route("/api/configuration", endpoint=api_get_configuration, methods=["GET"]),
