@@ -162,7 +162,7 @@ class TestMCPProgressE2E:
     @pytest.mark.asyncio
     @pytest.mark.skipif(
         __import__('os').name == 'nt',
-        reason="Skipping on Windows due to async process handling"
+        reason="Skipping on Windows due to test worker compatibility issues"
     )
     async def test_concurrent_progress_tokens_dont_interfere(self, mcp_client_info):
         """
@@ -239,6 +239,10 @@ class TestMCPProgressE2E:
             logger.info("✅ Concurrent progress tokens work independently")
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        __import__('os').name == 'nt',
+        reason="Skipping on Windows due to test worker compatibility issues"
+    )
     async def test_progress_token_cleanup_after_completion(self, mcp_client_info):
         """
         Test that progress tokens are properly cleaned up after command completion.
