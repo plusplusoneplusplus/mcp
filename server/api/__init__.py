@@ -45,6 +45,8 @@ from .tool_history import (
 
 from .background_jobs import (
     api_list_background_jobs,
+    api_get_background_job,
+    api_terminate_background_job,
     api_background_job_stats,
 )
 
@@ -101,6 +103,8 @@ api_routes = [
     # Background job management endpoints
     Route("/api/background-jobs", endpoint=api_list_background_jobs, methods=["GET"]),
     Route("/api/background-jobs/stats", endpoint=api_background_job_stats, methods=["GET"]),
+    Route("/api/background-jobs/{token}", endpoint=api_get_background_job, methods=["GET"]),
+    Route("/api/background-jobs/{token}/terminate", endpoint=api_terminate_background_job, methods=["POST"]),
 
     # Configuration management endpoints
     Route("/api/configuration", endpoint=api_get_configuration, methods=["GET"]),
