@@ -346,7 +346,7 @@ def test_enabled_flag_with_other_metadata(clean_registry):
     """Test that enabled flag works correctly with other metadata (ecosystem, os_type)."""
 
     @register_tool(
-        source="code", ecosystem="test-ecosystem", os_type="non-windows", enabled=False
+        source="code", ecosystem="test-ecosystem", os_type="all", enabled=False
     )
     class ComplexTool(ToolInterface):
         @property
@@ -374,7 +374,7 @@ def test_enabled_flag_with_other_metadata(clean_registry):
     assert tool_ecosystems["complex_tool"] == "test-ecosystem"
 
     tool_os = clean_registry.get_tool_os()
-    assert tool_os["complex_tool"] == "non-windows"
+    assert tool_os["complex_tool"] == "all"
 
     tool_enabled = clean_registry.get_tool_enabled()
     assert tool_enabled["complex_tool"] is False
@@ -382,7 +382,7 @@ def test_enabled_flag_with_other_metadata(clean_registry):
     # Check class metadata
     assert ComplexTool._mcp_source == "code"
     assert ComplexTool._mcp_ecosystem == "test-ecosystem"
-    assert ComplexTool._mcp_os == "non-windows"
+    assert ComplexTool._mcp_os == "all"
     assert ComplexTool._mcp_enabled is False
 
 
