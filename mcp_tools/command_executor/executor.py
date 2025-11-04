@@ -131,9 +131,31 @@ class CommandExecutor(CommandExecutorInterface):
         # Use progress callback if available
         progress_callback = getattr(self, '_progress_callback', None)
 
-        # For now, execute synchronously with progress support
-        # In the future, we could detect long-running commands and use execute_async
-        return self.execute(command, timeout)
+        # Use async execution with progress notifications if callback is provided
+        if progress_callback:
+            _log_with_context(
+                logging.DEBUG,
+                "Executing command asynchronously with progress notifications",
+                {"command": command}
+            )
+            # Start async execution
+            start_result = await self.execute_async(
+                command,
+                timeout=timeout,
+                progress_callback=progress_callback
+            )
+
+            # Wait for completion
+            if start_result.get("status") == "running":
+                token = start_result.get("token")
+                result = await self.wait_for_process(token, timeout=timeout)
+                return result
+            else:
+                # Error starting the command
+                return start_result
+        else:
+            # No progress callback - use synchronous execution
+            return self.execute(command, timeout)
 
     def __init__(self, temp_dir: Optional[str] = None):
         self.os_type = platform.system().lower()
