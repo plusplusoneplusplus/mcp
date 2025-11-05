@@ -1,14 +1,13 @@
 """
 Background job management API endpoints.
 
-This module contains API endpoints for monitoring currently running background jobs.
-For real-time progress updates, use MCP progress notifications instead of polling.
+This module contains all API endpoints related to background job management,
+including listing, getting details, terminating jobs, and getting statistics.
 """
 
 import os
 import sys
 from pathlib import Path
-import logging
 
 # Add the project root to Python path so we can import plugins
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -19,17 +18,15 @@ import psutil
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-logger = logging.getLogger(__name__)
-
 
 def get_command_executor():
-    """Get or create the command_executor instance."""
+    """Get or create the command executor instance."""
     from mcp_tools.dependency import injector
     return injector.get_tool_instance("command_executor")
 
 
 async def api_list_background_jobs(request: Request):
-    """List all background jobs (running and optionally completed)."""
+    """List all background jobs."""
     try:
         command_executor = get_command_executor()
         if not command_executor:
@@ -82,17 +79,14 @@ async def api_list_background_jobs(request: Request):
         # Apply limit
         jobs = jobs[:limit]
 
-        response_body = {
+        return JSONResponse({
             "jobs": jobs,
             "total_count": total_count,
             "running_count": running_count,
             "completed_count": completed_count,
-        }
-
-        return JSONResponse(response_body)
+        })
 
     except Exception as e:
-        logger.error(f"Error listing background jobs: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
@@ -159,7 +153,6 @@ async def api_get_background_job(request: Request):
         return JSONResponse({"error": "Job not found"}, status_code=404)
 
     except Exception as e:
-        logger.error(f"Error getting background job: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
@@ -191,7 +184,6 @@ async def api_terminate_background_job(request: Request):
             )
 
     except Exception as e:
-        logger.error(f"Error terminating background job: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
@@ -242,17 +234,14 @@ async def api_background_job_stats(request: Request):
             "memory_usage": psutil.virtual_memory().percent,
         }
 
-        response_body = {
+        return JSONResponse({
             "current_running": current_running,
             "total_completed": total_completed,
             "total_failed": total_failed,
             "average_runtime": average_runtime,
             "longest_running_token": longest_running_token,
             "system_load": system_load,
-        }
-
-        return JSONResponse(response_body)
+        })
 
     except Exception as e:
-        logger.error(f"Error getting background job stats: {e}")
         return JSONResponse({"error": str(e)}, status_code=500)

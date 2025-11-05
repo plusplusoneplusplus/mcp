@@ -5,8 +5,6 @@ import click
 import json
 import datetime
 import time
-import asyncio
-import signal
 from typing import Dict, Any, Optional, Union, List
 
 # Import startup tracing utilities
@@ -55,21 +53,6 @@ server = Server("mymcp")
 
 # Add debug logging for server events
 logging.info("MCP Server created successfully")
-
-# Initialize MCP progress handler
-from server.mcp_progress_handler import MCPProgressHandler
-import server.mcp_progress_handler as mcp_progress_module
-
-# Create global progress handler instance
-progress_handler = MCPProgressHandler(
-    min_update_interval=env.get_setting("mcp_progress_rate_limit", 0.1),
-    max_update_interval=env.get_setting("mcp_progress_update_interval", 5.0),
-)
-
-# Set the module-level server reference for progress handler
-mcp_progress_module.server = server
-
-logging.info("MCP Progress Handler initialized")
 
 # Initialize tools system directly with tracing
 with time_operation("Tool Discovery and Registration"):
@@ -231,28 +214,6 @@ async def call_tool_handler(
     logging.info(f"TOOL CALL HANDLER INVOKED: {name} with arguments: {arguments}")
     logging.info(f"Handler running on platform: {os.name}")
 
-    # Extract progress token from request metadata if available
-    progress_token = None
-    progress_callback = None
-    try:
-        context = server.request_context
-        if context.meta and hasattr(context.meta, "progressToken"):
-            progress_token = context.meta.progressToken
-            if progress_token:
-                progress_handler.register_token(str(progress_token))
-                # Create progress callback for this tool execution
-                from server.mcp_progress_handler import create_progress_callback
-
-                progress_callback = create_progress_callback(
-                    progress_handler, str(progress_token)
-                )
-                logging.info(
-                    f"Registered progress token: {progress_token} for tool: {name}"
-                )
-    except (LookupError, AttributeError) as e:
-        # No request context or no progress token - this is fine
-        logging.debug(f"No progress token for tool {name}: {e}")
-
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
     )
@@ -260,11 +221,6 @@ async def call_tool_handler(
     tool = injector.get_tool_instance(name)
     if tool and invocation_dir:
         tool.diagnostic_dir = str(invocation_dir)
-
-    # Set progress callback on tool if it supports it
-    if tool and progress_callback and hasattr(tool, "set_progress_callback"):
-        tool.set_progress_callback(progress_callback)
-
     if not tool:
         # Debug: Log available tools when tool is not found
         available_tools = list(injector.get_all_instances().keys())
@@ -328,11 +284,6 @@ async def call_tool_handler(
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
         return [TextContent(type="text", text=error_msg)]
-    finally:
-        # Unregister progress token after tool execution
-        if progress_token:
-            progress_handler.unregister_token(str(progress_token))
-            logging.debug(f"Unregistered progress token: {progress_token}")
 
 
 # Setup SSE transport
@@ -458,7 +409,6 @@ routes = [
     ),
 ] + api_routes
 
-
 # Knowledge sync service startup/shutdown handlers
 async def startup_knowledge_sync():
     """Initialize the knowledge sync service on application startup."""
@@ -466,7 +416,6 @@ async def startup_knowledge_sync():
         await knowledge_sync_service.start_knowledge_sync_service()
     except Exception as e:
         logging.error(f"Failed to initialize knowledge sync service: {e}")
-
 
 async def shutdown_knowledge_sync():
     """Shutdown the knowledge sync service on application shutdown."""
@@ -476,100 +425,11 @@ async def shutdown_knowledge_sync():
     except Exception as e:
         logging.error(f"Error shutting down knowledge sync service: {e}")
 
-
-async def shutdown_command_executor():
-    """Shutdown the command executor and terminate all running processes."""
-    try:
-        logging.info("Shutting down command executor...")
-        command_executor = injector.get_tool_instance("command_executor")
-        if command_executor:
-            # Terminate all running processes
-            running_processes = list(command_executor.running_processes.keys())
-            if running_processes:
-                logging.info(f"Terminating {len(running_processes)} running processes...")
-                for pid in running_processes:
-                    try:
-                        command_executor.terminate_process(pid)
-                        logging.debug(f"Terminated process {pid}")
-                    except Exception as e:
-                        logging.error(f"Error terminating process {pid}: {e}")
-                logging.info("All running processes terminated")
-            else:
-                logging.info("No running processes to terminate")
-
-            # Stop the cleanup task if it exists
-            if hasattr(command_executor, 'stop_cleanup_task'):
-                command_executor.stop_cleanup_task()
-                logging.info("Command executor cleanup task stopped")
-        else:
-            logging.debug("Command executor not found, skipping shutdown")
-    except Exception as e:
-        logging.error(f"Error shutting down command executor: {e}")
-
-
-async def shutdown_tool_instances():
-    """Cleanup tool instances that may have resources to release."""
-    try:
-        logging.info("Cleaning up tool instances...")
-        tool_instances = list(injector.get_all_instances().values())
-        cleaned_count = 0
-
-        for tool in tool_instances:
-            try:
-                # Check if tool has a cleanup/close method
-                if hasattr(tool, 'cleanup'):
-                    if asyncio.iscoroutinefunction(tool.cleanup):
-                        await tool.cleanup()
-                    else:
-                        tool.cleanup()
-                    cleaned_count += 1
-                    logging.debug(f"Cleaned up tool: {tool.name}")
-                elif hasattr(tool, 'close'):
-                    if asyncio.iscoroutinefunction(tool.close):
-                        await tool.close()
-                    else:
-                        tool.close()
-                    cleaned_count += 1
-                    logging.debug(f"Closed tool: {tool.name}")
-            except Exception as e:
-                logging.error(f"Error cleaning up tool {tool.name}: {e}")
-
-        if cleaned_count > 0:
-            logging.info(f"Cleaned up {cleaned_count} tool instances")
-        else:
-            logging.debug("No tool instances required cleanup")
-    except Exception as e:
-        logging.error(f"Error during tool instances cleanup: {e}")
-
-
-async def shutdown_logging_handlers():
-    """Close all logging file handlers to release file handles."""
-    try:
-        logging.info("Closing logging handlers...")
-        handlers_closed = 0
-        for handler in logging.root.handlers[:]:
-            try:
-                handler.close()
-                handlers_closed += 1
-            except Exception as e:
-                logging.error(f"Error closing handler {handler}: {e}")
-        logging.info(f"Closed {handlers_closed} logging handlers")
-    except Exception as e:
-        # Log to stderr since logging handlers might be closed
-        import sys
-        print(f"Error closing logging handlers: {e}", file=sys.stderr)
-
-
 # Create Starlette app with event handlers
 starlette_app = Starlette(
     routes=routes,
     on_startup=[startup_knowledge_sync],
-    on_shutdown=[
-        shutdown_knowledge_sync,
-        shutdown_command_executor,
-        shutdown_tool_instances,
-        shutdown_logging_handlers,
-    ],
+    on_shutdown=[shutdown_knowledge_sync]
 )
 
 

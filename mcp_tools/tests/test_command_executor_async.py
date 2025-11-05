@@ -124,9 +124,9 @@ class TestCommandExecutorAsync:
         result = await executor.wait_for_process(token)
         assert result["status"] == "completed"
 
-        # Check status after completion - process removed from cache (Phase 3 migration)
+        # Check status after completion - should indicate not running
         status = await executor.get_process_status(token)
-        assert status["status"] == "not_found"  # Completed processes no longer cached
+        assert status["status"] == "completed"
 
     async def test_query_process_no_wait(self, executor):
         """Test query_process without waiting"""

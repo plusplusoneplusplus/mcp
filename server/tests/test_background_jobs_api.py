@@ -26,18 +26,18 @@ class TestBackgroundJobsAPI:
     async def test_background_job_lifecycle(self, server_url, mcp_client_info):
         logger.debug(f"Starting test_background_job_lifecycle with server_url: {server_url}")
         logger.debug(f"MCP client info: {mcp_client_info}")
-
+        
         server_sse_url = mcp_client_info["url"]
         worker_id = mcp_client_info["worker_id"]
-
+        
         logger.debug(f"Creating MCP client with URL: {server_sse_url}, worker_id: {worker_id}")
         async with create_mcp_client(server_sse_url, worker_id) as session:
             logger.debug("MCP client session created successfully")
-
+            
             logger.debug("Calling execute_task tool with system_info")
             result = await session.call_tool("execute_task", {"task_name": "system_info"})
             logger.debug(f"execute_task result: {result}")
-
+            
             token = None
             logger.debug("Searching for token in result content")
             for c in result.content:
@@ -49,7 +49,7 @@ class TestBackgroundJobsAPI:
                     logger.debug(f"Found token: {token}")
                     break
             assert token, "Token not found in tool output"
-
+            
             logger.debug(f"Calling query_task_status with token: {token}")
             await session.call_tool("query_task_status", {"token": token, "wait": True})
             logger.debug("query_task_status completed")
@@ -75,5 +75,5 @@ class TestBackgroundJobsAPI:
         stats = stats_resp.json()
         logger.debug(f"Stats response: {stats}")
         assert stats["total_completed"] >= 1
-
+        
         logger.debug("test_background_job_lifecycle completed successfully")

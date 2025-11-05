@@ -359,21 +359,20 @@ class DependencyInjector:
         """Get tool instances filtered by configuration settings.
 
         Returns:
-            Dictionary of tool instances filtered by tool source and enabled state
+            Dictionary of tool instances filtered by tool source based on config
         """
         from mcp_tools.plugin_config import config
 
-        # Get tool sources and enabled states
-        tool_sources = registry.get_tool_sources()
-        tool_enabled = registry.get_tool_enabled()
+        # If both sources are enabled, return all instances
+        if config.register_code_tools and config.register_yaml_tools:
+            return self.instances.copy()
 
-        # Filter instances based on config and enabled state
+        # Get tool sources
+        tool_sources = registry.get_tool_sources()
+
+        # Filter instances based on config
         filtered_instances = {}
         for tool_name, instance in self.instances.items():
-            # Check if tool is disabled at the class level
-            if not tool_enabled.get(tool_name, True):
-                continue
-
             source = tool_sources.get(tool_name, "unknown")
 
             # Use the plugin_config to check if source is enabled

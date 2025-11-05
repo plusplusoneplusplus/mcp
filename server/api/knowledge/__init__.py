@@ -25,6 +25,11 @@ from .code_indexing import (
     api_code_indexing_tree_sitter
 )
 
+from .async_code_indexing import (
+    api_code_indexing_async,
+    api_code_indexing_status
+)
+
 from .code_viewer import (
     api_code_viewer_paths,
     api_code_viewer_classes,
@@ -53,6 +58,8 @@ __all__ = [
     # Code indexing operations
     'api_code_indexing_ctags',
     'api_code_indexing_tree_sitter',
+    'api_code_indexing_async',
+    'api_code_indexing_status',
 
     # Code viewer operations
     'api_code_viewer_paths',
