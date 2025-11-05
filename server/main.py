@@ -54,21 +54,6 @@ server = Server("mymcp")
 # Add debug logging for server events
 logging.info("MCP Server created successfully")
 
-# Initialize MCP progress handler
-from server.mcp_progress_handler import MCPProgressHandler
-import server.mcp_progress_handler as mcp_progress_module
-
-# Create global progress handler instance
-progress_handler = MCPProgressHandler(
-    min_update_interval=env.get_setting("mcp_progress_rate_limit", 0.1),
-    max_update_interval=env.get_setting("mcp_progress_update_interval", 5.0)
-)
-
-# Set the module-level server reference for progress handler
-mcp_progress_module.server = server
-
-logging.info("MCP Progress Handler initialized")
-
 # Initialize tools system directly with tracing
 with time_operation("Tool Discovery and Registration"):
     discover_and_register_tools()
@@ -229,19 +214,6 @@ async def call_tool_handler(
     logging.info(f"TOOL CALL HANDLER INVOKED: {name} with arguments: {arguments}")
     logging.info(f"Handler running on platform: {os.name}")
 
-    # Extract progress token from request metadata if available
-    progress_token = None
-    try:
-        context = server.request_context
-        if context.meta and hasattr(context.meta, 'progressToken'):
-            progress_token = context.meta.progressToken
-            if progress_token:
-                progress_handler.register_token(str(progress_token))
-                logging.info(f"Registered progress token: {progress_token} for tool: {name}")
-    except (LookupError, AttributeError) as e:
-        # No request context or no progress token - this is fine
-        logging.debug(f"No progress token for tool {name}: {e}")
-
     invocation_dir = (
         get_new_invocation_dir(name) if env.is_tool_history_enabled() else None
     )
@@ -312,11 +284,6 @@ async def call_tool_handler(
             name, arguments, None, duration_ms, False, error_msg, invocation_dir
         )
         return [TextContent(type="text", text=error_msg)]
-    finally:
-        # Unregister progress token after tool execution
-        if progress_token:
-            progress_handler.unregister_token(str(progress_token))
-            logging.debug(f"Unregistered progress token: {progress_token}")
 
 
 # Setup SSE transport

@@ -2,7 +2,7 @@ import platform
 import subprocess
 import asyncio
 import uuid
-from typing import Dict, Any, List, Optional, Union, Callable, Awaitable
+from typing import Dict, Any, List, Optional, Union
 import logging
 import shlex
 import time
@@ -21,9 +21,6 @@ from mcp_tools.plugin import register_tool
 
 # Import config manager
 from config import env_manager
-
-# Type alias for progress callback
-ProgressCallback = Callable[[float, Optional[float], Optional[str]], Awaitable[None]]
 
 g_config_sleep_when_running = True
 
@@ -130,9 +127,6 @@ class CommandExecutor(CommandExecutorInterface):
         self.cleanup_lock = asyncio.Lock()  # Lock to protect temp file operations
 
         # Memory management for completed processes - using OrderedDict for LRU behavior
-        # Note: This is separate from MCP progress notifications
-        # - MCP notifications = real-time progress updates during execution
-        # - completed_processes cache = historical record for debugging/auditing
         self.completed_processes = OrderedDict()  # Store results of completed processes
         self.completed_process_timestamps = {}  # Track completion timestamps for TTL
 
@@ -154,7 +148,7 @@ class CommandExecutor(CommandExecutorInterface):
             "periodic_status_max_command_length", 60
         )
 
-        # Job history persistence settings (separate from MCP progress notifications)
+        # Job history persistence settings
         self.job_history_persistence_enabled = env_manager.get_setting(
             "job_history_persistence_enabled", False
         )
@@ -200,12 +194,10 @@ class CommandExecutor(CommandExecutorInterface):
                 "max_completed_processes": self.max_completed_processes,
                 "completed_process_ttl": self.completed_process_ttl,
                 "auto_cleanup_enabled": self.auto_cleanup_enabled,
-                "cleanup_interval": self.cleanup_interval,
-                "job_history_persistence_enabled": self.job_history_persistence_enabled,
+                "cleanup_interval": self.cleanup_interval
             },
         )
 
-        # Load persisted job history if enabled
         if self.job_history_persistence_enabled:
             self._load_persisted_history()
 
@@ -228,18 +220,21 @@ class CommandExecutor(CommandExecutorInterface):
         """
         # Remove processes if we exceed the limit
         while len(self.completed_processes) > self.max_completed_processes:
-            # Remove the oldest item (FIFO from OrderedDict)
+            # Remove the oldest item (FIFO/LRU behavior with OrderedDict)
             oldest_token, oldest_result = self.completed_processes.popitem(last=False)
-            self.completed_process_timestamps.pop(oldest_token, None)
+
+            # Also remove from timestamps
+            if oldest_token in self.completed_process_timestamps:
+                del self.completed_process_timestamps[oldest_token]
 
             _log_with_context(
                 logging.DEBUG,
-                "Evicted completed process due to memory limit",
+                "Evicted oldest completed process due to limit",
                 {
-                    "token": oldest_token,
-                    "max_limit": self.max_completed_processes,
+                    "evicted_token": oldest_token[:8],
                     "current_count": len(self.completed_processes),
-                },
+                    "max_limit": self.max_completed_processes
+                }
             )
 
     def _cleanup_expired_processes(self) -> int:
@@ -417,16 +412,38 @@ class CommandExecutor(CommandExecutorInterface):
             "initial_count": initial_count,
             "cleaned_count": cleanup_count,
             "remaining_count": len(self.completed_processes),
+            "force_all": force_all
         }
 
     def get_memory_stats(self) -> Dict[str, Any]:
-        """Get memory usage statistics for completed processes cache."""
-        return {
+        """Get current memory usage statistics for completed processes.
+
+        Returns:
+            Dictionary with memory statistics
+        """
+        current_time = time.time()
+
+        # Calculate age statistics
+        ages = []
+        for timestamp in self.completed_process_timestamps.values():
+            ages.append(current_time - timestamp)
+
+        stats = {
             "completed_processes_count": len(self.completed_processes),
             "max_completed_processes": self.max_completed_processes,
             "completed_process_ttl": self.completed_process_ttl,
             "auto_cleanup_enabled": self.auto_cleanup_enabled,
+            "cleanup_interval": self.cleanup_interval,
         }
+
+        if ages:
+            stats.update({
+                "oldest_process_age": max(ages),
+                "newest_process_age": min(ages),
+                "average_process_age": sum(ages) / len(ages)
+            })
+
+        return stats
 
     def _create_temp_files(self, prefix: str = "cmd_") -> tuple:
         """Create temporary files for stdout and stderr
@@ -829,73 +846,14 @@ class CommandExecutor(CommandExecutorInterface):
             # Try to clean up
             await self.wait_for_process(token, timeout=5, from_monitor=True)
 
-    async def _monitor_process_with_progress(self, pid: int) -> None:
-        """Monitor process and send periodic MCP progress notifications.
-
-        Args:
-            pid: Process ID to monitor
-        """
-        try:
-            process_data = self.running_processes.get(pid)
-            if not process_data:
-                return
-
-            callback = process_data.get("progress_callback")
-            if not callback:
-                return  # No MCP progress requested
-
-            start_time = process_data["start_time"]
-            command = process_data["command"]
-            update_interval = 5  # Send update every 5 seconds
-
-            while pid in self.running_processes:
-                runtime = time.time() - start_time
-
-                # Get process metrics if available
-                try:
-                    proc = psutil.Process(pid)
-                    cpu_percent = proc.cpu_percent(interval=0.1)
-                    memory_mb = proc.memory_info().rss / 1024 / 1024
-                    message = f"Running for {runtime:.1f}s | CPU: {cpu_percent:.1f}% | Memory: {memory_mb:.1f}MB"
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    message = f"Running for {runtime:.1f}s"
-
-                # Send progress (use runtime as progress indicator)
-                try:
-                    await callback(
-                        progress=runtime,
-                        total=None,  # Unknown total for command execution
-                        message=message
-                    )
-                except Exception as e:
-                    _log_with_context(
-                        logging.ERROR,
-                        "Error sending progress notification",
-                        {"pid": pid, "error": str(e)}
-                    )
-
-                await asyncio.sleep(update_interval)
-
-        except Exception as e:
-            _log_with_context(
-                logging.ERROR,
-                f"Error monitoring process {pid}",
-                {"pid": pid, "error": str(e)}
-            )
-
     async def execute_async(
-        self,
-        command: str,
-        timeout: Optional[float] = None,
-        progress_callback: Optional[ProgressCallback] = None
+        self, command: str, timeout: Optional[float] = None
     ) -> Dict[str, Any]:
-        """Execute a command asynchronously with optional progress notifications.
+        """Execute a command asynchronously
 
         Args:
             command: The command to execute
             timeout: Optional timeout in seconds (for process completion)
-            progress_callback: Optional callback for MCP progress notifications
-                Signature: async def callback(progress: float, total: Optional[float], message: Optional[str])
 
         Returns:
             Dictionary with process token and initial status
@@ -952,7 +910,6 @@ class CommandExecutor(CommandExecutorInterface):
                 "token": token,
                 "start_time": time.time(),
                 "terminated": False,  # Initialize terminated flag
-                "progress_callback": progress_callback,  # Store progress callback
             }
 
             # Store temp file locations for cleanup
@@ -963,20 +920,6 @@ class CommandExecutor(CommandExecutorInterface):
                 f"Started async command",
                 {"command": command, "token": token, "pid": pid},
             )
-
-            # Send initial progress if callback provided
-            if progress_callback:
-                try:
-                    await progress_callback(0, None, f"Started: {command}")
-                except Exception as e:
-                    _log_with_context(
-                        logging.ERROR,
-                        "Failed to send initial progress notification",
-                        {"error": str(e), "token": token}
-                    )
-
-                # Start progress monitoring task
-                asyncio.create_task(self._monitor_process_with_progress(pid))
 
             # Start a task to monitor the process if timeout is specified
             if timeout:
@@ -1032,49 +975,93 @@ class CommandExecutor(CommandExecutorInterface):
                 status_info["os_status"] = os_status
 
     async def get_process_status(self, token: str) -> Dict[str, Any]:
-        """DEPRECATED: Use MCP progress notifications instead of polling.
+        """Get the status of an asynchronous process
 
         Args:
             token: Process token to check
 
         Returns:
-            Dictionary with process status information (running processes only)
+            Dictionary with process status information
         """
-        # Only check running processes - completed process cache removed
+        # Check if the token exists
         if token not in self.process_tokens:
+            # Check if it's in completed processes
+            if token in self.completed_processes:
+                # Move to end to mark as recently accessed (LRU behavior)
+                result = self.completed_processes[token]
+                self.completed_processes.move_to_end(token)
+                return result
+
+            _log_with_context(
+                logging.WARNING, f"Process token not found: {token}", {"token": token}
+            )
             return {
                 "status": "not_found",
-                "error": f"Process with token {token} not found or already completed",
-                "_deprecated": "Use MCP progress notifications instead of polling"
+                "error": f"Process with token {token} not found",
             }
 
+        # Get the process ID
         pid = self.process_tokens[token]
+
+        # Check if the process is still running
         if pid not in self.running_processes:
+            _log_with_context(
+                logging.WARNING,
+                f"Process PID not found in running processes: {pid}",
+                {"token": token, "pid": pid},
+            )
             return {
-                "status": "not_found",
-                "error": "Process not found in running processes",
-                "_deprecated": "Use MCP progress notifications instead of polling"
+                "status": "unknown",
+                "error": f"Process with PID {pid} not found in running processes",
             }
 
         process_data = self.running_processes[pid]
         process = process_data["process"]
 
-        # If completed, wait for final result
+        # Check if the process has exited
         if process.returncode is not None:
-            return await self.wait_for_process(token)
+            # Process has completed
+            _log_with_context(
+                logging.INFO,
+                f"Process status check found completed process",
+                {"token": token, "pid": pid, "returncode": process.returncode},
+            )
 
-        # Still running
+            # Get final result
+            result = await self.wait_for_process(token)
+            return result
+
+        # Check if the process has been marked as terminated
+        if "terminated" in process_data and process_data["terminated"]:
+            # Get additional process info if psutil is available
+            process_info = self.get_process_info(pid)
+
+            status_info = {
+                "status": "terminated",
+                "pid": pid,
+                "token": token,
+                "command": process_data["command"],
+                "runtime": time.time() - process_data["start_time"],
+            }
+
+            self._merge_psutil_info(status_info, process_info)
+
+            return status_info
+
+        # Process is still running
+        # Get additional process info if psutil is available
         process_info = self.get_process_info(pid)
+
         status_info = {
             "status": "running",
             "pid": pid,
             "token": token,
             "command": process_data["command"],
             "runtime": time.time() - process_data["start_time"],
-            "_deprecated": "Use MCP progress notifications instead of polling"
         }
 
         self._merge_psutil_info(status_info, process_info)
+
         return status_info
 
     def get_allowed_commands(self) -> List[str]:
@@ -1222,10 +1209,18 @@ class CommandExecutor(CommandExecutorInterface):
         """
         # Check if the token exists
         if token not in self.process_tokens:
-            # Note: completed_processes cache removed - token not found
+            # Check if it's already in completed processes
+            if token in self.completed_processes:
+                _log_with_context(
+                    logging.INFO,
+                    f"Process already completed, no need to terminate",
+                    {"token": token},
+                )
+                return True
+
             _log_with_context(
                 logging.WARNING,
-                f"Process token not found, may be already completed",
+                f"Cannot terminate: Process token not found: {token}",
                 {"token": token},
             )
             return False
@@ -1282,8 +1277,9 @@ class CommandExecutor(CommandExecutorInterface):
         Returns:
             Dictionary with final process result
         """
-        # Note: completed_processes cache removed in Phase 3
-        # Results are now returned directly without caching
+        # Check if already in completed processes
+        if token in self.completed_processes:
+            return self.completed_processes[token]
 
         # Check if the token exists
         if token not in self.process_tokens:
@@ -1376,24 +1372,6 @@ class CommandExecutor(CommandExecutorInterface):
         stdout_content = self._read_temp_file(stdout_path)
         stderr_content = self._read_temp_file(stderr_path)
 
-        # Send final progress notification if callback exists
-        callback = process_data.get("progress_callback")
-        if callback:
-            duration = time.time() - process_data.get("start_time", time.time())
-            status = "completed successfully" if returncode == 0 else f"failed with code {returncode}"
-            try:
-                await callback(
-                    progress=duration,
-                    total=duration,
-                    message=f"Process {status} in {duration:.1f}s"
-                )
-            except Exception as e:
-                _log_with_context(
-                    logging.ERROR,
-                    "Failed to send final progress notification",
-                    {"token": token, "error": str(e)}
-                )
-
         # Clean up process and temp files
         del self.running_processes[pid]
         del self.process_tokens[token]
@@ -1418,15 +1396,15 @@ class CommandExecutor(CommandExecutorInterface):
         if "terminated" in process_data and process_data["terminated"]:
             result["status"] = "terminated"
 
-        # Store result in completed_processes cache for history/debugging
-        # This is separate from MCP progress notifications
-        self.completed_processes[token] = result
-        self.completed_process_timestamps[token] = time.time()
-
-        # Enforce memory limits
+        # Enforce memory limits before adding new process
         self._enforce_completed_process_limit()
 
-        # Persist to disk if enabled
+        # Store in completed processes with timestamp
+        current_time = time.time()
+        self.completed_processes[token] = result
+        self.completed_process_timestamps[token] = current_time
+
+        # Persist job history
         self._persist_completed_processes()
 
         _log_with_context(
@@ -1438,6 +1416,7 @@ class CommandExecutor(CommandExecutorInterface):
                 "returncode": returncode,
                 "stdout_length": len(stdout_content),
                 "stderr_length": len(stderr_content),
+                "completed_processes_count": len(self.completed_processes),
             },
         )
 
