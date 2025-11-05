@@ -61,7 +61,7 @@ import server.mcp_progress_handler as mcp_progress_module
 # Create global progress handler instance
 progress_handler = MCPProgressHandler(
     min_update_interval=env.get_setting("mcp_progress_rate_limit", 0.1),
-    max_update_interval=env.get_setting("mcp_progress_update_interval", 5.0),
+    max_update_interval=env.get_setting("mcp_progress_update_interval", 5.0)
 )
 
 # Set the module-level server reference for progress handler
@@ -231,22 +231,13 @@ async def call_tool_handler(
 
     # Extract progress token from request metadata if available
     progress_token = None
-    progress_callback = None
     try:
         context = server.request_context
-        if context.meta and hasattr(context.meta, "progressToken"):
+        if context.meta and hasattr(context.meta, 'progressToken'):
             progress_token = context.meta.progressToken
             if progress_token:
                 progress_handler.register_token(str(progress_token))
-                # Create progress callback for this tool execution
-                from server.mcp_progress_handler import create_progress_callback
-
-                progress_callback = create_progress_callback(
-                    progress_handler, str(progress_token)
-                )
-                logging.info(
-                    f"Registered progress token: {progress_token} for tool: {name}"
-                )
+                logging.info(f"Registered progress token: {progress_token} for tool: {name}")
     except (LookupError, AttributeError) as e:
         # No request context or no progress token - this is fine
         logging.debug(f"No progress token for tool {name}: {e}")
@@ -258,11 +249,6 @@ async def call_tool_handler(
     tool = injector.get_tool_instance(name)
     if tool and invocation_dir:
         tool.diagnostic_dir = str(invocation_dir)
-
-    # Set progress callback on tool if it supports it
-    if tool and progress_callback and hasattr(tool, "set_progress_callback"):
-        tool.set_progress_callback(progress_callback)
-
     if not tool:
         # Debug: Log available tools when tool is not found
         available_tools = list(injector.get_all_instances().keys())
@@ -456,7 +442,6 @@ routes = [
     ),
 ] + api_routes
 
-
 # Knowledge sync service startup/shutdown handlers
 async def startup_knowledge_sync():
     """Initialize the knowledge sync service on application startup."""
@@ -464,7 +449,6 @@ async def startup_knowledge_sync():
         await knowledge_sync_service.start_knowledge_sync_service()
     except Exception as e:
         logging.error(f"Failed to initialize knowledge sync service: {e}")
-
 
 async def shutdown_knowledge_sync():
     """Shutdown the knowledge sync service on application shutdown."""
@@ -474,12 +458,11 @@ async def shutdown_knowledge_sync():
     except Exception as e:
         logging.error(f"Error shutting down knowledge sync service: {e}")
 
-
 # Create Starlette app with event handlers
 starlette_app = Starlette(
     routes=routes,
     on_startup=[startup_knowledge_sync],
-    on_shutdown=[shutdown_knowledge_sync],
+    on_shutdown=[shutdown_knowledge_sync]
 )
 
 

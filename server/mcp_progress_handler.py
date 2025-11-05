@@ -9,8 +9,6 @@ from typing import Optional, Dict, Callable, Awaitable
 import logging
 import asyncio
 import time
-from dataclasses import dataclass, field
-from datetime import datetime
 
 
 # Type alias for progress callback
@@ -19,28 +17,6 @@ ProgressCallback = Callable[[float, Optional[float], Optional[str]], Awaitable[N
 # Module-level variable that will be set during server initialization
 # This allows tests to patch it
 server = None
-
-
-@dataclass
-class ProgressMetrics:
-    """Metrics for progress notification tracking."""
-    total_notifications_sent: int = 0
-    total_notifications_skipped: int = 0
-    total_errors: int = 0
-    active_tokens: int = 0
-    last_error: Optional[str] = None
-    last_error_time: Optional[datetime] = None
-
-    def to_dict(self) -> Dict:
-        """Convert metrics to dictionary."""
-        return {
-            "total_notifications_sent": self.total_notifications_sent,
-            "total_notifications_skipped": self.total_notifications_skipped,
-            "total_errors": self.total_errors,
-            "active_tokens": self.active_tokens,
-            "last_error": self.last_error,
-            "last_error_time": self.last_error_time.isoformat() if self.last_error_time else None,
-        }
 
 
 class MCPProgressHandler:
@@ -80,7 +56,6 @@ class MCPProgressHandler:
         self._last_progress: Dict[str, float] = {}  # Last progress value per token
         self.min_update_interval = min_update_interval  # 100ms minimum between updates
         self.max_update_interval = max_update_interval  # 5s maximum between updates
-        self.metrics = ProgressMetrics()  # Track metrics
 
     def register_token(self, progress_token: str) -> None:
         """Register a progress token from incoming request.
@@ -91,7 +66,6 @@ class MCPProgressHandler:
         self.active_tokens[progress_token] = True
         self._rate_limiters[progress_token] = 0
         self._last_progress[progress_token] = -1  # Initialize to -1 to allow first update
-        self.metrics.active_tokens = len(self.active_tokens)
         self.logger.debug(f"Registered progress token: {progress_token}")
 
     def unregister_token(self, progress_token: str) -> None:
@@ -103,7 +77,6 @@ class MCPProgressHandler:
         self.active_tokens.pop(progress_token, None)
         self._rate_limiters.pop(progress_token, None)
         self._last_progress.pop(progress_token, None)
-        self.metrics.active_tokens = len(self.active_tokens)
         self.logger.debug(f"Unregistered progress token: {progress_token}")
 
     async def send_progress(
@@ -158,7 +131,6 @@ class MCPProgressHandler:
         )
 
         if not should_send:
-            self.metrics.total_notifications_skipped += 1
             self.logger.debug(
                 f"Skipping progress update for {progress_token} due to rate limiting "
                 f"(time_since_last={time_since_last:.3f}s)"
@@ -202,7 +174,6 @@ class MCPProgressHandler:
                     total=total
                 )
 
-                self.metrics.total_notifications_sent += 1
                 self.logger.debug(
                     f"Sent progress: {progress}/{total if total else '?'} - {message}"
                 )
@@ -210,18 +181,12 @@ class MCPProgressHandler:
 
             except LookupError:
                 # No request context available (e.g., called outside of request)
-                self.metrics.total_errors += 1
-                self.metrics.last_error = "No active request context"
-                self.metrics.last_error_time = datetime.now()
                 self.logger.warning(
                     f"Cannot send progress - no active request context"
                 )
                 return False
 
         except Exception as e:
-            self.metrics.total_errors += 1
-            self.metrics.last_error = str(e)
-            self.metrics.last_error_time = datetime.now()
             self.logger.error(
                 f"Failed to send progress notification: {e}",
                 exc_info=True
@@ -255,23 +220,7 @@ class MCPProgressHandler:
         self.active_tokens.clear()
         self._rate_limiters.clear()
         self._last_progress.clear()
-        self.metrics.active_tokens = 0
         self.logger.info("Cleared all progress handler state")
-
-    def get_metrics(self) -> Dict:
-        """Get current metrics for monitoring and debugging.
-
-        Returns:
-            Dictionary containing progress notification metrics
-        """
-        self.metrics.active_tokens = len(self.active_tokens)
-        return self.metrics.to_dict()
-
-    def reset_metrics(self) -> None:
-        """Reset metrics counters (keeps active tokens)."""
-        active_count = len(self.active_tokens)
-        self.metrics = ProgressMetrics(active_tokens=active_count)
-        self.logger.info("Reset progress handler metrics")
 
 
 def create_progress_callback(
