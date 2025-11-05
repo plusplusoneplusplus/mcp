@@ -20,25 +20,25 @@ from typing import Dict, Any
 
 class ToolInterface(ABC):
     """Base interface for all tools."""
-
+    
     @property
     @abstractmethod
     def name(self) -> str:
         """Get the tool name."""
         pass
-
+        
     @property
     @abstractmethod
     def description(self) -> str:
         """Get the tool description."""
         pass
-
+        
     @property
     @abstractmethod
     def input_schema(self) -> Dict[str, Any]:
         """Get the JSON schema for the tool input."""
         pass
-
+    
     @abstractmethod
     async def execute_tool(self, arguments: Dict[str, Any]) -> Any:
         """Execute the tool with the provided arguments."""
@@ -63,17 +63,17 @@ logger = logging.getLogger(__name__)
 @register_tool
 class MyCustomTool(ToolInterface):
     """Description of your custom tool."""
-
+    
     @property
     def name(self) -> str:
         """Get the tool name."""
         return "my_custom_tool"  # Use a unique, descriptive name
-
+        
     @property
     def description(self) -> str:
         """Get the tool description."""
         return "A detailed description of what your tool does"
-
+        
     @property
     def input_schema(self) -> Dict[str, Any]:
         """Get the JSON schema for the tool input."""
@@ -92,30 +92,30 @@ class MyCustomTool(ToolInterface):
             },
             "required": ["param1"]  # List required parameters
         }
-
+    
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the tool with the provided arguments.
-
+        
         Args:
             arguments: Dictionary of arguments for the tool
-
+            
         Returns:
             Tool execution result
         """
         # Extract parameters from arguments
         param1 = arguments.get("param1", "")
         param2 = arguments.get("param2", 0)
-
+        
         try:
             # Implement your tool logic here
             result = f"Processed {param1} with value {param2}"
-
+            
             # Return success result
             return {
                 "success": True,
                 "result": result
             }
-
+            
         except Exception as e:
             logger.error(f"Error executing tool: {str(e)}")
             return {
@@ -133,7 +133,7 @@ If your tool depends on other tools, you can use dependency injection to access 
 class ToolWithDependencies(ToolInterface):
     def __init__(self, command_executor=None):
         """Initialize with optional dependencies.
-
+        
         Args:
             command_executor: An instance of CommandExecutor or None
         """
@@ -149,49 +149,14 @@ class ToolWithDependencies(ToolInterface):
 
 ## Step 4: Register Your Tool
 
-The `@register_tool` decorator automatically registers your tool with the plugin system. It supports several optional parameters:
-
-```python
-@register_tool(
-    source="code",              # Source type: "code" or "yaml" (default: "code")
-    ecosystem="general",        # Ecosystem: "microsoft", "general", "open-source", etc.
-    os_type="all",              # OS compatibility: "windows", "non-windows", "all"
-    enabled=True                # Whether the tool is enabled (default: True)
-)
-class MyCustomTool(ToolInterface):
-    """Description of your custom tool."""
-    # ... implementation ...
-```
-
-### Disabling a Tool
-
-You can disable a tool by setting `enabled=False`. This is useful for:
-- Temporarily disabling a tool without removing its code
-- Having tools that are conditionally enabled based on environment
-- Development/testing tools that shouldn't be available in production
-
-```python
-@register_tool(enabled=False)
-class ExperimentalTool(ToolInterface):
-    """A tool that is disabled by default."""
-    # ... implementation ...
-```
-
-Disabled tools are:
-- Still registered in the plugin registry
-- Not included in `list_tools()` responses
-- Not available for execution via MCP
-
-### Manual Registration
-
-If for some reason you want to register a tool manually, you can do so:
+The `@register_tool` decorator automatically registers your tool with the plugin system. If for some reason you want to register a tool manually, you can do so:
 
 ```python
 from mcp_tools.plugin import registry
 from my_package.my_tool import MyCustomTool
 
 # Register manually
-registry.register_tool(MyCustomTool, enabled=True)
+registry.register_tool(MyCustomTool)
 ```
 
 ## Step 5: Testing Your Tool
@@ -205,13 +170,13 @@ from mcp_tools.plugin import registry
 async def test_tool():
     # Get instance of your tool
     my_tool = registry.get_tool_instance("my_custom_tool")
-
+    
     # Test with sample arguments
     result = await my_tool.execute_tool({
         "param1": "test value",
         "param2": 42
     })
-
+    
     print(f"Tool result: {result}")
 
 if __name__ == "__main__":
@@ -254,15 +219,15 @@ logger = logging.getLogger(__name__)
 @register_tool
 class CalculatorTool(ToolInterface):
     """A simple calculator tool that performs basic arithmetic operations."""
-
+    
     @property
     def name(self) -> str:
         return "calculator"
-
+        
     @property
     def description(self) -> str:
         return "Performs basic arithmetic operations (add, subtract, multiply, divide)"
-
+        
     @property
     def input_schema(self) -> Dict[str, Any]:
         return {
@@ -284,12 +249,12 @@ class CalculatorTool(ToolInterface):
             },
             "required": ["operation", "a", "b"]
         }
-
+    
     async def execute_tool(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         operation = arguments.get("operation", "")
         a = arguments.get("a", 0)
         b = arguments.get("b", 0)
-
+        
         try:
             if operation == "add":
                 result = a + b
@@ -313,13 +278,13 @@ class CalculatorTool(ToolInterface):
                     "success": False,
                     "error": f"Unknown operation: {operation}"
                 }
-
+            
             return {
                 "success": True,
                 "result": result,
                 "expression": expression
             }
-
+            
         except Exception as e:
             logger.error(f"Calculator error: {str(e)}")
             return {
@@ -337,4 +302,4 @@ If you're creating a specific type of tool, check if there's a more specialized 
 - `BrowserClientInterface`: For tools that interact with web browsers
 - `EnvironmentManagerInterface`: For tools that manage environment information
 
-These specialized interfaces extend the base `ToolInterface` with additional methods specific to their domain.
+These specialized interfaces extend the base `ToolInterface` with additional methods specific to their domain. 

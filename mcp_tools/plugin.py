@@ -52,13 +52,11 @@ class PluginRegistry:
         self.tool_sources: Dict[str, str] = {}  # Track tool source: "code" or "yaml"
         self.tool_ecosystems: Dict[str, Optional[str]] = {}  # Track tool ecosystem
         self.tool_os: Dict[str, Optional[str]] = {}  # Track tool OS compatibility
-        self.tool_enabled: Dict[str, bool] = {}  # Track tool enabled state
 
 
     def register_tool(
         self, tool_class: Type[ToolInterface], source: str = "code",
-        ecosystem: Optional[str] = None, os_type: Optional[str] = None,
-        enabled: bool = True
+        ecosystem: Optional[str] = None, os_type: Optional[str] = None
     ) -> Optional[Type[ToolInterface]]:
         """Register a tool class.
 
@@ -67,7 +65,6 @@ class PluginRegistry:
             source: Source of the tool ("code" or "yaml")
             ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
             os_type: OS compatibility ("windows", "non-windows", "all")
-            enabled: Whether the tool is enabled by default (True by default)
 
         Returns:
             The registered tool class or None if it wasn't registered
@@ -106,13 +103,11 @@ class PluginRegistry:
                 f"Registering tool: {tool_name} ({tool_class.__name__}) from {source}"
                 f"{f' [ecosystem: {ecosystem}]' if ecosystem else ''}"
                 f"{f' [os: {os_type}]' if os_type else ''}"
-                f"{f' [enabled: {enabled}]' if not enabled else ''}"
             )
             self.tools[tool_name] = tool_class
             self.tool_sources[tool_name] = source
             self.tool_ecosystems[tool_name] = ecosystem
             self.tool_os[tool_name] = os_type
-            self.tool_enabled[tool_name] = enabled
             return tool_class
         except Exception as e:
             logger.error(f"Error creating instance of {tool_class.__name__}: {e}")
@@ -313,9 +308,6 @@ class PluginRegistry:
                         # Get OS type from the class metadata (set by decorator) or instance if available
                         os_type = getattr(obj, '_mcp_os', getattr(temp_instance, 'os_type', None))
 
-                        # Get enabled state from the class metadata (set by decorator), defaults to True
-                        enabled = getattr(obj, '_mcp_enabled', True)
-
                         # Check if this tool should be registered based on configuration
                         if not config.should_register_tool_class(
                             name, tool_name, self.yaml_tool_names,
@@ -359,7 +351,7 @@ class PluginRegistry:
                             continue
 
                         # Use direct registry method for consistency
-                        result = self.register_tool(obj, source="code", ecosystem=ecosystem, os_type=os_type, enabled=enabled)
+                        result = self.register_tool(obj, source="code", ecosystem=ecosystem, os_type=os_type)
                         if result is not None:
                             successful_registrations.append(
                                 f"{name} (as '{tool_name}')"
@@ -739,14 +731,6 @@ class PluginRegistry:
         """
         return self.tool_os.copy()
 
-    def get_tool_enabled(self) -> Dict[str, bool]:
-        """Get the enabled state for all tools.
-
-        Returns:
-            Dictionary mapping tool names to their enabled state
-        """
-        return self.tool_enabled.copy()
-
 
 
     def get_all_instances(self) -> List[ToolInterface]:
@@ -794,7 +778,6 @@ class PluginRegistry:
         self.tool_sources.clear()
         self.tool_ecosystems.clear()
         self.tool_os.clear()
-        self.tool_enabled.clear()
 
     def add_yaml_tool_names(self, tool_names: Set[str]) -> None:
         """Add YAML tool names to the registry.
@@ -900,7 +883,7 @@ registry = PluginRegistry()
 
 
 # Decorator for registering tools
-def register_tool(cls=None, *, source="code", ecosystem=None, os_type=None, enabled=True):
+def register_tool(cls=None, *, source="code", ecosystem=None, os_type=None):
     """Decorator to register a tool class with the plugin registry.
 
     Args:
@@ -908,7 +891,6 @@ def register_tool(cls=None, *, source="code", ecosystem=None, os_type=None, enab
         source: Source of the tool ("code" or "yaml")
         ecosystem: Ecosystem the tool belongs to (e.g., "microsoft", "general")
         os_type: OS compatibility ("windows", "non-windows", "all")
-        enabled: Whether the tool is enabled by default (True by default)
 
     Example:
         @register_tool
@@ -919,11 +901,6 @@ def register_tool(cls=None, *, source="code", ecosystem=None, os_type=None, enab
         @register_tool(source="yaml", ecosystem="microsoft", os_type="windows")
         class AzureTool(ToolInterface):
             ...
-
-        # Or with enabled flag:
-        @register_tool(enabled=False)
-        class DisabledTool(ToolInterface):
-            ...
     """
 
     def _register(cls):
@@ -931,9 +908,8 @@ def register_tool(cls=None, *, source="code", ecosystem=None, os_type=None, enab
         cls._mcp_ecosystem = ecosystem
         cls._mcp_source = source
         cls._mcp_os = os_type
-        cls._mcp_enabled = enabled
 
-        result = registry.register_tool(cls, source=source, ecosystem=ecosystem, os_type=os_type, enabled=enabled)
+        result = registry.register_tool(cls, source=source, ecosystem=ecosystem, os_type=os_type)
         return cls if result is None else result
 
     if cls is None:
