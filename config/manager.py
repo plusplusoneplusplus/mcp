@@ -20,6 +20,7 @@ class EnvironmentManager:
         "git_root",
         "private_tool_root",
         "tool_history_path",
+        "session_storage_path",
         "job_history_storage_path",
         "browser_profile_path",
         "image_dir",
@@ -36,6 +37,12 @@ class EnvironmentManager:
         # Tool history settings
         "tool_history_enabled": (True, bool),
         "tool_history_path": (".history", str),
+        # Session storage settings
+        "session_storage_enabled": (True, bool),
+        "session_storage_path": (".sessions", str),
+        "session_retention_days": (30, int),
+        "session_storage_backend": ("filesystem", str),
+        # Browser settings
         "browser_profile_path": (".browserprofile", str),
         "browser_type": ("chrome", str),
         "client_type": ("playwright", str),
@@ -74,7 +81,10 @@ class EnvironmentManager:
     # Default Azure repo settings with their types
     DEFAULT_AZREPO_SETTINGS = {
         # Azure DevOps authentication settings
-        "bearer_token_command": ('az account get-access-token --scope "499b84ac-1321-427f-aa17-267ca6975798/.default"', str),
+        "bearer_token_command": (
+            'az account get-access-token --scope "499b84ac-1321-427f-aa17-267ca6975798/.default"',
+            str,
+        ),
     }
 
     # Create mapping dynamically - each setting can be set via its uppercase env var
@@ -117,8 +127,6 @@ class EnvironmentManager:
                 if not p.is_absolute():
                     p = server_root / p
                 self.settings[key] = str(p.resolve())
-
-
 
     def _sync_settings_to_repo(self):
         """Sync settings to repository info object"""
@@ -258,7 +266,10 @@ class EnvironmentManager:
                             setting_name = self.ENV_MAPPING[key]
 
                             # Get the target type from default settings
-                            for default_key, (_, target_type) in self.DEFAULT_SETTINGS.items():
+                            for default_key, (
+                                _,
+                                target_type,
+                            ) in self.DEFAULT_SETTINGS.items():
                                 if setting_name == default_key:
                                     self.settings[setting_name] = self._convert_value(
                                         value, target_type
@@ -271,7 +282,9 @@ class EnvironmentManager:
                             self.repository_info.additional_paths[path_name] = value
                         # Handle GIT_ROOT_ prefixed variables for multiple git roots
                         elif key.startswith("GIT_ROOT_"):
-                            project_name = key[9:].lower()  # Extract project name after GIT_ROOT_
+                            project_name = key[
+                                9:
+                            ].lower()  # Extract project name after GIT_ROOT_
                             self.repository_info.git_roots[project_name] = value
                         # Handle AZREPO_ prefixed variables
                         elif key.startswith("AZREPO_"):
@@ -427,7 +440,9 @@ class EnvironmentManager:
         if project_name:
             return self.repository_info.git_roots.get(project_name)
         # Return the default git_root or the first available git root from git_roots
-        return self.get_setting("git_root") or next(iter(self.repository_info.git_roots.values()), None)
+        return self.get_setting("git_root") or next(
+            iter(self.repository_info.git_roots.values()), None
+        )
 
     def get_all_git_roots(self) -> Dict[str, str]:
         """Get all configured git roots"""
@@ -493,11 +508,28 @@ class EnvironmentManager:
         """Get the path for storing tool invoke history"""
         return self.get_setting("tool_history_path", ".history")
 
+    def is_session_storage_enabled(self) -> bool:
+        """Check if session storage is enabled"""
+        return self.get_setting("session_storage_enabled", True)
+
+    def get_session_storage_path(self) -> str:
+        """Get the path for storing session data"""
+        return self.get_setting("session_storage_path", ".sessions")
+
+    def get_session_retention_days(self) -> int:
+        """Get session retention period in days"""
+        return self.get_setting("session_retention_days", 30)
+
+    def get_session_storage_backend(self) -> str:
+        """Get session storage backend type"""
+        return self.get_setting("session_storage_backend", "filesystem")
+
     def get_vector_store_path(self) -> str:
         """Get the vector store persistence path"""
         path = self.get_setting("vector_store_path", ".vector_store")
         # Ensure the path is always resolved relative to the server directory
         from pathlib import Path
+
         if not Path(path).is_absolute():
             server_root = Path(__file__).parent.parent / "server"
             path = str((server_root / path).resolve())
@@ -514,7 +546,7 @@ class EnvironmentManager:
         for key, (default_value, type_class) in self.DEFAULT_SETTINGS.items():
             default_settings_serializable[key] = {
                 "default_value": default_value,
-                "type": type_class.__name__
+                "type": type_class.__name__,
             }
 
         # Convert DEFAULT_AZREPO_SETTINGS to JSON-serializable format
@@ -522,7 +554,7 @@ class EnvironmentManager:
         for key, (default_value, type_class) in self.DEFAULT_AZREPO_SETTINGS.items():
             default_azrepo_settings_serializable[key] = {
                 "default_value": default_value,
-                "type": type_class.__name__
+                "type": type_class.__name__,
             }
 
         return {
@@ -534,7 +566,7 @@ class EnvironmentManager:
             "default_settings": default_settings_serializable,
             "default_azrepo_settings": default_azrepo_settings_serializable,
             "path_settings": list(self.PATH_SETTINGS),
-            "env_mapping": dict(self.ENV_MAPPING)
+            "env_mapping": dict(self.ENV_MAPPING),
         }
 
     def update_configuration(self, updates: Dict[str, Any]) -> Dict[str, Any]:
@@ -550,7 +582,7 @@ class EnvironmentManager:
                         # Convert value to correct type
                         _, target_type = self.DEFAULT_SETTINGS[key]
                         if target_type == bool and isinstance(value, str):
-                            value = value.lower() in ('true', '1', 'yes', 'on')
+                            value = value.lower() in ("true", "1", "yes", "on")
                         elif target_type in (int, float) and isinstance(value, str):
                             value = target_type(value) if value else None
 
@@ -559,7 +591,12 @@ class EnvironmentManager:
                         updated_settings.append(key)
 
                         # Check if restart is required for certain settings
-                        if key in ["vector_store_path", "browser_profile_path", "browser_type", "client_type"]:
+                        if key in [
+                            "vector_store_path",
+                            "browser_profile_path",
+                            "browser_type",
+                            "client_type",
+                        ]:
                             restart_required = True
 
             # Update Azure DevOps parameters
@@ -581,14 +618,14 @@ class EnvironmentManager:
                 "success": True,
                 "updated_settings": updated_settings,
                 "restart_required": restart_required,
-                "message": f"Updated {len(updated_settings)} settings successfully"
+                "message": f"Updated {len(updated_settings)} settings successfully",
             }
 
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "message": f"Failed to update configuration: {str(e)}"
+                "message": f"Failed to update configuration: {str(e)}",
             }
 
     def reset_setting(self, setting_name: str) -> Dict[str, Any]:
@@ -603,27 +640,45 @@ class EnvironmentManager:
                     if param_name in self.DEFAULT_AZREPO_SETTINGS:
                         default_value, _ = self.DEFAULT_AZREPO_SETTINGS[param_name]
                         default_msg = f" (default: {default_value})"
-                    return {"success": True, "message": f"Reset {setting_name} to default{default_msg}"}
+                    return {
+                        "success": True,
+                        "message": f"Reset {setting_name} to default{default_msg}",
+                    }
                 elif param_name in self.DEFAULT_AZREPO_SETTINGS:
                     # Setting exists in defaults but not in current config, already at default
                     default_value, _ = self.DEFAULT_AZREPO_SETTINGS[param_name]
-                    return {"success": True, "message": f"Setting {setting_name} is already at default value: {default_value}"}
+                    return {
+                        "success": True,
+                        "message": f"Setting {setting_name} is already at default value: {default_value}",
+                    }
                 else:
-                    return {"success": False, "error": f"Setting {setting_name} not found"}
+                    return {
+                        "success": False,
+                        "error": f"Setting {setting_name} not found",
+                    }
 
             elif setting_name.startswith("kusto_"):
                 param_name = setting_name[6:]
                 if param_name in self.kusto_parameters:
                     del self.kusto_parameters[param_name]
-                    return {"success": True, "message": f"Reset {setting_name} to default"}
+                    return {
+                        "success": True,
+                        "message": f"Reset {setting_name} to default",
+                    }
                 else:
-                    return {"success": False, "error": f"Setting {setting_name} not found"}
+                    return {
+                        "success": False,
+                        "error": f"Setting {setting_name} not found",
+                    }
 
             elif setting_name in self.DEFAULT_SETTINGS:
                 default_value, _ = self.DEFAULT_SETTINGS[setting_name]
                 self.settings[setting_name] = default_value
                 self._sync_settings_to_repo()
-                return {"success": True, "message": f"Reset {setting_name} to default value: {default_value}"}
+                return {
+                    "success": True,
+                    "message": f"Reset {setting_name} to default value: {default_value}",
+                }
 
             else:
                 return {"success": False, "error": f"Unknown setting: {setting_name}"}
@@ -651,13 +706,13 @@ class EnvironmentManager:
             # Find the first existing .env file
             for env_path in env_file_paths:
                 if env_path.exists() and env_path.is_file():
-                    with open(env_path, 'r') as f:
+                    with open(env_path, "r") as f:
                         content = f.read()
                     return {
                         "success": True,
                         "content": content,
                         "file_path": str(env_path),
-                        "message": f"Loaded .env file from {env_path}"
+                        "message": f"Loaded .env file from {env_path}",
                     }
 
             return {
@@ -665,7 +720,7 @@ class EnvironmentManager:
                 "error": "No .env file found",
                 "content": "",
                 "file_path": None,
-                "message": "No .env file found in common locations"
+                "message": "No .env file found in common locations",
             }
 
         except Exception as e:
@@ -674,7 +729,7 @@ class EnvironmentManager:
                 "error": str(e),
                 "content": "",
                 "file_path": None,
-                "message": f"Error reading .env file: {str(e)}"
+                "message": f"Error reading .env file: {str(e)}",
             }
 
     def save_env_file_content(self, content: str) -> Dict[str, Any]:
@@ -694,17 +749,17 @@ class EnvironmentManager:
 
             # Create backup if file exists
             if env_file_path.exists():
-                backup_path = env_file_path.with_suffix('.env.backup')
+                backup_path = env_file_path.with_suffix(".env.backup")
                 shutil.copy2(env_file_path, backup_path)
 
             # Write the new content
-            with open(env_file_path, 'w') as f:
+            with open(env_file_path, "w") as f:
                 f.write(content)
 
             return {
                 "success": True,
                 "file_path": str(env_file_path),
-                "message": f"Successfully saved .env file to {env_file_path}"
+                "message": f"Successfully saved .env file to {env_file_path}",
             }
 
         except Exception as e:
@@ -712,7 +767,7 @@ class EnvironmentManager:
                 "success": False,
                 "error": str(e),
                 "file_path": None,
-                "message": f"Error saving .env file: {str(e)}"
+                "message": f"Error saving .env file: {str(e)}",
             }
 
     def validate_env_content(self, content: str) -> Dict[str, Any]:
@@ -723,21 +778,23 @@ class EnvironmentManager:
             valid_lines = 0
             total_lines = 0
 
-            for line_num, line in enumerate(content.split('\n'), 1):
+            for line_num, line in enumerate(content.split("\n"), 1):
                 total_lines += 1
                 line = line.strip()
 
                 # Skip empty lines and comments
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
 
                 # Check if line contains '='
-                if '=' not in line:
-                    errors.append(f"Line {line_num}: Invalid format, missing '=' separator")
+                if "=" not in line:
+                    errors.append(
+                        f"Line {line_num}: Invalid format, missing '=' separator"
+                    )
                     continue
 
                 # Split on first '=' only
-                key, value = line.split('=', 1)
+                key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip()
 
@@ -746,12 +803,16 @@ class EnvironmentManager:
                     errors.append(f"Line {line_num}: Empty variable name")
                     continue
 
-                if not key.replace('_', '').replace('-', '').isalnum():
-                    warnings.append(f"Line {line_num}: Variable name '{key}' contains special characters")
+                if not key.replace("_", "").replace("-", "").isalnum():
+                    warnings.append(
+                        f"Line {line_num}: Variable name '{key}' contains special characters"
+                    )
 
                 # Check for common issues
-                if value.startswith(' ') or value.endswith(' '):
-                    warnings.append(f"Line {line_num}: Value for '{key}' has leading/trailing spaces")
+                if value.startswith(" ") or value.endswith(" "):
+                    warnings.append(
+                        f"Line {line_num}: Value for '{key}' has leading/trailing spaces"
+                    )
 
                 valid_lines += 1
 
@@ -761,7 +822,7 @@ class EnvironmentManager:
                 "warnings": warnings,
                 "valid_lines": valid_lines,
                 "total_lines": total_lines,
-                "message": f"Validation complete: {valid_lines}/{total_lines} valid lines, {len(errors)} errors, {len(warnings)} warnings"
+                "message": f"Validation complete: {valid_lines}/{total_lines} valid lines, {len(errors)} errors, {len(warnings)} warnings",
             }
 
         except Exception as e:
@@ -771,7 +832,7 @@ class EnvironmentManager:
                 "warnings": [],
                 "valid_lines": 0,
                 "total_lines": 0,
-                "message": f"Error validating .env content: {str(e)}"
+                "message": f"Error validating .env content: {str(e)}",
             }
 
     def backup_env_file(self) -> Dict[str, Any]:
@@ -796,6 +857,7 @@ class EnvironmentManager:
                 if env_path.exists() and env_path.is_file():
                     # Create backup with timestamp
                     from datetime import datetime
+
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     backup_path = env_path.with_name(f".env.backup_{timestamp}")
 
@@ -805,7 +867,7 @@ class EnvironmentManager:
                         "success": True,
                         "original_path": str(env_path),
                         "backup_path": str(backup_path),
-                        "message": f"Successfully created backup at {backup_path}"
+                        "message": f"Successfully created backup at {backup_path}",
                     }
 
             return {
@@ -813,7 +875,7 @@ class EnvironmentManager:
                 "error": "No .env file found to backup",
                 "original_path": None,
                 "backup_path": None,
-                "message": "No .env file found in common locations"
+                "message": "No .env file found in common locations",
             }
 
         except Exception as e:
@@ -822,7 +884,7 @@ class EnvironmentManager:
                 "error": str(e),
                 "original_path": None,
                 "backup_path": None,
-                "message": f"Error creating backup: {str(e)}"
+                "message": f"Error creating backup: {str(e)}",
             }
 
 
