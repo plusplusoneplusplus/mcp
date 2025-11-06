@@ -8,7 +8,7 @@
 # Groups:
 #   core-group      - config, mcp_core, mcp_tools
 #   server-group    - server, project tests
-#   utils-group-1   - html_to_markdown, vector_store, secret_scanner
+#   utils-group-1   - html_to_markdown, vector_store, secret_scanner, agent, session
 #   utils-group-2   - ocr_extractor, playwright, graph_interface
 #   plugins-group-1 - azrepo, kusto
 #   plugins-group-2 - git_tool, knowledge_indexer
@@ -116,7 +116,7 @@ case "$GROUP_NAME" in
         ;;
 
     "utils-group-1")
-        echo -e "${BLUE}Running utils group 1: html_to_markdown, vector_store, secret_scanner, memory, dataframe_manager, pyeval, code_indexing, knowledge_sync${NC}"
+        echo -e "${BLUE}Running utils group 1: html_to_markdown, vector_store, secret_scanner, memory, dataframe_manager, pyeval, code_indexing, knowledge_sync, agent, session${NC}"
         echo ""
         run_component_tests "utils.html_to_markdown" "utils/html_to_markdown/tests" "$TEST_PATTERN"
         run_component_tests "utils.vector_store" "utils/vector_store/tests" "$TEST_PATTERN"
@@ -126,6 +126,8 @@ case "$GROUP_NAME" in
         run_component_tests "utils.pyeval" "utils/pyeval/tests" "$TEST_PATTERN"
         run_component_tests "utils.code_indexing" "utils/code_indexing/tests" "$TEST_PATTERN"
         run_component_tests "utils.knowledge_sync" "utils/knowledge_sync/tests" "$TEST_PATTERN"
+        run_component_tests "utils.agent" "utils/agent/tests" "$TEST_PATTERN"
+        run_component_tests "utils.session" "utils/session/tests" "$TEST_PATTERN"
         ;;
 
     "utils-group-2")
