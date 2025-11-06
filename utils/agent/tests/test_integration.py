@@ -5,16 +5,16 @@ These tests are skipped in CI environments but can be run locally
 to verify actual CLI integration.
 
 To run these tests locally:
-    pytest utils/specialized_agent/tests/test_integration.py -v
+    pytest utils/agent/tests/test_integration.py -v
 
 To run with specific CLI:
-    pytest utils/specialized_agent/tests/test_integration.py -v -k "copilot"
+    pytest utils/agent/tests/test_integration.py -v -k "copilot"
 """
 
 import os
 import pytest
 
-from utils.specialized_agent import SpecializedAgent, AgentConfig, CLIType
+from utils.agent import SpecializedAgent, AgentConfig, CLIType
 
 
 # Skip all tests in this module if running in CI

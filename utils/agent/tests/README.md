@@ -13,8 +13,8 @@ These tests use mocks and run automatically in CI.
 
 ```bash
 # Run all unit tests
-uv run pytest utils/specialized_agent/tests/test_agent.py -v
-uv run pytest utils/specialized_agent/tests/test_cli_executor.py -v
+uv run pytest utils/agent/tests/test_agent.py -v
+uv run pytest utils/agent/tests/test_cli_executor.py -v
 ```
 
 ### Integration Tests (Manual Only)
@@ -35,33 +35,33 @@ These tests are **skipped in CI** but can be run manually to verify actual CLI i
 ### Run All Integration Tests
 
 ```bash
-uv run pytest utils/specialized_agent/tests/test_integration.py -v
+uv run pytest utils/agent/tests/test_integration.py -v
 ```
 
 ### Run Specific CLI Tests
 
 ```bash
 # Test only Copilot
-uv run pytest utils/specialized_agent/tests/test_integration.py -v -k "copilot"
+uv run pytest utils/agent/tests/test_integration.py -v -k "copilot"
 
 # Test only Claude
-uv run pytest utils/specialized_agent/tests/test_integration.py -v -k "claude"
+uv run pytest utils/agent/tests/test_integration.py -v -k "claude"
 
 # Test only Codex
-uv run pytest utils/specialized_agent/tests/test_integration.py -v -k "codex"
+uv run pytest utils/agent/tests/test_integration.py -v -k "codex"
 ```
 
 ### Run Specific Test Cases
 
 ```bash
 # Test hello world responses
-uv run pytest utils/specialized_agent/tests/test_integration.py::test_copilot_hello_world -v
+uv run pytest utils/agent/tests/test_integration.py::test_copilot_hello_world -v
 
 # Test conversation history
-uv run pytest utils/specialized_agent/tests/test_integration.py::test_conversation_with_history -v
+uv run pytest utils/agent/tests/test_integration.py::test_conversation_with_history -v
 
 # Test context preparation
-uv run pytest utils/specialized_agent/tests/test_integration.py::test_context_preparation -v
+uv run pytest utils/agent/tests/test_integration.py::test_context_preparation -v
 ```
 
 ## Integration Test Coverage
@@ -89,7 +89,7 @@ unset CI
 unset GITHUB_ACTIONS
 
 # Then run the tests
-uv run pytest utils/specialized_agent/tests/test_integration.py -v
+uv run pytest utils/agent/tests/test_integration.py -v
 ```
 
 ### CLI not found errors
