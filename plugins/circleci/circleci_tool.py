@@ -7,7 +7,7 @@ from mcp_tools.interfaces import ToolInterface
 from mcp_tools.plugin import register_tool
 
 
-@register_tool(ecosystem="open-source", os_type="non-windows")
+@register_tool(ecosystem="open-source", os_type="non-windows", enabled=False)
 class CircleCITool(ToolInterface):
     """Interact with the CircleCI REST API."""
 
@@ -90,7 +90,10 @@ class CircleCITool(ToolInterface):
         if function_name == "get_pipeline_workflows":
             pipeline_id = parameters.get("pipeline_id")
             if not pipeline_id:
-                return {"success": False, "error": "Missing required parameter: pipeline_id"}
+                return {
+                    "success": False,
+                    "error": "Missing required parameter: pipeline_id",
+                }
             url = f"{base_url}/pipeline/{pipeline_id}/workflow"
             async with httpx.AsyncClient() as client:
                 resp = await client.get(url, headers=headers, timeout=30)
