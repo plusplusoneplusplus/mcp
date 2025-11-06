@@ -197,6 +197,8 @@ class CLIExecutor:
         try:
             # Execute CLI
             logger.debug(f"Executing: {' '.join(cmd[:3])} [prompt...]")
+            logger.debug(f"Full command: {cmd}")
+            logger.debug(f"Prompt length: {len(prompt)} chars")
 
             result = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -219,6 +221,9 @@ class CLIExecutor:
             # Decode output
             response = stdout.decode('utf-8').strip()
             error_output = stderr.decode('utf-8').strip()
+
+            logger.debug(f"Response length: {len(response)} chars")
+            logger.debug(f"Response preview: {response[:200]}...")
 
             # Check for errors
             if result.returncode != 0:
