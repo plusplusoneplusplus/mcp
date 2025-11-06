@@ -111,6 +111,9 @@ asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 timeout = 60  # 1 minute default timeout per test
 timeout_method = "thread"  # Use thread-based timeout (more reliable than signal)
+markers = [
+    "integration: marks tests as integration tests (skipped in CI, run manually)",
+]
 
 [dependency-groups]
 dev = [
