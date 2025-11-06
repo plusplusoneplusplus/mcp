@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 import asyncio
 
-from utils.specialized_agent.cli_executor import CLIExecutor, CLIConfig, CLIType
+from utils.agent.cli_executor import CLIExecutor, CLIConfig, CLIType
 
 
 class TestCLIConfig:

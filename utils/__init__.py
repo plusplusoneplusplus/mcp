@@ -5,6 +5,6 @@
 # from utils.logcomp import compress_logs
 # from utils.memory import MemoryManager
 
-from .specialized_agent import SpecializedAgent, AgentConfig, CLIExecutor, CLIConfig, CLIType
+from .agent import SpecializedAgent, AgentConfig, CLIExecutor, CLIConfig, CLIType
 
 __all__ = ["SpecializedAgent", "AgentConfig", "CLIExecutor", "CLIConfig", "CLIType"]

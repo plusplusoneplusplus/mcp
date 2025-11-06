@@ -5,8 +5,8 @@ Unit tests for SpecializedAgent
 import pytest
 from unittest.mock import Mock, AsyncMock, patch, MagicMock
 
-from utils.specialized_agent.agent import SpecializedAgent, AgentConfig
-from utils.specialized_agent.cli_executor import CLIType, CLIExecutor
+from utils.agent.agent import SpecializedAgent, AgentConfig
+from utils.agent.cli_executor import CLIType, CLIExecutor
 
 
 # Test agent implementations (not test classes, just agent implementations for testing)
