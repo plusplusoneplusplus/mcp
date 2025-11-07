@@ -21,7 +21,8 @@ class TestCLIConfig:
         assert config.skip_permissions is True
         assert config.cli_path is None
         assert config.timeout is None
-        assert config.working_directory is None
+        assert config.working_directories is None
+        assert config.cwd is None
         assert config.codex_mode == "exec"
         assert config.codex_approval_mode is None
         assert config.copilot_use_programmatic is True
@@ -296,11 +297,11 @@ class TestCLIExecutor:
         assert "Test error" in response
 
     @pytest.mark.asyncio
-    async def test_execute_with_working_directory(self):
-        """Test execution with custom working directory"""
+    async def test_execute_with_cwd(self):
+        """Test execution with custom cwd (current working directory)"""
         config = CLIConfig(
             cli_type=CLIType.CLAUDE,
-            working_directory="/custom/dir"
+            cwd="/custom/dir"
         )
         executor = CLIExecutor(config)
 
@@ -311,9 +312,41 @@ class TestCLIExecutor:
         with patch('asyncio.create_subprocess_exec', return_value=mock_process) as mock_exec:
             await executor.execute("test prompt")
 
-            # Verify working directory was passed
+            # Verify cwd was passed
             call_kwargs = mock_exec.call_args[1]
             assert call_kwargs['cwd'] == "/custom/dir"
+
+    @pytest.mark.asyncio
+    async def test_execute_with_working_directories_and_cwd(self):
+        """Test execution with both working_directories and cwd"""
+        config = CLIConfig(
+            cli_type=CLIType.CLAUDE,
+            working_directories=["/dir1", "/dir2", "/dir3"],
+            cwd="/dir1"
+        )
+        executor = CLIExecutor(config)
+
+        mock_process = AsyncMock()
+        mock_process.communicate = AsyncMock(return_value=(b"response", b""))
+        mock_process.returncode = 0
+
+        with patch('asyncio.create_subprocess_exec', return_value=mock_process) as mock_exec:
+            await executor.execute("test prompt")
+
+            # Verify cwd was passed (not working_directories)
+            call_kwargs = mock_exec.call_args[1]
+            assert call_kwargs['cwd'] == "/dir1"
+
+    def test_config_with_working_directories_list(self):
+        """Test configuration with multiple working directories"""
+        config = CLIConfig(
+            cli_type=CLIType.CLAUDE,
+            working_directories=["/dir1", "/dir2", "/dir3"]
+        )
+
+        assert config.working_directories == ["/dir1", "/dir2", "/dir3"]
+        assert len(config.working_directories) == 3
+        assert config.cwd is None
 
     def test_build_command_invalid_cli_type(self):
         """Test building command with invalid CLI type"""

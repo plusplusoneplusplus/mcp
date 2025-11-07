@@ -37,8 +37,11 @@ class AgentConfig:
     timeout: Optional[int] = None
     """Timeout for CLI invocations in seconds"""
 
-    working_directory: Optional[str] = None
-    """Working directory for CLI execution"""
+    working_directories: Optional[List[str]] = None
+    """Working directories for the agent's context"""
+
+    cwd: Optional[str] = None
+    """Current working directory for CLI execution"""
 
     def to_cli_config(self) -> CLIConfig:
         """Convert to CLIConfig for executor"""
@@ -48,7 +51,8 @@ class AgentConfig:
             skip_permissions=self.skip_permissions,
             cli_path=self.cli_path,
             timeout=self.timeout,
-            working_directory=self.working_directory,
+            working_directories=self.working_directories,
+            cwd=self.cwd,
         )
 
 
