@@ -49,8 +49,11 @@ class CLIConfig:
     timeout: Optional[int] = None
     """Timeout for CLI invocations in seconds (None for no timeout)"""
 
-    working_directory: Optional[str] = None
-    """Working directory for CLI execution (None for current directory)"""
+    working_directories: Optional[List[str]] = None
+    """Working directories for the agent's context"""
+
+    cwd: Optional[str] = None
+    """Current working directory for CLI execution (None for current directory)"""
 
     additional_cli_args: List[str] = field(default_factory=list)
     """Additional CLI arguments to pass"""
@@ -204,7 +207,7 @@ class CLIExecutor:
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=self.config.working_directory
+                cwd=self.config.cwd
             )
 
             # Wait for completion with timeout

@@ -43,7 +43,8 @@ class TestAgentConfig:
         assert config.skip_permissions is True
         assert config.cli_path is None
         assert config.timeout is None
-        assert config.working_directory is None
+        assert config.working_directories is None
+        assert config.cwd is None
 
     def test_custom_config(self):
         """Test custom agent configuration"""
@@ -69,7 +70,8 @@ class TestAgentConfig:
             skip_permissions=True,
             cli_path="/custom/claude",
             timeout=60,
-            working_directory="/work/dir"
+            working_directories=["/work/dir1", "/work/dir2"],
+            cwd="/work/dir1"
         )
 
         cli_config = config.to_cli_config()
@@ -79,7 +81,34 @@ class TestAgentConfig:
         assert cli_config.skip_permissions is True
         assert cli_config.cli_path == "/custom/claude"
         assert cli_config.timeout == 60
-        assert cli_config.working_directory == "/work/dir"
+        assert cli_config.working_directories == ["/work/dir1", "/work/dir2"]
+        assert cli_config.cwd == "/work/dir1"
+
+    def test_working_directories_list(self):
+        """Test configuration with multiple working directories"""
+        config = AgentConfig(
+            working_directories=["/dir1", "/dir2", "/dir3"]
+        )
+
+        assert config.working_directories == ["/dir1", "/dir2", "/dir3"]
+        assert len(config.working_directories) == 3
+
+    def test_cwd_without_working_directories(self):
+        """Test configuration with cwd but no working_directories"""
+        config = AgentConfig(cwd="/current/dir")
+
+        assert config.cwd == "/current/dir"
+        assert config.working_directories is None
+
+    def test_working_directories_and_cwd_together(self):
+        """Test configuration with both working_directories and cwd"""
+        config = AgentConfig(
+            working_directories=["/dir1", "/dir2"],
+            cwd="/dir1"
+        )
+
+        assert config.working_directories == ["/dir1", "/dir2"]
+        assert config.cwd == "/dir1"
 
 
 class TestSpecializedAgent:
