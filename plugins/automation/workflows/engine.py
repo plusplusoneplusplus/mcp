@@ -141,6 +141,9 @@ class WorkflowEngine:
             result.status = WorkflowStatus.FAILED
             result.error = str(e)
             result.completed_at = datetime.utcnow()
+            # Include step results and outputs even on failure
+            result.step_results = context.step_results
+            result.outputs = context.outputs
 
         return result
 
@@ -196,6 +199,9 @@ class WorkflowEngine:
 
                     # Execute step with retry
                     step_result = await step.execute_with_retry(context)
+
+                    # Store step result in context
+                    context.set_step_result(step.step_id, step_result)
 
                     # Handle step result
                     if step_result.status == StepStatus.COMPLETED:

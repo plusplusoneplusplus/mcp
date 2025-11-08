@@ -131,9 +131,10 @@ class BaseStep(ABC):
                 # Execute step
                 result = await self.execute(context)
 
-                # Mark as completed
+                # Mark as completed and set retry count
                 result.status = StepStatus.COMPLETED
                 result.completed_at = datetime.utcnow()
+                result.retry_count = retry_count
                 context.set_step_result(self.step_id, result)
 
                 # Store outputs if configured

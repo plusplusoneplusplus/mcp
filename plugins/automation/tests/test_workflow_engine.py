@@ -41,11 +41,12 @@ workflow:
         workflow = WorkflowDefinition.from_yaml(yaml_str)
         engine = WorkflowEngine()
 
-        # Mock agent execution
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(return_value="Result from agent")
+        # Mock agent execution via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(return_value="Result from agent")
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(
                 workflow,
                 inputs={"question": "test question"}
@@ -83,11 +84,12 @@ workflow:
         workflow = WorkflowDefinition.from_yaml(yaml_str)
         engine = WorkflowEngine()
 
-        # Mock agent execution
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(side_effect=["Result 1", "Result 2"])
+        # Mock agent execution via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(side_effect=["Result 1", "Result 2"])
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(workflow)
 
             assert result.status == WorkflowStatus.COMPLETED
@@ -161,11 +163,12 @@ workflow:
         workflow = WorkflowDefinition.from_yaml(yaml_str)
         engine = WorkflowEngine()
 
-        # Mock agent to raise exception
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(side_effect=Exception("Test error"))
+        # Mock agent to raise exception via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(side_effect=Exception("Test error"))
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(workflow)
 
             assert result.status == WorkflowStatus.FAILED
@@ -199,14 +202,15 @@ workflow:
         workflow = WorkflowDefinition.from_yaml(yaml_str)
         engine = WorkflowEngine()
 
-        # Mock agent - first fails, second succeeds
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(side_effect=[
-                Exception("Test error"),
-                "Success result"
-            ])
+        # Mock agent - first fails, second succeeds via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(side_effect=[
+            Exception("Test error"),
+            "Success result"
+        ])
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(workflow)
 
             assert result.status == WorkflowStatus.PARTIAL
@@ -235,15 +239,16 @@ workflow:
         workflow = WorkflowDefinition.from_yaml(yaml_str)
         engine = WorkflowEngine()
 
-        # Mock agent - fail twice, then succeed
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(side_effect=[
-                Exception("Fail 1"),
-                Exception("Fail 2"),
-                "Success"
-            ])
+        # Mock agent - fail twice, then succeed via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(side_effect=[
+            Exception("Fail 1"),
+            Exception("Fail 2"),
+            "Success"
+        ])
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(workflow)
 
             assert result.status == WorkflowStatus.COMPLETED
@@ -275,10 +280,12 @@ workflow:
             execution_id="existing-exec-123"
         )
 
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(return_value="Result")
+        # Mock agent execution via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(return_value="Result")
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(workflow, context=context)
 
             assert result.execution_id == "existing-exec-123"
@@ -302,10 +309,12 @@ workflow:
         workflow = WorkflowDefinition.from_yaml(yaml_str)
         engine = WorkflowEngine()
 
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(return_value="Result")
+        # Mock agent execution via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(return_value="Result")
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(workflow)
 
             assert result.workflow_id == "test"
@@ -334,10 +343,12 @@ workflow:
         workflow = WorkflowDefinition.from_yaml(yaml_str)
         engine = WorkflowEngine()
 
-        with patch('plugins.automation.workflows.steps.agent_step.ExploreAgent') as MockAgent:
-            mock_agent = MockAgent.return_value
-            mock_agent.explore = AsyncMock(return_value="Result")
+        # Mock agent execution via AgentRegistry
+        mock_agent_class = MagicMock()
+        mock_agent = mock_agent_class.return_value
+        mock_agent.explore = AsyncMock(return_value="Result")
 
+        with patch('plugins.automation.workflows.steps.agent_step.AgentRegistry.get_agent_class', return_value=mock_agent_class):
             result = await engine.execute(workflow)
             result_dict = result.to_dict()
 
