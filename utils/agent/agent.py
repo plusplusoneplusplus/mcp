@@ -9,8 +9,10 @@ import logging
 from typing import Optional, List, Dict, Any
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from pathlib import Path
 
 from .cli_executor import CLIExecutor, CLIConfig, CLIType
+from .system_prompt import SystemPromptBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,9 @@ class AgentConfig:
     session_id: Optional[str] = None
     """Optional session ID for tracking conversations"""
 
+    session_storage_path: Optional[Path] = None
+    """Optional path to session storage directory"""
+
     skip_permissions: bool = True
     """Whether to skip permission prompts"""
 
@@ -42,6 +47,9 @@ class AgentConfig:
 
     cwd: Optional[str] = None
     """Current working directory for CLI execution"""
+
+    include_session_in_prompt: bool = False
+    """Whether to automatically include session info in system prompt"""
 
     def to_cli_config(self) -> CLIConfig:
         """Convert to CLIConfig for executor"""
@@ -89,10 +97,49 @@ class SpecializedAgent(ABC):
         This should return a prompt that sets up the agent's role, expertise,
         and any specific instructions for how it should respond.
 
+        If config.include_session_in_prompt is True, you can use
+        get_default_system_prompt() to get a prompt with session context.
+
         Returns:
             System prompt string
         """
         pass
+
+    def get_default_system_prompt(
+        self,
+        agent_role: Optional[str] = None,
+        custom_instructions: Optional[str] = None,
+    ) -> str:
+        """
+        Get a default system prompt with session information.
+
+        This method generates a system prompt that includes session ID
+        and session storage path. Use this in your get_system_prompt()
+        implementation if you want to include session context.
+
+        Args:
+            agent_role: Optional role/purpose description of the agent
+            custom_instructions: Optional custom instructions
+
+        Returns:
+            System prompt with session context
+
+        Example:
+            def get_system_prompt(self) -> str:
+                return self.get_default_system_prompt(
+                    agent_role="You are a Python code reviewer",
+                    custom_instructions="Focus on PEP 8 compliance"
+                )
+        """
+        session_id = self._get_session_id()
+        session_storage_path = self._get_session_storage_path()
+
+        return SystemPromptBuilder.build_default_prompt(
+            session_id=session_id,
+            session_storage_path=session_storage_path,
+            agent_role=agent_role,
+            custom_instructions=custom_instructions,
+        )
 
     def prepare_context(self, **kwargs) -> Optional[str]:
         """
@@ -112,6 +159,19 @@ class SpecializedAgent(ABC):
     def _get_session_id(self) -> str:
         """Get the current session ID"""
         return self.config.session_id or "default"
+
+    def _get_session_storage_path(self) -> Path:
+        """Get the session storage path"""
+        if self.config.session_storage_path:
+            storage_path = self.config.session_storage_path
+        else:
+            # Default to .sessions directory in current working directory
+            cwd = Path(self.config.cwd) if self.config.cwd else Path.cwd()
+            storage_path = cwd / ".sessions"
+
+        # Append session ID to get full session path
+        session_id = self._get_session_id()
+        return storage_path / session_id
 
     def _get_session_history(self) -> List[Dict[str, str]]:
         """Get the message history for the current session"""
