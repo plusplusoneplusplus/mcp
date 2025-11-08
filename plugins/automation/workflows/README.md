@@ -1,97 +1,28 @@
 # Workflow System
 
-Deterministic orchestration of AI agents and operations through declarative YAML workflows.
+Deterministic orchestration of AI agents and data operations through declarative YAML workflows.
 
 ## Overview
 
-The workflow system enables deterministic orchestration of AI agents and other operations in a declarative, reproducible manner. Workflows are defined in YAML format and executed by a workflow engine that manages state, dependencies, and error handling.
-
-### Features
-
-- **Chain AI agents** in a deterministic, reproducible manner
-- **Define workflows declaratively** using YAML
-- **Manage complex automation** with dependency resolution
-- **Track execution state** with full observability
-- **Handle errors gracefully** with retry policies
-- **Resume interrupted workflows** from last successful step
-- **Template expressions** for dynamic value resolution
-
-## Architecture
-
-### Core Components
-
-```
-plugins/automation/
-├── context.py             # WorkflowContext - shared execution context
-├── workflows/
-│   ├── __init__.py
-│   ├── README.md          # This documentation
-│   ├── definition.py      # WorkflowDefinition - parse and validate
-│   ├── engine.py          # WorkflowEngine - main execution engine
-│   ├── steps/
-│   │   ├── __init__.py
-│   │   ├── base.py       # BaseStep - abstract base class
-│   │   ├── agent_step.py # AgentStep - execute agent operations
-│   │   ├── conditional_step.py  # ConditionalStep - branching logic (future)
-│   │   ├── parallel_step.py  # ParallelStep - parallel execution (future)
-│   │   ├── loop_step.py  # LoopStep - iteration (future)
-│   │   └── transform_step.py # TransformStep - data transformation (future)
-│   └── examples/
-│       ├── feature_exploration.yaml
-│       └── codebase_onboarding.yaml
-└── tests/
-    ├── test_workflow_context.py     # Context tests
-    ├── test_workflow_definition.py  # Definition tests
-    └── test_workflow_engine.py      # Engine tests
-```
-
-### Workflow Execution Flow
-
-```
-1. Load & Validate
-   ├─ Parse YAML
-   ├─ Validate structure
-   └─ Check dependencies
-
-2. Create Context
-   ├─ Initialize inputs
-   ├─ Generate execution ID
-   └─ Prepare state tracking
-
-3. Execute Steps
-   ├─ Resolve dependencies
-   ├─ Execute in order
-   ├─ Handle retries
-   └─ Store results
-
-4. Collect Results
-   ├─ Gather step outputs
-   ├─ Determine status
-   └─ Return result
-```
+The workflow system enables reproducible automation through:
+- **Declarative YAML workflows** - Define complex operations as configuration
+- **Dependency resolution** - Automatic execution ordering via DAG
+- **Template expressions** - Dynamic data flow between steps
+- **Error handling** - Configurable retry policies and failure modes
+- **Pluggable operations** - Extensible step types and operations
 
 ## Quick Start
 
-### Define a Workflow
-
-Create a YAML file describing your workflow:
-
+**Define workflow (YAML):**
 ```yaml
 workflow:
-  name: "feature-exploration"
-  version: "1.0"
-  description: "Explore a specific feature implementation"
-
+  name: "analyze-feature"
   inputs:
-    feature_name:
-      type: string
-      required: true
-    codebase_path:
-      type: string
-      required: true
+    feature_name: {type: string, required: true}
+    codebase_path: {type: string, required: true}
 
   steps:
-    - id: find_implementation
+    - id: find_impl
       type: agent
       agent: explore
       operation: find_implementation
@@ -103,809 +34,347 @@ workflow:
       type: agent
       agent: explore
       operation: find_usage
+      depends_on: [find_impl]
       inputs:
         symbol: "{{ inputs.feature_name }}"
         codebase_path: "{{ inputs.codebase_path }}"
-      depends_on: [find_implementation]
 ```
 
-### Execute the Workflow
-
+**Execute (Python):**
 ```python
 from plugins.automation.workflows import WorkflowDefinition, WorkflowEngine
 
-# Load workflow
-workflow = WorkflowDefinition.from_file("feature_exploration.yaml")
-
-# Execute with inputs
+workflow = WorkflowDefinition.from_file("analyze-feature.yaml")
 engine = WorkflowEngine()
-result = await engine.execute(
-    workflow,
-    inputs={
-        "feature_name": "authentication",
-        "codebase_path": "/path/to/code"
-    }
-)
+result = await engine.execute(workflow, inputs={
+    "feature_name": "authentication",
+    "codebase_path": "/path/to/code"
+})
 
-# Check results
 print(f"Status: {result.status}")
-print(f"Outputs: {result.outputs}")
-```
-
-## Workflow Definition Format
-
-### Basic Structure
-
-```yaml
-workflow:
-  name: string          # Workflow identifier
-  version: string       # Semantic version
-  description: string   # Human-readable description
-
-  inputs:               # Input parameters
-    param_name:
-      type: string      # string, number, boolean, array, object
-      required: bool    # Is this input required?
-      default: any      # Default value if not provided
-      description: string
-
-  outputs:              # Output definitions
-    output_name:
-      type: string
-      description: string
-
-  steps:                # Workflow steps
-    - id: step_id       # Unique step identifier
-      type: step_type   # agent, conditional, parallel, loop, transform
-      depends_on: []    # List of step IDs this depends on
-      # ... step-specific fields
-
-  error_handling:       # Global error handling
-    on_failure: stop    # stop, continue
-    retry_policy:
-      max_attempts: 3
-      backoff: exponential
-```
-
-### Template Expressions
-
-Access dynamic values using `{{ }}` syntax:
-
-- `{{ inputs.name }}` - Access workflow inputs
-- `{{ steps.step_id.result }}` - Access step results
-- `{{ steps.step_id.status }}` - Access step status
-- `{{ context.get("key", "default") }}` - Access context with default
-- `{{ env.VARIABLE }}` - Access environment variables (future)
-
-**Examples:**
-
-```yaml
-inputs:
-  question: "{{ inputs.user_question }}"                    # Access workflow input
-  previous_result: "{{ steps.analyze_structure.result }}"  # Access step result
-  codebase: "{{ context.get('config.path', '/default') }}" # Context with default
+print(f"Results: {result.outputs}")
 ```
 
 ## Step Types
 
-### 1. Agent Step (✅ Implemented)
+### 1. Agent Step
 
-Execute an AI agent operation.
+Execute AI agent operations.
 
 ```yaml
 - id: explore_code
   type: agent
-  agent: explore                    # Agent type (explore, review, etc.)
+  agent: explore                    # Agent type
   operation: find_implementation    # Agent operation
   inputs:
-    feature_or_function: "authentication"
-    codebase_path: "/path/to/code"
-  outputs:
-    implementation: result          # Store result as 'explore_code.implementation'
+    feature_or_function: "auth"
+    codebase_path: "/code"
   config:
-    cli_type: claude               # claude, codex, copilot
-    model: haiku                   # Model to use
+    model: haiku                   # Optional: model override
   retry:
     max_attempts: 3
-    backoff: exponential           # exponential or fixed
-    backoff_multiplier: 2
-  timeout: 300                      # seconds
-  on_error: stop                    # stop or continue
+    backoff: exponential
+  timeout: 300
+  on_error: stop                    # stop | continue
 ```
 
-**Available Agents:**
+**Available agents:**
+- `explore`: Codebase exploration (find_implementation, analyze_structure, find_usage, explain_flow)
 
-- `explore`: ExploreAgent with operations:
-  - `explore`: Answer general codebase questions
-  - `find_implementation`: Locate feature/function implementations
-  - `analyze_structure`: Analyze component or codebase structure
-  - `find_usage`: Find all usages of symbols
-  - `explain_flow`: Explain execution flows and processes
+### 2. Transform Step
 
-### 2. Conditional Step (🚧 Future)
+Generic data transformation with pluggable operations.
 
-Branch execution based on conditions.
-
+**Comparison (Multi-model validation):**
 ```yaml
-- id: check_complexity
-  type: conditional
-  condition: "{{ steps.analyze_structure.result.files_count > 100 }}"
-  then:
-    - id: detailed_analysis
-      type: agent
-      agent: explore
-      operation: explore
-      inputs:
-        question: "Provide detailed complexity analysis"
-  else:
-    - id: simple_analysis
-      type: agent
-      agent: explore
-      operation: explore
-      inputs:
-        question: "Provide basic overview"
-```
-
-### 3. Parallel Step (🚧 Future)
-
-Execute multiple steps concurrently.
-
-```yaml
-- id: parallel_analysis
-  type: parallel
-  steps:
-    - id: find_tests
-      type: agent
-      agent: explore
-      operation: find_usage
-      inputs:
-        symbol: "test"
-
-    - id: find_docs
-      type: agent
-      agent: explore
-      operation: explore
-      inputs:
-        question: "Where is the documentation?"
-
-    - id: find_config
-      type: agent
-      agent: explore
-      operation: find_implementation
-      inputs:
-        feature_or_function: "configuration"
-  max_concurrency: 3
-```
-
-### 4. Loop Step (🚧 Future)
-
-Iterate over a collection.
-
-```yaml
-- id: analyze_modules
-  type: loop
-  items: "{{ inputs.module_list }}"
-  item_var: module
-  steps:
-    - id: analyze_module
-      type: agent
-      agent: explore
-      operation: analyze_structure
-      inputs:
-        component_or_module: "{{ module }}"
-  outputs:
-    results: collected  # Collect all iteration results
-```
-
-### 5. Transform Step (🚧 Future)
-
-Transform data using Python expressions.
-
-```yaml
-- id: transform_results
+- id: compare
   type: transform
-  script: |
-    # Python code to transform data
-    results = []
-    for item in context.get("parallel_analysis.results", []):
-      results.append({
-        "summary": item["result"][:100],
-        "full": item["result"]
-      })
-    return {"processed": results}
-  outputs:
-    transformed: result
+  config:
+    operation: compare_results
+  inputs:
+    model_1_result: "{{ steps.sonnet.result }}"
+    model_2_result: "{{ steps.haiku.result }}"
+    threshold: 0.75
 ```
 
-## Workflow Context
+**Aggregation:**
+```yaml
+- id: total
+  type: transform
+  config:
+    operation: aggregate
+    function: sum              # sum, avg, count, min, max, group_by, concat
+  inputs:
+    items: [1, 2, 3, 4, 5]
+```
 
-The workflow context manages execution state and data flow between steps.
+**Filtering:**
+```yaml
+- id: active_only
+  type: transform
+  config:
+    operation: filter
+    condition: equals          # equals, contains, greater_than, less_than, regex
+    field: status
+    value: "active"
+  inputs:
+    items: "{{ steps.users.result }}"
+```
 
-### Context Structure
+**Mapping:**
+```yaml
+- id: extract_names
+  type: transform
+  config:
+    operation: map
+    function: extract          # extract, project, compute, transform
+    fields: name
+  inputs:
+    items: "{{ steps.users.result }}"
+```
 
-```python
-{
-  "inputs": {
-    "codebase_path": "/path/to/code",
-    "focus_area": "authentication"
-  },
-  "steps": {
-    "analyze_structure": {
-      "status": "completed",
-      "result": {...},
-      "started_at": "2025-11-08T10:00:00Z",
-      "completed_at": "2025-11-08T10:00:05Z"
-    },
-    "find_patterns": {
-      "status": "running",
-      "started_at": "2025-11-08T10:00:05Z"
-    }
-  },
-  "outputs": {},
-  "metadata": {
-    "workflow_id": "uuid-here",
-    "execution_id": "uuid-here",
-    "started_at": "2025-11-08T10:00:00Z"
-  }
-}
+See [TRANSFORM_GUIDE.md](examples/TRANSFORM_GUIDE.md) for complete operation reference.
+
+## Template Expressions
+
+Access dynamic values using `{{ }}`:
+
+```yaml
+"{{ inputs.param }}"                    # Workflow inputs
+"{{ steps.step_id.result }}"            # Step results
+"{{ steps.step_id.result.field }}"      # Nested field access
+"{{ context.get('key', 'default') }}"   # Context with default
+```
+
+## Workflow Definition
+
+```yaml
+workflow:
+  name: string                    # Required: workflow identifier
+  version: string                 # Optional: semantic version
+  description: string             # Optional: description
+
+  inputs:                         # Input parameters
+    param_name:
+      type: string                # string, number, boolean, array, object
+      required: bool
+      default: any
+      description: string
+
+  outputs:                        # Output definitions
+    output_name:
+      value: "{{ steps.x.result }}"
+      description: string
+
+  steps:                          # Workflow steps
+    - id: step_id                 # Unique identifier
+      type: agent | transform     # Step type
+      depends_on: []              # Step dependencies
+      # ... type-specific config
+
+  error_handling:                 # Optional: global error handling
+    on_failure: stop              # stop | continue
+    retry_policy:
+      max_attempts: 3
+      backoff: exponential        # exponential | fixed
 ```
 
 ## Execution Model
 
-### Dependency Resolution
+**Dependency Resolution:**
+- Steps execute in dependency order (DAG)
+- Independent steps can run concurrently (future)
+- Circular dependencies are rejected during validation
 
-The engine automatically determines execution order based on `depends_on` declarations:
+**Error Handling:**
+- `stop` (default): Halt workflow on step failure
+- `continue`: Mark failed, continue with remaining steps
+- Retry with exponential/fixed backoff
 
-```yaml
-steps:
-  - id: step1
-    type: agent
-    # ... (runs first)
+**State Management:**
+- Track step status (pending, running, completed, failed)
+- Store results, timing, retry counts
+- Resume from last successful step (future)
 
-  - id: step2
-    type: agent
-    depends_on: [step1]  # Waits for step1
+## Architecture
 
-  - id: step3
-    type: agent
-    depends_on: [step1, step2]  # Waits for both
+```
+plugins/automation/workflows/
+├── definition.py               # WorkflowDefinition - YAML parsing
+├── engine.py                   # WorkflowEngine - execution orchestrator
+├── steps/
+│   ├── base.py                 # BaseStep - abstract base
+│   ├── agent_step.py           # AgentStep - AI agent operations
+│   ├── transform_step.py       # TransformStep - data operations
+│   └── operations/             # Pluggable transform operations
+│       ├── base.py             # BaseOperation, OperationRegistry
+│       ├── comparison.py       # Model comparison operations
+│       ├── aggregation.py      # Data aggregation
+│       ├── filtering.py        # Data filtering
+│       └── mapping.py          # Data mapping/transformation
+└── examples/
+    ├── TRANSFORM_GUIDE.md      # Transform operations reference
+    ├── feature_exploration.yaml
+    ├── codebase_onboarding.yaml
+    └── model_comparison_mapreduce.yaml
 ```
 
-**Key behaviors:**
-- Steps without dependencies execute first
-- Dependencies form a DAG (no circular references allowed)
-- Engine validates dependencies before execution
-- Execution stops if dependencies fail (unless on_error: continue)
+## Common Patterns
 
-### Error Handling
-
-Configure retry and failure behavior at step or workflow level:
+### Pattern 1: Map-Reduce (Multi-model Consensus)
 
 ```yaml
-# Workflow-level error handling
-error_handling:
-  on_failure: stop              # stop or continue
-  retry_policy:
-    max_attempts: 3
-    backoff: exponential        # exponential or fixed
-    backoff_multiplier: 2
+# Map: Execute on multiple models
+- id: model_1
+  type: agent
+  inputs: {question: "{{ inputs.prompt }}"}
 
-# Step-level error handling (overrides workflow-level)
-steps:
-  - id: risky_step
-    type: agent
-    retry:
-      max_attempts: 3
-      backoff: exponential
-      backoff_multiplier: 2
-    timeout: 300                 # seconds
-    on_error: continue          # stop or continue
-```
+- id: model_2
+  type: agent
+  inputs: {question: "{{ inputs.prompt }}"}
 
-**Error Policies:**
-- `stop` (default): Stop workflow on failure
-- `continue`: Mark step as failed but continue with remaining steps
-
-**Retry Strategies:**
-- `fixed`: Wait same amount between retries
-- `exponential`: Exponentially increase wait time (backoff_multiplier ** retry_count)
-
-### State Management
-
-The engine tracks:
-- **Step Status**: pending, running, completed, failed, skipped
-- **Step Results**: Output data from each step
-- **Execution Timing**: Start and completion timestamps
-- **Retry Counts**: Number of retry attempts per step
-
-Access state in templates:
-```yaml
-"{{ steps.step_id.result }}"      # Step result data
-"{{ steps.step_id.status }}"      # Step status
-"{{ steps.step_id.error }}"       # Error message (if failed)
-```
-
-## Integration with Agents
-
-### Agent Registry
-
-The `AgentRegistry` manages available agents for workflows:
-
-```python
-from plugins.automation.workflows.steps.agent_step import AgentRegistry
-
-# Built-in agents are auto-registered:
-# - "explore": ExploreAgent
-
-# Register custom agents:
-class ReviewAgent(SpecializedAgent):
-    async def review_code(self, file_path):
-        # Implementation
-        pass
-
-AgentRegistry.register("review", ReviewAgent)
-```
-
-### Agent Step Execution
-
-When an agent step executes:
-
-1. **Get agent from registry** based on `agent` field
-2. **Create agent configuration** from step `config` and inputs
-3. **Resolve inputs** from workflow context
-4. **Execute agent operation** (explore, find_implementation, etc.)
-5. **Store result** in workflow context
-6. **Handle errors** according to retry policy
-
-## Example Workflows
-
-### Example 1: Feature Exploration
-
-Comprehensive exploration of a feature implementation.
-
-```yaml
-workflow:
-  name: "feature-exploration"
-  version: "1.0"
-  description: "Comprehensive exploration of a specific feature implementation"
-
+# Reduce: Compare and verify
+- id: compare
+  type: transform
+  depends_on: [model_1, model_2]
+  config: {operation: compare_results}
   inputs:
-    feature_name:
-      type: string
-      required: true
-      description: "Name of the feature to explore"
-    codebase_path:
-      type: string
-      required: true
-      description: "Path to the codebase root directory"
+    model_1_result: "{{ steps.model_1.result }}"
+    model_2_result: "{{ steps.model_2.result }}"
+    threshold: 0.75
 
-  outputs:
-    exploration_report:
-      type: object
-      description: "Complete feature exploration report"
-
-  steps:
-    # Step 1: Find the implementation
-    - id: find_implementation
-      type: agent
-      agent: explore
-      operation: find_implementation
-      inputs:
-        feature_or_function: "{{ inputs.feature_name }}"
-        codebase_path: "{{ inputs.codebase_path }}"
-      outputs:
-        implementation_details: result
-
-    # Step 2: Find where it's used
-    - id: find_usage
-      type: agent
-      agent: explore
-      operation: find_usage
-      inputs:
-        symbol: "{{ inputs.feature_name }}"
-        codebase_path: "{{ inputs.codebase_path }}"
-      depends_on: [find_implementation]
-      outputs:
-        usage_locations: result
-
-    # Step 3: Explain the flow
-    - id: explain_flow
-      type: agent
-      agent: explore
-      operation: explain_flow
-      inputs:
-        flow_description: "{{ inputs.feature_name }} implementation and usage"
-        codebase_path: "{{ inputs.codebase_path }}"
-      depends_on: [find_implementation, find_usage]
-      outputs:
-        flow_explanation: result
-
-  error_handling:
-    on_failure: stop
-    retry_policy:
-      max_attempts: 2
-      backoff: exponential
+- id: verify
+  type: transform
+  depends_on: [compare]
+  config: {operation: verify_consensus}
+  inputs:
+    comparison: "{{ steps.compare.result }}"
+    threshold: 0.75
 ```
 
-### Example 2: Codebase Onboarding
-
-Generate comprehensive onboarding documentation for a codebase.
+### Pattern 2: Filter → Transform → Aggregate
 
 ```yaml
-workflow:
-  name: "codebase-onboarding"
-  version: "1.0"
-  description: "Generate comprehensive onboarding documentation for a codebase"
+- id: filter
+  type: transform
+  config: {operation: filter, condition: equals, field: status, value: "active"}
+  inputs: {items: "{{ inputs.users }}"}
 
-  inputs:
-    codebase_path:
-      type: string
-      required: true
-      description: "Path to the codebase root directory"
+- id: extract
+  type: transform
+  depends_on: [filter]
+  config: {operation: map, function: extract, fields: score}
+  inputs: {items: "{{ steps.filter.result.filtered_items }}"}
 
-  outputs:
-    onboarding_guide:
-      type: object
-      description: "Complete onboarding guide"
-
-  steps:
-    # Step 1: Analyze overall structure
-    - id: analyze_structure
-      type: agent
-      agent: explore
-      operation: analyze_structure
-      inputs:
-        codebase_path: "{{ inputs.codebase_path }}"
-      outputs:
-        structure: result
-
-    # Step 2: Find main entry points
-    - id: find_entry_points
-      type: agent
-      agent: explore
-      operation: find_implementation
-      inputs:
-        feature_or_function: "main entry point"
-        codebase_path: "{{ inputs.codebase_path }}"
-      depends_on: [analyze_structure]
-      outputs:
-        entry_points: result
-
-    # Step 3: Find configuration
-    - id: find_configuration
-      type: agent
-      agent: explore
-      operation: find_implementation
-      inputs:
-        feature_or_function: "configuration"
-        codebase_path: "{{ inputs.codebase_path }}"
-      depends_on: [analyze_structure]
-      outputs:
-        configuration: result
-
-    # Step 4: Find tests
-    - id: find_tests
-      type: agent
-      agent: explore
-      operation: explore
-      inputs:
-        question: "Where are the tests located and how do I run them?"
-        codebase_path: "{{ inputs.codebase_path }}"
-      depends_on: [analyze_structure]
-      outputs:
-        testing_info: result
-
-    # Step 5: Find documentation
-    - id: find_documentation
-      type: agent
-      agent: explore
-      operation: explore
-      inputs:
-        question: "Where is the documentation located?"
-        codebase_path: "{{ inputs.codebase_path }}"
-      depends_on: [analyze_structure]
-      outputs:
-        documentation: result
-
-  error_handling:
-    on_failure: continue  # Continue even if some steps fail
-    retry_policy:
-      max_attempts: 2
-      backoff: fixed
+- id: average
+  type: transform
+  depends_on: [extract]
+  config: {operation: aggregate, function: avg}
+  inputs: {items: "{{ steps.extract.result.mapped_items }}"}
 ```
 
 ## Python API
 
-### Basic Usage
-
 ```python
 from plugins.automation.workflows import WorkflowDefinition, WorkflowEngine
-from plugins.automation.context import WorkflowContext
 
-# Load workflow
+# Load and validate
 workflow = WorkflowDefinition.from_file("workflow.yaml")
-
-# Validate before execution
 errors = workflow.validate()
 if errors:
     print(f"Validation errors: {errors}")
-    return
 
 # Execute
 engine = WorkflowEngine()
-result = await engine.execute(
-    workflow,
-    inputs={
-        "param1": "value1",
-        "param2": "value2"
-    }
-)
+result = await engine.execute(workflow, inputs={...})
 
-# Check results
+# Access results
 if result.status == "completed":
-    print(f"Success! Outputs: {result.outputs}")
+    for step_id, step_result in result.step_results.items():
+        print(f"{step_id}: {step_result.status}")
 else:
     print(f"Failed: {result.error}")
 ```
 
-### Resume Execution
+## Extending the System
+
+### Add Custom Agent
 
 ```python
-# Save context for later resume
-context_dict = context.to_dict()
-
-# Later... restore and resume
-context = WorkflowContext.from_dict(context_dict)
-result = await engine.execute(workflow, context=context)
-```
-
-### Access Step Results
-
-```python
-# Get specific step result
-step_result = result.step_results.get("find_implementation")
-if step_result:
-    print(f"Status: {step_result.status}")
-    print(f"Result: {step_result.result}")
-    print(f"Duration: {step_result.completed_at - step_result.started_at}")
-    print(f"Retries: {step_result.retry_count}")
-```
-
-### Workflow Validation
-
-```python
-# Load and validate
-workflow = WorkflowDefinition.from_file("workflow.yaml")
-errors = workflow.validate()
-
-if errors:
-    print("Validation errors found:")
-    for error in errors:
-        print(f"  - {error}")
-else:
-    print("Workflow is valid!")
-```
-
-## Adding New Agent Types
-
-To add a new agent to workflows:
-
-```python
-# 1. Create your agent class
 from utils.agent import SpecializedAgent
-
-class ReviewAgent(SpecializedAgent):
-    def get_system_prompt(self) -> str:
-        return "You are a code review agent..."
-
-    async def review_code(self, file_path: str) -> str:
-        # Implementation
-        return await self._executor.execute(
-            f"Review the code in {file_path}"
-        )
-
-# 2. Register with AgentRegistry
 from plugins.automation.workflows.steps.agent_step import AgentRegistry
 
-AgentRegistry.register("review", ReviewAgent)
+class ReviewAgent(SpecializedAgent):
+    async def review_code(self, file_path: str) -> str:
+        return await self._executor.execute(f"Review {file_path}")
 
-# 3. Use in workflows
-# - id: review_step
-#   type: agent
-#   agent: review
-#   operation: review_code
-#   inputs:
-#     file_path: "src/main.py"
+AgentRegistry.register("review", ReviewAgent)
 ```
 
-## State Persistence (Future)
-
-### Storage Options
-
-1. **In-Memory** (default, current implementation)
-2. **File-based** (future: JSON files in .workflows/ directory)
-3. **Database** (future: PostgreSQL, SQLite)
-
-### Planned State Structure
+### Add Custom Transform Operation
 
 ```python
-{
-  "workflow_id": "uuid",
-  "execution_id": "uuid",
-  "status": "running",
-  "context": {...},
-  "history": [
-    {
-      "step_id": "analyze_structure",
-      "status": "completed",
-      "result": {...},
-      "started_at": "...",
-      "completed_at": "..."
-    }
-  ],
-  "created_at": "...",
-  "updated_at": "..."
-}
+from plugins.automation.workflows.steps.operations.base import BaseOperation
+from plugins.automation.workflows.steps.operations import registry
+
+class MyOperation(BaseOperation):
+    def validate(self) -> Optional[str]:
+        if "required_field" not in self.inputs:
+            return "MyOperation requires 'required_field'"
+        return None
+
+    async def execute(self) -> Dict[str, Any]:
+        data = self.inputs["required_field"]
+        return {"result": process(data)}
+
+registry.register("my_operation", MyOperation)
 ```
+
+## Testing
+
+```bash
+# Test workflow engine
+uv run pytest plugins/automation/tests/test_workflow_engine.py -v
+
+# Test transform operations
+uv run pytest plugins/automation/tests/test_transform_operations.py -v
+
+# Test all
+uv run pytest plugins/automation/tests/ -v
+```
+
+## Examples
+
+See `examples/` directory:
+- `feature_exploration.yaml` - Sequential agent workflow
+- `codebase_onboarding.yaml` - Multi-step codebase analysis
+- `model_comparison_mapreduce.yaml` - Multi-model validation with consensus
+- `TRANSFORM_GUIDE.md` - Complete transform operations reference
 
 ## Best Practices
 
-### 1. Workflow Design
-
-- **Keep workflows focused**: One workflow, one purpose
-- **Use meaningful IDs**: Clear, descriptive step identifiers
-- **Document inputs/outputs**: Help users understand requirements
-- **Handle errors**: Define retry and failure policies
-- **Break complex workflows**: Into smaller, reusable workflows
-
-### 2. Step Dependencies
-
-- **Minimize dependencies**: Only declare truly necessary dependencies
-- **Avoid cycles**: Dependencies must form a DAG (no circular references)
-- **Group independent steps**: Steps without dependencies run first
-- **Consider execution order**: Dependent steps wait for all dependencies
-
-### 3. Error Handling
-
-- **Set appropriate retries**: Balance reliability vs speed
-- **Use exponential backoff**: For transient failures
-- **Choose error policy carefully**:
-  - `stop` for critical steps (default)
-  - `continue` for optional steps
-- **Set reasonable timeouts**: Based on expected operation duration
-
-### 4. Performance
-
-- **Use lightweight models**: Haiku for simple tasks, Sonnet for complex
-- **Keep sessions consistent**: Use same session_id for related operations
-- **Monitor execution time**: Adjust timeouts based on observed durations
-- **Future: Use parallel steps**: For independent operations (when implemented)
-
-### 5. Template Usage
-
-- **Access inputs**: `{{ inputs.param_name }}`
-- **Access step results**: `{{ steps.step_id.result }}`
-- **Provide defaults**: `{{ context.get("path", "default") }}`
-- **String interpolation**: Mix templates with text
-- **Keep templates simple**: Complex logic should be in transform steps (future)
-
-## Troubleshooting
-
-### Workflow Validation Fails
-
-```python
-errors = workflow.validate()
-for error in errors:
-    print(f"Error: {error}")
-```
-
-**Common issues:**
-- Missing required fields (agent, operation, etc.)
-- Unknown step dependencies
-- Duplicate step IDs
-- Invalid step types
-- Circular dependencies
-
-### Step Execution Fails
-
-Check the step result for details:
-
-```python
-step_result = result.step_results["step_id"]
-print(f"Status: {step_result.status}")
-print(f"Error: {step_result.error}")
-print(f"Retries: {step_result.retry_count}")
-```
-
-**Common issues:**
-- Agent not registered
-- Invalid operation for agent type
-- Missing required inputs
-- Timeout exceeded
-- Template resolution failures
-
-### Template Resolution Issues
-
-Test template resolution:
-
-```python
-from plugins.automation.context import WorkflowContext
-
-context = WorkflowContext(inputs={"key": "value"})
-resolved = context.resolve_template("{{ inputs.key }}")
-print(resolved)  # Should print "value"
-```
-
-**Common issues:**
-- Typo in path (e.g., `{{ inputs.keey }}`)
-- Accessing non-existent step result
-- Incorrect dot notation
-- Missing quotes in YAML strings
-
-### Dependency Deadlock
-
-If workflow stalls without completing:
-
-1. Check for circular dependencies
-2. Verify all referenced step IDs exist
-3. Ensure dependencies are spelled correctly
-4. Review error logs for failed dependencies
+1. **Keep workflows focused** - One workflow, one purpose
+2. **Use meaningful IDs** - Clear step identifiers
+3. **Document thoroughly** - Add descriptions to inputs/outputs
+4. **Handle errors** - Set appropriate retry policies
+5. **Minimize dependencies** - Only declare necessary dependencies
+6. **Use appropriate models** - Haiku for simple tasks, Sonnet for complex
+7. **Chain operations** - Use transform steps for data pipelines
 
 ## Implementation Status
 
-### ✅ Currently Implemented
+**✅ Implemented:**
+- Workflow definition (YAML parsing, validation)
+- Workflow engine (DAG resolution, execution)
+- Agent step type (ExploreAgent integration)
+- Transform step type (8 operations: comparison, aggregation, filtering, mapping)
+- Error handling (retry policies, failure modes)
+- Template expression system
 
-- [x] Workflow definition (YAML parsing and validation)
-- [x] Workflow context (state management, template resolution)
-- [x] Workflow engine (dependency resolution, sequential execution)
-- [x] Agent step type (ExploreAgent integration)
-- [x] Error handling (retry policies, failure modes)
-- [x] Step-level configuration
-- [x] Template expression system
-- [x] Example workflows
-- [x] Comprehensive documentation
-
-### 🚧 Planned (Future)
-
-- [ ] Conditional steps (branching logic)
-- [ ] Parallel steps (concurrent execution)
-- [ ] Loop steps (iteration)
-- [ ] Transform steps (data transformation)
-- [ ] MCP tool interface
-- [ ] State persistence (file-based, database)
-- [ ] Workflow templates
-- [ ] Dynamic step generation
-- [ ] Webhook triggers
-- [ ] Scheduled execution
-- [ ] Version management
-- [ ] Approval steps (human-in-the-loop)
-- [ ] Notifications (Slack, email)
-- [ ] Metrics and monitoring
-- [ ] Visual workflow editor
-
-## Design Principles
-
-1. **Declarative**: Workflows are defined declaratively in YAML, not imperatively
-2. **Deterministic**: Same inputs produce same execution path
-3. **Observable**: Full visibility into execution state and history
-4. **Resumable**: Can resume from failures or interruptions
-5. **Extensible**: Easy to add new step types and agents
-6. **Type-Safe**: Strong typing and validation
-7. **Testable**: Each component is independently testable
-
-## Contributing
-
-To contribute to the workflow system:
-
-1. **New step types**: Extend `BaseStep` in `steps/` directory
-2. **New agents**: Register with `AgentRegistry`
-3. **Tests**: Add tests for new functionality
-4. **Documentation**: Update this README
-5. **Examples**: Add example workflows demonstrating new features
-
-## See Also
-
-- [Automation Plugin README](../README.md) - Parent plugin documentation
-- [ExploreAgent](../agents/explore_agent.py) - Agent implementation
-- [Workflow Context](../context.py) - Shared execution context
-- [Agent Base Class](../../../utils/agent/agent.py) - Specialized agent framework
+**🚧 Future:**
+- Conditional steps (branching)
+- Parallel execution
+- Loop steps (iteration)
+- State persistence
+- MCP tool interface
+- Webhook triggers

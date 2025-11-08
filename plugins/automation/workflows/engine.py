@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from ..context import WorkflowContext, StepResult, StepStatus
 from .definition import WorkflowDefinition, StepDefinition
-from .steps import BaseStep, AgentStep
+from .steps import BaseStep, AgentStep, TransformStep
 
 
 class WorkflowStatus(str, Enum):
@@ -248,10 +248,12 @@ class WorkflowEngine:
         """
         if step_def.type == "agent":
             return AgentStep(step_def)
+        elif step_def.type == "transform":
+            return TransformStep(step_def)
         else:
             raise ValueError(
                 f"Step type '{step_def.type}' not yet implemented. "
-                f"Currently only 'agent' steps are supported."
+                f"Currently supported types: 'agent', 'transform'"
             )
 
     def _determine_status(
