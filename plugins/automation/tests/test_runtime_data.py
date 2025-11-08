@@ -5,7 +5,7 @@ Tests for Structural Context (WorkflowContext)
 import pytest
 from datetime import datetime
 
-from plugins.automation.context import (
+from plugins.automation.runtime_data import (
     WorkflowContext,
     StepResult,
     StepStatus,

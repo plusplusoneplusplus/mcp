@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 
-from ..context import WorkflowContext, StepResult, StepStatus
+from ..runtime_data import WorkflowContext, StepResult, StepStatus
 from .definition import WorkflowDefinition, StepDefinition
 from .steps import BaseStep, AgentStep, TransformStep
 

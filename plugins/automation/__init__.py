@@ -12,7 +12,7 @@ This plugin provides:
 
 from .agents import ExploreAgent, ExploreAgentConfig, explore_codebase
 from .tools import AgentTool
-from .context import WorkflowContext, StepResult, StepStatus
+from .runtime_data import WorkflowContext, StepResult, StepStatus
 
 __all__ = [
     "ExploreAgent",

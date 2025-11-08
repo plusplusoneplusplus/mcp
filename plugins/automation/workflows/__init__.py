@@ -11,7 +11,7 @@ This module provides:
 - MCP tool interface for workflow execution
 """
 
-from ..context import WorkflowContext, StepResult
+from ..runtime_data import WorkflowContext, StepResult
 from .definition import WorkflowDefinition
 from .engine import WorkflowEngine, WorkflowExecutionResult
 
