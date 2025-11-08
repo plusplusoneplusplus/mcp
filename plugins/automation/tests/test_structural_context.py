@@ -1,5 +1,5 @@
 """
-Tests for WorkflowContext
+Tests for Structural Context (WorkflowContext)
 """
 
 import pytest
