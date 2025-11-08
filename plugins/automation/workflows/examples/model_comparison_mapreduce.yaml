@@ -1,0 +1,121 @@
+workflow:
+  name: "model_comparison_mapreduce"
+  version: "1.0.0"
+  description: |
+    Map-Reduce workflow for comparing AI model outputs.
+    Map phase: Run the same prompt with different AI models
+    Reduce phase: Aggregate and verify if models return similar results
+
+  inputs:
+    prompt:
+      type: string
+      required: true
+      description: "The prompt to send to all AI models"
+
+    models:
+      type: list
+      required: false
+      default: ["sonnet", "haiku"]
+      description: "List of AI models to compare (sonnet, haiku, opus)"
+
+    similarity_threshold:
+      type: float
+      required: false
+      default: 0.75
+      description: "Minimum similarity score (0-1) for results to be considered similar"
+
+  outputs:
+    all_results:
+      type: dict
+      description: "Results from all models in the map phase"
+
+    comparison_result:
+      type: dict
+      description: "Aggregated comparison analysis including similarity scores and consensus"
+
+    models_agree:
+      type: boolean
+      description: "Whether all models produced similar results"
+
+  steps:
+    # MAP PHASE: Execute same prompt with different models
+    - id: map_model_1
+      type: agent
+      agent: explore
+      operation: explore
+      config:
+        model: "{{ inputs.models[0] | default('sonnet') }}"
+        cli_type: "claude"
+      inputs:
+        question: "{{ inputs.prompt }}"
+      retry:
+        max_attempts: 2
+        backoff: exponential
+      on_error: stop
+      timeout: 300
+
+    - id: map_model_2
+      type: agent
+      agent: explore
+      operation: explore
+      config:
+        model: "{{ inputs.models[1] | default('haiku') }}"
+        cli_type: "claude"
+      inputs:
+        question: "{{ inputs.prompt }}"
+      retry:
+        max_attempts: 2
+        backoff: exponential
+      on_error: stop
+      timeout: 300
+
+    # Optional third model
+    - id: map_model_3
+      type: agent
+      agent: explore
+      operation: explore
+      config:
+        model: "{{ inputs.models[2] | default('haiku') }}"
+        cli_type: "claude"
+      inputs:
+        question: "{{ inputs.prompt }}"
+      retry:
+        max_attempts: 2
+        backoff: exponential
+      on_error: continue
+      timeout: 300
+
+    # REDUCE PHASE: Aggregate and compare results
+    - id: reduce_aggregate
+      type: transform
+      depends_on:
+        - map_model_1
+        - map_model_2
+        - map_model_3
+      inputs:
+        model_1_result: "{{ steps.map_model_1.result }}"
+        model_2_result: "{{ steps.map_model_2.result }}"
+        model_3_result: "{{ steps.map_model_3.result }}"
+        prompt: "{{ inputs.prompt }}"
+        threshold: "{{ inputs.similarity_threshold }}"
+      config:
+        operation: "compare_results"
+      on_error: stop
+
+    # Final verification and consensus building
+    - id: verify_consensus
+      type: transform
+      depends_on:
+        - reduce_aggregate
+      inputs:
+        comparison: "{{ steps.reduce_aggregate.result }}"
+        threshold: "{{ inputs.similarity_threshold }}"
+      config:
+        operation: "verify_consensus"
+      outputs:
+        all_results:
+          model_1: "{{ steps.map_model_1.result }}"
+          model_2: "{{ steps.map_model_2.result }}"
+          model_3: "{{ steps.map_model_3.result }}"
+        comparison_result: "{{ steps.reduce_aggregate.result }}"
+        models_agree: "{{ steps.reduce_aggregate.result.all_similar }}"
