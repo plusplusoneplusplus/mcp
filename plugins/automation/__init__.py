@@ -12,10 +12,14 @@ This plugin provides:
 
 from .agents import ExploreAgent, ExploreAgentConfig, explore_codebase
 from .tools import AgentTool
+from .context import WorkflowContext, StepResult, StepStatus
 
 __all__ = [
     "ExploreAgent",
     "ExploreAgentConfig",
     "explore_codebase",
     "AgentTool",
+    "WorkflowContext",
+    "StepResult",
+    "StepStatus",
 ]

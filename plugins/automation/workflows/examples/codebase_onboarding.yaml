@@ -1,0 +1,95 @@
+workflow:
+  name: "codebase-onboarding"
+  version: "1.0"
+  description: "Generate comprehensive onboarding documentation for a codebase"
+
+  inputs:
+    codebase_path:
+      type: string
+      required: true
+      description: "Path to the codebase root directory"
+
+  outputs:
+    onboarding_guide:
+      type: object
+      description: "Complete onboarding guide with structure, entry points, config, and tests"
+
+  steps:
+    # Step 1: Analyze overall structure
+    - id: analyze_structure
+      type: agent
+      agent: explore
+      operation: analyze_structure
+      inputs:
+        codebase_path: "{{ inputs.codebase_path }}"
+      outputs:
+        structure: result
+      config:
+        cli_type: claude
+        model: haiku
+
+    # Step 2: Find main entry points
+    - id: find_entry_points
+      type: agent
+      agent: explore
+      operation: find_implementation
+      inputs:
+        feature_or_function: "main entry point"
+        codebase_path: "{{ inputs.codebase_path }}"
+      depends_on: [analyze_structure]
+      outputs:
+        entry_points: result
+      config:
+        cli_type: claude
+        model: haiku
+
+    # Step 3: Find configuration
+    - id: find_configuration
+      type: agent
+      agent: explore
+      operation: find_implementation
+      inputs:
+        feature_or_function: "configuration"
+        codebase_path: "{{ inputs.codebase_path }}"
+      depends_on: [analyze_structure]
+      outputs:
+        configuration: result
+      config:
+        cli_type: claude
+        model: haiku
+
+    # Step 4: Find tests
+    - id: find_tests
+      type: agent
+      agent: explore
+      operation: explore
+      inputs:
+        question: "Where are the tests located and how do I run them?"
+        codebase_path: "{{ inputs.codebase_path }}"
+      depends_on: [analyze_structure]
+      outputs:
+        testing_info: result
+      config:
+        cli_type: claude
+        model: haiku
+
+    # Step 5: Find documentation
+    - id: find_documentation
+      type: agent
+      agent: explore
+      operation: explore
+      inputs:
+        question: "Where is the documentation located?"
+        codebase_path: "{{ inputs.codebase_path }}"
+      depends_on: [analyze_structure]
+      outputs:
+        documentation: result
+      config:
+        cli_type: claude
+        model: haiku
+
+  error_handling:
+    on_failure: continue  # Continue even if some steps fail
+    retry_policy:
+      max_attempts: 2
+      backoff: fixed
