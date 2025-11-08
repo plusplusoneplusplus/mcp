@@ -35,6 +35,10 @@
 !mcp_admin/
 !mcp_admin/**
 
+# Track the automation plugin
+!automation/
+!automation/**
+
 # Ignore Python bytecode files
 *.pyc
 __pycache__/
@@ -47,4 +51,4 @@ __pycache__/
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo

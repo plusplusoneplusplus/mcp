@@ -11,7 +11,7 @@
 #   utils-group-1   - html_to_markdown, vector_store, secret_scanner, agent, session
 #   utils-group-2   - ocr_extractor, playwright, graph_interface
 #   plugins-group-1 - azrepo, kusto
-#   plugins-group-2 - git_tool, knowledge_indexer
+#   plugins-group-2 - git_tool, knowledge_indexer, automation
 
 # Don't exit immediately on error - we want to run all test suites in the group
 set +e
@@ -146,10 +146,11 @@ case "$GROUP_NAME" in
         ;;
 
     "plugins-group-2")
-        echo -e "${BLUE}Running plugins group 2: git_tool, knowledge_indexer${NC}"
+        echo -e "${BLUE}Running plugins group 2: git_tool, knowledge_indexer, automation${NC}"
         echo ""
         run_component_tests "plugins.git_tool" "plugins/git_tool/tests" "$TEST_PATTERN"
         run_component_tests "plugins.knowledge_indexer" "plugins/knowledge_indexer/tests" "$TEST_PATTERN"
+        run_component_tests "plugins.automation" "plugins/automation/tests" "$TEST_PATTERN"
         ;;
 
     *)
