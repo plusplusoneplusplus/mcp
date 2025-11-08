@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from ...context import WorkflowContext, StepResult, StepStatus
+from ...runtime_data import WorkflowContext, StepResult, StepStatus
 from ..definition import StepDefinition
 
 

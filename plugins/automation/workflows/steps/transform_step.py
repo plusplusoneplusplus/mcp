@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, Optional
 from .base import BaseStep, StepStatus
-from ...context import WorkflowContext, StepResult
+from ...runtime_data import WorkflowContext, StepResult
 from .operations import registry
 
 

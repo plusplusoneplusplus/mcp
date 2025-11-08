@@ -11,7 +11,7 @@ from plugins.automation.workflows import (
     WorkflowContext,
 )
 from plugins.automation.workflows.engine import WorkflowStatus
-from plugins.automation.context import StepStatus
+from plugins.automation.runtime_data import StepStatus
 
 
 class TestWorkflowEngine:

@@ -8,7 +8,7 @@ import logging
 from typing import Any, Dict
 
 from .base import BaseStep
-from ...context import WorkflowContext, StepResult, StepStatus
+from ...runtime_data import WorkflowContext, StepResult, StepStatus
 from ..definition import StepDefinition
 from ...agents import ExploreAgent, ExploreAgentConfig
 from utils.agent import CLIType
