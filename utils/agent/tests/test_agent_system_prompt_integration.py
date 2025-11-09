@@ -130,20 +130,24 @@ class TestAgentSystemPromptIntegration:
 
     def test_agent_session_storage_path_custom(self):
         """Test agent with custom session storage path"""
-        custom_path = Path("/custom/sessions")
-        config = AgentConfig(
-            cli_type=CLIType.COPILOT,
-            session_id="custom_path_test",
-            session_storage_path=custom_path,
-        )
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            custom_path = Path(tmpdir) / "sessions"
+            config = AgentConfig(
+                cli_type=CLIType.COPILOT,
+                session_id="custom_path_test",
+                session_storage_path=custom_path,
+            )
 
-        agent = DefaultSystemPromptAgent(config)
+            agent = DefaultSystemPromptAgent(config)
 
-        # Get storage path
-        storage_path = agent._get_session_storage_path()
+            # Get storage path
+            storage_path = agent._get_session_storage_path()
 
-        # Should use custom path + session_id
-        assert storage_path == custom_path / "custom_path_test"
+            # Should use custom path + session_id
+            assert storage_path == custom_path / "custom_path_test"
+            # Verify session directory was created
+            assert custom_path.exists()
 
     def test_agent_default_session_id(self):
         """Test agent with default session ID"""

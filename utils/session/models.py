@@ -116,6 +116,8 @@ class Session:
     metadata: SessionMetadata
     invocation_ids: List[str] = field(default_factory=list)
     conversation: List[ConversationMessage] = field(default_factory=list)
+    # NEW: Workflow data storage
+    data: Dict[str, Any] = field(default_factory=dict)
 
     def add_invocation(self, invocation_id: str, duration_ms: Optional[float] = None):
         """Link an invocation to this session"""
@@ -144,12 +146,34 @@ class Session:
         self.conversation.append(message)
         self.metadata.updated_at = datetime.now()
 
+    # NEW: Data storage methods (from automation/session.py)
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get value from session data."""
+        return self.data.get(key, default)
+
+    def set(self, key: str, value: Any) -> None:
+        """Set value in session data."""
+        self.data[key] = value
+        self.metadata.updated_at = datetime.now()
+
+    def delete(self, key: str) -> None:
+        """Delete value from session data."""
+        if key in self.data:
+            del self.data[key]
+            self.metadata.updated_at = datetime.now()
+
+    def clear_data(self) -> None:
+        """Clear all session data (preserves conversation)."""
+        self.data.clear()
+        self.metadata.updated_at = datetime.now()
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert session to dictionary for serialization"""
         return {
             "metadata": self.metadata.to_dict(),
             "invocation_ids": self.invocation_ids,
             "conversation": [msg.to_dict() for msg in self.conversation],
+            "data": self.data,
         }
 
     @classmethod
@@ -161,4 +185,5 @@ class Session:
             conversation=[
                 ConversationMessage.from_dict(msg) for msg in data.get("conversation", [])
             ],
+            data=data.get("data", {}),
         )

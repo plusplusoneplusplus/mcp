@@ -1,24 +1,19 @@
 """
 Runtime Data Module
 
-Manages runtime data for automation workflows, including:
+Manages runtime data for automation workflows:
 - State: Structural context (WorkflowContext, StepResult, StepStatus)
-- Session: Session-level storage and persistence
+
+Note: Session management has been unified with utils.session.
+Use utils.session.SessionManager for session-level storage.
 """
 
 # State management (structural context)
 from .state import StepResult, StepStatus, WorkflowContext
-
-# Session storage
-from .session import SessionData, SessionStorage, get_storage
 
 __all__ = [
     # State
     "StepResult",
     "StepStatus",
     "WorkflowContext",
-    # Session
-    "SessionData",
-    "SessionStorage",
-    "get_storage",
 ]
