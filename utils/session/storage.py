@@ -87,6 +87,12 @@ class FileSystemSessionStorage(SessionStorage):
         with open(invocations_list_path, "w") as f:
             json.dump(session.invocation_ids, f, indent=2)
 
+        # NEW: Save data field
+        if session.data:
+            data_path = session_path / "data.json"
+            with open(data_path, "w") as f:
+                json.dump(session.data, f, indent=2)
+
     def load_session(self, session_id: str) -> Optional[Session]:
         """Load session from filesystem"""
         session_path = self.sessions_dir / session_id
@@ -121,8 +127,18 @@ class FileSystemSessionStorage(SessionStorage):
                         msg_dict = json.loads(line)
                         conversation.append(ConversationMessage.from_dict(msg_dict))
 
+        # NEW: Load data field
+        data = {}
+        data_path = session_path / "data.json"
+        if data_path.exists():
+            with open(data_path, "r") as f:
+                data = json.load(f)
+
         return Session(
-            metadata=metadata, invocation_ids=invocation_ids, conversation=conversation
+            metadata=metadata,
+            invocation_ids=invocation_ids,
+            conversation=conversation,
+            data=data,
         )
 
     def link_invocation(

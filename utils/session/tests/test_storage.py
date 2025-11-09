@@ -411,3 +411,56 @@ class TestFileSystemSessionStorage:
 
         assert not storage.session_exists("old_session")
         assert storage.session_exists("new_session")
+
+    def test_memory_storage_persists_data(self):
+        """Test data field is persisted in memory storage"""
+        storage = MemorySessionStorage()
+        now = datetime.now()
+
+        metadata = SessionMetadata(
+            session_id="test_session",
+            created_at=now,
+            updated_at=now,
+            status=SessionStatus.ACTIVE,
+        )
+        session = Session(metadata=metadata)
+        session.set("workflow_input", "test")
+        session.set("step_output", {"result": "success"})
+        storage.save_session(session)
+
+        loaded = storage.load_session("test_session")
+        assert loaded is not None
+        assert loaded.get("workflow_input") == "test"
+        assert loaded.get("step_output") == {"result": "success"}
+
+
+class TestDataPersistence:
+    """Tests for data field persistence"""
+
+    def test_filesystem_storage_persists_data(self):
+        """Test data field is persisted to filesystem"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            storage = FileSystemSessionStorage(tmp_path, tmp_path)
+            now = datetime.now()
+
+            metadata = SessionMetadata(
+                session_id="test_session",
+                created_at=now,
+                updated_at=now,
+                status=SessionStatus.ACTIVE,
+            )
+            session = Session(metadata=metadata)
+            session.set("workflow_input", "test")
+            session.set("step_output", {"result": "success"})
+            storage.save_session(session)
+
+            # Verify data.json file exists
+            data_path = tmp_path / "test_session" / "data.json"
+            assert data_path.exists()
+
+            # Load and verify
+            loaded = storage.load_session("test_session")
+            assert loaded is not None
+            assert loaded.get("workflow_input") == "test"
+            assert loaded.get("step_output") == {"result": "success"}

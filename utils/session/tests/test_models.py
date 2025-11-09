@@ -284,3 +284,104 @@ class TestSession:
 
         assert len(session.invocation_ids) == 1
         assert session.metadata.total_invocations == 1
+
+    def test_session_data_storage(self):
+        """Test new data storage methods"""
+        now = datetime.now()
+        metadata = SessionMetadata(
+            session_id="test_session",
+            created_at=now,
+            updated_at=now,
+            status=SessionStatus.ACTIVE,
+        )
+        session = Session(metadata=metadata)
+
+        # Test set and get
+        session.set("key1", "value1")
+        assert session.get("key1") == "value1"
+
+        # Test nested data
+        session.set("key2", {"nested": "data"})
+        assert session.get("key2") == {"nested": "data"}
+
+        # Test default value
+        assert session.get("nonexistent", "default") == "default"
+        assert session.get("nonexistent") is None
+
+        # Test delete
+        session.delete("key1")
+        assert session.get("key1") is None
+
+        # Test clear_data
+        session.set("key3", "value3")
+        session.clear_data()
+        assert session.data == {}
+
+    def test_session_data_preserves_conversation(self):
+        """Test that clear_data preserves conversation"""
+        now = datetime.now()
+        metadata = SessionMetadata(
+            session_id="test_session",
+            created_at=now,
+            updated_at=now,
+            status=SessionStatus.ACTIVE,
+        )
+        session = Session(metadata=metadata)
+
+        # Add conversation and data
+        session.add_message("user", "Hello")
+        session.set("key", "value")
+
+        # Clear data should preserve conversation
+        session.clear_data()
+        assert len(session.conversation) == 1
+        assert session.data == {}
+
+    def test_session_to_dict_with_data(self):
+        """Test converting session with data to dictionary"""
+        now = datetime.now()
+        metadata = SessionMetadata(
+            session_id="test_session",
+            created_at=now,
+            updated_at=now,
+            status=SessionStatus.ACTIVE,
+        )
+        session = Session(metadata=metadata)
+        session.set("workflow_input", "test")
+        session.set("step_output", {"result": "success"})
+
+        data = session.to_dict()
+        assert "data" in data
+        assert data["data"]["workflow_input"] == "test"
+        assert data["data"]["step_output"] == {"result": "success"}
+
+    def test_session_from_dict_with_data(self):
+        """Test creating session from dictionary with data"""
+        now = datetime.now()
+        data = {
+            "metadata": {
+                "session_id": "test_session",
+                "created_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "status": "active",
+                "user_id": None,
+                "purpose": None,
+                "tags": [],
+                "total_invocations": 0,
+                "total_duration_ms": 0.0,
+                "tools_used": [],
+                "estimated_cost": 0.0,
+                "token_usage": {},
+                "custom_metadata": {},
+            },
+            "invocation_ids": [],
+            "conversation": [],
+            "data": {
+                "workflow_input": "test",
+                "step_output": {"result": "success"},
+            },
+        }
+
+        session = Session.from_dict(data)
+        assert session.get("workflow_input") == "test"
+        assert session.get("step_output") == {"result": "success"}
