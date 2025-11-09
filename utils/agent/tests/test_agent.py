@@ -122,7 +122,10 @@ class TestSpecializedAgent:
         assert agent.config == config
         assert agent._executor is not None
         assert isinstance(agent._executor, CLIExecutor)
-        assert agent._sessions == {}
+        assert agent._session_manager is not None
+        # Verify session was created
+        session_id = agent._get_session_id()
+        assert agent._session_manager.storage.session_exists(session_id)
 
     def test_get_system_prompt(self):
         """Test getting system prompt"""

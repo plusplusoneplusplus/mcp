@@ -13,6 +13,7 @@ from pathlib import Path
 
 from .cli_executor import CLIExecutor, CLIConfig, CLIType
 from .system_prompt import SystemPromptBuilder
+from utils.session import SessionManager, FileSystemSessionStorage, MemorySessionStorage, SessionStorage
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +88,30 @@ class SpecializedAgent(ABC):
         """
         self.config = config
         self._executor = CLIExecutor(config.to_cli_config())
-        self._sessions: Dict[str, List[Dict[str, str]]] = {}
+
+        # Use session manager instead of raw dict
+        storage = self._create_storage(config)
+        self._session_manager = SessionManager(storage)
+
+        # Ensure session exists
+        session_id = self._get_session_id()
+        if not self._session_manager.storage.session_exists(session_id):
+            self._session_manager.create_session(
+                session_id=session_id,
+                purpose=f"{self.__class__.__name__} session"
+            )
+
+    def _create_storage(self, config: AgentConfig) -> SessionStorage:
+        """Create storage backend based on config."""
+        if config.session_storage_path:
+            # Use filesystem storage for persistence
+            return FileSystemSessionStorage(
+                sessions_dir=config.session_storage_path,
+                history_dir=config.session_storage_path.parent / ".history"
+            )
+        else:
+            # Use memory storage (backward compatible)
+            return MemorySessionStorage()
 
     @abstractmethod
     def get_system_prompt(self) -> str:
@@ -176,14 +200,23 @@ class SpecializedAgent(ABC):
     def _get_session_history(self) -> List[Dict[str, str]]:
         """Get the message history for the current session"""
         session_id = self._get_session_id()
-        if session_id not in self._sessions:
-            self._sessions[session_id] = []
-        return self._sessions[session_id]
+        session = self._session_manager.get_session(session_id)
+        if session is None:
+            return []
+        # Convert ConversationMessage to dict format
+        return [
+            {"role": msg.role, "content": msg.content}
+            for msg in session.conversation
+        ]
 
     def _add_to_history(self, role: str, content: str):
         """Add a message to the session history"""
-        history = self._get_session_history()
-        history.append({"role": role, "content": content})
+        session_id = self._get_session_id()
+        self._session_manager.add_conversation_message(
+            session_id=session_id,
+            role=role,
+            content=content
+        )
 
     def _build_prompt(
         self,
@@ -307,8 +340,10 @@ class SpecializedAgent(ABC):
             session_id: Session to clear (if None, clears current session)
         """
         sid = session_id or self._get_session_id()
-        if sid in self._sessions:
-            self._sessions[sid] = []
+        session = self._session_manager.get_session(sid)
+        if session:
+            session.conversation.clear()
+            self._session_manager.storage.save_session(session)
             logger.info(f"Cleared history for session {sid}")
 
     def get_session_history(self, session_id: Optional[str] = None) -> List[Dict[str, str]]:
@@ -322,7 +357,14 @@ class SpecializedAgent(ABC):
             List of message dictionaries with 'role' and 'content' keys
         """
         sid = session_id or self._get_session_id()
-        return self._sessions.get(sid, []).copy()
+        session = self._session_manager.get_session(sid)
+        if session is None:
+            return []
+        # Convert ConversationMessage to dict format
+        return [
+            {"role": msg.role, "content": msg.content}
+            for msg in session.conversation
+        ]
 
     def set_session(self, session_id: str):
         """
@@ -332,6 +374,12 @@ class SpecializedAgent(ABC):
             session_id: ID of the session to switch to
         """
         self.config.session_id = session_id
+        # Ensure session exists
+        if not self._session_manager.storage.session_exists(session_id):
+            self._session_manager.create_session(
+                session_id=session_id,
+                purpose=f"{self.__class__.__name__} session"
+            )
         logger.info(f"Switched to session {session_id}")
 
     def __repr__(self) -> str:
