@@ -1,0 +1,176 @@
+# AI-Powered Exploration Workflow
+#
+# This workflow uses AI to intelligently split exploration work:
+# 1. AI Split: AI analyzes the goal and decides how to break it down
+# 2. Parallel Exploration: Execute AI-generated tasks independently
+# 3. AI Summarize: Aggregate all findings into a comprehensive report
+#
+# The AI makes ALL the decisions about:
+# - What aspects to explore
+# - How many tasks to create
+# - What questions to ask
+# - How to organize the work
+
+workflow:
+  name: ai_exploration
+  version: 1.0
+  description: Fully AI-driven exploration with intelligent task decomposition
+
+  inputs:
+    goal:
+      type: string
+      required: true
+      description: High-level exploration goal (e.g., "Understand how authentication works")
+
+    codebase_path:
+      type: string
+      required: true
+      description: Path to the codebase to explore
+
+    focus_areas:
+      type: array
+      required: false
+      default: []
+      description: Optional areas to focus on (e.g., ["security", "performance"])
+
+    constraints:
+      type: string
+      required: false
+      description: Optional constraints (e.g., "focus on backend only")
+
+    session_dir:
+      type: string
+      required: false
+      default: ".mcp_sessions"
+
+  outputs:
+    summary:
+      type: object
+      description: AI-generated comprehensive summary
+
+    ai_reasoning:
+      type: string
+      description: AI's reasoning for how it split the work
+
+  steps:
+    # Step 1: AI decides how to split the exploration
+    - id: ai_split
+      type: transform
+      config:
+        operation: ai_split
+        model: haiku              # Fast model for task decomposition
+        max_tasks: 8              # Let AI create up to 8 parallel tasks
+        min_tasks: 3              # Require at least 3 focused tasks
+      inputs:
+        goal: "{{ inputs.goal }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+        focus_areas: "{{ inputs.focus_areas }}"
+        constraints: "{{ inputs.constraints }}"
+      outputs:
+        tasks: result.tasks
+        reasoning: result.reasoning
+
+    # Step 2: Execute AI-generated explorations
+    # Note: In production, these would be dynamically generated based on ai_split output
+    # For now, we show the pattern with fixed task slots
+
+    - id: explore_0
+      type: transform
+      depends_on: [ai_split]
+      config:
+        operation: explore
+        exploration_type: "{{ steps.ai_split.result.tasks[0].type }}"
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "ai_explore_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.ai_split.result.tasks[0] }}"
+        question: "{{ steps.ai_split.result.tasks[0].query }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      on_error: continue
+
+    - id: explore_1
+      type: transform
+      depends_on: [ai_split]
+      config:
+        operation: explore
+        exploration_type: "{{ steps.ai_split.result.tasks[1].type }}"
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "ai_explore_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.ai_split.result.tasks[1] }}"
+        question: "{{ steps.ai_split.result.tasks[1].query }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      on_error: continue
+
+    - id: explore_2
+      type: transform
+      depends_on: [ai_split]
+      config:
+        operation: explore
+        exploration_type: "{{ steps.ai_split.result.tasks[2].type }}"
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "ai_explore_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.ai_split.result.tasks[2] }}"
+        question: "{{ steps.ai_split.result.tasks[2].query }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      on_error: continue
+
+    # Additional task slots (if AI generates more tasks)
+    - id: explore_3
+      type: transform
+      depends_on: [ai_split]
+      config:
+        operation: explore
+        exploration_type: "{{ steps.ai_split.result.tasks[3].type }}"
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "ai_explore_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.ai_split.result.tasks[3] }}"
+        question: "{{ steps.ai_split.result.tasks[3].query }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      on_error: continue
+
+    - id: explore_4
+      type: transform
+      depends_on: [ai_split]
+      config:
+        operation: explore
+        exploration_type: "{{ steps.ai_split.result.tasks[4].type }}"
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "ai_explore_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.ai_split.result.tasks[4] }}"
+        question: "{{ steps.ai_split.result.tasks[4].query }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      on_error: continue
+
+    # Step 3: AI aggregates and summarizes all findings
+    - id: summarize
+      type: transform
+      depends_on:
+        - explore_0
+        - explore_1
+        - explore_2
+        - explore_3
+        - explore_4
+      config:
+        operation: summarize
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "ai_explore_{{ context.execution_id }}"
+        summary_format: structured
+        include_metadata: true
+        output_file: "{{ inputs.session_dir }}/ai_summary_{{ context.execution_id }}.json"
+      inputs:
+        session_id: "ai_explore_{{ context.execution_id }}"
+      outputs:
+        summary: result.summary
+        ai_reasoning: "{{ steps.ai_split.result.reasoning }}"
+
+  error_handling:
+    default: continue  # Continue even if some explorations fail
