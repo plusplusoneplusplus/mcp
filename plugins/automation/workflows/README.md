@@ -133,6 +133,60 @@ Generic data transformation with pluggable operations.
     items: "{{ steps.users.result }}"
 ```
 
+### 3. Map-Reduce Exploration Operations
+
+**Split:** Divide exploration tasks into parallel chunks
+```yaml
+- id: split_tasks
+  type: transform
+  config:
+    operation: split
+    strategy: by_items         # by_items, by_count, by_chunk_size, custom
+  inputs:
+    items: ["Q1", "Q2", "Q3"]
+```
+
+**AI Split:** Let AI intelligently decompose exploration goals (uses CLIExecutor)
+```yaml
+- id: ai_split
+  type: transform
+  config:
+    operation: ai_split
+    model: haiku              # Fast model for task decomposition
+    max_tasks: 8
+  inputs:
+    goal: "Understand how authentication works"
+    codebase_path: "/code"
+```
+
+**Explore:** AI-powered exploration with session storage (uses ExploreAgent)
+```yaml
+- id: explore_task
+  type: transform
+  config:
+    operation: explore
+    exploration_type: question  # question, implementation, structure, usage, flow
+    session_dir: .mcp_sessions
+    save_to_session: true
+  inputs:
+    task: "{{ task }}"
+    codebase_path: "/code"
+```
+
+**Summarize:** Aggregate findings from session files
+```yaml
+- id: summarize
+  type: transform
+  config:
+    operation: summarize
+    summary_format: structured  # detailed, concise, structured
+    output_file: summary.json
+  inputs:
+    session_id: "{{ context.execution_id }}"
+```
+
+The map-reduce exploration pattern enables parallel AI exploration of codebases with automatic result aggregation. **AI Split** uses Claude to intelligently decompose goals into focused tasks, **Explore** operations use ExploreAgent to investigate each task independently (storing findings in session files), and **Summarize** aggregates all results into comprehensive reports. See [examples/ai_exploration_workflow.yaml](examples/ai_exploration_workflow.yaml) for AI-driven exploration or [examples/exploration_mapreduce.yaml](examples/exploration_mapreduce.yaml) for manual task specification.
+
 See [TRANSFORM_GUIDE.md](examples/TRANSFORM_GUIDE.md) for complete operation reference.
 
 ## Template Expressions
@@ -211,12 +265,16 @@ plugins/automation/workflows/
 │       ├── comparison.py       # Model comparison operations
 │       ├── aggregation.py      # Data aggregation
 │       ├── filtering.py        # Data filtering
-│       └── mapping.py          # Data mapping/transformation
+│       ├── mapping.py          # Data mapping/transformation
+│       ├── split.py            # Task splitting for map-reduce
+│       ├── exploration.py      # AI exploration with session storage
+│       └── summarize.py        # Result aggregation and summarization
 └── examples/
     ├── TRANSFORM_GUIDE.md      # Transform operations reference
     ├── feature_exploration.yaml
     ├── codebase_onboarding.yaml
-    └── model_comparison_mapreduce.yaml
+    ├── model_comparison_mapreduce.yaml
+    └── exploration_mapreduce.yaml        # Map-reduce exploration workflow
 ```
 
 ## Common Patterns
@@ -367,13 +425,14 @@ See `examples/` directory:
 - Workflow definition (YAML parsing, validation)
 - Workflow engine (DAG resolution, execution)
 - Agent step type (ExploreAgent integration)
-- Transform step type (8 operations: comparison, aggregation, filtering, mapping)
+- Transform step type (11 operations: comparison, aggregation, filtering, mapping, split, explore, summarize)
+- Map-reduce exploration pattern with session storage
 - Error handling (retry policies, failure modes)
 - Template expression system
 
 **🚧 Future:**
 - Conditional steps (branching)
-- Parallel execution
+- Parallel execution (true concurrent processing)
 - Loop steps (iteration)
 - State persistence
 - MCP tool interface

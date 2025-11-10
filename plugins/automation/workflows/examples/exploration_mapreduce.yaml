@@ -1,0 +1,154 @@
+# Exploration Map-Reduce Workflow
+#
+# This workflow demonstrates the map-reduce pattern for AI-powered codebase exploration:
+# 1. Split: Divide exploration tasks into smaller chunks
+# 2. Map: Run parallel AI explorations, storing findings in session files
+# 3. Reduce: Aggregate and summarize all findings
+#
+# Use case: Explore multiple aspects of a codebase in parallel and get a comprehensive summary
+
+workflow:
+  name: exploration_mapreduce
+  version: 1.0
+  description: Map-reduce workflow for parallel AI exploration with session storage
+
+  inputs:
+    codebase_path:
+      type: string
+      required: true
+      description: Path to the codebase to explore
+
+    exploration_questions:
+      type: array
+      required: true
+      description: List of questions to explore about the codebase
+      default:
+        - "How does authentication work in this codebase?"
+        - "What are the main API endpoints?"
+        - "How is error handling implemented?"
+        - "What database operations are performed?"
+
+    session_dir:
+      type: string
+      required: false
+      default: ".mcp_sessions"
+      description: Directory to store exploration session files
+
+    summary_format:
+      type: string
+      required: false
+      default: "detailed"
+      description: Format for final summary (detailed, concise, structured)
+
+  outputs:
+    summary:
+      type: object
+      description: Aggregated summary of all explorations
+
+    session_files:
+      type: array
+      description: List of session files created during exploration
+
+  steps:
+    # Step 1: Split - Divide questions into individual exploration tasks
+    - id: split_tasks
+      type: transform
+      config:
+        operation: split
+        strategy: by_items  # One task per question
+      inputs:
+        items: "{{ inputs.exploration_questions }}"
+      outputs:
+        tasks: result.tasks
+
+    # Step 2: Map - Explore each question in parallel (simulated)
+    # Note: In a real implementation, you would use a loop or parallel step
+    # For now, we'll show the pattern with individual steps
+
+    - id: explore_task_0
+      type: transform
+      depends_on:
+        - split_tasks
+      config:
+        operation: explore
+        exploration_type: question
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "exploration_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.split_tasks.result.tasks[0] }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      outputs:
+        finding_0: result
+
+    - id: explore_task_1
+      type: transform
+      depends_on:
+        - split_tasks
+      config:
+        operation: explore
+        exploration_type: question
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "exploration_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.split_tasks.result.tasks[1] }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      outputs:
+        finding_1: result
+
+    - id: explore_task_2
+      type: transform
+      depends_on:
+        - split_tasks
+      config:
+        operation: explore
+        exploration_type: question
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "exploration_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.split_tasks.result.tasks[2] }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      outputs:
+        finding_2: result
+
+    - id: explore_task_3
+      type: transform
+      depends_on:
+        - split_tasks
+      config:
+        operation: explore
+        exploration_type: question
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "exploration_{{ context.execution_id }}"
+        save_to_session: true
+      inputs:
+        task: "{{ steps.split_tasks.result.tasks[3] }}"
+        codebase_path: "{{ inputs.codebase_path }}"
+      outputs:
+        finding_3: result
+
+    # Step 3: Reduce - Aggregate all findings into a comprehensive summary
+    - id: summarize_findings
+      type: transform
+      depends_on:
+        - explore_task_0
+        - explore_task_1
+        - explore_task_2
+        - explore_task_3
+      config:
+        operation: summarize
+        session_dir: "{{ inputs.session_dir }}"
+        session_id: "exploration_{{ context.execution_id }}"
+        summary_format: "{{ inputs.summary_format }}"
+        include_metadata: true
+        output_file: "{{ inputs.session_dir }}/exploration_{{ context.execution_id }}_summary.json"
+      inputs:
+        session_id: "exploration_{{ context.execution_id }}"
+      outputs:
+        summary: result.summary
+        session_files: result.session_files_read
+
+  error_handling:
+    default: continue  # Continue with other explorations even if one fails
