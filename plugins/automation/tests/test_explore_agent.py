@@ -143,19 +143,19 @@ class TestExploreAgent:
         assert "/dir2" in context
         assert "Working Directories" in context
 
-    def test_prepare_context_with_focus_areas(self):
-        """Test context preparation with focus areas"""
-        config = ExploreAgentConfig()
+    def test_prepare_context_with_search_paths(self):
+        """Test context preparation with search paths"""
+        config = ExploreAgentConfig(
+            search_paths=["/src/auth", "/src/db"]
+        )
         agent = ExploreAgent(config)
 
-        context = agent.prepare_context(
-            focus_areas=["authentication", "database layer"]
-        )
+        context = agent.prepare_context()
 
         assert context is not None
-        assert "authentication" in context
-        assert "database layer" in context
-        assert "Focus Areas" in context
+        assert "/src/auth" in context
+        assert "/src/db" in context
+        assert "Search Paths" in context
 
     def test_prepare_context_comprehensive(self):
         """Test context preparation with all parameters"""
@@ -167,16 +167,13 @@ class TestExploreAgent:
         agent = ExploreAgent(config)
 
         context = agent.prepare_context(
-            codebase_path="/work",
-            focus_areas=["api", "models"]
+            codebase_path="/work"
         )
 
         assert context is not None
         assert "/work" in context
         assert "/work/current" in context
         assert "/work/src" in context
-        assert "api" in context
-        assert "models" in context
 
     @pytest.mark.asyncio
     async def test_explore(self):

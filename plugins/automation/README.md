@@ -110,7 +110,6 @@ All operations use a consistent 3-parameter structure:
    - `session_id`: Session ID for conversation context
    - `model`: Model to use (e.g., "haiku", "gpt-4")
    - `cli_type`: CLI to use ("claude", "codex", "copilot")
-   - `focus_areas`: Array of specific areas to focus on
    - `working_directories`: Array of working directory paths
 
 ### Operations
@@ -270,13 +269,12 @@ The tool maintains session-based agents. Use the same `session_id` in the `conte
 
 ### ExploreAgent Methods
 
-#### `explore(question, codebase_path=None, focus_areas=None)`
+#### `explore(question, codebase_path=None)`
 General exploration method for any codebase question.
 
 ```python
 answer = await agent.explore(
-    "Where is the database connection configured?",
-    focus_areas=["config", "database"]
+    "Where is the database connection configured?"
 )
 ```
 

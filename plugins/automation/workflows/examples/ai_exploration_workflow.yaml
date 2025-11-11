@@ -27,12 +27,6 @@ workflow:
       required: true
       description: Path to the codebase to explore
 
-    focus_areas:
-      type: array
-      required: false
-      default: []
-      description: Optional areas to focus on (e.g., ["security", "performance"])
-
     constraints:
       type: string
       required: false
@@ -64,7 +58,6 @@ workflow:
       inputs:
         goal: "{{ inputs.goal }}"
         codebase_path: "{{ inputs.codebase_path }}"
-        focus_areas: "{{ inputs.focus_areas }}"
         constraints: "{{ inputs.constraints }}"
       outputs:
         tasks: result.tasks

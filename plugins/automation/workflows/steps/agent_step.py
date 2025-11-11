@@ -227,7 +227,6 @@ class AgentStep(BaseStep):
             ValueError: If operation not supported
         """
         codebase_path = inputs.get("codebase_path")
-        focus_areas = inputs.get("focus_areas")
 
         if self.operation == "explore":
             question = inputs.get("question")
@@ -236,7 +235,6 @@ class AgentStep(BaseStep):
             return await agent.explore(
                 question=question,
                 codebase_path=codebase_path,
-                focus_areas=focus_areas,
             )
 
         elif self.operation == "find_implementation":
