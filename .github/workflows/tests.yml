@@ -61,9 +61,10 @@ jobs:
 
       - name: Install system dependencies (Windows)
         if: runner.os == 'Windows'
+        continue-on-error: true
         run: |
-          # Install ctags using chocolatey
-          choco install universal-ctags -y
+          # Install ctags using chocolatey (optional, some tests may be skipped if unavailable)
+          choco install universal-ctags -y --timeout=60
 
       - name: Install uv (Unix)
         if: runner.os != 'Windows'
