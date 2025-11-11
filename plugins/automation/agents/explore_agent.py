@@ -180,7 +180,6 @@ When answering questions:
     def prepare_context(
         self,
         codebase_path: Optional[str] = None,
-        focus_areas: Optional[List[str]] = None,
         **kwargs
     ) -> Optional[str]:
         """
@@ -188,7 +187,6 @@ When answering questions:
 
         Args:
             codebase_path: Path to the codebase root
-            focus_areas: Specific areas or components to focus on
             **kwargs: Additional context parameters
 
         Returns:
@@ -209,11 +207,6 @@ When answering questions:
         if self.config.cwd:
             context_parts.append(f"**Current Directory**: `{self.config.cwd}`")
 
-        # Add focus areas if provided
-        if focus_areas:
-            areas = "\n".join([f"  - {area}" for area in focus_areas])
-            context_parts.append(f"**Focus Areas**:\n{areas}")
-
         # Add search paths if configured
         if self.explore_config.search_paths:
             paths = "\n".join([f"  - `{p}`" for p in self.explore_config.search_paths])
@@ -228,7 +221,6 @@ When answering questions:
         self,
         question: str,
         codebase_path: Optional[str] = None,
-        focus_areas: Optional[List[str]] = None,
     ) -> str:
         """
         Explore the codebase to answer a specific question.
@@ -236,7 +228,6 @@ When answering questions:
         Args:
             question: Question about the codebase
             codebase_path: Path to the codebase root
-            focus_areas: Specific areas to focus on
 
         Returns:
             Answer with code locations and explanations
@@ -244,7 +235,6 @@ When answering questions:
         return await self.invoke(
             prompt=question,
             codebase_path=codebase_path,
-            focus_areas=focus_areas,
         )
 
     async def find_implementation(

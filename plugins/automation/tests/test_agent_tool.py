@@ -332,7 +332,6 @@ class TestAgentTool:
                     "session_id": "custom-session",
                     "model": "gpt-4",
                     "cli_type": "codex",
-                    "focus_areas": ["auth", "database"],
                     "working_directories": ["/project/src"]
                 }
             })
@@ -347,10 +346,6 @@ class TestAgentTool:
             assert call_args.kwargs["session_id"] == "custom-session"
             assert call_args.kwargs["codebase_path"] == "/project"
             assert call_args.kwargs["working_directories"] == ["/project/src"]
-
-            # Verify focus_areas passed to explore
-            explore_call_args = mock_agent.explore.call_args
-            assert explore_call_args.kwargs["focus_areas"] == ["auth", "database"]
 
     @pytest.mark.asyncio
     async def test_execute_invalid_operation(self):

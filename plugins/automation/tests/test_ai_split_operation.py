@@ -47,7 +47,6 @@ class TestAISplitOperation:
         prompt = operation._build_split_prompt(
             goal="Understand authentication",
             codebase_path=None,
-            focus_areas=[],
             constraints=None,
             context="",
             min_tasks=2,
@@ -67,7 +66,6 @@ class TestAISplitOperation:
         prompt = operation._build_split_prompt(
             goal="Understand security",
             codebase_path="/path/to/code",
-            focus_areas=["authentication", "authorization"],
             constraints="Focus on backend only",
             context="Legacy system",
             min_tasks=3,
@@ -76,7 +74,6 @@ class TestAISplitOperation:
 
         assert "Understand security" in prompt
         assert "/path/to/code" in prompt
-        assert "authentication" in prompt
         assert "Focus on backend only" in prompt
         assert "Legacy system" in prompt
 
@@ -273,19 +270,18 @@ class TestAISplitOperation:
         assert tasks[1]["index"] == 1
 
     @pytest.mark.asyncio
-    async def test_execute_with_focus_areas(self):
-        """Test execution with focus areas."""
+    async def test_execute_with_constraints(self):
+        """Test execution with constraints."""
         config = {"max_tasks": 5}
         inputs = {
             "goal": "Understand system",
-            "focus_areas": ["performance", "security"],
-            "constraints": "Backend only"
+            "constraints": "Backend only, focus on security"
         }
 
         operation = AISplitOperation(config, inputs)
 
         mock_response = {
-            "reasoning": "Focused on performance and security",
+            "reasoning": "Focused on backend security",
             "tasks": [
                 {"title": "Security", "query": "Security aspects", "type": "question", "priority": "high"}
             ]
@@ -296,11 +292,9 @@ class TestAISplitOperation:
 
             result = await operation.execute()
 
-            # Verify focus areas were included in the call
+            # Verify constraints were included in the call
             call_args = mock_call.call_args[0][0]  # Get prompt
-            assert "performance" in call_args
-            assert "security" in call_args
-            assert "Backend only" in call_args
+            assert "Backend only, focus on security" in call_args
 
 
 class TestAISplitIntegration:
@@ -318,7 +312,7 @@ class TestAISplitIntegration:
         inputs = {
             "goal": "Understand authentication flow in the application",
             "codebase_path": "/path/to/code",
-            "focus_areas": ["security", "user management"]
+            "constraints": "Focus on security and user management"
         }
 
         operation = AISplitOperation(config, inputs)

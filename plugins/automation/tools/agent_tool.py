@@ -82,11 +82,6 @@ class AgentTool(ToolInterface):
                             "description": "CLI type: claude, codex, or copilot",
                             "enum": ["claude", "codex", "copilot"],
                         },
-                        "focus_areas": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Specific areas to focus on",
-                        },
                         "working_directories": {
                             "type": "array",
                             "items": {"type": "string"},
@@ -158,7 +153,6 @@ class AgentTool(ToolInterface):
             # Extract context (optional)
             context = parameters.get("context", {})
             codebase_path = context.get("codebase_path")
-            focus_areas = context.get("focus_areas")
             cli_type_str = context.get("cli_type", "claude")
             model = context.get("model")
             session_id = context.get("session_id")
@@ -183,7 +177,6 @@ class AgentTool(ToolInterface):
                 result = await agent.explore(
                     question=prompt,
                     codebase_path=codebase_path,
-                    focus_areas=focus_areas,
                 )
 
             elif operation == AgentOperationType.FIND_IMPLEMENTATION:

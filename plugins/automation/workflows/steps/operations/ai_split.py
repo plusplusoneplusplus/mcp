@@ -30,7 +30,6 @@ class AISplitOperation(BaseOperation):
     Inputs:
         - goal: High-level exploration goal or question
         - codebase_path: Path to codebase being explored (optional, for context)
-        - focus_areas: Optional list of areas to focus on
         - constraints: Optional constraints (e.g., "focus on security", "prioritize performance")
 
     Returns:
@@ -72,7 +71,6 @@ class AISplitOperation(BaseOperation):
         """Execute AI-powered task splitting."""
         goal = self.inputs.get("goal")
         codebase_path = self.inputs.get("codebase_path")
-        focus_areas = self.inputs.get("focus_areas", [])
         constraints = self.inputs.get("constraints")
 
         # Get config
@@ -85,7 +83,6 @@ class AISplitOperation(BaseOperation):
         prompt = self._build_split_prompt(
             goal=goal,
             codebase_path=codebase_path,
-            focus_areas=focus_areas,
             constraints=constraints,
             context=context,
             min_tasks=min_tasks,
@@ -117,7 +114,6 @@ class AISplitOperation(BaseOperation):
         self,
         goal: str,
         codebase_path: Optional[str],
-        focus_areas: List[str],
         constraints: Optional[str],
         context: str,
         min_tasks: int,
@@ -129,7 +125,6 @@ class AISplitOperation(BaseOperation):
         Args:
             goal: High-level exploration goal
             codebase_path: Path to codebase
-            focus_areas: Areas to focus on
             constraints: Additional constraints
             context: Extra context
             min_tasks: Minimum tasks to generate
@@ -145,9 +140,6 @@ class AISplitOperation(BaseOperation):
 
         if codebase_path:
             prompt += f"\n**Codebase:** {codebase_path}"
-
-        if focus_areas:
-            prompt += f"\n**Focus Areas:** {', '.join(focus_areas)}"
 
         if constraints:
             prompt += f"\n**Constraints:** {constraints}"
