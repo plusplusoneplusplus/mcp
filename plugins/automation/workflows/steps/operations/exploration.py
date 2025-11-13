@@ -64,6 +64,10 @@ class ExplorationOperation(BaseOperation):
         """Validate exploration configuration."""
         exploration_type = self.config.get("exploration_type", "question")
 
+        # Skip validation for template variables (they'll be resolved at runtime)
+        if isinstance(exploration_type, str) and "{{" in exploration_type:
+            return None
+
         valid_types = ["question", "implementation", "structure", "usage", "flow", "generic"]
         if exploration_type not in valid_types:
             return f"Invalid exploration_type '{exploration_type}'. Valid: {', '.join(valid_types)}"

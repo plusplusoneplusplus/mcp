@@ -9,10 +9,9 @@ from .comparison import ComparisonOperation, ConsensusVerificationOperation
 from .aggregation import AggregateOperation
 from .filtering import FilterOperation
 from .mapping import MapOperation
-from .split import SplitOperation
-from .ai_split import AISplitOperation
 from .exploration import ExplorationOperation
 from .summarize import SummarizeOperation
+from .decompose import DecomposeOperation
 
 # Global operation registry
 registry = OperationRegistry()
@@ -24,11 +23,10 @@ registry.register("aggregate", AggregateOperation)
 registry.register("filter", FilterOperation)
 registry.register("map", MapOperation)
 
-# Register map-reduce exploration operations
-registry.register("split", SplitOperation)  # Deterministic split
-registry.register("ai_split", AISplitOperation)  # AI-powered intelligent split
+# Register AI exploration operations
 registry.register("explore", ExplorationOperation)
 registry.register("summarize", SummarizeOperation)
+registry.register("decompose", DecomposeOperation)  # AI-powered task decomposition
 
 __all__ = [
     "BaseOperation",

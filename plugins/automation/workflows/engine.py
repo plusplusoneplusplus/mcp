@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from ..runtime_data import WorkflowContext, StepResult, StepStatus
 from .definition import WorkflowDefinition, StepDefinition
-from .steps import BaseStep, AgentStep, TransformStep
+from .steps import BaseStep, AgentStep, TransformStep, LoopStep
 
 
 class WorkflowStatus(str, Enum):
@@ -250,10 +250,12 @@ class WorkflowEngine:
             return AgentStep(step_def)
         elif step_def.type == "transform":
             return TransformStep(step_def)
+        elif step_def.type == "loop":
+            return LoopStep(step_def)
         else:
             raise ValueError(
                 f"Step type '{step_def.type}' not yet implemented. "
-                f"Currently supported types: 'agent', 'transform'"
+                f"Currently supported types: 'agent', 'transform', 'loop'"
             )
 
     def _determine_status(

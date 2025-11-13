@@ -329,8 +329,14 @@ class WorkflowDefinition:
                         f"Loop step '{step.id}' must have at least one substep"
                     )
             elif step.type == "transform":
-                if not step.script:
-                    errors.append(f"Transform step '{step.id}' must specify 'script'")
+                # Transform steps must have either 'script' or 'operation'
+                has_script = bool(step.script)
+                has_operation = bool(step.config.get("operation"))
+                if not has_script and not has_operation:
+                    errors.append(
+                        f"Transform step '{step.id}' must specify either 'script' or "
+                        f"'operation' in config"
+                    )
 
         return errors
 
