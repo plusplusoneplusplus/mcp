@@ -23,7 +23,11 @@ class ExplorationOperation(BaseOperation):
         - exploration_type: Type of exploration (question, implementation, structure, usage, flow)
         - session_dir: Directory to store session files (default: .mcp_sessions)
         - save_to_session: Whether to save findings to session (default: true)
-        - session_id: Optional session ID to use
+        - session_id: Optional session ID for conversation tracking
+        - session_storage_path: Optional path to store agent session data
+        - include_session_in_prompt: Whether to include session context in prompts (default: False)
+        - model: Optional model override for the agent
+        - working_directories: Optional list of working directories
 
     Inputs:
         - task: Task object from split operation (should contain item, question, or exploration details)
@@ -164,12 +168,14 @@ class ExplorationOperation(BaseOperation):
         from plugins.automation.agents import ExploreAgent, ExploreAgentConfig
         from utils.agent import CLIType
 
-        # Create agent configuration
+        # Create agent configuration with unified session management
         config = ExploreAgentConfig(
             cli_type=CLIType.CLAUDE,
             model=self.config.get("model"),  # Optional model override
             cwd=codebase_path,
             session_id=self.config.get("session_id"),
+            session_storage_path=self.config.get("session_storage_path"),
+            include_session_in_prompt=self.config.get("include_session_in_prompt", False),
             working_directories=self.config.get("working_directories")
         )
 
