@@ -79,7 +79,8 @@ workflow:
         operation: decompose
         min_subtopics: 2
         max_subtopics: 5
-        cli_type: copilot
+        cli_type: claude
+        model: haiku
       inputs:
         question: "{{ inputs.question }}"
 
@@ -94,6 +95,9 @@ workflow:
           type: agent
           agent: explore
           operation: explore
+          config:
+            cli_type: claude
+            model: haiku
           inputs:
             question: "{{ subtopic.exploration_task }}"
 
@@ -134,7 +138,23 @@ workflow:
         print("🤖 PHASE 1: AI Planning - Decomposing research question...\n")
 
         engine = WorkflowEngine()
-        result = await engine.execute(workflow, inputs)
+
+        # Execute with session persistence enabled
+        result = await engine.execute(workflow, inputs, persist=True)
+
+        # Show session info
+        print(f"\n💾 SESSION PERSISTENCE")
+        print(f"   Execution ID: {result.execution_id}")
+        print(f"   Workflow Status: {result.status.value}")
+        print(f"   All intermediate results are stored in: ~/.mcp/workflows/sessions/")
+
+        # List recent workflow sessions
+        sessions = engine.list_workflow_sessions(workflow_name="ai_research_system", limit=5)
+        if sessions:
+            latest_session = sessions[0]
+            print(f"   Latest Session ID: {latest_session['session_id']}")
+            print(f"   Last Step: {latest_session.get('last_completed_step', 'N/A')}")
+        print()
 
         # Show decomposition using schema helper functions
         if "decompose_question" in result.step_results:
@@ -245,6 +265,34 @@ workflow:
             else:
                 count = synth_result
             print(f"✅ Research Complete - Aggregated {count} exploration results!\n")
+
+        # Show session persistence summary
+        print("=" * 80)
+        print("SESSION PERSISTENCE SUMMARY")
+        print("=" * 80 + "\n")
+
+        if sessions:
+            latest = sessions[0]
+            print(f"📁 Session Details:")
+            print(f"   ID: {latest['session_id']}")
+            print(f"   Status: {latest['status']}")
+            print(f"   Created: {latest['created_at']}")
+            print(f"   Last Updated: {latest['updated_at']}\n")
+
+            print("💡 You can access persisted data:")
+            print(f"   • All step results are saved")
+            print(f"   • Agent exploration findings are preserved")
+            print(f"   • Context and outputs are recoverable")
+            print(f"   • Session can be resumed or inspected later\n")
+
+            # Show how to load session data
+            print("🔍 To inspect session data programmatically:")
+            print(f"   ```python")
+            print(f"   engine = WorkflowEngine()")
+            print(f"   context, metadata = engine.load_from_session('{latest['session_id']}')")
+            print(f"   print(metadata['last_completed_step'])")
+            print(f"   print(context.step_results.keys())")
+            print(f"   ```\n")
 
         print()
 

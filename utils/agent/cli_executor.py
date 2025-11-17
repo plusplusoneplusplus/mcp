@@ -232,8 +232,10 @@ class CLIExecutor:
             if result.returncode != 0:
                 error_msg = f"CLI failed with exit code {result.returncode}"
                 if error_output:
-                    error_msg += f"\n{error_output}"
-                logger.error(error_msg)
+                    error_msg += f"\nStderr: {error_output}"
+                if response:
+                    error_msg += f"\nStdout: {response}"
+                logger.error(f"CLI execution failed:\nCommand: {' '.join(cmd[:3])} [prompt...]\n{error_msg}")
                 return f"Error: {error_msg}"
 
             if error_output:
