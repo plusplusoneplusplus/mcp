@@ -3,6 +3,7 @@ Tests for ExploreAgent
 """
 
 import pytest
+import tempfile
 from unittest.mock import AsyncMock, patch
 from pathlib import Path
 
@@ -438,3 +439,185 @@ class TestExploreAgentIntegration:
 
             # All should have been executed
             assert mock_execute.call_count == 4
+
+
+class TestExploreAgentSessionManagement:
+    """Tests for session management in ExploreAgent"""
+
+    def test_session_id_propagation(self):
+        """Test that session_id is properly propagated"""
+        config = ExploreAgentConfig(
+            cli_type=CLIType.CLAUDE,
+            session_id="explore-session-123"
+        )
+        agent = ExploreAgent(config)
+
+        assert agent.config.session_id == "explore-session-123"
+        assert agent._get_session_id() == "explore-session-123"
+
+    def test_session_storage_path_propagation(self):
+        """Test that session_storage_path is properly propagated"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage_path = Path(tmpdir) / "explore" / "sessions"
+            config = ExploreAgentConfig(
+                cli_type=CLIType.CLAUDE,
+                session_storage_path=storage_path
+            )
+            agent = ExploreAgent(config)
+
+            assert agent.config.session_storage_path == storage_path
+
+    def test_include_session_in_prompt_false(self):
+        """Test system prompt without session context"""
+        config = ExploreAgentConfig(
+            cli_type=CLIType.CLAUDE,
+            include_session_in_prompt=False
+        )
+        agent = ExploreAgent(config)
+
+        prompt = agent.get_system_prompt()
+
+        # Should use basic system prompt without session context
+        assert "Codebase Exploration Agent" in prompt
+        # Should not include session-specific content
+        assert "Session ID:" not in prompt
+
+    def test_include_session_in_prompt_true(self):
+        """Test system prompt with session context"""
+        config = ExploreAgentConfig(
+            cli_type=CLIType.CLAUDE,
+            include_session_in_prompt=True,
+            session_id="explore-with-context"
+        )
+        agent = ExploreAgent(config)
+
+        prompt = agent.get_system_prompt()
+
+        # Should include session context
+        assert "Session" in prompt
+        assert "explore-with-context" in prompt
+
+    def test_unified_session_config(self):
+        """Test that all session config parameters work together"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage_path = Path(tmpdir) / "unified" / "explore"
+            config = ExploreAgentConfig(
+                cli_type=CLIType.CLAUDE,
+                session_id="unified-explore-session",
+                session_storage_path=storage_path,
+                include_session_in_prompt=True
+            )
+            agent = ExploreAgent(config)
+
+            # All session parameters should be set
+            assert agent.config.session_id == "unified-explore-session"
+            assert agent.config.session_storage_path == storage_path
+            assert agent.config.include_session_in_prompt is True
+
+            # System prompt should reflect session config
+            prompt = agent.get_system_prompt()
+            assert "Session" in prompt
+            assert "unified-explore-session" in prompt
+
+    @pytest.mark.asyncio
+    async def test_session_persistence_across_calls(self):
+        """Test that session data persists across multiple calls"""
+        config = ExploreAgentConfig(
+            cli_type=CLIType.CLAUDE,
+            session_id="persistent-session"
+        )
+        agent = ExploreAgent(config)
+
+        with patch.object(agent._executor, 'execute', new_callable=AsyncMock) as mock_execute:
+            mock_execute.side_effect = ["First answer", "Second answer", "Third answer"]
+
+            # Make multiple calls
+            await agent.explore("First question")
+            await agent.explore("Second question")
+            await agent.find_implementation("feature")
+
+            # Session history should contain all interactions
+            history = agent.get_session_history()
+            assert len(history) == 6  # 3 user + 3 assistant
+
+            # Verify session ID remains consistent
+            assert agent._get_session_id() == "persistent-session"
+
+    @pytest.mark.asyncio
+    async def test_session_history_included_in_prompts(self):
+        """Test that session history is included in subsequent prompts"""
+        config = ExploreAgentConfig(
+            cli_type=CLIType.CLAUDE,
+            session_id="history-session"
+        )
+        agent = ExploreAgent(config)
+
+        with patch.object(agent._executor, 'execute', new_callable=AsyncMock) as mock_execute:
+            mock_execute.side_effect = ["Found in auth.py", "Uses JWT tokens"]
+
+            # First call
+            await agent.explore("Where is authentication?")
+
+            # Second call
+            await agent.explore("How does it work?")
+
+            # The second call should include history from the first
+            second_call_prompt = mock_execute.call_args_list[1][0][0]
+            assert "Where is authentication?" in second_call_prompt
+            assert "Found in auth.py" in second_call_prompt
+
+    def test_session_config_from_base_agent_config(self):
+        """Test that session config is preserved when converting from base AgentConfig"""
+        from utils.agent import AgentConfig
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage_path = Path(tmpdir) / "base" / "storage"
+            base_config = AgentConfig(
+                cli_type=CLIType.CLAUDE,
+                session_id="base-session",
+                session_storage_path=storage_path,
+                include_session_in_prompt=True
+            )
+
+            agent = ExploreAgent(base_config)
+
+            # Session config should be preserved
+            assert agent.config.session_id == "base-session"
+            assert agent.config.session_storage_path == storage_path
+            assert agent.config.include_session_in_prompt is True
+
+    @pytest.mark.asyncio
+    async def test_different_sessions_are_isolated(self):
+        """Test that different session IDs maintain separate histories"""
+        config1 = ExploreAgentConfig(
+            cli_type=CLIType.CLAUDE,
+            session_id="session-1"
+        )
+        agent1 = ExploreAgent(config1)
+
+        config2 = ExploreAgentConfig(
+            cli_type=CLIType.CLAUDE,
+            session_id="session-2"
+        )
+        agent2 = ExploreAgent(config2)
+
+        with patch.object(agent1._executor, 'execute', new_callable=AsyncMock) as mock1:
+            with patch.object(agent2._executor, 'execute', new_callable=AsyncMock) as mock2:
+                mock1.return_value = "Answer from session 1"
+                mock2.return_value = "Answer from session 2"
+
+                # Agent 1 interaction
+                await agent1.explore("Question for session 1")
+
+                # Agent 2 interaction
+                await agent2.explore("Question for session 2")
+
+                # Sessions should be separate
+                history1 = agent1.get_session_history()
+                history2 = agent2.get_session_history()
+
+                assert len(history1) == 2  # 1 user + 1 assistant
+                assert len(history2) == 2  # 1 user + 1 assistant
+
+                assert history1[0]["content"] == "Question for session 1"
+                assert history2[0]["content"] == "Question for session 2"

@@ -6,8 +6,9 @@ import re
 from typing import Any, Dict, Optional, List
 
 from .base import BaseOperation
-from utils.agent.agent import SpecializedAgent, AgentConfig
+from utils.agent.agent import AgentConfig
 from utils.agent.cli_executor import CLIType
+from plugins.automation.agents.decompose_agent import DecomposeAgent
 
 
 class DecomposeOperation(BaseOperation):
@@ -24,6 +25,9 @@ class DecomposeOperation(BaseOperation):
         - max_subtopics: Maximum number of subtopics (default: 6)
         - cli_type: CLI type to use - "claude", "codex", or "copilot" (default: "copilot")
         - model: Optional AI model to use (depends on CLI type)
+        - session_id: Optional session ID for conversation tracking
+        - session_storage_path: Optional path to store session data
+        - include_session_in_prompt: Whether to include session context in prompts (default: False)
 
     Inputs:
         - question: The main question or task to decompose
@@ -40,6 +44,8 @@ class DecomposeOperation(BaseOperation):
           min_subtopics: 2
           max_subtopics: 5
           cli_type: copilot
+          session_id: "workflow_123"
+          session_storage_path: "/path/to/sessions"
         inputs:
           question: "How does the MCP workflow system work?"
         # Result: 3-5 subtopics like:
@@ -72,11 +78,15 @@ class DecomposeOperation(BaseOperation):
             max_subtopics = self.config.get("max_subtopics", 6)
             model = self.config.get("model")
             cli_type = self.config.get("cli_type", "copilot")
+            session_id = self.config.get("session_id")
+            session_storage_path = self.config.get("session_storage_path")
+            include_session_in_prompt = self.config.get("include_session_in_prompt", False)
 
             self.logger.info("=" * 60)
             self.logger.info("Starting task decomposition operation")
             self.logger.info(f"Question: {question[:100]}..." if len(question) > 100 else f"Question: {question}")
             self.logger.info(f"Config: cli_type={cli_type}, model={model}, subtopics={min_subtopics}-{max_subtopics}")
+            self.logger.info(f"Session: session_id={session_id}, storage_path={session_storage_path}")
             self.logger.info("=" * 60)
 
             # Create a specialized agent for task decomposition
@@ -84,56 +94,23 @@ class DecomposeOperation(BaseOperation):
             agent_config = AgentConfig(
                 cli_type=CLIType(cli_type),
                 model=model,
-                session_id="decompose_operation",
+                session_id=session_id,
+                session_storage_path=session_storage_path,
                 skip_permissions=True,
+                include_session_in_prompt=include_session_in_prompt,
             )
-
-            # Create anonymous agent class inline
-            class DecomposeAgent(SpecializedAgent):
-                def get_system_prompt(self) -> str:
-                    return """You are an expert task planner specialized in decomposing complex questions into parallelizable subtasks.
-
-Your role is to analyze questions and break them down into focused, independently explorable subtopics that can be investigated in parallel by different agents."""
 
             agent = DecomposeAgent(agent_config)
             self.logger.debug("Agent created successfully")
 
-            # Construct prompt for AI decomposition
-            prompt = f"""Analyze the following question and decompose it into specific subtopics that can be explored in parallel.
-
-Question:
-{question}
-
-Guidelines:
-- Create between {min_subtopics} and {max_subtopics} subtopics
-- Each subtopic should be focused and independently explorable
-- Subtopics should cover different aspects of the main question
-- Avoid overlapping or redundant subtopics
-- Order subtopics by importance/logical progression
-
-Respond with a JSON object:
-{{
-  "reasoning": "Brief explanation of your decomposition strategy and why you chose this number of subtopics",
-  "subtopic_count": <number of subtopics>,
-  "subtopics": [
-    {{
-      "id": "subtopic_1",
-      "title": "Brief title",
-      "exploration_task": "Specific question or task for the exploration agent",
-      "importance": "high|medium|low",
-      "expected_findings": "What kind of information this subtopic should reveal"
-    }},
-    ...
-  ]
-}}
-
-Make each exploration_task a clear, focused question that an agent can directly investigate."""
-
             self.logger.info(f"Invoking agent for task decomposition (cli_type={cli_type})")
-            self.logger.debug(f"Full prompt length: {len(prompt)} characters")
 
-            # Invoke the agent
-            response_text = await agent.invoke(prompt, include_history=False)
+            # Use the agent's decompose method
+            response_text = await agent.decompose(
+                question=question,
+                min_subtopics=min_subtopics,
+                max_subtopics=max_subtopics,
+            )
 
             self.logger.info(f"Received response from agent ({len(response_text)} characters)")
             self.logger.debug(f"Response preview: {response_text[:200]}...")
