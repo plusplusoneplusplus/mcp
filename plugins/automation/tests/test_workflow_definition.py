@@ -326,6 +326,67 @@ workflow:
 
         assert any("operation" in error.lower() and "specify" in error.lower() for error in errors)
 
+    def test_validate_transform_step_with_operation(self):
+        """Test validating transform step with operation (no script required)."""
+        yaml_str = """
+workflow:
+  name: "test"
+
+  steps:
+    - id: step1
+      type: transform
+      config:
+        operation: aggregate
+        function: sum
+      inputs:
+        items: [1, 2, 3]
+"""
+
+        workflow = WorkflowDefinition.from_yaml(yaml_str)
+        errors = workflow.validate()
+
+        # Should not have errors - operation is valid alternative to script
+        assert len(errors) == 0
+
+    def test_validate_transform_step_with_script(self):
+        """Test validating transform step with script."""
+        yaml_str = """
+workflow:
+  name: "test"
+
+  steps:
+    - id: step1
+      type: transform
+      script: "result = inputs['x'] * 2"
+      inputs:
+        x: 5
+"""
+
+        workflow = WorkflowDefinition.from_yaml(yaml_str)
+        errors = workflow.validate()
+
+        # Should not have errors - script is provided
+        assert len(errors) == 0
+
+    def test_validate_transform_step_missing_both(self):
+        """Test validating transform step without script or operation."""
+        yaml_str = """
+workflow:
+  name: "test"
+
+  steps:
+    - id: step1
+      type: transform
+      inputs:
+        x: 5
+"""
+
+        workflow = WorkflowDefinition.from_yaml(yaml_str)
+        errors = workflow.validate()
+
+        # Should have error - needs either script or operation
+        assert any("script" in error.lower() or "operation" in error.lower() for error in errors)
+
     def test_get_step(self):
         """Test getting step by ID."""
         yaml_str = """

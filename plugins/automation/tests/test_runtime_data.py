@@ -259,6 +259,79 @@ class TestWorkflowContext:
         assert "step1" in context.step_results
         assert context.outputs == {"final": "result"}
 
+    def test_get_array_indexing(self):
+        """Test getting values with array indexing."""
+        context = WorkflowContext()
+
+        step_result = StepResult(
+            step_id="split",
+            status=StepStatus.COMPLETED,
+            result={
+                "tasks": [
+                    {"items": [10, 20], "chunk_index": 0},
+                    {"items": [30, 40], "chunk_index": 1},
+                ]
+            },
+        )
+        context.set_step_result("split", step_result)
+
+        # Test array indexing
+        assert context.get("steps.split.result.tasks[0]") == {"items": [10, 20], "chunk_index": 0}
+        assert context.get("steps.split.result.tasks[1]") == {"items": [30, 40], "chunk_index": 1}
+
+        # Test array indexing with nested property access
+        assert context.get("steps.split.result.tasks[0].items") == [10, 20]
+        assert context.get("steps.split.result.tasks[1].items") == [30, 40]
+        assert context.get("steps.split.result.tasks[0].chunk_index") == 0
+
+    def test_get_array_indexing_out_of_bounds(self):
+        """Test array indexing with out of bounds index."""
+        context = WorkflowContext()
+
+        step_result = StepResult(
+            step_id="split",
+            status=StepStatus.COMPLETED,
+            result={"tasks": [{"items": [10, 20]}]},
+        )
+        context.set_step_result("split", step_result)
+
+        # Out of bounds should return default
+        assert context.get("steps.split.result.tasks[5].items", "default") == "default"
+
+    def test_get_array_indexing_invalid_index(self):
+        """Test array indexing with invalid index."""
+        context = WorkflowContext()
+
+        step_result = StepResult(
+            step_id="split",
+            status=StepStatus.COMPLETED,
+            result={"tasks": [{"items": [10, 20]}]},
+        )
+        context.set_step_result("split", step_result)
+
+        # Invalid index should return default
+        assert context.get("steps.split.result.tasks[abc].items", "default") == "default"
+
+    def test_resolve_template_with_array_indexing(self):
+        """Test resolving templates with array indexing."""
+        context = WorkflowContext()
+
+        step_result = StepResult(
+            step_id="split",
+            status=StepStatus.COMPLETED,
+            result={
+                "tasks": [
+                    {"items": [10, 20]},
+                    {"items": [30, 40]},
+                ]
+            },
+        )
+        context.set_step_result("split", step_result)
+
+        # Resolve template with array indexing
+        assert context.resolve_template("{{ steps.split.result.tasks[0].items }}") == [10, 20]
+        assert context.resolve_template("{{ steps.split.result.tasks[1].items }}") == [30, 40]
+
     def test_repr(self):
         """Test string representation."""
         context = WorkflowContext(

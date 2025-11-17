@@ -83,21 +83,23 @@ class WorkflowContext:
 
     def get(self, path: str, default: Any = None) -> Any:
         """
-        Get value from context using dot notation path.
+        Get value from context using dot notation path with array indexing.
 
         Supports:
         - inputs.key
         - steps.step_id.result
+        - steps.step_id.result.tasks[0].items
         - steps.step_id.status
         - outputs.key
 
         Args:
-            path: Dot-notation path (e.g., "steps.step1.result")
+            path: Dot-notation path with array indexing (e.g., "steps.step1.result.tasks[0].items")
             default: Default value if path not found
 
         Returns:
             Value at path or default
         """
+
         parts = path.split(".")
         if not parts:
             return default
@@ -105,6 +107,10 @@ class WorkflowContext:
         # Navigate through context
         if parts[0] == "inputs":
             obj = self.inputs
+            parts = parts[1:]
+        elif parts[0] in self.inputs:
+            # Direct access to input variable with nested path (e.g., "chunk.items")
+            obj = self.inputs[parts[0]]
             parts = parts[1:]
         elif parts[0] == "steps":
             if len(parts) < 2:
@@ -130,14 +136,41 @@ class WorkflowContext:
         else:
             return default
 
-        # Navigate remaining path
+        # Navigate remaining path with array indexing support
         for part in parts:
-            if isinstance(obj, dict):
-                obj = obj.get(part)
-                if obj is None:
+            # Check for array indexing like "tasks[0]"
+            if "[" in part and part.endswith("]"):
+                # Split into key and index
+                key, index_str = part[:-1].split("[", 1)
+                try:
+                    index = int(index_str)
+                except ValueError:
+                    return default
+
+                # Get the array/list
+                if isinstance(obj, dict):
+                    obj = obj.get(key)
+                    if obj is None:
+                        return default
+                else:
+                    return default
+
+                # Index into the array
+                if isinstance(obj, list):
+                    if 0 <= index < len(obj):
+                        obj = obj[index]
+                    else:
+                        return default
+                else:
                     return default
             else:
-                return default
+                # Regular dictionary access
+                if isinstance(obj, dict):
+                    obj = obj.get(part)
+                    if obj is None:
+                        return default
+                else:
+                    return default
 
         return obj if obj is not None else default
 
