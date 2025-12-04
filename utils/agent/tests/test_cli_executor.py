@@ -70,20 +70,26 @@ class TestCLIConfig:
     def test_get_default_model_claude(self):
         """Test getting default model for Claude"""
         config = CLIConfig(cli_type=CLIType.CLAUDE)
-        assert config.get_default_model() == "sonnet"
+        # Default model is claude-opus-4.5, but CLI name is 'opus'
+        assert config.get_model_name() == "claude-opus-4.5"
+        assert config.get_cli_model_name() == "opus"
 
-        config = CLIConfig(cli_type=CLIType.CLAUDE, model="haiku")
-        assert config.get_default_model() == "haiku"
+        config = CLIConfig(cli_type=CLIType.CLAUDE, model="claude-haiku-4.5")
+        assert config.get_model_name() == "claude-haiku-4.5"
+        assert config.get_cli_model_name() == "haiku"
 
     def test_get_default_model_copilot(self):
         """Test getting default model for Copilot"""
         config = CLIConfig(cli_type=CLIType.COPILOT)
-        assert config.get_default_model() == "claude-sonnet-4.5"
+        assert config.get_model_name() == "claude-opus-4.5"
+        # Copilot uses full model names
+        assert config.get_cli_model_name() == "claude-opus-4.5"
 
     def test_get_default_model_codex(self):
         """Test getting default model for Codex"""
         config = CLIConfig(cli_type=CLIType.CODEX)
-        assert config.get_default_model() == ""
+        assert config.get_model_name() == "gpt-5"
+        assert config.get_cli_model_name() == "gpt-5"
 
 
 class TestCLIExecutor:
